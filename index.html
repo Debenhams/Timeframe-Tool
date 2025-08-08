@@ -1,100 +1,189 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Refund & Returns Calculator</title>
-  <style>
-    body { font-family: Arial; padding: 20px; max-width: 500px; margin: auto; }
-    input, select { width: 100%; margin-bottom: 10px; padding: 8px; }
-    label { font-weight: bold; }
-    .output { background: #f3f3f3; padding: 10px; margin-bottom: 20px; }
-  </style>
+<meta charset="UTF-8">
+<title>Refund & Returns Calculator</title>
+<style>
+    body {
+        font-family: 'Segoe UI', Tahoma, sans-serif;
+        background: linear-gradient(135deg, #f0f4f8, #d9e4ec);
+        margin: 0;
+        padding: 0;
+        color: #333;
+    }
+ 
+    header {
+        background: #004080;
+        color: white;
+        padding: 20px;
+        text-align: center;
+        font-size: 1.8em;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+ 
+    main {
+        display: flex;
+        flex-wrap: wrap;
+        max-width: 1200px;
+        margin: 20px auto;
+        background: white;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+ 
+    section {
+        flex: 1 1 50%;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+ 
+    h2 {
+        border-bottom: 2px solid #eee;
+        padding-bottom: 10px;
+        margin-bottom: 20px;
+        color: #004080;
+    }
+ 
+    label {
+        font-weight: bold;
+        display: block;
+        margin-bottom: 5px;
+        margin-top: 15px;
+    }
+ 
+    input, select {
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 15px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 1em;
+        transition: border-color 0.3s;
+    }
+ 
+    input:focus, select:focus {
+        border-color: #004080;
+        outline: none;
+    }
+ 
+    .output {
+        background: #f8f9fa;
+        padding: 12px;
+        margin-bottom: 15px;
+        border-radius: 6px;
+        border-left: 4px solid #004080;
+        font-size: 1.1em;
+    }
+ 
+    @media (max-width: 768px) {
+        section {
+            flex: 1 1 100%;
+        }
+    }
+</style>
 </head>
 <body>
-
-  <h1>Refund & Return Timeframes</h1>
-
-  <!-- NRG -->
-  <label for="nrgDate">NRG - Enter last tracking date:</label>
-  <input type="date" id="nrgDate">
-  <div class="output" id="nrgResult">NRG Date is: —</div>
-
-  <!-- PA -->
-  <label for="paDate">PA - Enter dispatch date:</label>
-  <input type="date" id="paDate">
-  <div class="output" id="paResult">PA Date is: —</div>
-
-  <!-- Return Window -->
-  <label for="returnDate">Return Window - Enter delivery date:</label>
-  <input type="date" id="returnDate">
-  <div class="output" id="returnResult">Customer can return their item up to: —</div>
-
-  <!-- Refund Completion -->
-  <label for="refundDate">Refund - Enter refund date:</label>
-  <input type="date" id="refundDate">
-  <label for="method">Refund Method:</label>
-  <select id="method">
-    <option value="Card">Card</option>
-    <option value="Payplus">Payplus</option>
-    <option value="Applepay">Applepay</option>
-    <option value="Paypal">Paypal</option>
-    <option value="Klarna">Klarna</option>
-    <option value="Clearpay">Clearpay</option>
-    <option value="Gift Card">Gift Card</option>
-  </select>
-  <div class="output" id="refundResult">Refund Completion Date: —</div>
-
-  <script>
+ 
+<header>Refund & Return Timeframes Calculator</header>
+ 
+<main>
+    <!-- Inputs Section -->
+    <section>
+        <h2>Enter Dates</h2>
+ 
+        <!-- NRG -->
+        <label for="nrgDate">NRG - Last tracking date:</label>
+        <input type="date" id="nrgDate">
+ 
+        <!-- PA -->
+        <label for="paDate">PA - Dispatch date:</label>
+        <input type="date" id="paDate">
+ 
+        <!-- Return Window -->
+        <label for="returnDate">Return Window - Delivery date:</label>
+        <input type="date" id="returnDate">
+ 
+        <!-- Refund -->
+        <label for="refundDate">Refund date:</label>
+        <input type="date" id="refundDate">
+ 
+        <label for="method">Refund Method:</label>
+        <select id="method">
+            <option value="Card">Card</option>
+            <option value="Payplus">Payplus</option>
+            <option value="Applepay">Applepay</option>
+            <option value="Paypal">Paypal</option>
+            <option value="Klarna">Klarna</option>
+            <option value="Clearpay">Clearpay</option>
+            <option value="Gift Card">Gift Card</option>
+        </select>
+    </section>
+ 
+    <!-- Outputs Section -->
+    <section>
+        <h2>Results</h2>
+        <div class="output" id="nrgResult">NRG Date is: —</div>
+        <div class="output" id="paResult">PA Date is: —</div>
+        <div class="output" id="returnResult">Customer can return their item up to: —</div>
+        <div class="output" id="refundResult">Refund Completion Date: —</div>
+    </section>
+</main>
+ 
+<script>
     const refundDays = {
-      "Card": 19,
-      "Payplus": 19,
-      "Applepay": 19,
-      "Paypal": 15,
-      "Klarna": 15,
-      "Clearpay": 15,
-      "Gift Card": 15
+        "Card": 19,
+        "Payplus": 19,
+        "Applepay": 19,
+        "Paypal": 15,
+        "Klarna": 15,
+        "Clearpay": 15,
+        "Gift Card": 15
     };
-
+ 
     function daysSince(dateStr) {
-      const today = new Date();
-      const input = new Date(dateStr);
-      const diff = Math.floor((today - input) / (1000 * 60 * 60 * 24));
-      return diff;
+        const today = new Date();
+        const input = new Date(dateStr);
+        const diff = Math.floor((today - input) / (1000 * 60 * 60 * 24));
+        return diff;
     }
-
+ 
     function addDays(dateStr, days) {
-      const d = new Date(dateStr);
-      d.setDate(d.getDate() + days);
-      return d.toISOString().split("T")[0];
+        const d = new Date(dateStr);
+        d.setDate(d.getDate() + days);
+        return d.toISOString().split("T")[0];
     }
-
+ 
     document.getElementById('nrgDate').addEventListener('change', function () {
-      const days = daysSince(this.value);
-      document.getElementById('nrgResult').innerText = `NRG Date is: ${days} days since tracking`;
+        if (!this.value) return;
+        const days = daysSince(this.value);
+        document.getElementById('nrgResult').innerText = `NRG Date is: ${days} days since tracking (${this.value})`;
     });
-
+ 
     document.getElementById('paDate').addEventListener('change', function () {
-      const days = daysSince(this.value);
-      document.getElementById('paResult').innerText = `PA Date is: ${days} days since dispatch`;
+        if (!this.value) return;
+        const days = daysSince(this.value);
+        document.getElementById('paResult').innerText = `PA Date is: ${days} days since dispatch (${this.value})`;
     });
-
+ 
     document.getElementById('returnDate').addEventListener('change', function () {
-      const returnDeadline = addDays(this.value, 28);
-      document.getElementById('returnResult').innerText = `Customer can return their item up to: ${returnDeadline}`;
+        if (!this.value) return;
+        const returnDeadline = addDays(this.value, 28);
+        document.getElementById('returnResult').innerText = `Customer can return their item up to: ${returnDeadline}`;
     });
-
+ 
     function updateRefundDate() {
-      const method = document.getElementById('method').value;
-      const date = document.getElementById('refundDate').value;
-      if (date) {
-        const result = addDays(date, refundDays[method]);
-        document.getElementById('refundResult').innerText = `Refund Completion Date: ${result}`;
-      }
+        const method = document.getElementById('method').value;
+        const date = document.getElementById('refundDate').value;
+        if (date) {
+            const result = addDays(date, refundDays[method]);
+            document.getElementById('refundResult').innerText = `Refund Completion Date: ${result} (${refundDays[method]} days from refund date)`;
+        }
     }
-
+ 
     document.getElementById('refundDate').addEventListener('change', updateRefundDate);
     document.getElementById('method').addEventListener('change', updateRefundDate);
-  </script>
-
+</script>
+ 
 </body>
 </html>
