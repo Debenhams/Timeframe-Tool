@@ -168,18 +168,19 @@
       if (val) document.getElementById("return-deadline").textContent = addDays(val, 28);
     });
 
-    // NRG 3 working days
+    // NRG 11 calendar days
     document.getElementById("nrg-start").addEventListener("change", function() {
       const val = this.value;
-      if (val) document.getElementById("nrg-due").textContent = addWorkingDays(val, 3);
+      if (val) document.getElementById("nrg-due").textContent = addDays(val, 11);
     });
 
-    // PA 2 working days
+    // PA 6 calendar days
     document.getElementById("pa-start").addEventListener("change", function() {
       const val = this.value;
-      if (val) document.getElementById("pa-due").textContent = addWorkingDays(val, 2);
+      if (val) document.getElementById("pa-due").textContent = addDays(val, 6);
     });
   </script>
 
 </body>
 </html>
+
