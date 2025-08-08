@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Refund & Returns Calculator</title>
+  <style>
+    body { font-family: Arial; padding: 20px; max-width: 500px; margin: auto; }
+    input, select { width: 100%; margin-bottom: 10px; padding: 8px; }
+    label { font-weight: bold; }
+    .output { background: #f3f3f3; padding: 10px; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+
+  <h1>Refund & Return Timeframes</h1>
+
+  <!-- NRG -->
+  <label for="nrgDate">NRG - Enter last tracking date:</label>
+  <input type="date" id="nrgDate">
+  <div class="output" id="nrgResult">NRG Date is: —</div>
+
+  <!-- PA -->
+  <label for="paDate">PA - Enter dispatch date:</label>
+  <input type="date" id="paDate">
+  <div class="output" id="paResult">PA Date is: —</div>
+
+  <!-- Return Window -->
+  <label for="returnDate">Return Window - Enter delivery date:</label>
+  <input type="date" id="returnDate">
+  <div class="output" id="returnResult">Customer can return their item up to: —</div>
+
+  <!-- Refund Completion -->
+  <label for="refundDate">Refund - Enter refund date:</label>
+  <input type="date" id="refundDate">
+  <label for="method">Refund Method:</label>
+  <select id="method">
+    <option value="Card">Card</option>
+    <option value="Payplus">Payplus</option>
+    <option value="Applepay">Applepay</option>
+    <option value="Paypal">Paypal</option>
+    <option value="Klarna">Klarna</option>
+    <option value="Clearpay">Clearpay</option>
+    <option value="Gift Card">Gift Card</option>
+  </select>
+  <div class="output" id="refundResult">Refund Completion Date: —</div>
+
+  <script>
+    const refundDays = {
+      "Card": 19,
+      "Payplus": 19,
+      "Applepay": 19,
+      "Paypal": 15,
+      "Klarna": 15,
+      "Clearpay": 15,
+      "Gift Card": 15
+    };
+
+    function daysSince(dateStr) {
+      const today = new Date();
+      const input = new Date(dateStr);
+      const diff = Math.floor((today - input) / (1000 * 60 * 60 * 24));
+      return diff;
+    }
+
+    function addDays(dateStr, days) {
+      const d = new Date(dateStr);
+      d.setDate(d.getDate() + days);
+      return d.toISOString().split("T")[0];
+    }
+
+    document.getElementById('nrgDate').addEventListener('change', function () {
+      const days = daysSince(this.value);
+      document.getElementById('nrgResult').innerText = `NRG Date is: ${days} days since tracking`;
+    });
+
+    document.getElementById('paDate').addEventListener('change', function () {
+      const days = daysSince(this.value);
+      document.getElementById('paResult').innerText = `PA Date is: ${days} days since dispatch`;
+    });
+
+    document.getElementById('returnDate').addEventListener('change', function () {
+      const returnDeadline = addDays(this.value, 28);
+      document.getElementById('returnResult').innerText = `Customer can return their item up to: ${returnDeadline}`;
+    });
+
+    function updateRefundDate() {
+      const method = document.getElementById('method').value;
+      const date = document.getElementById('refundDate').value;
+      if (date) {
+        const result = addDays(date, refundDays[method]);
+        document.getElementById('refundResult').innerText = `Refund Completion Date: ${result}`;
+      }
+    }
+
+    document.getElementById('refundDate').addEventListener('change', updateRefundDate);
+    document.getElementById('method').addEventListener('change', updateRefundDate);
+  </script>
+
+</body>
+</html>
