@@ -1,189 +1,185 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Refund & Returns Calculator</title>
-<style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Refund & Returns Calculator</title>
+  <style>
     body {
-        font-family: 'Segoe UI', Tahoma, sans-serif;
-        background: linear-gradient(135deg, #f0f4f8, #d9e4ec);
-        margin: 0;
-        padding: 0;
-        color: #333;
+      font-family: 'Segoe UI', sans-serif;
+      background: #f5f8fb;
+      color: #333;
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 20px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+      border-radius: 10px;
     }
- 
-    header {
-        background: #004080;
-        color: white;
-        padding: 20px;
-        text-align: center;
-        font-size: 1.8em;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+
+    h1 {
+      text-align: center;
+      color: #2c3e50;
     }
- 
-    main {
-        display: flex;
-        flex-wrap: wrap;
-        max-width: 1200px;
-        margin: 20px auto;
-        background: white;
-        border-radius: 12px;
-        overflow: hidden;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+
+    .section {
+      margin-top: 40px;
     }
- 
-    section {
-        flex: 1 1 50%;
-        padding: 20px;
-        box-sizing: border-box;
+
+    .section h2 {
+      border-left: 5px solid #4F81BD;
+      padding-left: 10px;
+      color: #4F81BD;
     }
- 
-    h2 {
-        border-bottom: 2px solid #eee;
-        padding-bottom: 10px;
-        margin-bottom: 20px;
-        color: #004080;
+
+    label, input {
+      display: block;
+      margin-top: 10px;
+      font-size: 16px;
     }
- 
-    label {
-        font-weight: bold;
-        display: block;
-        margin-bottom: 5px;
-        margin-top: 15px;
+
+    input[type="date"] {
+      padding: 8px;
+      width: 200px;
     }
- 
-    input, select {
-        width: 100%;
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      border: 1px solid #ddd;
+      padding: 10px;
+      text-align: center;
+    }
+
+    th {
+      background: #4F81BD;
+      color: white;
+    }
+
+    .note {
+      font-size: 14px;
+      color: #666;
+    }
+
+    #today {
+      font-weight: bold;
+    }
+
+    @media (max-width: 600px) {
+      body {
         padding: 10px;
-        margin-bottom: 15px;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        font-size: 1em;
-        transition: border-color 0.3s;
+      }
+      table, th, td {
+        font-size: 14px;
+      }
     }
- 
-    input:focus, select:focus {
-        border-color: #004080;
-        outline: none;
-    }
- 
-    .output {
-        background: #f8f9fa;
-        padding: 12px;
-        margin-bottom: 15px;
-        border-radius: 6px;
-        border-left: 4px solid #004080;
-        font-size: 1.1em;
-    }
- 
-    @media (max-width: 768px) {
-        section {
-            flex: 1 1 100%;
-        }
-    }
-</style>
+  </style>
 </head>
 <body>
- 
-<header>Refund & Return Timeframes Calculator</header>
- 
-<main>
-    <!-- Inputs Section -->
-    <section>
-        <h2>Enter Dates</h2>
- 
-        <!-- NRG -->
-        <label for="nrgDate">NRG - Last tracking date:</label>
-        <input type="date" id="nrgDate">
- 
-        <!-- PA -->
-        <label for="paDate">PA - Dispatch date:</label>
-        <input type="date" id="paDate">
- 
-        <!-- Return Window -->
-        <label for="returnDate">Return Window - Delivery date:</label>
-        <input type="date" id="returnDate">
- 
-        <!-- Refund -->
-        <label for="refundDate">Refund date:</label>
-        <input type="date" id="refundDate">
- 
-        <label for="method">Refund Method:</label>
-        <select id="method">
-            <option value="Card">Card</option>
-            <option value="Payplus">Payplus</option>
-            <option value="Applepay">Applepay</option>
-            <option value="Paypal">Paypal</option>
-            <option value="Klarna">Klarna</option>
-            <option value="Clearpay">Clearpay</option>
-            <option value="Gift Card">Gift Card</option>
-        </select>
-    </section>
- 
-    <!-- Outputs Section -->
-    <section>
-        <h2>Results</h2>
-        <div class="output" id="nrgResult">NRG Date is: —</div>
-        <div class="output" id="paResult">PA Date is: —</div>
-        <div class="output" id="returnResult">Customer can return their item up to: —</div>
-        <div class="output" id="refundResult">Refund Completion Date: —</div>
-    </section>
-</main>
- 
-<script>
-    const refundDays = {
-        "Card": 19,
-        "Payplus": 19,
-        "Applepay": 19,
-        "Paypal": 15,
-        "Klarna": 15,
-        "Clearpay": 15,
-        "Gift Card": 15
-    };
- 
-    function daysSince(dateStr) {
-        const today = new Date();
-        const input = new Date(dateStr);
-        const diff = Math.floor((today - input) / (1000 * 60 * 60 * 24));
-        return diff;
+
+  <h1>Refund & Returns Calculator</h1>
+  <div>Today (UK): <span id="today">loading…</span></div>
+
+  <div class="section">
+    <h2>Refund Completion Dates</h2>
+    <table>
+      <thead>
+        <tr><th>Refund Method</th><th>Completion Date</th></tr>
+      </thead>
+      <tbody id="refund-results"></tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Return Deadline Calculator</h2>
+    <label for="dispatch-date">Enter Dispatch Date:</label>
+    <input type="date" id="dispatch-date" />
+    <div class="note">You’ll see the 28-day return window deadline.</div>
+    <p><strong>Return Window Ends:</strong> <span id="return-deadline">—</span></p>
+  </div>
+
+  <div class="section">
+    <h2>NRG Completion Date</h2>
+    <label for="nrg-start">Enter NRG Raised Date:</label>
+    <input type="date" id="nrg-start" />
+    <div class="note">NRG is resolved within 3 working days (excluding weekends).</div>
+    <p><strong>NRG Due:</strong> <span id="nrg-due">—</span></p>
+  </div>
+
+  <div class="section">
+    <h2>PA Resolution</h2>
+    <label for="pa-start">Enter PA Raised Date:</label>
+    <input type="date" id="pa-start" />
+    <div class="note">PA must be actioned in 2 working days.</div>
+    <p><strong>PA Deadline:</strong> <span id="pa-due">—</span></p>
+  </div>
+
+  <script>
+    // UK date logic
+    function getTodayUK() {
+      const now = new Date();
+      const ukOffset = now.getTimezoneOffset() / 60 + 1;
+      const ukTime = new Date(now.getTime() + ukOffset * 3600 * 1000);
+      return ukTime.toISOString().split('T')[0];
     }
- 
+
+    document.getElementById("today").textContent = getTodayUK();
+
     function addDays(dateStr, days) {
-        const d = new Date(dateStr);
-        d.setDate(d.getDate() + days);
-        return d.toISOString().split("T")[0];
+      const date = new Date(dateStr);
+      date.setDate(date.getDate() + days);
+      return date.toISOString().split('T')[0];
     }
- 
-    document.getElementById('nrgDate').addEventListener('change', function () {
-        if (!this.value) return;
-        const days = daysSince(this.value);
-        document.getElementById('nrgResult').innerText = `NRG Date is: ${days} days since tracking (${this.value})`;
-    });
- 
-    document.getElementById('paDate').addEventListener('change', function () {
-        if (!this.value) return;
-        const days = daysSince(this.value);
-        document.getElementById('paResult').innerText = `PA Date is: ${days} days since dispatch (${this.value})`;
-    });
- 
-    document.getElementById('returnDate').addEventListener('change', function () {
-        if (!this.value) return;
-        const returnDeadline = addDays(this.value, 28);
-        document.getElementById('returnResult').innerText = `Customer can return their item up to: ${returnDeadline}`;
-    });
- 
-    function updateRefundDate() {
-        const method = document.getElementById('method').value;
-        const date = document.getElementById('refundDate').value;
-        if (date) {
-            const result = addDays(date, refundDays[method]);
-            document.getElementById('refundResult').innerText = `Refund Completion Date: ${result} (${refundDays[method]} days from refund date)`;
-        }
+
+    function addWorkingDays(dateStr, daysNeeded) {
+      const date = new Date(dateStr);
+      let added = 0;
+      while (added < daysNeeded) {
+        date.setDate(date.getDate() + 1);
+        const day = date.getDay();
+        if (day !== 0 && day !== 6) added++;
+      }
+      return date.toISOString().split('T')[0];
     }
- 
-    document.getElementById('refundDate').addEventListener('change', updateRefundDate);
-    document.getElementById('method').addEventListener('change', updateRefundDate);
-</script>
- 
+
+    // Refund timeframes
+    const refundTimeframes = {
+      "Card": 19,
+      "Klarna": 15,
+      "Clearpay": 15,
+      "Apple Pay": 19,
+      "PayPal": 15
+    };
+
+    const today = getTodayUK();
+    const refundTbody = document.getElementById("refund-results");
+    Object.entries(refundTimeframes).forEach(([method, days]) => {
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>${method}</td><td>${addDays(today, days)}</td>`;
+      refundTbody.appendChild(row);
+    });
+
+    // Return 28-day deadline
+    document.getElementById("dispatch-date").addEventListener("change", function() {
+      const val = this.value;
+      if (val) document.getElementById("return-deadline").textContent = addDays(val, 28);
+    });
+
+    // NRG 3 working days
+    document.getElementById("nrg-start").addEventListener("change", function() {
+      const val = this.value;
+      if (val) document.getElementById("nrg-due").textContent = addWorkingDays(val, 3);
+    });
+
+    // PA 2 working days
+    document.getElementById("pa-start").addEventListener("change", function() {
+      const val = this.value;
+      if (val) document.getElementById("pa-due").textContent = addWorkingDays(val, 2);
+    });
+  </script>
+
 </body>
 </html>
