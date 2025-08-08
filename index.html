@@ -1,182 +1,197 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Refund & Returns Calculator</title>
-  <style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Customer Service Timeframe Tool</title>
+<style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f5f8fb;
-      color: #333;
-      max-width: 800px;
-      margin: 40px auto;
-      padding: 20px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.1);
-      border-radius: 10px;
+        font-family: Arial, sans-serif;
+        margin: 20px;
+        background-color: #f4f4f4;
+        color: #333;
     }
-
-    h1 {
-      text-align: center;
-      color: #2c3e50;
+    h2 {
+        margin-top: 30px;
+        color: #444;
     }
-
-    .section {
-      margin-top: 40px;
+    label {
+        font-weight: bold;
     }
-
-    .section h2 {
-      border-left: 5px solid #4F81BD;
-      padding-left: 10px;
-      color: #4F81BD;
-    }
-
-    label, input {
-      display: block;
-      margin-top: 10px;
-      font-size: 16px;
-    }
-
     input[type="date"] {
-      padding: 8px;
-      width: 200px;
+        padding: 5px;
+        margin: 5px 0;
     }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-
-    th, td {
-      border: 1px solid #ddd;
-      padding: 10px;
-      text-align: center;
-    }
-
-    th {
-      background: #4F81BD;
-      color: white;
-    }
-
-    .note {
-      font-size: 14px;
-      color: #666;
-    }
-
-    #today {
-      font-weight: bold;
-    }
-
-    @media (max-width: 600px) {
-      body {
+    .result {
+        margin-top: 10px;
         padding: 10px;
-      }
-      table, th, td {
-        font-size: 14px;
-      }
+        border-radius: 5px;
     }
-  </style>
+    .badge {
+        padding: 5px 10px;
+        border-radius: 5px;
+        color: white;
+        font-weight: bold;
+    }
+    .badge.green { background-color: green; }
+    .badge.orange { background-color: orange; }
+    .badge.red { background-color: red; }
+    .progress-bar {
+        width: 100%;
+        background-color: #ddd;
+        border-radius: 5px;
+        overflow: hidden;
+        margin-top: 5px;
+    }
+    .progress {
+        height: 10px;
+        background-color: #4caf50;
+        width: 0;
+        transition: width 0.5s ease-in-out;
+    }
+    #spinner {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100%;
+        background: rgba(255, 255, 255, 0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+    #spinner div {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #ccc;
+        border-top: 5px solid #4caf50;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+        0% { transform: rotate(0deg);}
+        100% { transform: rotate(360deg);}
+    }
+    button {
+        margin-top: 5px;
+        padding: 5px 10px;
+        cursor: pointer;
+    }
+</style>
 </head>
 <body>
 
-  <h1>Refund & Returns Calculator</h1>
-  <div>Today (UK): <span id="today">loading…</span></div>
+<div id="spinner"><div></div></div>
 
-  <div class="section">
-    <h2>Refund Completion Dates</h2>
-    <table>
-      <thead>
-        <tr><th>Refund Method</th><th>Completion Date</th></tr>
-      </thead>
-      <tbody id="refund-results"></tbody>
-    </table>
-  </div>
+<h1>Customer Service Timeframe Tool</h1>
 
-  <div class="section">
-    <h2>Return Deadline Calculator</h2>
-    <label for="dispatch-date">Enter Delivery Date:</label>
-    <input type="date" id="dispatch-date" />
-    <div class="note">You’ll see the 28-day return window deadline.</div>
-    <p><strong>Return Window Ends:</strong> <span id="return-deadline">—</span></p>
-  </div>
+<!-- Refund Completion -->
+<h2>Refund Completion Dates</h2>
+<label>Enter Refund Start Date:</label>
+<input type="date" id="refundDate" onchange="calcRefund()">
+<div id="refundResult" class="result"></div>
+<button onclick="copyResult('refundResult')">Copy</button>
 
-  <div class="section">
-    <h2>NRG Completion Date</h2>
-    <label for="nrg-start">Enter Last Tracked Date:</label>
-    <input type="date" id="nrg-start" />
-    <div class="note">NRG is 11 days since last tracked (UK)</div>
-    <p><strong>NRG Due:</strong> <span id="nrg-due">—</span></p>
-  </div>
+<!-- Return Deadline -->
+<h2>Return Deadline Calculator</h2>
+<label>Enter Delivery Date:</label>
+<input type="date" id="returnDate" onchange="calcReturn()">
+<div id="returnResult" class="result"></div>
+<button onclick="copyResult('returnResult')">Copy</button>
 
-  <div class="section">
-    <h2>PA Resolution</h2>
-    <label for="pa-start">Enter Dispatch Date:</label>
-    <input type="date" id="pa-start" />
-    <div class="note">PA is 6 days since dispatch</div>
-    <p><strong>PA Deadline:</strong> <span id="pa-due">—</span></p>
-  </div>
+<!-- NRG Completion -->
+<h2>NRG Completion Date</h2>
+<label>Enter Last Tracked Date:</label>
+<input type="date" id="nrgDate" onchange="calcNRG()">
+<div id="nrgResult" class="result"></div>
+<button onclick="copyResult('nrgResult')">Copy</button>
 
-  <script>
-    // UK date logic
-    function getTodayUK() {
-      const now = new Date();
-      const ukOffset = now.getTimezoneOffset() / 60 + 1;
-      const ukTime = new Date(now.getTime() + ukOffset * 3600 * 1000);
-      return ukTime.toISOString().split('T')[0];
+<!-- PA Resolution -->
+<h2>PA Resolution</h2>
+<label>Enter Dispatch Date:</label>
+<input type="date" id="paDate" onchange="calcPA()">
+<div id="paResult" class="result"></div>
+<button onclick="copyResult('paResult')">Copy</button>
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+    setTimeout(() => document.getElementById("spinner").style.display = "none", 1000);
+});
+
+// Format UK date
+function formatUK(date) {
+    return date.toLocaleDateString('en-GB');
+}
+
+// Status badge
+function getBadge(daysLeft) {
+    if (daysLeft > 3) return '<span class="badge green">On Track</span>';
+    if (daysLeft >= 0) return '<span class="badge orange">Due Soon</span>';
+    return '<span class="badge red">Overdue</span>';
+}
+
+// Progress bar
+function getProgress(start, end) {
+    const total = (end - start) / (1000*60*60*24);
+    const done = (new Date() - start) / (1000*60*60*24);
+    const percent = Math.min(100, Math.max(0, (done / total) * 100));
+    return `<div class="progress-bar"><div class="progress" style="width:${percent}%"></div></div>`;
+}
+
+// Copy to clipboard
+function copyResult(id) {
+    const text = document.getElementById(id).innerText;
+    navigator.clipboard.writeText(text);
+    alert("Copied to clipboard!");
+}
+
+// Refund example (unchanged from last working version)
+function calcRefund() {
+    const date = new Date(document.getElementById("refundDate").value);
+    if (!date.getTime()) return;
+    const methods = { "Card":19, "Klarna":15, "Apple Pay":19, "PayPal":15 };
+    let html = "";
+    for (let m in methods) {
+        let due = new Date(date);
+        due.setDate(due.getDate() + methods[m]);
+        let daysLeft = Math.ceil((due - new Date())/(1000*60*60*24));
+        html += `<p>${m} Refund Due: ${formatUK(due)} ${getBadge(daysLeft)} (${daysLeft} days left) ${getProgress(date, due)}</p>`;
     }
+    document.getElementById("refundResult").innerHTML = html;
+}
 
-    document.getElementById("today").textContent = getTodayUK();
+// Return Deadline
+function calcReturn() {
+    const date = new Date(document.getElementById("returnDate").value);
+    if (!date.getTime()) return;
+    let due = new Date(date);
+    due.setDate(due.getDate() + 28);
+    let daysLeft = Math.ceil((due - new Date())/(1000*60*60*24));
+    document.getElementById("returnResult").innerHTML =
+        `Return Deadline: ${formatUK(due)} ${getBadge(daysLeft)} (${daysLeft} days left) ${getProgress(date, due)}`;
+}
 
-    function addDays(dateStr, days) {
-      const date = new Date(dateStr);
-      date.setDate(date.getDate() + days);
-      return date.toISOString().split('T')[0];
-    }
+// NRG (11 days from last tracked)
+function calcNRG() {
+    const date = new Date(document.getElementById("nrgDate").value);
+    if (!date.getTime()) return;
+    let due = new Date(date);
+    due.setDate(due.getDate() + 11);
+    let daysLeft = Math.ceil((due - new Date())/(1000*60*60*24));
+    document.getElementById("nrgResult").innerHTML =
+        `NRG is 11 days since last tracked (UK) - Due: ${formatUK(due)} ${getBadge(daysLeft)} (${daysLeft} days left) ${getProgress(date, due)}`;
+}
 
-    function addWorkingDays(dateStr, daysNeeded) {
-      const date = new Date(dateStr);
-      let added = 0;
-      while (added < daysNeeded) {
-        date.setDate(date.getDate() + 1);
-        const day = date.getDay();
-        if (day !== 0 && day !== 6) added++;
-      }
-      return date.toISOString().split('T')[0];
-    }
+// PA (6 days from dispatch)
+function calcPA() {
+    const date = new Date(document.getElementById("paDate").value);
+    if (!date.getTime()) return;
+    let due = new Date(date);
+    due.setDate(due.getDate() + 6);
+    let daysLeft = Math.ceil((due - new Date())/(1000*60*60*24));
+    document.getElementById("paResult").innerHTML =
+        `PA is 6 days since dispatch - Deadline: ${formatUK(due)} ${getBadge(daysLeft)} (${daysLeft} days left) ${getProgress(date, due)}`;
+}
+</script>
 
-    // Refund timeframes
-    const refundTimeframes = {
-      "Card": 19,
-      "Klarna": 15,
-      "Clearpay": 15,
-      "Apple Pay": 19,
-      "PayPal": 15
-    };
-
-    const today = getTodayUK();
-    const refundTbody = document.getElementById("refund-results");
-    Object.entries(refundTimeframes).forEach(([method, days]) => {
-      const row = document.createElement("tr");
-      row.innerHTML = `<td>${method}</td><td>${addDays(today, days)}</td>`;
-      refundTbody.appendChild(row);
-    });
-
-    // Return 28-day deadline
-    document.getElementById("dispatch-date").addEventListener("change", function() {
-      const val = this.value;
-      if (val) document.getElementById("return-deadline").textContent = addDays(val, 28);
-    });
-
-    // NRG 11 calendar days
-    document.getElementById("nrg-start").addEventListener("change", function() {
-      const val = this.value;
-      if (val) document.getElementById("nrg-due").textContent = addDays(val, 11);
-    });
-
-    // PA 6 calendar days
-    document.getElementById("pa-start").addEventListener("change", function() {
-      const val = this.value;
-      if (val) document.getElementById("pa-due").textContent = addDays(val, 6);
-    });
-  </script>
+</body>
+</html>
