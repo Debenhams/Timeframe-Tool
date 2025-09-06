@@ -31,15 +31,15 @@
       color: #4F81BD;
     }
 
-    label, input {
+    label, input, select {
       display: block;
       margin-top: 10px;
       font-size: 16px;
     }
 
-    input[type="date"] {
+    input[type="date"], select {
       padding: 8px;
-      width: 200px;
+      width: 220px;
     }
 
     table {
@@ -93,6 +93,25 @@
     </table>
   </div>
 
+  <!-- NEW SECTION: Select Payment Method + Date -->
+  <div class="section">
+    <h2>Custom Refund Calculator</h2>
+    <label for="refund-method">Select Payment Method:</label>
+    <select id="refund-method">
+      <option value="">-- Select Method --</option>
+      <option value="Card">Card</option>
+      <option value="Apple Pay">Apple Pay</option>
+      <option value="Klarna">Klarna</option>
+      <option value="Clearpay">Clearpay</option>
+      <option value="PayPal">PayPal</option>
+    </select>
+
+    <label for="refund-date">Select Refund Processed Date:</label>
+    <input type="date" id="refund-date" />
+
+    <p><strong>Calculated Completion Date:</strong> <span id="custom-refund-date">—</span></p>
+  </div>
+
   <div class="section">
     <h2>Return Deadline Calculator</h2>
     <label for="dispatch-date">Enter Delivery Date:</label>
@@ -118,12 +137,10 @@
   </div>
 
   <script>
-    // Format date to DD/MM/YYYY
     function formatUK(date) {
       return date.toLocaleDateString('en-GB');
     }
 
-    // Get today's date in UK format
     function getTodayUK() {
       return formatUK(new Date());
     }
@@ -136,18 +153,6 @@
       return formatUK(date);
     }
 
-    function addWorkingDays(dateStr, daysNeeded) {
-      const date = new Date(dateStr);
-      let added = 0;
-      while (added < daysNeeded) {
-        date.setDate(date.getDate() + 1);
-        const day = date.getDay();
-        if (day !== 0 && day !== 6) added++;
-      }
-      return formatUK(date);
-    }
-
-    // Refund timeframes
     const refundTimeframes = {
       "Card": 19,
       "Apple Pay": 19,
@@ -156,13 +161,36 @@
       "PayPal": 15
     };
 
+    // Populate table with today's dates
     const today = new Date();
+    const todayISO = today.toISOString().split('T')[0];
+    document.getElementById("refund-date").value = todayISO;
+
     const refundTbody = document.getElementById("refund-results");
     Object.entries(refundTimeframes).forEach(([method, days]) => {
       const row = document.createElement("tr");
-      row.innerHTML = `<td>${method}</td><td>${addDays(today, days)}</td>`;
+      row.innerHTML = `<td>${method}</td><td>${addDays(todayISO, days)}</td>`;
       refundTbody.appendChild(row);
     });
+
+    // Custom refund calculator
+    const refundMethodSelect = document.getElementById("refund-method");
+    const refundDateInput = document.getElementById("refund-date");
+    const customRefundDate = document.getElementById("custom-refund-date");
+
+    function calculateCustomRefund() {
+      const method = refundMethodSelect.value;
+      const date = refundDateInput.value;
+      if (method && date) {
+        const days = refundTimeframes[method];
+        customRefundDate.textContent = addDays(date, days);
+      } else {
+        customRefundDate.textContent = "—";
+      }
+    }
+
+    refundMethodSelect.addEventListener("change", calculateCustomRefund);
+    refundDateInput.addEventListener("change", calculateCustomRefund);
 
     // Return 28-day deadline
     document.getElementById("dispatch-date").addEventListener("change", function() {
@@ -184,5 +212,6 @@
   </script>
 </body>
 </html>
+
 
       
