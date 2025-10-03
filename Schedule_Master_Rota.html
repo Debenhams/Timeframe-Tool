@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Professional Team Rota System</title>
+    <style>
+        /* --- PROFESSIONAL THEME & VARIABLES --- */
+        :root {
+            /* New Aesthetic Theme: Navy, Charcoal, and Accent Green */
+            --primary-color: #0d47a1; /* Navy Blue (Professional) */
+            --secondary-color: #fafafa; /* Clean White/Off-White */
+            --background-dark: #263238; /* Charcoal Grey */
+            --accent-color: #00c853; /* Success Green */
+            --text-dark: #212121; 
+            --text-light: #ffffff;
+            --border-color: #e0e0e0;
+            --timeline-start: 7; /* Hour (7 AM) */
+            --timeline-end: 20; /* Hour (8 PM) */
+            --timeline-height: 1000px; 
+            
+            /* Activity Colors (Customizable) */
+            --color-emails: #2ecc71;      
+            --color-mirakl: #ffb300;      /* Darker Amber */
+            --color-social: #5e35b1;      /* Deep Purple */
+            --color-overtime: #e53935;    /* Deep Red */
+            --color-meeting: #ffd700;     /* Gold Yellow */
+            --color-break: #90a4ae;       /* Light Blue-Grey */
+            --color-lunch: #ff8f00;       /* Dark Orange */
+            --color-dayoff: #f4f4f4;      
+        }
+
+        /* --- BASE & LAYOUT --- */
+        body { 
+            font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            margin: 0; padding: 0; 
+            background-color: var(--secondary-color); 
+            color: var(--text-dark);
+        }
+        .header {
+            background-color: var(--primary-color);
+            color: var(--text-light);
+            padding: 30px 40px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        .header h1 { margin: 0; font-size: 2.4em; font-weight: 700; }
+        .container {
+            padding: 40px;
+            max-width: 100%; 
+            margin: auto;
+        }
+        h2 { 
+            border-bottom: 2px solid var(--border-color); 
+            padding-bottom: 10px; 
+            margin-top: 30px; 
+            color: var(--primary-color);
+        }
+
+        /* --- CONTROLS & DATA --- */
+        .controls-panel {
+            background-color: var(--text-light);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+        }
+        input[type="date"], input[type="text"], input[type="time"], select {
+            padding: 8px 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+        }
+        input:focus, select:focus {
+            border-color: var(--primary-color);
+        }
+        button {
+            background-color: var(--accent-color);
+            color: var(--text-light);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background-color 0.2s;
+        }
+        button:hover { background-color: #00a040; }
+        .button-group { display: flex; gap: 10px; }
+        .hidden { display: none !important; }
+
+        /* --- TEMPLATE EDITOR --- */
+        .template-row { 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+            padding: 10px; 
+            border: 1px solid #cfd8dc;
+            background-color: var(--secondary-color);
+            border-radius: 4px;
+            margin-bottom: 10px;
+            flex-wrap: wrap;
+        }
+        .template-row input, .template-row select { padding: 5px; }
+        .template-row button { background-color: #dc3545; }
+        .template-row label { font-size: 0.9em; font-weight: 600; }
+        .template-row .time-block { display: flex; gap: 5px; }
+        
+        /* --- MASTER ROTA GRID --- */
+        .master-table-container { 
+            overflow-x: auto; 
+            background-color: var(--text-light); 
+            border-radius: 8px; 
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); 
+            margin-bottom: 30px;
+        }
+        .master-table { width: 100%; border-collapse: collapse; min-width: 800px; }
+        .master-table th, .master-table td { border: 1px solid var(--border-color); padding: 8px; text-align: center; }
+        .master-table th { background-color: var(--primary-color); color: var(--text-light); font-weight: 600; }
+        .master-table td.advisor-name-cell { text-align: left; font-weight: 700; background-color: #e3f2fd; color: var(--text-dark); }
+        .master-table select { width: 95%; padding: 6px; }
+
+        /* --- TIMELINE GRID --- */
+        #team-timeline-container {
+            background-color: var(--text-light);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            overflow-x: auto;
+        }
+        .master-timeline-grid {
+            display: grid;
+            position: relative;
+        }
+        
+        /* Time Axis */
+        .time-axis {
+            grid-column: 1;
+            padding-right: 10px;
+            text-align: right;
+            border-right: 1px solid var(--border-color);
+            height: var(--timeline-height);
+            position: relative;
+            z-index: 10;
+            background-color: var(--text-light);
+        }
+        .time-label {
+            position: absolute;
+            font-size: 0.8em;
+            transform: translateY(-50%);
+            left: 0;
+            width: 100%;
+            padding-right: 5px;
+            color: #757575; /* Darker grey for clarity */
+            border-bottom: 1px dashed #cfd8dc;
+        }
+
+        /* Advisor/Day Cells */
+        .advisor-header {
+            grid-row: 1;
+            padding: 10px 0;
+            text-align: center;
+            font-weight: 700;
+            background-color: var(--primary-color);
+            color: var(--text-light);
+            border: 1px solid var(--border-color);
+            border-left: none;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+        .day-cell {
+            position: relative;
+            border: 1px solid var(--border-color);
+            border-top: none;
+            height: var(--timeline-height);
+            overflow: hidden; /* Crucial for integration */
+        }
+        .activity-block {
+            position: absolute;
+            width: 90%;
+            left: 5%;
+            color: var(--text-light);
+            padding: 5px;
+            box-sizing: border-box;
+            border-radius: 4px;
+            font-size: 0.75em;
+            overflow: hidden;
+            text-shadow: 0 0 1px rgba(0,0,0,0.5);
+            cursor: help;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            font-weight: 600;
+            z-index: 5;
+            /* Ensure text contrast for better readability */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        .activity-time { font-size: 0.7em; font-weight: normal; display: block; }
+        .day-off-label { position: absolute; top: 50%; transform: translateY(-50%); width: 100%; text-align: center; color: #bdbdbd; font-size: 1.2em; font-weight: 600; }
+        
+        /* Print Styles */
+        @media print {
+            .header, .controls-panel, .master-table-container, button { display: none !important; }
+            .container { padding: 0 !important; }
+            .master-timeline-grid { page-break-inside: avoid; }
+            .time-axis { height: auto !important; }
+            .day-cell { height: 1000px !important; page-break-inside: avoid; }
+            body { background-color: white !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Professional Team Rota System</h1>
+    </div>
+
+    <div class="container">
+
+        <div class="controls-panel">
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <label for="start-date-input" style="font-weight: 700;">Week Start Date (Monday):</label>
+                <input type="date" id="start-date-input" onchange="updateDates()">
+            </div>
+            <div class="button-group">
+                <button onclick="saveData(true)">💾 Save & Download Data</button>
+                <button onclick="toggleSettings()">⚙️ Toggle Settings/Templates</button>
+                <button onclick="generateAllSchedules()">🚀 Generate Timeline View</button>
+            </div>
+        </div>
+
+        <div id="settings-area" class="controls-panel hidden">
+            <div style="width: 55%;">
+                <h2 style="color: var(--text-dark);">🛠️ Shift Template Builder (Define your flexible shifts)</h2>
+                <div id="template-editor" style="padding: 10px;">
+                    </div>
+                <button onclick="addTemplate()">➕ Add New Shift Template</button>
+            </div>
+
+            <div style="width: 40%;">
+                <h2 style="color: var(--text-dark);">🎨 Activity Color Key</h2>
+                <div class="color-key-grid" style="padding: 10px; background-color: var(--secondary-color); border-radius: 4px;">
+                    <div class="color-input-group"><span class="color-example" data-activity="emails" style="background-color: var(--color-emails);"></span> <label>Emails:</label> <input type="text" id="color-emails" value="#2ecc71" oninput="updateColors()"></div>
+                    <div class="color-input-group"><span class="color-example" data-activity="mirakl" style="background-color: var(--color-mirakl);"></span> <label>Mirakl:</label> <input type="text" id="color-mirakl" value="#ffb300" oninput="updateColors()"></div>
+                    <div class="color-input-group"><span class="color-example" data-activity="social" style="background-color: var(--color-social);"></span> <label>Social:</label> <input type="text" id="color-social" value="#5e35b1" oninput="updateColors()"></div>
+                    <div class="color-input-group"><span class="color-example" data-activity="meeting" style="background-color: var(--color-meeting);"></span> <label>Meeting/Coach:</label> <input type="text" id="color-meeting" value="#ffd700" oninput="updateColors()"></div>
+                    <div class="color-input-group"><span class="color-example" data-activity="overtime" style="background-color: var(--color-overtime);"></span> <label>Overtime:</label> <input type="text" id="color-overtime" value="#e53935" oninput="updateColors()"></div>
+                    <div class="color-input-group"><span class="color-example" data-activity="break" style="background-color: var(--color-break);"></span> <label>Break:</label> <input type="text" id="color-break" value="#90a4ae" oninput="updateColors()"></div>
+                    <div class="color-input-group"><span class="color-example" data-activity="lunch" style="background-color: var(--color-lunch);"></span> <label>Lunch:</label> <input type="text" id="color-lunch" value="#ff8f00" oninput="updateColors()"></div>
+                </div>
+                <div class="button-group" style="margin-top: 15px;">
+                    <input type="file" id="load-file" accept=".json" onchange="loadData(event)" style="display: none;">
+                    <button onclick="document.getElementById('load-file').click()">📂 Load Data from File</button>
+                </div>
+            </div>
+        </div>
+
+        <h2>📅 Master Rota Assignment Grid</h2>
+        <div class="master-table-container">
+            <table class="master-table" id="master-rota-table">
+                <thead>
+                    <tr>
+                        <th rowspan="2" class="advisor-name-cell" style="width: 150px;">Advisor</th>
+                        <th colspan="7">Select Shift Template</th>
+                    </tr>
+                    <tr id="date-headers"></tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <button onclick="generateAllSchedules()" style="margin-top: 20px;">🚀 Generate Timeline View</button>
+
+
+        <h2 style="margin-top: 40px;">📊 Team Weekly Timeline Schedule</h2>
+        <div id="team-timeline-container">
+             <div class="master-timeline-grid" id="master-timeline-grid">
+                 <p style="padding: 20px; text-align: center; color: var(--text-dark);">Select your shifts in the grid above and click 'Generate Timeline View' to see the schedule.</p>
+             </div>
+        </div>
+        <button onclick="printGeneratedSchedule()" style="margin-top: 20px;">🖨️ Download Team Rota (PDF)</button>
+    </div> <script>
+        // --- CONFIGURATION ---
+        const ADVISOR_NAMES = [
+            'Luke Pashley', 'Ameena Malik', 'Carrie-Ann Raw', 'Danielle Smith', 
+            'Farwa Shaheen', 'Gemma Emmett', 'Laura Stockburn', 'Millie Walsh', 'Tunis Foley'
+        ];
+        const DAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const PLATFORM_ACTIVITIES = ['Emails', 'Mirakl', 'Social', 'Overtime', 'Meeting'];
+        const BREAK_SLOTS = ['Break1', 'Lunch', 'Break2'];
+        const STORAGE_KEY = 'ultraFastRotasV4';
+        
+        let masterRotaData = {};
+        let shiftTemplates = {}; 
+        
+        // --- TIMELINE CONSTANTS ---
+        const START_HOUR = 7; 
+        const END_HOUR = 20;  
+        const TOTAL_HOURS = END_HOUR - START_HOUR;
+        const TIMELINE_HEIGHT_PX = 1000;
+        const HEIGHT_PER_HOUR = TIMELINE_HEIGHT_PX / TOTAL_HOURS;
+        const HEIGHT_PER_MINUTE = HEIGHT_PER_HOUR / 60;
+
+        // --- UTILITY FUNCTIONS ---
+        
+        function toggleSettings() {
+             document.getElementById('settings-area').classList.toggle('hidden');
+        }
+
+        /** Converts a time (HH:MM) into a vertical position (top offset in px) */
+        function timeToPosition(time) {
+            if (!time) return null;
+            const [h, m] = time.split(':').map(Number);
+            const totalMinutes = (h * 60) + m;
+            const startMinutes = (START_HOUR * 60);
+            
+            // Ensure position starts at 0 for START_HOUR
+            if (totalMinutes < startMinutes) return -10; 
+            
+            const offsetMinutes = totalMinutes - startMinutes;
+            return offsetMinutes * HEIGHT_PER_MINUTE;
+        }
+
+        /** Converts a shift template into a series of timed activities (Work blocks + fixed breaks/lunch) */
+        function processDayWorkflow(templateData) {
+            const activities = [];
+            const platform = templateData.Platform || 'Emails'; 
+            const startTime = templateData.Start;
+            const finishTime = templateData.Finish;
+
+            if (!startTime || !finishTime || startTime === finishTime) return [];
+
+            // 1. Collect all timed events (Work segments and breaks)
+            const events = [
+                { time: startTime, activity: platform, isStart: true, duration: 0 },
+                { time: finishTime, activity: platform, isEnd: true, duration: 0 }
+            ];
+            
+            BREAK_SLOTS.forEach(slot => {
+                const time = templateData[slot];
+                if (time) {
+                    const durationMins = slot === 'Lunch' ? 45 : 15;
+                    events.push({ time: time, activity: slot.replace(/\d/g, ''), duration: durationMins });
+                }
+            });
+
+            // 2. Sort all events chronologically
+            events.sort((a, b) => a.time.localeCompare(b.time));
+
+            let currentTime = startTime;
+            
+            events.forEach((event) => {
+                if (!event.time) return;
+
+                // A. Add the preceding work segment (from currentTime to event.time)
+                if (event.time > currentTime) {
+                    activities.push({ activity: platform, start: currentTime, end: event.time });
+                }
+                
+                if (event.isEnd) return; 
+
+                // B. Add the break/lunch segment
+                if (event.duration > 0) {
+                    const endTimeDate = new Date(`2000/01/01 ${event.time}`);
+                    endTimeDate.setMinutes(endTimeDate.getMinutes() + event.duration);
+                    const newEndTime = endTimeDate.toTimeString().substring(0, 5);
+
+                    activities.push({ activity: event.activity, start: event.time, end: newEndTime });
+                    
+                    // C. Update currentTime to the END of the break/lunch
+                    currentTime = newEndTime;
+                } else if (event.isStart) {
+                    currentTime = event.time;
+                }
+            });
+            
+            return activities.filter(a => timeToPosition(a.end) > timeToPosition(a.start));
+        }
+
+        /** Gets the current color map from the input fields */
+        function getColorMap() {
+            const map = {};
+            document.querySelectorAll('#settings-area input[type="text"]').forEach(input => {
+                if (input.id.startsWith('color-')) {
+                    map[input.id.replace('color-', '')] = input.value;
+                }
+            });
+            return map;
+        }
+
+        // --- TEMPLATE LOGIC ---
+        
+        function addTemplate() {
+            const newName = `Shift${Object.keys(shiftTemplates).length + 1}`;
+            shiftTemplates[newName] = { name: newName, Start: '', Finish: '', Break1: '', Lunch: '', Break2: '', Platform: 'Emails' };
+            populateTemplateEditor();
+            saveToLocalStorage();
+        }
+
+        function deleteTemplate(name) {
+            delete shiftTemplates[name];
+            populateTemplateEditor();
+            populateMasterTable(); 
+            saveToLocalStorage();
+        }
+
+        function updateTemplate(oldName, key, value) {
+            const template = shiftTemplates[oldName];
+            if (key === 'name') {
+                if (value && value !== oldName) {
+                    shiftTemplates[value] = { ...template, name: value };
+                    delete shiftTemplates[oldName];
+                    populateTemplateEditor();
+                    populateMasterTable(); 
+                }
+            } else {
+                template[key] = value;
+            }
+            saveToLocalStorage();
+        }
+
+        function populateTemplateEditor() {
+            const editor = document.getElementById('template-editor');
+            editor.innerHTML = '';
+
+            Object.keys(shiftTemplates).forEach(key => {
+                const t = shiftTemplates[key];
+                const row = document.createElement('div');
+                row.className = 'template-row';
+                
+                row.innerHTML = `
+                    <label>Name:</label>
+                    <input type="text" value="${t.name}" oninput="updateTemplate('${key}', 'name', this.value)" style="width: 100px;">
+                    
+                    <label>Shift:</label>
+                    <input type="time" value="${t.Start}" oninput="updateTemplate('${t.name}', 'Start', this.value)" title="Start Time">
+                    <input type="time" value="${t.Finish}" oninput="updateTemplate('${t.name}', 'Finish', this.value)" title="Finish Time">
+                    
+                    <label>Breaks (Start Times):</label>
+                    <div class="time-block">
+                        <input type="time" value="${t.Break1}" oninput="updateTemplate('${t.name}', 'Break1', this.value)" title="Break 1 (15m)">
+                        <input type="time" value="${t.Lunch}" oninput="updateTemplate('${t.name}', 'Lunch', this.value)" title="Lunch (45m)">
+                        <input type="time" value="${t.Break2}" oninput="updateTemplate('${t.name}', 'Break2', this.value)" title="Break 2 (15m)">
+                    </div>
+
+                    <label>Platform:</label>
+                    <select onchange="updateTemplate('${t.name}', 'Platform', this.value)" style="width: 100px;">
+                        <option value="">-- Main --</option>
+                        ${PLATFORM_ACTIVITIES.map(p => `<option value="${p}" ${t.Platform === p ? 'selected' : ''}>${p}</option>`).join('')}
+                    </select>
+                    
+                    <button onclick="deleteTemplate('${t.name}')">X</button>
+                `;
+                editor.appendChild(row);
+            });
+        }
+        
+        // --- MASTER GRID LOGIC ---
+
+        /** Builds the dynamic input table */
+        function populateMasterTable() {
+            const dateHeadersRow = document.getElementById('date-headers');
+            const masterBody = document.querySelector('#master-rota-table tbody');
+
+            // 1. Set up date headers for M-S
+            dateHeadersRow.innerHTML = DAYS_FULL.map(day => 
+                `<th class="day-col" data-day="${day}">${day.substring(0, 3)}<br><span class="date-display">Date N/A</span></th>`
+            ).join('');
+            
+            // 2. Populate Advisor Rows
+            masterBody.innerHTML = '';
+            const templateOptions = Object.keys(shiftTemplates).map(name => 
+                `<option value="${name}">${name}</option>`
+            ).join('');
+
+            ADVISOR_NAMES.forEach(name => {
+                const row = masterBody.insertRow();
+                
+                let cell = row.insertCell();
+                cell.className = 'advisor-name-cell';
+                cell.textContent = name;
+
+                DAYS_FULL.forEach(day => {
+                    cell = row.insertCell();
+                    cell.className = 'day-input-cell';
+
+                    const currentTemplate = (masterRotaData[name] && masterRotaData[name][day]) ? masterRotaData[name][day].template : '';
+
+                    cell.innerHTML = `
+                        <select onchange="saveAssignment('${name}', '${day}', this.value)">
+                            <option value="">-- DAY OFF --</option>
+                            ${templateOptions.replace(new RegExp(`value="${currentTemplate}"`), `value="${currentTemplate}" selected`)}
+                        </select>
+                    `;
+                });
+            });
+        }
+        
+        /** Saves the template assignment */
+        function saveAssignment(advisorName, day, templateName) {
+             masterRotaData[advisorName][day].template = templateName;
+             saveToLocalStorage();
+             generateAllSchedules(); // Auto-update the view immediately
+        }
+
+        /** Updates the dates in the header based on the Monday input field */
+        function updateDates() {
+            const startDateInput = document.getElementById('start-date-input').value;
+            const dateDisplayFormat = { month: 'short', day: 'numeric' };
+
+            if (!startDateInput) return;
+
+            const startDate = new Date(startDateInput + 'T00:00:00'); 
+            if (startDate.getDay() !== 1) { 
+                alert("Please select a Monday as the start date.");
+                document.getElementById('start-date-input').value = '';
+                return;
+            }
+
+            DAYS_FULL.forEach((day, i) => {
+                const date = new Date(startDate);
+                date.setDate(date.getDate() + i);
+                
+                const formattedDate = date.toLocaleDateString('en-GB', dateDisplayFormat);
+                
+                const header = document.querySelector(`th[data-day="${day}"] .date-display`);
+                if (header) header.textContent = formattedDate;
+            });
+            
+            generateAllSchedules();
+        }
+        
+        /** Updates the CSS variables based on the color key inputs */
+        function updateColors(refreshSchedules = true) {
+            const root = document.documentElement;
+            const colorMap = getColorMap();
+            
+            Object.keys(colorMap).forEach(activity => {
+                const colorValue = colorMap[activity];
+                root.style.setProperty(`--color-${activity}`, colorValue);
+                const swatch = document.querySelector(`[data-activity="${activity}"]`);
+                if (swatch) swatch.style.backgroundColor = colorValue;
+            });
+            
+            saveToLocalStorage();
+            
+            if (refreshSchedules) {
+                generateAllSchedules();
+            }
+        }
+        
+        // --- SCHEDULE GENERATION (TIMELINE) ---
+
+        /** Generates the side-by-side timeline for ALL advisors */
+        function generateAllSchedules() {
+            const gridContainer = document.getElementById('master-timeline-grid');
+            gridContainer.innerHTML = '';
+            
+            const advisorCount = ADVISOR_NAMES.length;
+            const colorMap = getColorMap();
+
+            if (Object.keys(shiftTemplates).length === 0 && Object.values(masterRotaData).some(adv => Object.values(adv).some(day => day.template))) {
+                 gridContainer.innerHTML = '<p style="padding: 20px; text-align: center; color: var(--text-dark);">Please define shift templates first.</p>';
+                 return;
+            }
+
+            // Set grid columns and min-width for the side-by-side view
+            gridContainer.style.gridTemplateColumns = `80px repeat(${advisorCount}, 1fr)`;
+            gridContainer.style.minWidth = `${80 + (180 * advisorCount)}px`; // Wider columns for better look
+            
+            // 1. Time Axis (Column 1)
+            let timeAxisHTML = `<div class="time-axis" style="height: ${TIMELINE_HEIGHT_PX}px;">`;
+            for (let h = START_HOUR; h <= END_HOUR; h++) {
+                const timeString = `${String(h).padStart(2, '0')}:00`;
+                const topOffset = timeToPosition(timeString);
+                if (topOffset >= 0 && topOffset <= TIMELINE_HEIGHT_PX) {
+                     timeAxisHTML += `<div class="time-label" style="top: ${topOffset}px;">${timeString}</div>`;
+                }
+            }
+            timeAxisHTML += '</div>';
+            
+            // 2. Main Grid Construction (Headers, Day Labels, Day Cells)
+            
+            const finalGridHTML = `
+                ${ADVISOR_NAMES.map((name, index) => `<div class="advisor-header" style="grid-column: ${index + 2};">${name}</div>`).join('')}
+                
+                <div style="grid-column: 1; height: 40px; border-right: 1px solid var(--border-color); background-color: var(--secondary-color);"></div>
+                ${DAYS_FULL.map((day, dayIndex) => {
+                    const dayDisplay = document.querySelector(`th[data-day="${day}"] .date-display`).textContent;
+                    return `<div style="grid-column: ${dayIndex + 2}; height: 40px; padding: 5px 0; text-align: center; font-weight: 600; background-color: var(--secondary-color); border-right: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color);">
+                        ${day.substring(0, 3)}<br>${dayDisplay}
+                    </div>`;
+                }).join('')}
+                
+                ${ADVISOR_NAMES.map((advisorName, advisorIndex) => {
+                    const columnGridIndex = advisorIndex + 2; 
+
+                    return DAYS_FULL.map(day => {
+                        const assignedTemplateName = masterRotaData[advisorName][day].template;
+                        const templateData = shiftTemplates[assignedTemplateName];
+                        const activities = templateData ? processDayWorkflow(templateData) : [];
+
+                        let columnHTML = `<div class="day-cell" style="grid-column: ${columnGridIndex}; grid-row: 3; position: relative;">`; 
+
+                        if (activities.length === 0) {
+                            columnHTML += `<div class="day-off-label">DAY OFF</div>`;
+                        } else {
+                            activities.forEach(a => {
+                                const top = timeToPosition(a.start);
+                                const bottom = timeToPosition(a.end);
+                                const height = bottom - top;
+                                const activityKey = a.activity.toLowerCase();
+                                const bgColor = colorMap[activityKey] || '#343a40';
+
+                                columnHTML += `
+                                    <div class="activity-block" 
+                                        style="top: ${top}px; height: ${Math.max(10, height)}px; background-color: ${bgColor};"
+                                        title="${a.activity} (${a.start} - ${a.end})">
+                                        ${a.activity.toUpperCase()}
+                                        <span class="activity-time">${a.start} - ${a.end}</span>
+                                    </div>
+                                `;
+                            });
+                        }
+                        return columnHTML + '</div>';
+                    }).join('');
+                }).join('')}
+            `;
+            
+            gridContainer.innerHTML = timeAxisHTML + finalGridHTML;
+            gridContainer.style.gridTemplateRows = `auto auto ${TIMELINE_HEIGHT_PX}px`; 
+        }
+
+        // --- PDF DOWNLOAD FUNCTION ---
+        function printGeneratedSchedule() {
+            // This relies on the browser's native print dialogue (File -> Print or Ctrl+P)
+            // The @media print CSS styles ensure only the timeline is visible and it is optimized to fit.
+            window.print();
+        }
+
+        // --- DATA PERSISTENCE (SAVE/LOAD) ---
+        
+        /** Gathers all app data (rotas, colors, date) into one JSON object */
+        function collectFullData() {
+            return {
+                dates: document.getElementById('start-date-input').value,
+                colors: getColorMap(),
+                rotas: masterRotaData,
+                templates: shiftTemplates
+            };
+        }
+        
+        /** Saves data to browser's localStorage */
+        function saveToLocalStorage() {
+            try {
+                const data = collectFullData();
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+            } catch(e) {
+                console.warn("Could not save data to localStorage.");
+            }
+        }
+        
+        /** Loads data from browser's localStorage on initial load */
+        function loadDataFromStorage() {
+            try {
+                const storedData = localStorage.getItem(STORAGE_KEY);
+                if (storedData) {
+                    const data = JSON.parse(storedData);
+                    applyData(data);
+                }
+            } catch(e) {
+                console.warn("Could not load data from localStorage.");
+            }
+        }
+
+        /** Handles loading data from a file input */
+        function loadData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    applyData(data);
+                    alert("Schedule data loaded successfully from file!");
+                } catch (error) {
+                    alert("Error loading file: Invalid JSON format.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        /** Applies the loaded data (from file or storage) to the UI and internal structure */
+        function applyData(data) {
+            if (data.colors) {
+                Object.keys(data.colors).forEach(activity => {
+                    const input = document.getElementById(`color-${activity}`);
+                    if (input) input.value = data.colors[activity];
+                });
+                updateColors(false); 
+            }
+            if (data.templates) {
+                shiftTemplates = data.templates;
+                populateTemplateEditor();
+            }
+
+            document.getElementById('start-date-input').value = data.dates || '';
+            updateDates();
+
+            if (data.rotas) {
+                Object.assign(masterRotaData, data.rotas);
+            }
+            
+            populateMasterTable();
+            generateAllSchedules();
+        }
+        
+        /** Downloads the full schedule data as a JSON file */
+        function downloadData(data) {
+            const json = JSON.stringify(data, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'team_schedule_data.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // --- INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+             ADVISOR_NAMES.forEach(name => {
+                 masterRotaData[name] = {};
+                 DAYS_FULL.forEach(day => {
+                     masterRotaData[name][day] = {};
+                 });
+             });
+             initApp();
+        });
+    </script>
+</body>
+</html>
