@@ -2,284 +2,392 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Team Schedule & Rota</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+<title>Professional Team Rota System</title>
 <style>
-    body {
-        font-family: Arial, sans-serif;
-        background: #f9f9f9;
-        margin: 0;
-        padding: 0;
-    }
-    header {
-        background: #0052cc;
-        color: white;
-        padding: 15px;
-        text-align: center;
-    }
-    .controls {
-        display: flex;
-        justify-content: space-between;
-        padding: 10px 20px;
-        background: #eaeaea;
-        flex-wrap: wrap;
-    }
-    .controls select, .controls button {
-        padding: 5px 10px;
-        margin: 5px;
-    }
-    table {
-        border-collapse: collapse;
-        width: 100%;
-        margin: 20px auto;
-        table-layout: fixed;
-    }
-    th, td {
-        border: 1px solid #ddd;
-        text-align: center;
-        padding: 10px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    th {
-        background: #0052cc;
-        color: white;
-        position: sticky;
-        top: 0;
-        z-index: 2;
-    }
-    .shift {
-        padding: 5px;
-        border-radius: 5px;
-        color: white;
-        font-weight: bold;
-        font-size: 0.9em;
-    }
-    .early { background-color: #6c5ce7; }
-    .middle { background-color: #00b894; }
-    .late { background-color: #fd79a8; }
-    .break { background-color: #ffeaa7; color: #2d3436; }
-    .lunch { background-color: #fab1a0; color: #2d3436; }
-    .email { font-size: 0.8em; margin-top: 3px; display: block; color: #fff; }
-    .mirakl { font-size: 0.8em; margin-top: 3px; display: block; color: #fff; }
-    .hidden { display: none; }
+/* --- THEME & VARIABLES --- */
+:root {
+  --primary-color: #0d47a1;
+  --secondary-color: #fafafa;
+  --background-dark: #263238;
+  --accent-color: #00c853;
+  --text-dark: #212121;
+  --text-light: #ffffff;
+  --border-color: #e0e0e0;
+  --timeline-start: 7;
+  --timeline-end: 20;
+  --timeline-height: 1000px;
+
+  /* Activity Colors */
+  --color-emails: #2ecc71;
+  --color-mirakl: #ffb300;
+  --color-social: #5e35b1;
+  --color-overtime: #e53935;
+  --color-meeting: #ffd700;
+  --color-break: #90a4ae;
+  --color-lunch: #ff8f00;
+  --color-dayoff: #f4f4f4;
+}
+
+/* --- BASE & LAYOUT --- */
+body {
+  font-family: 'Roboto', sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: var(--secondary-color);
+  color: var(--text-dark);
+}
+.header {
+  background-color: var(--primary-color);
+  color: var(--text-light);
+  padding: 30px 40px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+.header h1 { margin:0; font-size:2.4em; font-weight:700; }
+.container { padding:40px; max-width:100%; margin:auto; }
+h2 { border-bottom:2px solid var(--border-color); padding-bottom:10px; margin-top:30px; color:var(--primary-color); }
+
+/* --- CONTROLS & DATA --- */
+.controls-panel {
+  background-color: var(--text-light);
+  padding:20px;
+  border-radius:8px;
+  box-shadow:0 2px 8px rgba(0,0,0,0.1);
+  margin-bottom:20px;
+  display:flex;
+  flex-wrap:wrap;
+  justify-content:space-between;
+}
+input[type="date"], input[type="text"], input[type="time"], select {
+  padding:8px 10px;
+  border:1px solid var(--border-color);
+  border-radius:4px;
+  box-sizing:border-box;
+  transition:border-color 0.2s;
+}
+input:focus, select:focus { border-color: var(--primary-color); }
+button {
+  background-color: var(--accent-color);
+  color: var(--text-light);
+  border:none;
+  padding:10px 20px;
+  border-radius:6px;
+  cursor:pointer;
+  font-weight:600;
+  transition: background-color 0.2s;
+}
+button:hover { background-color:#00a040; }
+.button-group { display:flex; gap:10px; }
+.hidden { display:none !important; }
+
+/* --- TEMPLATE EDITOR --- */
+.template-row {
+  display:flex;
+  align-items:center;
+  gap:15px;
+  padding:10px;
+  border:1px solid #cfd8dc;
+  background-color: var(--secondary-color);
+  border-radius:4px;
+  margin-bottom:10px;
+  flex-wrap:wrap;
+}
+.template-row input, .template-row select { padding:5px; }
+.template-row button {
+  background-color:#dc3545;
+  color:white;
+  border:none;
+  padding:5px 10px;
+  border-radius:4px;
+  cursor:pointer;
+}
+.template-row label { font-size:0.9em; font-weight:600; }
+.template-row .time-block { display:flex; gap:5px; }
+
+/* --- MASTER ROTA GRID --- */
+.master-table-container { overflow-x:auto; background-color: var(--text-light); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom:30px; }
+.master-table { width:100%; border-collapse:collapse; min-width:800px; }
+.master-table th, .master-table td { border:1px solid var(--border-color); padding:8px; text-align:center; }
+.master-table th { background-color: var(--primary-color); color: var(--text-light); font-weight:600; }
+.master-table td.advisor-name-cell { text-align:left; font-weight:700; background-color:#e3f2fd; color:var(--text-dark); }
+.master-table select { width:95%; padding:6px; }
+
+/* --- TIMELINE GRID --- */
+#team-timeline-container { background-color: var(--text-light); padding:10px; border-radius:8px; box-shadow:0 8px 16px rgba(0,0,0,0.1); overflow-x:auto; }
+.master-timeline-grid { display:grid; position:relative; }
+.time-axis { grid-column:1; padding-right:10px; text-align:right; border-right:1px solid var(--border-color); height: var(--timeline-height); position:relative; z-index:10; background-color: var(--text-light);}
+.time-label { position:absolute; font-size:0.8em; transform:translateY(-50%); left:0; width:100%; padding-right:5px; color:#757575; border-bottom:1px dashed #cfd8dc; }
+.advisor-header { grid-row:1; padding:10px 0; text-align:center; font-weight:700; background-color:var(--primary-color); color:var(--text-light); border:1px solid var(--border-color); border-left:none; position:sticky; top:0; z-index:20; }
+.day-cell { position:relative; border:1px solid var(--border-color); border-top:none; height:var(--timeline-height); overflow:hidden; }
+.activity-block {
+  position:absolute;
+  width:90%;
+  left:5%;
+  color:var(--text-light);
+  padding:5px;
+  box-sizing:border-box;
+  border-radius:4px;
+  font-size:0.75em;
+  overflow:hidden;
+  text-shadow:0 0 1px rgba(0,0,0,0.5);
+  cursor:help;
+  box-shadow:0 1px 3px rgba(0,0,0,0.2);
+  font-weight:600;
+  z-index:5;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+}
+.activity-time { font-size:0.7em; font-weight:normal; display:block; }
+.day-off-label { position:absolute; top:50%; transform:translateY(-50%); width:100%; text-align:center; color:#bdbdbd; font-size:1.2em; font-weight:600; }
+
+/* --- PRINT --- */
+@media print {
+  .header, .controls-panel, .master-table-container, button { display:none !important; }
+  .container { padding:0 !important; }
+  .master-timeline-grid { page-break-inside:avoid; }
+  .time-axis { height:auto !important; }
+  .day-cell { height:1000px !important; page-break-inside:avoid; }
+  body { background-color:white !important; }
+}
 </style>
 </head>
 <body>
-<header>
-    <h1>Team Schedule & Rota</h1>
-</header>
+<div class="header">
+<h1>Professional Team Rota System</h1>
+</div>
+<div class="container">
 
-<div class="controls">
-    <div>
-        <label for="userSelect">Select User:</label>
-        <select id="userSelect">
-            <option value="all">All Team</option>
-            <option value="Luke Pashley">Luke Pashley</option>
-            <option value="Ameena Malik">Ameena Malik</option>
-            <option value="Carrie-Ann Raw">Carrie-Ann Raw</option>
-            <option value="Danielle Smith">Danielle Smith</option>
-            <option value="Farwa Shaheen">Farwa Shaheen</option>
-            <option value="Gemma Emmett">Gemma Emmett</option>
-            <option value="Laura Stockburn">Laura Stockburn</option>
-            <option value="Millie Walsh">Millie Walsh</option>
-            <option value="Tunis Foley">Tunis Foley</option>
-        </select>
-    </div>
-    <div>
-        <label for="weekSelect">Select Week:</label>
-        <input type="week" id="weekSelect"/>
-        <button id="toggleView">Toggle View</button>
-        <button id="downloadPDF">Download PDF</button>
-    </div>
+<!-- CONTROLS PANEL -->
+<div class="controls-panel">
+<div style="display:flex; gap:15px; align-items:center;">
+<label for="start-date-input" style="font-weight:700;">Week Start Date (Monday):</label>
+<input type="date" id="start-date-input" onchange="updateDates()">
+</div>
+<div class="button-group">
+<button onclick="downloadData(collectFullData())">💾 Save & Download Data</button>
+<button onclick="toggleSettings()">⚙️ Toggle Settings/Templates</button>
+<button onclick="generateAllSchedules()">🚀 Generate Timeline View</button>
+</div>
 </div>
 
-<table id="scheduleTable">
-    <thead>
-        <tr>
-            <th>Time</th>
-            <th>Luke Pashley</th>
-            <th>Ameena Malik</th>
-            <th>Carrie-Ann Raw</th>
-            <th>Danielle Smith</th>
-            <th>Farwa Shaheen</th>
-            <th>Gemma Emmett</th>
-            <th>Laura Stockburn</th>
-            <th>Millie Walsh</th>
-            <th>Tunis Foley</th>
-        </tr>
-    </thead>
-    <tbody>
-        <!-- Schedule rows dynamically generated here -->
-    </tbody>
+<!-- SETTINGS -->
+<div id="settings-area" class="controls-panel hidden">
+<div style="width:55%;">
+<h2 style="color:var(--text-dark);">🛠️ Shift Template Builder</h2>
+<div id="template-editor" style="padding:10px;"></div>
+<button onclick="addTemplate()">➕ Add New Shift Template</button>
+</div>
+<div style="width:40%;">
+<h2 style="color:var(--text-dark);">🎨 Activity Color Key</h2>
+<div class="color-key-grid" style="padding:10px; background-color:var(--secondary-color); border-radius:4px;">
+<div class="color-input-group"><span class="color-example" data-activity="emails" style="background-color:var(--color-emails);"></span> <label>Emails:</label> <input type="text" id="color-emails" value="#2ecc71" oninput="updateColors()"></div>
+<div class="color-input-group"><span class="color-example" data-activity="mirakl" style="background-color:var(--color-mirakl);"></span> <label>Mirakl:</label> <input type="text" id="color-mirakl" value="#ffb300" oninput="updateColors()"></div>
+<div class="color-input-group"><span class="color-example" data-activity="social" style="background-color:var(--color-social);"></span> <label>Social:</label> <input type="text" id="color-social" value="#5e35b1" oninput="updateColors()"></div>
+<div class="color-input-group"><span class="color-example" data-activity="meeting" style="background-color:var(--color-meeting);"></span> <label>Meeting:</label> <input type="text" id="color-meeting" value="#ffd700" oninput="updateColors()"></div>
+<div class="color-input-group"><span class="color-example" data-activity="overtime" style="background-color:var(--color-overtime);"></span> <label>Overtime:</label> <input type="text" id="color-overtime" value="#e53935" oninput="updateColors()"></div>
+<div class="color-input-group"><span class="color-example" data-activity="break" style="background-color:var(--color-break);"></span> <label>Break:</label> <input type="text" id="color-break" value="#90a4ae" oninput="updateColors()"></div>
+<div class="color-input-group"><span class="color-example" data-activity="lunch" style="background-color:var(--color-lunch);"></span> <label>Lunch:</label> <input type="text" id="color-lunch" value="#ff8f00" oninput="updateColors()"></div>
+</div>
+<div class="button-group" style="margin-top:15px;">
+<input type="file" id="load-file" accept=".json" onchange="loadData(event)" style="display:none;">
+<button onclick="document.getElementById('load-file').click()">📂 Load Data from File</button>
+</div>
+</div>
+</div>
+
+<!-- MASTER ROTA TABLE -->
+<h2>📅 Master Rota Assignment Grid</h2>
+<div class="master-table-container">
+<table class="master-table" id="master-rota-table">
+<thead>
+<tr>
+<th rowspan="2" class="advisor-name-cell" style="width:150px;">Advisor</th>
+<th colspan="7">Select Shift Template</th>
+</tr>
+<tr id="date-headers"></tr>
+</thead>
+<tbody></tbody>
 </table>
+</div>
+<button onclick="generateAllSchedules()" style="margin-top:20px;">🚀 Generate Timeline View</button>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<!-- TIMELINE -->
+<h2 style="margin-top:40px;">📊 Team Weekly Timeline Schedule</h2>
+<div id="team-timeline-container">
+<div class="master-timeline-grid" id="master-timeline-grid">
+<p style="padding:20px; text-align:center; color:var(--text-dark);">Select your shifts in the grid above and click 'Generate Timeline View' to see the schedule.</p>
+</div>
+</div>
+<button onclick="printGeneratedSchedule()" style="margin-top:20px;">🖨️ Download Team Rota (PDF)</button>
+</div>
+
 <script>
-    const users = ['Luke Pashley','Ameena Malik','Carrie-Ann Raw','Danielle Smith','Farwa Shaheen','Gemma Emmett','Laura Stockburn','Millie Walsh','Tunis Foley'];
-    let viewMode = 'week'; // week/daily toggle
-</script>
-<script>
-const scheduleTableBody = document.querySelector('#scheduleTable tbody');
-const userSelect = document.getElementById('userSelect');
-const weekSelect = document.getElementById('weekSelect');
-const toggleViewBtn = document.getElementById('toggleView');
-const downloadPDFBtn = document.getElementById('downloadPDF');
+// --- CONFIG ---
+const ADVISOR_NAMES = ['Luke Pashley','Ameena Malik','Carrie-Ann Raw','Danielle Smith','Farwa Shaheen','Gemma Emmett','Laura Stockburn','Millie Walsh','Tunis Foley'];
+const DAYS_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const PLATFORM_ACTIVITIES = ['Emails','Mirakl','Social','Overtime','Meeting'];
+const BREAK_SLOTS = ['Break1','Lunch','Break2'];
+const STORAGE_KEY = 'ultraFastRotasV4';
 
-// Sample shift data structure
-let shifts = {
-    'Luke Pashley': [],
-    'Ameena Malik': [],
-    'Carrie-Ann Raw': [],
-    'Danielle Smith': [],
-    'Farwa Shaheen': [],
-    'Gemma Emmett': [],
-    'Laura Stockburn': [],
-    'Millie Walsh': [],
-    'Tunis Foley': []
-};
+let masterRotaData = {};
+let shiftTemplates = {};
 
-// Default times for demonstration (can be customized per shift)
-const defaultTimes = ['08:00', '09:00', '10:00', '11:00', '12:00','13:00','14:00','15:00','16:00','17:00'];
+// --- TIMELINE CONSTANTS ---
+const START_HOUR = 7;
+const END_HOUR = 20;
+const TOTAL_HOURS = END_HOUR - START_HOUR;
+const TIMELINE_HEIGHT_PX = 1000;
+const HEIGHT_PER_HOUR = TIMELINE_HEIGHT_PX / TOTAL_HOURS;
+const HEIGHT_PER_MINUTE = HEIGHT_PER_HOUR / 60;
 
-function generateSchedule() {
-    scheduleTableBody.innerHTML = '';
-
-    // Create row for each time
-    defaultTimes.forEach(time => {
-        const tr = document.createElement('tr');
-        const timeCell = document.createElement('td');
-        timeCell.textContent = time;
-        tr.appendChild(timeCell);
-
-        users.forEach(user => {
-            const td = document.createElement('td');
-            td.dataset.user = user;
-
-            // Filter shifts for this time
-            const shift = shifts[user].find(s => s.start <= time && s.end > time);
-            if (shift) {
-                const span = document.createElement('span');
-                span.classList.add('shift', shift.type);
-                span.textContent = shift.type.charAt(0).toUpperCase() + shift.type.slice(1);
-                if(shift.email) {
-                    const emailSpan = document.createElement('span');
-                    emailSpan.classList.add('email');
-                    emailSpan.textContent = 'Email';
-                    span.appendChild(emailSpan);
-                }
-                if(shift.mirakl) {
-                    const miraklSpan = document.createElement('span');
-                    miraklSpan.classList.add('mirakl');
-                    miraklSpan.textContent = 'Mirakl';
-                    span.appendChild(miraklSpan);
-                }
-                td.appendChild(span);
-            }
-
-            tr.appendChild(td);
-        });
-
-        scheduleTableBody.appendChild(tr);
-    });
+// --- INIT ---
+function initApp(){
+  ADVISOR_NAMES.forEach(name=>{
+    masterRotaData[name]={};
+    DAYS_FULL.forEach(day=>{masterRotaData[name][day]={template:''};});
+  });
+  populateTemplateEditor();
+  populateMasterTable();
+  loadDataFromStorage();
 }
 
-// Toggle daily/weekly view
-toggleViewBtn.addEventListener('click', () => {
-    viewMode = (viewMode === 'week') ? 'daily' : 'week';
-    generateSchedule();
-});
+// --- UTIL ---
+function toggleSettings(){document.getElementById('settings-area').classList.toggle('hidden');}
+function timeToPosition(time){ if(!time) return 0; const [h,m]=time.split(':').map(Number); return ((h*60+m)-START_HOUR*60)*HEIGHT_PER_MINUTE; }
+function getColorMap(){ const map={}; document.querySelectorAll('#settings-area input[type="text"]').forEach(input=>{ if(input.id.startsWith('color-')) map[input.id.replace('color-','')]=input.value; }); return map; }
 
-// Filter by user
-userSelect.addEventListener('change', () => {
-    const selectedUser = userSelect.value;
-    document.querySelectorAll('#scheduleTable tbody td').forEach(td => {
-        if(selectedUser === 'all') {
-            td.classList.remove('hidden');
-        } else if(td.dataset.user !== selectedUser && td.dataset.user !== undefined) {
-            td.classList.add('hidden');
-        } else {
-            td.classList.remove('hidden');
-        }
+// --- TEMPLATE FUNCTIONS ---
+function addTemplate(){ const name='Shift'+(Object.keys(shiftTemplates).length+1); shiftTemplates[name]={name,Start:'',Finish:'',Break1:'',Lunch:'',Break2:'',Platform:'Emails'}; populateTemplateEditor(); populateMasterTable(); saveToLocalStorage();}
+function deleteTemplate(name){ delete shiftTemplates[name]; populateTemplateEditor(); populateMasterTable(); saveToLocalStorage();}
+function updateTemplate(oldName,key,value){ const template=shiftTemplates[oldName]; if(key==='name' && value!==oldName && value!==''){ shiftTemplates[value]={...template,name:value}; delete shiftTemplates[oldName]; populateTemplateEditor(); populateMasterTable(); } else {template[key]=value;} saveToLocalStorage();}
+function populateTemplateEditor(){ const editor=document.getElementById('template-editor'); editor.innerHTML=''; Object.keys(shiftTemplates).forEach(key=>{ const t=shiftTemplates[key]; const row=document.createElement('div'); row.className='template-row'; row.innerHTML=`
+<label>Name:</label><input type="text" value="${t.name}" oninput="updateTemplate('${key}','name',this.value)" style="width:100px;">
+<label>Shift:</label><input type="time" value="${t.Start}" oninput="updateTemplate('${t.name}','Start',this.value)" title="Start Time">
+<input type="time" value="${t.Finish}" oninput="updateTemplate('${t.name}','Finish',this.value)" title="Finish Time">
+<label>Breaks:</label><div class="time-block">
+<input type="time" value="${t.Break1}" oninput="updateTemplate('${t.name}','Break1',this.value)">
+<input type="time" value="${t.Lunch}" oninput="updateTemplate('${t.name}','Lunch',this.value)">
+<input type="time" value="${t.Break2}" oninput="updateTemplate('${t.name}','Break2',this.value)">
+</div>
+<label>Platform:</label>
+<select onchange="updateTemplate('${t.name}','Platform',this.value)" style="width:100px;">
+<option value="">-- Main --</option>
+${PLATFORM_ACTIVITIES.map(p=>`<option value="${p}" ${t.Platform===p?'selected':''}>${p}</option>`).join('')}
+</select>
+<button onclick="deleteTemplate('${t.name}')">X</button>`; editor.appendChild(row); }); }
+
+// --- MASTER TABLE ---
+function populateMasterTable(){
+  const dateHeadersRow=document.getElementById('date-headers');
+  const masterBody=document.querySelector('#master-rota-table tbody');
+  dateHeadersRow.innerHTML=DAYS_FULL.map(day=>`<th data-day="${day}">${day.substring(0,3)}<br><span class="date-display">Date N/A</span></th>`).join('');
+  masterBody.innerHTML='';
+  const templateOptions=Object.keys(shiftTemplates).map(name=>`<option value="${name}">${name}</option>`).join('');
+  ADVISOR_NAMES.forEach(name=>{
+    const row=masterBody.insertRow();
+    let cell=row.insertCell(); cell.className='advisor-name-cell'; cell.textContent=name;
+    DAYS_FULL.forEach(day=>{
+      cell=row.insertCell(); cell.className='day-input-cell';
+      const currentTemplate=(masterRotaData[name] && masterRotaData[name][day]) ? masterRotaData[name][day].template : '';
+      cell.innerHTML=`<select onchange="saveAssignment('${name}','${day}',this.value)">
+      <option value="">-- DAY OFF --</option>
+      ${templateOptions.replace(new RegExp(`value="${currentTemplate}"`), `value="${currentTemplate}" selected`)}
+      </select>`;
     });
-});
-
-// Week selector change (stub, can integrate real week-based shifts)
-weekSelect.addEventListener('change', () => {
-    generateSchedule();
-});
-
-// Function to add shift manually
-function addShift(user, type, start, end, email=false, mirakl=false) {
-    if(!shifts[user]) shifts[user] = [];
-    shifts[user].push({type, start, end, email, mirakl});
-    generateSchedule();
+  });
 }
 
-// Example: Adding sample shifts
-addShift('Luke Pashley','early','08:00','12:00',true,false);
-addShift('Luke Pashley','middle','13:00','17:00',false,true);
-addShift('Ameena Malik','late','10:00','18:00',false,true);
+function saveAssignment(advisorName,day,templateName){ masterRotaData[advisorName][day].template=templateName; saveToLocalStorage(); generateAllSchedules();}
 
-// PDF Download
-downloadPDFBtn.addEventListener('click', () => {
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF('l', 'pt', 'a4');
-    doc.html(document.querySelector('#scheduleTable'), {
-        callback: function(pdf) {
-            pdf.save('team_schedule.pdf');
-        },
-        x: 10,
-        y: 10,
-        html2canvas: { scale: 0.8 }
-    });
-});
-
-// Initial render
-generateSchedule();
-</script>
-<script>
-function createCustomShiftUI() {
-    const controlsDiv = document.createElement('div');
-    controlsDiv.style.background = '#f1f1f1';
-    controlsDiv.style.padding = '10px';
-    controlsDiv.style.margin = '10px 20px';
-    controlsDiv.style.borderRadius = '8px';
-
-    controlsDiv.innerHTML = `
-        <h3>Custom Shift Management</h3>
-        <label>User: <select id="customUser">
-            ${users.map(u=>`<option value="${u}">${u}</option>`).join('')}
-        </select></label>
-        <label>Shift Type: <input type="text" id="customType" placeholder="Early/Middle/Late/Custom"></label>
-        <label>Start Time: <input type="time" id="customStart"></label>
-        <label>End Time: <input type="time" id="customEnd"></label>
-        <label>Break (min): <input type="number" id="customBreak" value="0"></label>
-        <label>Lunch (min): <input type="number" id="customLunch" value="0"></label>
-        <label>Email Task: <input type="checkbox" id="customEmail"></label>
-        <label>Mirakl Task: <input type="checkbox" id="customMirakl"></label>
-        <button id="addCustomShift">Add Shift</button>
-    `;
-    document.body.insertBefore(controlsDiv, document.getElementById('scheduleTable'));
-
-    document.getElementById('addCustomShift').addEventListener('click', () => {
-        const user = document.getElementById('customUser').value;
-        const type = document.getElementById('customType').value.toLowerCase();
-        const start = document.getElementById('customStart').value;
-        const end = document.getElementById('customEnd').value;
-        const email = document.getElementById('customEmail').checked;
-        const mirakl = document.getElementById('customMirakl').checked;
-
-        addShift(user, type, start, end, email, mirakl);
-    });
+// --- DATES ---
+function updateDates(){
+  const startDateInput=document.getElementById('start-date-input').value;
+  if(!startDateInput) return;
+  const startDate=new Date(startDateInput+'T00:00:00');
+  if(startDate.getDay()!==1){ alert("Please select a Monday."); document.getElementById('start-date-input').value=''; return;}
+  const format={month:'short', day:'numeric'};
+  DAYS_FULL.forEach((day,i)=>{
+    const date=new Date(startDate); date.setDate(date.getDate()+i);
+    const header=document.querySelector(`th[data-day="${day}"] .date-display`);
+    if(header) header.textContent=date.toLocaleDateString('en-GB',format);
+  });
+  generateAllSchedules();
 }
 
-// Initialize custom shift UI
-createCustomShiftUI();
+// --- COLORS ---
+function updateColors(refresh=true){
+  const root=document.documentElement;
+  const map=getColorMap();
+  Object.keys(map).forEach(a=>root.style.setProperty(`--color-${a}`,map[a]));
+  if(refresh) generateAllSchedules();
+}
+
+// --- SCHEDULE GENERATION ---
+function processDayWorkflow(template){
+  const activities=[]; if(!template.Start||!template.Finish||template.Start===template.Finish) return activities;
+  const events=[{time:template.Start,activity:template.Platform,isStart:true},{time:template.Finish,activity:template.Platform,isEnd:true}];
+  BREAK_SLOTS.forEach(b=>{ if(template[b]){ const duration=b==='Lunch'?45:15; events.push({time:template[b],activity:b.replace(/\d/g,''),duration}); }});
+  events.sort((a,b)=>a.time.localeCompare(b.time));
+  let currentTime=template.Start;
+  events.forEach(e=>{
+    if(e.time>currentTime) activities.push({activity:template.Platform,start:currentTime,end:e.time});
+    if(e.isEnd) return;
+    if(e.duration>0){ const [h,m]=e.time.split(':').map(Number); const d=new Date(0,0,0,h,m); d.setMinutes(d.getMinutes()+e.duration); const endTime=d.toTimeString().substr(0,5); activities.push({activity:e.activity,start:e.time,end:endTime}); currentTime=endTime; } else if(e.isStart){ currentTime=e.time;}
+  });
+  return activities.filter(a=>timeToPosition(a.end)>timeToPosition(a.start));
+}
+
+function generateAllSchedules(){
+  const grid=document.getElementById('master-timeline-grid'); grid.innerHTML='';
+  const colorMap=getColorMap();
+  const advisorCount=ADVISOR_NAMES.length;
+  if(Object.keys(shiftTemplates).length===0){ grid.innerHTML='<p style="padding:20px;text-align:center;color:var(--text-dark);">Please define shift templates first.</p>'; return;}
+  grid.style.gridTemplateColumns=`80px repeat(${advisorCount},1fr)`; grid.style.minWidth=`${80+(180*advisorCount)}px`;
+
+  // Time Axis
+  let timeAxisHTML=`<div class="time-axis" style="height:${TIMELINE_HEIGHT_PX}px;">`;
+  for(let h=START_HOUR;h<=END_HOUR;h++){ const t=`${String(h).padStart(2,'0')}:00`; const top=timeToPosition(t); timeAxisHTML+=`<div class="time-label" style="top:${top}px;">${t}</div>`;}
+  timeAxisHTML+='</div>';
+
+  // Headers
+  let headerHTML=ADVISOR_NAMES.map((name,i)=>`<div class="advisor-header" style="grid-column:${i+2};">${name}</div>`).join('');
+  headerHTML+=`<div style="grid-column:1;height:40px;border-right:1px solid var(--border-color);background-color:var(--secondary-color);"></div>`;
+  headerHTML+=DAYS_FULL.map((day,i)=>{ const dateDisplay=document.querySelector(`th[data-day="${day}"] .date-display`).textContent; return `<div style="grid-column:${i+2};height:40px;padding:5px 0;text-align:center;font-weight:600;background-color:var(--secondary-color);border-right:1px solid var(--border-color);border-bottom:1px solid var(--border-color);">${day.substring(0,3)}<br>${dateDisplay}</div>`}).join('');
+
+  // Day Cells
+  let cellsHTML='';
+  ADVISOR_NAMES.forEach((advisor,j)=>{
+    const col=j+2;
+    DAYS_FULL.forEach(day=>{
+      const templateName=masterRotaData[advisor][day].template;
+      const template=shiftTemplates[templateName];
+      const acts=template?processDayWorkflow(template):[];
+      let cell=`<div class="day-cell" style="grid-column:${col}; grid-row:3; position:relative;">`;
+      if(acts.length===0){ cell+=`<div class="day-off-label">DAY OFF</div>`;}
+      else{ acts.forEach(a=>{ const top=timeToPosition(a.start); const bottom=timeToPosition(a.end); const h=Math.max(10,bottom-top); const bg=colorMap[a.activity.toLowerCase()]||'#343a40'; cell+=`<div class="activity-block" style="top:${top}px;height:${h}px;background-color:${bg};" title="${a.activity} (${a.start}-${a.end})">${a.activity.toUpperCase()}<span class="activity-time">${a.start}-${a.end}</span></div>`; });}
+      cellsHTML+=cell+'</div>';
+    });
+  });
+
+  grid.innerHTML=timeAxisHTML+headerHTML+cellsHTML;
+  grid.style.gridTemplateRows=`auto auto ${TIMELINE_HEIGHT_PX}px`;
+}
+
+// --- PRINT ---
+function printGeneratedSchedule(){ window.print(); }
+
+// --- DATA PERSISTENCE ---
+function saveToLocalStorage(){ try{ const data={dates:document.getElementById('start-date-input').value,colors:getColorMap(),rotas:masterRotaData,templates:shiftTemplates}; localStorage.setItem(STORAGE_KEY,JSON.stringify(data)); } catch(e){console.warn("Could not save");} }
+function loadDataFromStorage(){ try{ const s=localStorage.getItem(STORAGE_KEY); if(s) applyData(JSON.parse(s));} catch(e){console.warn("Could not load");} }
+function loadData(event){ const f=event.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=function(e){ try{ applyData(JSON.parse(e.target.result)); alert("Data loaded successfully!"); } catch{ alert("Invalid JSON."); } }; r.readAsText(f);}
+function applyData(data){ if(data.colors){ Object.keys(data.colors).forEach(a=>{ const input=document.getElementById(`color-${a}`); if(input) input.value=data.colors[a]; }); updateColors(false);}
+if(data.templates){ shiftTemplates=data.templates; populateTemplateEditor();}
+if(data.dates) document.getElementById('start-date-input').value=data.dates; updateDates();
+if(data.rotas) Object.assign(masterRotaData,data.rotas); populateMasterTable(); generateAllSchedules(); }
+
+document.addEventListener('DOMContentLoaded',()=>{ initApp(); });
+
 </script>
 </body>
 </html>
-
-
