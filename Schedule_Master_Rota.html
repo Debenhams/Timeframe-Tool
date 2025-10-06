@@ -28,126 +28,53 @@
 }
 
 /* --- BASE & LAYOUT --- */
-body {
-    font-family: 'Roboto', sans-serif;
-    margin: 0;
-    padding: 0;
-    background-color: var(--secondary-color);
-    color: var(--text-dark);
-}
-.header {
-    background-color: var(--primary-color);
-    color: var(--text-light);
-    padding: 30px 40px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-}
-.header h1 {
-    margin:0;
-    font-size:2.4em;
-    font-weight:700;
-}
-.container {
-    padding: 40px;
-    max-width: 100%;
-    margin: auto;
-}
-h2 {
-    border-bottom:2px solid var(--border-color);
-    padding-bottom:10px;
-    margin-top:30px;
-    color: var(--primary-color);
-}
+body { font-family: 'Roboto', sans-serif; margin:0; padding:0; background-color:var(--secondary-color); color:var(--text-dark); }
+.header { background-color:var(--primary-color); color:var(--text-light); padding:30px 40px; box-shadow:0 4px 10px rgba(0,0,0,0.2);}
+.header h1 { margin:0; font-size:2.4em; font-weight:700;}
+.container { padding:40px; max-width:100%; margin:auto;}
+h2 { border-bottom:2px solid var(--border-color); padding-bottom:10px; margin-top:30px; color:var(--primary-color);}
 
 /* --- CONTROLS & DATA --- */
-.controls-panel {
-    background-color: var(--text-light);
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    margin-bottom: 20px;
-    display:flex;
-    flex-wrap:wrap;
-    justify-content:space-between;
-}
-input[type="date"], input[type="text"], input[type="time"], select {
-    padding:8px 10px;
-    border:1px solid var(--border-color);
-    border-radius:4px;
-    box-sizing:border-box;
-    transition:border-color 0.2s;
-}
-input:focus, select:focus { border-color: var(--primary-color); }
-button {
-    background-color: var(--accent-color);
-    color: var(--text-light);
-    border:none;
-    padding:10px 20px;
-    border-radius:6px;
-    cursor:pointer;
-    font-weight:600;
-    transition: background-color 0.2s;
-}
-button:hover { background-color:#00a040; }
-.button-group { display:flex; gap:10px; }
+.controls-panel { background-color:var(--text-light); padding:20px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1); margin-bottom:20px; display:flex; flex-wrap:wrap; justify-content:space-between;}
+input[type="date"], input[type="text"], input[type="time"], select { padding:8px 10px; border:1px solid var(--border-color); border-radius:4px; box-sizing:border-box; transition:border-color 0.2s;}
+input:focus, select:focus { border-color:var(--primary-color);}
+button { background-color:var(--accent-color); color:var(--text-light); border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:600; transition: background-color 0.2s;}
+button:hover { background-color:#00a040;}
+.button-group { display:flex; gap:10px;}
 .hidden { display:none !important; }
 
 /* --- TEMPLATE EDITOR --- */
-.template-row {
-    display:flex;
-    align-items:center;
-    gap:15px;
-    padding:10px;
-    border:1px solid #cfd8dc;
-    background-color: var(--secondary-color);
-    border-radius:4px;
-    margin-bottom:10px;
-    flex-wrap:wrap;
-}
-.template-row input, .template-row select { padding:5px; }
-.template-row button { background-color:#dc3545; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; }
-.template-row label { font-size:0.9em; font-weight:600; }
-.template-row .time-block { display:flex; gap:5px; }
+.template-row { display:flex; align-items:center; gap:15px; padding:10px; border:1px solid #cfd8dc; background-color:var(--secondary-color); border-radius:4px; margin-bottom:10px; flex-wrap:wrap;}
+.template-row input, .template-row select { padding:5px;}
+.template-row button { background-color:#dc3545; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;}
+.template-row label { font-size:0.9em; font-weight:600;}
+.template-row .time-block { display:flex; gap:5px;}
 
 /* --- MASTER ROTA GRID --- */
-.master-table-container { overflow-x:auto; background-color: var(--text-light); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom:30px; }
-.master-table { width:100%; border-collapse:collapse; min-width:800px; }
-.master-table th, .master-table td { border:1px solid var(--border-color); padding:8px; text-align:center; }
-.master-table th { background-color: var(--primary-color); color: var(--text-light); font-weight:600; }
-.master-table td.advisor-name-cell { text-align:left; font-weight:700; background-color:#e3f2fd; color:var(--text-dark); }
-.master-table select { width:95%; padding:6px; }
+.master-table-container { overflow-x:auto; background-color:var(--text-light); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom:30px;}
+.master-table { width:100%; border-collapse:collapse; min-width:800px;}
+.master-table th, .master-table td { border:1px solid var(--border-color); padding:8px; text-align:center;}
+.master-table th { background-color:var(--primary-color); color:var(--text-light); font-weight:600;}
+.master-table td.advisor-name-cell { text-align:left; font-weight:700; background-color:#e3f2fd; color:var(--text-dark);}
+.master-table select { width:95%; padding:6px;}
 
 /* --- TIMELINE GRID --- */
-#team-timeline-container {
-    background-color: var(--text-light);
-    padding:10px;
-    border-radius:8px;
-    box-shadow:0 8px 16px rgba(0,0,0,0.1);
-    overflow-x:auto;
-}
-.master-timeline-grid { display:grid; position:relative; }
+#team-timeline-container { background-color:var(--text-light); padding:10px; border-radius:8px; box-shadow:0 8px 16px rgba(0,0,0,0.1); overflow-x:auto;}
+.master-timeline-grid { display:grid; position:relative;}
 .time-axis { grid-column:1; padding-right:10px; text-align:right; border-right:1px solid var(--border-color); height: var(--timeline-height); position:relative; z-index:10; background-color: var(--text-light);}
-.time-label { position:absolute; font-size:0.8em; transform:translateY(-50%); left:0; width:100%; padding-right:5px; color:#757575; border-bottom:1px dashed #cfd8dc; }
-.advisor-header { grid-row:1; padding:10px 0; text-align:center; font-weight:700; background-color:var(--primary-color); color:var(--text-light); border:1px solid var(--border-color); border-left:none; position:sticky; top:0; z-index:20; }
-.day-cell { position:relative; border:1px solid var(--border-color); border-top:none; height:var(--timeline-height); overflow:hidden; }
-.activity-block { position:absolute; width:90%; left:5%; color:var(--text-light); padding:5px; box-sizing:border-box; border-radius:4px; font-size:0.75em; overflow:hidden; text-shadow:0 0 1px rgba(0,0,0,0.5); cursor:help; box-shadow:0 1px 3px rgba(0,0,0,0.2); font-weight:600; z-index:5; display:flex; flex-direction:column; justify-content:center; align-items:center; }
-.activity-time { font-size:0.7em; font-weight:normal; display:block; }
-.day-off-label { position:absolute; top:50%; transform:translateY(-50%); width:100%; text-align:center; color:#bdbdbd; font-size:1.2em; font-weight:600; }
+.time-label { position:absolute; font-size:0.8em; transform:translateY(-50%); left:0; width:100%; padding-right:5px; color:#757575; border-bottom:1px dashed #cfd8dc;}
+.advisor-header { grid-row:1; padding:10px 0; text-align:center; font-weight:700; background-color:var(--primary-color); color:var(--text-light); border:1px solid var(--border-color); border-left:none; position:sticky; top:0; z-index:20;}
+.day-cell { position:relative; border:1px solid var(--border-color); border-top:none; height:var(--timeline-height); overflow:hidden;}
+.activity-block { position:absolute; width:90%; left:5%; color:var(--text-light); padding:5px; box-sizing:border-box; border-radius:4px; font-size:0.75em; overflow:hidden; text-shadow:0 0 1px rgba(0,0,0,0.5); cursor:help; box-shadow:0 1px 3px rgba(0,0,0,0.2); font-weight:600; z-index:5; display:flex; flex-direction:column; justify-content:center; align-items:center;}
+.activity-time { font-size:0.7em; font-weight:normal; display:block;}
+.day-off-label { position:absolute; top:50%; transform:translateY(-50%); width:100%; text-align:center; color:#bdbdbd; font-size:1.2em; font-weight:600;}
 
 /* --- PRINT --- */
-@media print {
-    .header, .controls-panel, .master-table-container, button { display:none !important; }
-    .container { padding:0 !important; }
-    .master-timeline-grid { page-break-inside:avoid; }
-    .time-axis { height:auto !important; }
-    .day-cell { height:1000px !important; page-break-inside:avoid; }
-    body { background-color:white !important; }
-}
+@media print { .header, .controls-panel, .master-table-container, button { display:none !important;} .container { padding:0 !important;} .master-timeline-grid { page-break-inside:avoid;} .time-axis { height:auto !important;} .day-cell { height:1000px !important; page-break-inside:avoid;} body { background-color:white !important;} }
 </style>
 </head>
 <body>
-<div class="header">
-    <h1>Professional Team Rota System</h1>
-</div>
+<div class="header"><h1>Professional Team Rota System</h1></div>
 <div class="container">
     <div class="controls-panel">
         <div style="display:flex; gap:15px; align-items:center;">
@@ -155,7 +82,7 @@ button:hover { background-color:#00a040; }
             <input type="date" id="start-date-input" onchange="updateDates()">
         </div>
         <div class="button-group">
-            <button onclick="saveData(true)">💾 Save & Download Data</button>
+            <button onclick="downloadData(collectFullData())">💾 Save & Download Data</button>
             <button onclick="toggleSettings()">⚙️ Toggle Settings/Templates</button>
             <button onclick="generateAllSchedules()">🚀 Generate Timeline View</button>
         </div>
@@ -255,7 +182,7 @@ function getColorMap(){
     return map;
 }
 
-// --- TEMPLATE ---
+// --- TEMPLATE LOGIC ---
 function addTemplate(){
     const name='Shift'+(Object.keys(shiftTemplates).length+1);
     shiftTemplates[name]={name,Start:'',Finish:'',Break1:'',Lunch:'',Break2:'',Platform:'Emails'};
@@ -276,7 +203,7 @@ function updateTemplate(oldName,key,value){
         delete shiftTemplates[oldName];
         populateTemplateEditor();
         populateMasterTable();
-    } else {template[key]=value;}
+    } else { template[key]=value; }
     saveToLocalStorage();
 }
 function populateTemplateEditor(){
@@ -296,38 +223,4 @@ function populateTemplateEditor(){
                 <input type="time" value="${t.Break2}" oninput="updateTemplate('${t.name}','Break2',this.value)">
             </div>
             <label>Platform:</label>
-            <select onchange="updateTemplate('${t.name}','Platform',this.value)" style="width:100px;">
-                <option value="">-- Main --</option>
-                ${PLATFORM_ACTIVITIES.map(p=>`<option value="${p}" ${t.Platform===p?'selected':''}>${p}</option>`).join('')}
-            </select>
-            <button onclick="deleteTemplate('${t.name}')">X</button>
-        `;
-        editor.appendChild(row);
-    });
-}
-
-// --- MASTER TABLE ---
-function populateMasterTable(){
-    const dateHeadersRow=document.getElementById('date-headers');
-    const tbody=document.querySelector('#master-rota-table tbody');
-    dateHeadersRow.innerHTML=DAYS_FULL.map(d=>`<th data-day="${d}">${d.substring(0,3)}<br><span class="date-display">Date N/A</span></th>`).join('');
-    const templateOptions=Object.keys(shiftTemplates).map(name=>`<option value="${name}">${name}</option>`).join('');
-    tbody.innerHTML='';
-    ADVISOR_NAMES.forEach(name=>{
-        const row=tbody.insertRow();
-        let cell=row.insertCell(); cell.className='advisor-name-cell'; cell.textContent=name;
-        DAYS_FULL.forEach(day=>{
-            cell=row.insertCell(); cell.innerHTML=`<select onchange="saveAssignment('${name}','${day}',this.value)">
-                <option value="">-- DAY OFF --</option>${templateOptions.replace(`value="${masterRotaData[name][day].template}"`,`value="${masterRotaData[name][day].template}" selected`)}
-            </select>`;
-        });
-    });
-}
-function saveAssignment(advisor,day,templateName){
-    masterRotaData[advisor][day].template=templateName;
-    saveToLocalStorage();
-    generateAllSchedules();
-}
-
-// --- SCHEDULE / TIMELINE ---
-function
+            <select onchange="updateTemplate('${t.name}','Platform
