@@ -3,381 +3,283 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Team Schedule & Rota Manager</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<title>Team Schedule & Rota</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
 <style>
-  body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f4f6f9;
-    margin: 0;
-    padding: 0;
-  }
-
-  .container {
-    padding: 20px;
-    max-width: 1400px;
-    margin: auto;
-  }
-
-  h1 {
-    text-align: center;
-    margin-bottom: 30px;
-    color: #333;
-  }
-
-  .controls {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    margin-bottom: 20px;
-  }
-
-  .controls select,
-  .controls input,
-  .controls button {
-    padding: 8px 12px;
-    font-size: 14px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
-  }
-
-  .schedule-container {
-    overflow-x: auto;
-    background-color: #fff;
-    border-radius: 10px;
-    padding: 15px;
-    box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
-  }
-
-  table {
-    border-collapse: collapse;
-    width: 100%;
-    min-width: 900px;
-  }
-
-  table th, table td {
-    border: 1px solid #ddd;
-    padding: 8px;
-    text-align: center;
-    vertical-align: middle;
-  }
-
-  table th {
-    background-color: #007bff;
-    color: white;
-    font-weight: bold;
-  }
-
-  table td.shift {
-    background-color: #e0f7fa;
-    cursor: pointer;
-    transition: 0.3s;
-  }
-
-  table td.shift:hover {
-    background-color: #b2ebf2;
-  }
-
-  .shift-type {
-    font-size: 12px;
-    font-weight: 600;
-    color: #007bff;
-  }
-
-  .btn-toggle, .btn-pdf {
-    background-color: #007bff;
-    color: white;
-    border: none;
-    cursor: pointer;
-    transition: 0.3s;
-  }
-
-  .btn-toggle:hover, .btn-pdf:hover {
-    background-color: #0056b3;
-  }
-
-  .shift-editor {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 20px;
-    background-color: #fff;
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0px 4px 8px rgba(0,0,0,0.1);
-  }
-
-  .shift-editor label {
-    display: block;
-    font-size: 13px;
-    margin-bottom: 5px;
-  }
-
-  .shift-editor input, .shift-editor select {
-    padding: 6px 10px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
-    font-size: 13px;
-  }
-
-  .shift-editor button {
-    align-self: flex-end;
-    padding: 8px 12px;
-    font-size: 14px;
-    border-radius: 5px;
-    border: none;
-    background-color: #28a745;
-    color: white;
-    cursor: pointer;
-  }
-
-  .shift-editor button:hover {
-    background-color: #218838;
-  }
+    body {
+        font-family: Arial, sans-serif;
+        background: #f9f9f9;
+        margin: 0;
+        padding: 0;
+    }
+    header {
+        background: #0052cc;
+        color: white;
+        padding: 15px;
+        text-align: center;
+    }
+    .controls {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 20px;
+        background: #eaeaea;
+        flex-wrap: wrap;
+    }
+    .controls select, .controls button {
+        padding: 5px 10px;
+        margin: 5px;
+    }
+    table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 20px auto;
+        table-layout: fixed;
+    }
+    th, td {
+        border: 1px solid #ddd;
+        text-align: center;
+        padding: 10px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    th {
+        background: #0052cc;
+        color: white;
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+    .shift {
+        padding: 5px;
+        border-radius: 5px;
+        color: white;
+        font-weight: bold;
+        font-size: 0.9em;
+    }
+    .early { background-color: #6c5ce7; }
+    .middle { background-color: #00b894; }
+    .late { background-color: #fd79a8; }
+    .break { background-color: #ffeaa7; color: #2d3436; }
+    .lunch { background-color: #fab1a0; color: #2d3436; }
+    .email { font-size: 0.8em; margin-top: 3px; display: block; color: #fff; }
+    .mirakl { font-size: 0.8em; margin-top: 3px; display: block; color: #fff; }
+    .hidden { display: none; }
 </style>
 </head>
 <body>
-<div class="container">
-  <h1>Team Schedule & Rota Manager</h1>
+<header>
+    <h1>Team Schedule & Rota</h1>
+</header>
 
-  <div class="controls">
-    <select id="viewMode">
-      <option value="daily">Daily View</option>
-      <option value="weekly">Weekly View</option>
-    </select>
-
-    <select id="teamSelector">
-      <option value="all">All Team</option>
-      <option value="Luke Pashley">Luke Pashley</option>
-      <option value="Ameena Malik">Ameena Malik</option>
-      <option value="Carrie-Ann Raw">Carrie-Ann Raw</option>
-      <option value="Danielle Smith">Danielle Smith</option>
-      <option value="Farwa Shaheen">Farwa Shaheen</option>
-      <option value="Gemma Emmett">Gemma Emmett</option>
-      <option value="Laura Stockburn">Laura Stockburn</option>
-      <option value="Millie Walsh">Millie Walsh</option>
-      <option value="Tunis Foley">Tunis Foley</option>
-    </select>
-
-    <input type="week" id="weekSelector" />
-
-    <button class="btn-toggle" id="toggleView">Toggle View</button>
-    <button class="btn-pdf" id="downloadPDF">Download PDF</button>
-  </div>
-
-  <div class="shift-editor">
+<div class="controls">
     <div>
-      <label for="shiftUser">Select User</label>
-      <select id="shiftUser">
-        <option value="">--Select User--</option>
-        <option value="Luke Pashley">Luke Pashley</option>
-        <option value="Ameena Malik">Ameena Malik</option>
-        <option value="Carrie-Ann Raw">Carrie-Ann Raw</option>
-        <option value="Danielle Smith">Danielle Smith</option>
-        <option value="Farwa Shaheen">Farwa Shaheen</option>
-        <option value="Gemma Emmett">Gemma Emmett</option>
-        <option value="Laura Stockburn">Laura Stockburn</option>
-        <option value="Millie Walsh">Millie Walsh</option>
-        <option value="Tunis Foley">Tunis Foley</option>
-      </select>
+        <label for="userSelect">Select User:</label>
+        <select id="userSelect">
+            <option value="all">All Team</option>
+            <option value="Luke Pashley">Luke Pashley</option>
+            <option value="Ameena Malik">Ameena Malik</option>
+            <option value="Carrie-Ann Raw">Carrie-Ann Raw</option>
+            <option value="Danielle Smith">Danielle Smith</option>
+            <option value="Farwa Shaheen">Farwa Shaheen</option>
+            <option value="Gemma Emmett">Gemma Emmett</option>
+            <option value="Laura Stockburn">Laura Stockburn</option>
+            <option value="Millie Walsh">Millie Walsh</option>
+            <option value="Tunis Foley">Tunis Foley</option>
+        </select>
     </div>
-
     <div>
-      <label for="shiftDay">Select Day</label>
-      <select id="shiftDay">
-        <option value="Monday">Monday</option>
-        <option value="Tuesday">Tuesday</option>
-        <option value="Wednesday">Wednesday</option>
-        <option value="Thursday">Thursday</option>
-        <option value="Friday">Friday</option>
-        <option value="Saturday">Saturday</option>
-        <option value="Sunday">Sunday</option>
-      </select>
+        <label for="weekSelect">Select Week:</label>
+        <input type="week" id="weekSelect"/>
+        <button id="toggleView">Toggle View</button>
+        <button id="downloadPDF">Download PDF</button>
     </div>
-
-    <div>
-      <label for="shiftType">Shift Type</label>
-      <select id="shiftType">
-        <option value="Early">Early</option>
-        <option value="Middle">Middle</option>
-        <option value="Late">Late</option>
-        <option value="Custom">Custom</option>
-      </select>
-    </div>
-
-    <div>
-      <label for="shiftStart">Start Time</label>
-      <input type="time" id="shiftStart" />
-    </div>
-
-    <div>
-      <label for="shiftEnd">End Time</label>
-      <input type="time" id="shiftEnd" />
-    </div>
-
-    <div>
-      <label for="shiftBreak">Break Minutes</label>
-      <input type="number" id="shiftBreak" min="0" value="0" />
-    </div>
-
-    <div>
-      <label>&nbsp;</label>
-      <button id="addShiftBtn">Add Shift</button>
-    </div>
-  </div>
-
-  <div class="schedule-container">
-    <table id="scheduleTable">
-      <thead id="scheduleHeader">
-        <!-- Header generated dynamically -->
-      </thead>
-      <tbody id="scheduleBody">
-        <!-- Schedule generated dynamically -->
-      </tbody>
-    </table>
-  </div>
-<script>
-const teamMembers = [
-  'Luke Pashley','Ameena Malik','Carrie-Ann Raw','Danielle Smith',
-  'Farwa Shaheen','Gemma Emmett','Laura Stockburn','Millie Walsh','Tunis Foley'
-];
-
-let scheduleData = {}; // { week: { day: { user: [shifts] } } }
-let currentView = 'daily';
-let selectedWeek = getCurrentWeek();
-
-function getCurrentWeek() {
-  const now = new Date();
-  const onejan = new Date(now.getFullYear(),0,1);
-  const week = Math.ceil((((now - onejan) / 86400000) + onejan.getDay()+1)/7);
-  return `${now.getFullYear()}-W${week}`;
-}
-
-document.getElementById('weekSelector').value = selectedWeek;
-document.getElementById('weekSelector').addEventListener('change', (e) => {
-  selectedWeek = e.target.value;
-  renderSchedule();
-});
-
-document.getElementById('toggleView').addEventListener('click', () => {
-  currentView = currentView === 'daily' ? 'weekly' : 'daily';
-  renderSchedule();
-});
-
-document.getElementById('addShiftBtn').addEventListener('click', () => {
-  const user = document.getElementById('shiftUser').value;
-  const day = document.getElementById('shiftDay').value;
-  const type = document.getElementById('shiftType').value;
-  const start = document.getElementById('shiftStart').value;
-  const end = document.getElementById('shiftEnd').value;
-  const breakMinutes = parseInt(document.getElementById('shiftBreak').value) || 0;
-
-  if(!user || !day || !start || !end) {
-    alert('Please fill in all required shift fields.');
-    return;
-  }
-
-  if(!scheduleData[selectedWeek]) scheduleData[selectedWeek] = {};
-  if(!scheduleData[selectedWeek][day]) scheduleData[selectedWeek][day] = {};
-  if(!scheduleData[selectedWeek][day][user]) scheduleData[selectedWeek][day][user] = [];
-
-  scheduleData[selectedWeek][day][user].push({
-    type, start, end, breakMinutes
-  });
-
-  renderSchedule();
-});
-
-function renderSchedule() {
-  const header = document.getElementById('scheduleHeader');
-  const body = document.getElementById('scheduleBody');
-  header.innerHTML = '';
-  body.innerHTML = '';
-
-  const selectedTeam = document.getElementById('teamSelector').value;
-  const weekData = scheduleData[selectedWeek] || {};
-
-  if(currentView === 'daily') {
-    const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-    const day = days[new Date().getDay()-1] || 'Monday'; // default today
-    const thRow = document.createElement('tr');
-    thRow.innerHTML = `<th>User</th><th>Shifts (${day})</th>`;
-    header.appendChild(thRow);
-
-    teamMembers.forEach(member => {
-      if(selectedTeam !== 'all' && selectedTeam !== member) return;
-      const tdShifts = weekData[day] && weekData[day][member] ? weekData[day][member].map(s => 
-        `<div class="shift"><span class="shift-type">${s.type}</span> ${s.start} - ${s.end} (${s.breakMinutes}m break)</div>`).join('') : '';
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${member}</td><td>${tdShifts}</td>`;
-      body.appendChild(tr);
-    });
-  } else { // weekly
-    const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-    const thRow = document.createElement('tr');
-    thRow.innerHTML = `<th>User</th>` + days.map(d => `<th>${d}</th>`).join('');
-    header.appendChild(thRow);
-
-    teamMembers.forEach(member => {
-      if(selectedTeam !== 'all' && selectedTeam !== member) return;
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${member}</td>` + days.map(day => {
-        const tdShifts = weekData[day] && weekData[day][member] ? weekData[day][member].map(s => 
-          `<div class="shift"><span class="shift-type">${s.type}</span> ${s.start} - ${s.end} (${s.breakMinutes}m)</div>`).join('') : '';
-        return `<td>${tdShifts}</td>`;
-      }).join('');
-      body.appendChild(tr);
-    });
-  }
-}
-
-document.getElementById('teamSelector').addEventListener('change', renderSchedule);
-document.getElementById('viewMode').addEventListener('change', (e) => {
-  currentView = e.target.value;
-  renderSchedule();
-});
-
-// Initialize schedule
-renderSchedule();
-</script>
-<script>
-document.getElementById('downloadPDF').addEventListener('click', () => {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF('l', 'pt', 'a4');
-  const table = document.getElementById('scheduleTable');
-
-  doc.setFontSize(12);
-  doc.text("Team Schedule - Week " + selectedWeek, 40, 30);
-
-  // AutoTable plugin could be used, but we'll do simple export here
-  const rows = [];
-  const headers = [];
-  table.querySelectorAll('thead tr th').forEach(th => headers.push(th.innerText));
-
-  table.querySelectorAll('tbody tr').forEach(tr => {
-    const row = [];
-    tr.querySelectorAll('td').forEach(td => row.push(td.innerText));
-    rows.push(row);
-  });
-
-  // Draw headers
-  let startX = 40, startY = 50, rowHeight = 20;
-  headers.forEach((h, i) => {
-    doc.text(h, startX + i*100, startY);
-  });
-
-  // Draw rows
-  rows.forEach((r, rowIndex) => {
-    r.forEach((cell, i) => {
-      doc.text(cell, startX + i*100, startY + (rowIndex+1)*rowHeight);
-    });
-  });
-
-  doc.save(`Team_Schedule_${selectedWeek}.pdf`);
-});
-</script>
 </div>
+
+<table id="scheduleTable">
+    <thead>
+        <tr>
+            <th>Time</th>
+            <th>Luke Pashley</th>
+            <th>Ameena Malik</th>
+            <th>Carrie-Ann Raw</th>
+            <th>Danielle Smith</th>
+            <th>Farwa Shaheen</th>
+            <th>Gemma Emmett</th>
+            <th>Laura Stockburn</th>
+            <th>Millie Walsh</th>
+            <th>Tunis Foley</th>
+        </tr>
+    </thead>
+    <tbody>
+        <!-- Schedule rows dynamically generated here -->
+    </tbody>
+</table>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+    const users = ['Luke Pashley','Ameena Malik','Carrie-Ann Raw','Danielle Smith','Farwa Shaheen','Gemma Emmett','Laura Stockburn','Millie Walsh','Tunis Foley'];
+    let viewMode = 'week'; // week/daily toggle
+</script>
+<script>
+const scheduleTableBody = document.querySelector('#scheduleTable tbody');
+const userSelect = document.getElementById('userSelect');
+const weekSelect = document.getElementById('weekSelect');
+const toggleViewBtn = document.getElementById('toggleView');
+const downloadPDFBtn = document.getElementById('downloadPDF');
+
+// Sample shift data structure
+let shifts = {
+    'Luke Pashley': [],
+    'Ameena Malik': [],
+    'Carrie-Ann Raw': [],
+    'Danielle Smith': [],
+    'Farwa Shaheen': [],
+    'Gemma Emmett': [],
+    'Laura Stockburn': [],
+    'Millie Walsh': [],
+    'Tunis Foley': []
+};
+
+// Default times for demonstration (can be customized per shift)
+const defaultTimes = ['08:00', '09:00', '10:00', '11:00', '12:00','13:00','14:00','15:00','16:00','17:00'];
+
+function generateSchedule() {
+    scheduleTableBody.innerHTML = '';
+
+    // Create row for each time
+    defaultTimes.forEach(time => {
+        const tr = document.createElement('tr');
+        const timeCell = document.createElement('td');
+        timeCell.textContent = time;
+        tr.appendChild(timeCell);
+
+        users.forEach(user => {
+            const td = document.createElement('td');
+            td.dataset.user = user;
+
+            // Filter shifts for this time
+            const shift = shifts[user].find(s => s.start <= time && s.end > time);
+            if (shift) {
+                const span = document.createElement('span');
+                span.classList.add('shift', shift.type);
+                span.textContent = shift.type.charAt(0).toUpperCase() + shift.type.slice(1);
+                if(shift.email) {
+                    const emailSpan = document.createElement('span');
+                    emailSpan.classList.add('email');
+                    emailSpan.textContent = 'Email';
+                    span.appendChild(emailSpan);
+                }
+                if(shift.mirakl) {
+                    const miraklSpan = document.createElement('span');
+                    miraklSpan.classList.add('mirakl');
+                    miraklSpan.textContent = 'Mirakl';
+                    span.appendChild(miraklSpan);
+                }
+                td.appendChild(span);
+            }
+
+            tr.appendChild(td);
+        });
+
+        scheduleTableBody.appendChild(tr);
+    });
+}
+
+// Toggle daily/weekly view
+toggleViewBtn.addEventListener('click', () => {
+    viewMode = (viewMode === 'week') ? 'daily' : 'week';
+    generateSchedule();
+});
+
+// Filter by user
+userSelect.addEventListener('change', () => {
+    const selectedUser = userSelect.value;
+    document.querySelectorAll('#scheduleTable tbody td').forEach(td => {
+        if(selectedUser === 'all') {
+            td.classList.remove('hidden');
+        } else if(td.dataset.user !== selectedUser && td.dataset.user !== undefined) {
+            td.classList.add('hidden');
+        } else {
+            td.classList.remove('hidden');
+        }
+    });
+});
+
+// Week selector change (stub, can integrate real week-based shifts)
+weekSelect.addEventListener('change', () => {
+    generateSchedule();
+});
+
+// Function to add shift manually
+function addShift(user, type, start, end, email=false, mirakl=false) {
+    if(!shifts[user]) shifts[user] = [];
+    shifts[user].push({type, start, end, email, mirakl});
+    generateSchedule();
+}
+
+// Example: Adding sample shifts
+addShift('Luke Pashley','early','08:00','12:00',true,false);
+addShift('Luke Pashley','middle','13:00','17:00',false,true);
+addShift('Ameena Malik','late','10:00','18:00',false,true);
+
+// PDF Download
+downloadPDFBtn.addEventListener('click', () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('l', 'pt', 'a4');
+    doc.html(document.querySelector('#scheduleTable'), {
+        callback: function(pdf) {
+            pdf.save('team_schedule.pdf');
+        },
+        x: 10,
+        y: 10,
+        html2canvas: { scale: 0.8 }
+    });
+});
+
+// Initial render
+generateSchedule();
+</script>
+<script>
+function createCustomShiftUI() {
+    const controlsDiv = document.createElement('div');
+    controlsDiv.style.background = '#f1f1f1';
+    controlsDiv.style.padding = '10px';
+    controlsDiv.style.margin = '10px 20px';
+    controlsDiv.style.borderRadius = '8px';
+
+    controlsDiv.innerHTML = `
+        <h3>Custom Shift Management</h3>
+        <label>User: <select id="customUser">
+            ${users.map(u=>`<option value="${u}">${u}</option>`).join('')}
+        </select></label>
+        <label>Shift Type: <input type="text" id="customType" placeholder="Early/Middle/Late/Custom"></label>
+        <label>Start Time: <input type="time" id="customStart"></label>
+        <label>End Time: <input type="time" id="customEnd"></label>
+        <label>Break (min): <input type="number" id="customBreak" value="0"></label>
+        <label>Lunch (min): <input type="number" id="customLunch" value="0"></label>
+        <label>Email Task: <input type="checkbox" id="customEmail"></label>
+        <label>Mirakl Task: <input type="checkbox" id="customMirakl"></label>
+        <button id="addCustomShift">Add Shift</button>
+    `;
+    document.body.insertBefore(controlsDiv, document.getElementById('scheduleTable'));
+
+    document.getElementById('addCustomShift').addEventListener('click', () => {
+        const user = document.getElementById('customUser').value;
+        const type = document.getElementById('customType').value.toLowerCase();
+        const start = document.getElementById('customStart').value;
+        const end = document.getElementById('customEnd').value;
+        const email = document.getElementById('customEmail').checked;
+        const mirakl = document.getElementById('customMirakl').checked;
+
+        addShift(user, type, start, end, email, mirakl);
+    });
+}
+
+// Initialize custom shift UI
+createCustomShiftUI();
+</script>
 </body>
 </html>
+
 
