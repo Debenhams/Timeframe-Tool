@@ -1,796 +1,251 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>Professional Team Rota System</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>
-    /* ================= THEME ================= */
-    :root{
-      --primary: #0d47a1;
-      --accent: #00c853;
-      --bg: #fafafa;
-      --card: #ffffff;
-      --muted: #757575;
-      --border: #e6e9ee;
-      --shadow: 0 6px 18px rgba(13,71,161,0.08);
-      --timeline-height: 900px;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Professional Team Rota System</title>
+<style>
+/* --------------------- VARIABLES --------------------- */
+:root {
+    --primary-color: #0d47a1;
+    --secondary-color: #f5f5f5;
+    --accent-color: #00c853;
+    --text-light: #ffffff;
+    --text-dark: #212121;
+    --border-color: #e0e0e0;
+    --timeline-height: 1000px;
 
-      /* activity colours (defaults) */
-      --color-emails: #2ecc71;
-      --color-mirakl: #ffb300;
-      --color-social: #5e35b1;
-      --color-overtime: #e53935;
-      --color-meeting: #ffd700;
-      --color-break: #90a4ae;
-      --color-lunch: #ff8f00;
-      --color-dayoff: #f4f4f4;
-    }
+    --color-emails: #2ecc71;
+    --color-mirakl: #ffb300;
+    --color-social: #5e35b1;
+    --color-overtime: #e53935;
+    --color-meeting: #ffd700;
+    --color-break: #90a4ae;
+    --color-lunch: #ff8f00;
+    --color-dayoff: #f4f4f4;
+}
 
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family: Inter, "Roboto", "Segoe UI", system-ui, -apple-system, sans-serif;
-      background:linear-gradient(180deg,#fbfdff 0%,var(--bg) 100%);
-      color:#1f2937;
-      -webkit-font-smoothing:antialiased;
-    }
+/* --------------------- BASE --------------------- */
+* { box-sizing: border-box; }
+body {
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+    background: var(--secondary-color);
+    color: var(--text-dark);
+}
+.header {
+    background: var(--primary-color);
+    color: var(--text-light);
+    padding: 28px 36px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+}
+.header h1 { margin: 0; font-size: 1.9rem; font-weight: 700; }
+.container { padding: 28px; max-width: 1400px; margin: 0 auto; }
 
-    .page {
-      max-width:1200px;
-      margin:28px auto;
-      padding:24px;
-      gap:18px;
-    }
+/* Controls */
+.controls-panel {
+    background: var(--text-light);
+    padding: 14px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    margin-bottom: 18px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+input, select { padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; }
+button { background: var(--accent-color); color: var(--text-light); border: none; padding: 8px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+button.secondary { background: #1976d2; }
+button.danger { background: #dc3545; }
+.button-group { display: flex; gap: 8px; }
+.hidden { display: none !important; }
 
-    .header {
-      background:linear-gradient(90deg,var(--primary), #1565c0);
-      color:white;
-      padding:24px 28px;
-      border-radius:12px;
-      box-shadow:var(--shadow);
-      display:flex;
-      justify-content:space-between;
-      align-items:center;
-      gap:12px;
-    }
-    .header h1 { margin:0; font-size:1.35rem; letter-spacing:0.2px; }
-    .header .sub { opacity:0.9; font-size:0.95rem; }
+/* Template Editor */
+.template-row {
+    display: flex; gap: 10px; align-items: center; padding: 10px;
+    border-radius: 6px; border: 1px solid #cfd8dc; background: var(--secondary-color);
+    flex-wrap: wrap; margin-bottom: 10px;
+}
+.template-row input[type="time"]{width:110px}
+.template-row input[type="text"]{width:120px}
+.template-row select{width:130px;padding:6px}
 
-    .container { margin-top:18px; display:flex; flex-direction:column; gap:18px; }
+/* Master Table */
+.master-table-container { overflow: auto; background: var(--text-light); border-radius: 8px; padding: 0; margin-bottom: 16px; box-shadow:0 4px 12px rgba(0,0,0,0.05); }
+table.master-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+table.master-table th, table.master-table td { border:1px solid var(--border-color); padding:8px; text-align:center; }
+table.master-table th { background: var(--primary-color); color: var(--text-light); font-weight: 600; }
+td.advisor-name-cell { text-align:left; font-weight:700; background:#e3f2fd; color: var(--text-dark); width:200px; }
 
-    /* Controls card */
-    .controls {
-      background:var(--card);
-      padding:14px;
-      border-radius:10px;
-      box-shadow:0 4px 12px rgba(16,24,40,0.04);
-      display:flex;
-      gap:12px;
-      align-items:center;
-      justify-content:space-between;
-      flex-wrap:wrap;
-      border:1px solid var(--border);
-    }
-    .controls .left { display:flex; gap:12px; align-items:center; }
-    label { font-weight:700; color:#102a43; font-size:0.95rem }
-    input[type="date"], input[type="text"], input[type="time"], select {
-      padding:8px 10px;
-      border:1px solid var(--border);
-      border-radius:8px;
-      background:#fff;
-      font-size:0.95rem;
-    }
+/* Timeline */
+#timeline-container { background: var(--text-light); padding: 12px; border-radius: 8px; box-shadow: 0 8px 16px rgba(0,0,0,0.08); overflow:auto; }
+.timeline-grid { display:grid; position: relative; gap:0; align-items:start; }
+.time-axis{ padding-right:10px; text-align:right; border-right:1px solid var(--border-color); position:relative; background:var(--text-light); }
+.time-label{ position:absolute; font-size:0.8em; transform:translateY(-50%); left:0; width:100%; padding-right:6px; color:#616161; border-bottom:1px dashed #e0e0e0; }
+.advisor-header{ padding:10px 6px; text-align:center; font-weight:700; background:var(--primary-color); color:var(--text-light); position:sticky; top:0; z-index:20; border:1px solid var(--border-color); }
+.day-cell{ position:relative; border:1px solid var(--border-color); height: var(--timeline-height); overflow:hidden; background:transparent; }
+.activity-block{ position:absolute; left:6%; width:88%; color:var(--text-light); padding:4px 2px; border-radius:6px; font-size:0.75em; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 1px 3px rgba(0,0,0,0.15); font-weight:600; cursor:help; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.activity-time{ font-size:0.7em; font-weight:400; display:block; opacity:0.95; }
+.day-off-label{ position:absolute; top:50%; transform:translateY(-50%); width:100%; text-align:center; color:#bdbdbd; font-size:1.05em; font-weight:700; }
 
-    .buttons { display:flex; gap:10px; align-items:center; }
-    button {
-      border: none;
-      padding:8px 12px;
-      border-radius:10px;
-      cursor:pointer;
-      font-weight:700;
-      box-shadow: 0 3px 8px rgba(2,6,23,0.06);
-    }
-    button.primary{ background:linear-gradient(90deg,var(--accent), #00a64f); color:white; }
-    button.ghost{ background:transparent; color:var(--primary); border:1px solid rgba(13,71,161,0.08); }
-    button.warn{ background:#ff8a65; color:white; }
-    .small { padding:6px 10px; font-weight:600; border-radius:8px; }
+/* Color key */
+.color-key-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.color-input-group{display:flex;gap:8px;align-items:center;}
+.color-example{display:inline-block;width:18px;height:18px;border-radius:4px;border:1px solid rgba(0,0,0,0.08);}
 
-    /* Settings panel */
-    .settings {
-      display:flex; gap:16px; align-items:flex-start; flex-wrap:wrap;
-    }
-    .card {
-      background:var(--card);
-      padding:14px;
-      border-radius:10px;
-      border:1px solid var(--border);
-      box-shadow:0 6px 20px rgba(3,10,34,0.03);
-    }
-    .card.wide { flex:1; min-width:360px; }
-    .card.small { width:340px; }
+/* Print */
+@media print{ .header,.controls-panel,button{display:none !important} body{background:#fff} }
 
-    .template-row {
-      display:flex;
-      gap:10px;
-      align-items:center;
-      padding:10px;
-      border-radius:8px;
-      border:1px solid #edf2f7;
-      background:linear-gradient(180deg,#fff,#fbfcff);
-      margin-bottom:10px;
-      flex-wrap:wrap;
-    }
-    .template-row label{font-weight:700;font-size:0.85rem;color:#0f172a}
-    .template-row input[type="text"]{width:140px;padding:8px;border-radius:8px}
-    .template-row input[type="time"]{width:110px;padding:8px;border-radius:8px}
-    .template-row select{padding:8px;border-radius:8px}
-
-    .color-key-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-    .color-example{display:inline-block;width:18px;height:18px;border-radius:6px;border:1px solid rgba(0,0,0,0.06);margin-right:8px}
-
-    /* Master table */
-    .master-table-container{
-      overflow:auto;
-      border-radius:10px;
-      border:1px solid var(--border);
-      background:linear-gradient(180deg,#fff,#fbfdff);
-      padding:0;
-    }
-    table.master-table{ width:100%; border-collapse:collapse; min-width:760px; }
-    table.master-table th, table.master-table td {
-      padding:10px 12px; text-align:center; border-bottom:1px solid #f1f5f9; font-size:0.95rem;
-    }
-    table.master-table th {
-      background:linear-gradient(90deg,var(--primary),#1565c0); color:white; font-weight:800; position:sticky; top:0;
-    }
-    td.advisor-name-cell {
-      background:#e7f3ff; color:#072b58; text-align:left; font-weight:800; width:220px;
-      padding-left:16px;
-    }
-    select.shift-select{ width:100%; padding:8px; border-radius:8px; }
-
-    /* TIMELINE LAYOUT */
-    .timeline-wrap {
-      background:var(--card);
-      border-radius:12px;
-      padding:14px;
-      border:1px solid var(--border);
-      box-shadow:0 12px 30px rgba(12,24,60,0.04);
-    }
-
-    .timeline-row {
-      display:flex;
-      gap:14px;
-      align-items:flex-start;
-      overflow:auto;             /* horizontal scroll if many advisors */
-      padding-bottom:6px;
-    }
-
-    /* time-axis column */
-    .time-axis {
-      min-width:70px;
-      flex:0 0 70px;
-      position:relative;
-      border-right:1px solid var(--border);
-      padding-right:8px;
-      margin-right:6px;
-      height:var(--timeline-height);
-      background:linear-gradient(180deg,#fff,#fbfdff);
-    }
-    .time-axis .label {
-      position:absolute; left:0; width:100%; text-align:right; padding-right:6px;
-      font-size:0.82rem; color:var(--muted);
-    }
-    /* advisor column */
-    .advisor-column {
-      min-width:210px;
-      flex:0 0 210px;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-      align-items:stretch;
-    }
-    .advisor-header {
-      background:linear-gradient(90deg,var(--primary), #1565c0);
-      color:white; padding:10px; border-radius:10px; text-align:center; font-weight:800;
-      box-shadow:0 6px 18px rgba(8,27,86,0.06);
-      font-size:0.98rem;
-    }
-    .advisor-timeline {
-      position:relative;
-      height:var(--timeline-height);
-      border-radius:10px;
-      background:linear-gradient(180deg,#fff,#fbfdff);
-      border:1px solid #eef3fb;
-      overflow:hidden;
-    }
-    .activity-block {
-      position:absolute; left:6%; width:88%; border-radius:8px; padding:6px 8px; font-weight:700;
-      display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:0.83rem;
-      color:white; text-shadow:0 1px 2px rgba(0,0,0,0.25);
-      box-shadow:0 4px 14px rgba(2,6,23,0.06); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-    }
-    .activity-time { font-size:0.78rem; font-weight:600; opacity:0.95 }
-    .day-off-label { position:absolute; top:50%; left:0; transform:translateY(-50%); width:100%; text-align:center; color:var(--muted); font-weight:800; font-size:1rem; }
-
-    /* small screens */
-    @media (max-width:900px){
-      .advisor-column { min-width:180px; flex:0 0 180px; }
-      .time-axis { display:none; } /* hide axis on small screens to save space */
-    }
-  </style>
+/* Small screens */
+@media(max-width:820px){ .controls-panel{flex-direction:column;align-items:stretch} .template-row{flex-direction:column;align-items:stretch} }
+</style>
 </head>
 <body>
-  <div class="page">
-    <div class="header">
-      <div>
-        <h1>Professional Team Rota System</h1>
-        <div class="sub">Clean timeline view — add templates, assign shifts, export schedules</div>
-      </div>
-      <div>
-        <button class="ghost small" onclick="printGeneratedSchedule()">🖨 Print / PDF</button>
-        <button class="primary small" onclick="saveData(true)">💾 Save & Export</button>
-      </div>
-    </div>
-
-    <div class="container">
-      <!-- CONTROLS -->
-      <div class="controls">
-        <div class="left">
-          <label for="start-date-input">Week Start Date (Monday)</label>
-          <input id="start-date-input" type="date" onchange="updateDates()" />
-        </div>
-
-        <div class="buttons">
-          <button class="ghost" onclick="toggleSettings()">⚙️ Templates & Colours</button>
-          <button class="primary" onclick="generateAllSchedules()">🚀 Generate Timeline View</button>
-        </div>
-      </div>
-
-      <!-- SETTINGS / TEMPLATES -->
-      <div id="settings-area" style="display:none;">
-        <div class="settings">
-          <div class="card wide">
-            <h3 style="margin:0 0 10px 0">🛠 Shift Template Builder</h3>
-            <div id="template-editor" style="padding-bottom:6px"></div>
-            <div style="display:flex;gap:8px;margin-top:8px">
-              <button onclick="addTemplate()">➕ Add Template</button>
-              <button class="warn" onclick="resetTemplates()">Reset to Default</button>
-            </div>
-          </div>
-
-          <div class="card small">
-            <h3 style="margin:0 0 10px 0">🎨 Activity Color Key</h3>
-            <div class="color-key-grid">
-              <div><span class="color-example" data-activity="emails" style="background:var(--color-emails)"></span>Emails <input id="color-emails" type="text" value="#2ecc71" oninput="updateColors()" /></div>
-              <div><span class="color-example" data-activity="mirakl" style="background:var(--color-mirakl)"></span>Mirakl <input id="color-mirakl" type="text" value="#ffb300" oninput="updateColors()" /></div>
-              <div><span class="color-example" data-activity="social" style="background:var(--color-social)"></span>Social <input id="color-social" type="text" value="#5e35b1" oninput="updateColors()" /></div>
-              <div><span class="color-example" data-activity="meeting" style="background:var(--color-meeting)"></span>Meeting <input id="color-meeting" type="text" value="#ffd700" oninput="updateColors()" /></div>
-              <div><span class="color-example" data-activity="overtime" style="background:var(--color-overtime)"></span>Overtime <input id="color-overtime" type="text" value="#e53935" oninput="updateColors()" /></div>
-              <div><span class="color-example" data-activity="break" style="background:var(--color-break)"></span>Break <input id="color-break" type="text" value="#90a4ae" oninput="updateColors()" /></div>
-              <div><span class="color-example" data-activity="lunch" style="background:var(--color-lunch)"></span>Lunch <input id="color-lunch" type="text" value="#ff8f00" oninput="updateColors()" /></div>
-            </div>
-
-            <div style="margin-top:12px;display:flex;gap:8px">
-              <input id="load-file" type="file" accept=".json" style="display:none" onchange="loadData(event)" />
-              <button class="ghost" onclick="document.getElementById('load-file').click()">📂 Load JSON</button>
-              <button class="ghost" onclick="downloadData(collectFullData())">⬇️ Export JSON</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Master assignment grid -->
-      <h2 style="margin-top:6px">📅 Master Rota Assignment Grid</h2>
-      <div class="master-table-container card">
-        <table class="master-table" id="master-rota-table">
-          <thead>
-            <tr>
-              <th rowspan="2" class="advisor-name-cell" style="width:220px">Advisor</th>
-              <th colspan="7">Select Shift Template</th>
-            </tr>
-            <tr id="date-headers"></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-
-      <div style="display:flex;justify-content:flex-end">
-        <button class="primary" onclick="generateAllSchedules()">🚀 Generate Timeline View</button>
-      </div>
-
-      <!-- Timeline -->
-      <h2 style="margin-top:10px">📊 Team Weekly Timeline Schedule</h2>
-      <div class="timeline-wrap">
-        <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px">
-          <div style="color:var(--muted);font-weight:700">Time</div>
-          <div style="flex:1;color:var(--muted);font-weight:700">Team (names across — timeline below each name)</div>
-        </div>
-
-        <div style="display:flex;gap:12px;align-items:flex-start">
-          <div class="time-axis" id="time-axis"></div>
-          <div style="flex:1;overflow:auto">
-            <div id="master-timeline-grid" class="timeline-row"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-  /* ================= CONFIG ================= */
-  const ADVISOR_NAMES = [
-    'Luke Pashley','Ameena Malik','Carrie-Ann Raw','Danielle Smith',
-    'Farwa Shaheen','Gemma Emmett','Laura Stockburn','Millie Walsh','Tunis Foley'
-  ];
-  const DAYS_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-  const PLATFORM_ACTIVITIES = ['Emails','Mirakl','Social','Overtime','Meeting'];
-  const BREAK_SLOTS = ['Break1','Lunch','Break2'];
-  const STORAGE_KEY = 'ultraFastRotasV4';
-
-  const START_HOUR = 7;
-  const END_HOUR = 20;
-  const TIMELINE_HEIGHT_PX = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-height')) || 900;
-  const TOTAL_HOURS = END_HOUR - START_HOUR;
-  const HEIGHT_PER_HOUR = TIMELINE_HEIGHT_PX / TOTAL_HOURS;
-  const HEIGHT_PER_MINUTE = HEIGHT_PER_HOUR / 60;
-
-  let masterRotaData = {};   // advisor -> day -> { template }
-  let shiftTemplates = {};   // name -> template object
-
-  /* ================ UTILITIES ================ */
-  function clamp(n,a,b){ return Math.min(b,Math.max(a,n)); }
-  function escapeHtml(s){ if(s===undefined || s===null) return ''; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-  function escapeJs(s){ if(s===undefined || s===null) return ''; return String(s).replace(/'/g,"\\'"); }
-
-  function toggleSettings(){
-    const el = document.getElementById('settings-area');
-    el.style.display = (el.style.display === 'none' || !el.style.display) ? 'block' : 'none';
-  }
-
-  function timeToPosition(time){
-    if(!time) return null;
-    const [hStr,mStr] = time.split(':');
-    if(!hStr || mStr === undefined) return null;
-    const h = Number(hStr), m = Number(mStr);
-    const total = h*60 + m;
-    const startMin = START_HOUR * 60;
-    const offset = total - startMin;
-    return clamp(offset * HEIGHT_PER_MINUTE, 0, TIMELINE_HEIGHT_PX);
-  }
-
-  /* ================ TEMPLATE EDITOR ================ */
-
-  function addTemplate(defaultObj){
-    const idx = Object.keys(shiftTemplates).length + 1;
-    const name = defaultObj?.name || `Shift${idx}`;
-    let unique = name;
-    let c = 1;
-    while(shiftTemplates[unique]) { unique = `${name}_${c++}`; }
-    shiftTemplates[unique] = Object.assign({
-      name: unique, Start:'', Finish:'', Break1:'', Lunch:'', Break2:'', Platform:'Emails'
-    }, defaultObj || {});
-    populateTemplateEditor();
-    populateMasterTable();
-    saveToLocalStorage();
-  }
-
-  function deleteTemplate(name){
-    if(!shiftTemplates[name]) return;
-    if(!confirm(`Delete template "${name}"? This will not change existing assignments.`)) return;
-    delete shiftTemplates[name];
-    populateTemplateEditor();
-    populateMasterTable();
-    saveToLocalStorage();
-  }
-
-  // Rename on blur only (prevents focus-loss typing bug)
-  function renameTemplate(oldName, newNameRaw){
-    const newName = (newNameRaw || '').trim();
-    if(!oldName || !shiftTemplates[oldName]) return;
-    if(!newName || newName === oldName) { populateTemplateEditor(); return; }
-
-    let target = newName;
-    let c = 1;
-    while(shiftTemplates[target] && target !== oldName) { target = `${newName}_${c++}`; }
-    shiftTemplates[target] = {...shiftTemplates[oldName], name: target};
-    // update any assignments referencing oldName
-    Object.keys(masterRotaData).forEach(ad => {
-      DAYS_FULL.forEach(day => {
-        if(masterRotaData[ad][day] && masterRotaData[ad][day].template === oldName){
-          masterRotaData[ad][day].template = target;
-        }
-      });
-    });
-    delete shiftTemplates[oldName];
-    populateTemplateEditor();
-    populateMasterTable();
-    saveToLocalStorage();
-  }
-
-  function updateTemplateField(name, key, value){
-    const t = shiftTemplates[name];
-    if(!t) return;
-    t[key] = value;
-    saveToLocalStorage();
-    // quick live refresh in table/timeline is fine
-    populateMasterTable();
-  }
-
-  function populateTemplateEditor(){
-    const editor = document.getElementById('template-editor');
-    editor.innerHTML = '';
-    const keys = Object.keys(shiftTemplates);
-    if(keys.length === 0){
-      addTemplate({
-        name:'DefaultDay', Start:'09:00', Finish:'17:30', Break1:'11:30', Lunch:'13:00', Break2:'15:30', Platform:'Emails'
-      });
-      return;
-    }
-    keys.forEach(k => {
-      const t = shiftTemplates[k];
-      const row = document.createElement('div');
-      row.className = 'template-row';
-      row.innerHTML = `
-        <label>Name</label>
-        <input type="text" value="${escapeHtml(t.name)}" 
-               onblur="renameTemplate('${escapeJs(k)}', this.value)" 
-               title="Edit name then click away to rename" />
-
-        <label>Shift</label>
-        <input type="time" value="${t.Start||''}" onchange="updateTemplateField('${escapeJs(t.name)}','Start', this.value)" />
-        <input type="time" value="${t.Finish||''}" onchange="updateTemplateField('${escapeJs(t.name)}','Finish', this.value)" />
-
-        <label>Breaks (start)</label>
-        <input type="time" value="${t.Break1||''}" onchange="updateTemplateField('${escapeJs(t.name)}','Break1', this.value)" title="Break1 (15m)" />
-        <input type="time" value="${t.Lunch||''}" onchange="updateTemplateField('${escapeJs(t.name)}','Lunch', this.value)" title="Lunch (45m)" />
-        <input type="time" value="${t.Break2||''}" onchange="updateTemplateField('${escapeJs(t.name)}','Break2', this.value)" title="Break2 (15m)" />
-
-        <label>Platform</label>
-        <select onchange="updateTemplateField('${escapeJs(t.name)}','Platform', this.value)">
-          ${PLATFORM_ACTIVITIES.map(p => `<option value="${p}" ${t.Platform===p ? 'selected' : ''}>${p}</option>`).join('')}
-        </select>
-
-        <button class="warn small" onclick="deleteTemplate('${escapeJs(t.name)}')" title="Delete template">Delete</button>
-      `;
-      editor.appendChild(row);
-    });
-  }
-
-  function resetTemplates(){
-    if(!confirm('Reset templates to a sensible default?')) return;
-    shiftTemplates = {};
-    addTemplate({ name:'DefaultDay', Start:'09:00', Finish:'17:30', Break1:'11:30', Lunch:'13:00', Break2:'15:30', Platform:'Emails' });
-    saveToLocalStorage();
-  }
-
-  /* ================ MASTER TABLE ================ */
-  function ensureMasterStructure(){
-    ADVISOR_NAMES.forEach(name => {
-      if(!masterRotaData[name]) masterRotaData[name] = {};
-      DAYS_FULL.forEach(day => {
-        if(!masterRotaData[name][day]) masterRotaData[name][day] = { template: '' };
-        else if(typeof masterRotaData[name][day].template === 'undefined') masterRotaData[name][day].template = '';
-      });
-    });
-  }
-
-  function populateMasterTable(){
-    ensureMasterStructure();
-    const dateHeadersRow = document.getElementById('date-headers');
-    const masterBody = document.querySelector('#master-rota-table tbody');
-
-    dateHeadersRow.innerHTML = DAYS_FULL.map(day => `<th class="day-col" data-day="${day}">${day.substring(0,3)}<br><span class="date-display">Date N/A</span></th>`).join('');
-
-    const templateNames = Object.keys(shiftTemplates);
-    const baseOptions = ['<option value="">-- DAY OFF --</option>'].concat(templateNames.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`)).join('');
-
-    masterBody.innerHTML = '';
-    ADVISOR_NAMES.forEach(name => {
-      const row = masterBody.insertRow();
-      let cell = row.insertCell();
-      cell.className = 'advisor-name-cell';
-      cell.textContent = name;
-
-      DAYS_FULL.forEach(day => {
-        cell = row.insertCell();
-        const current = masterRotaData[name][day]?.template || '';
-        let options = baseOptions;
-        if(current){
-          options = options.replace(`<option value="${escapeHtml(current)}">${escapeHtml(current)}</option>`, `<option value="${escapeHtml(current)}" selected>${escapeHtml(current)}</option>`);
-        }
-        cell.innerHTML = `<select class="shift-select" onchange="saveAssignment('${escapeJs(name)}','${escapeJs(day)}', this.value)">${options}</select>`;
-      });
-    });
-  }
-
-  function saveAssignment(advisorName, day, templateName){
-    if(!masterRotaData[advisorName]) masterRotaData[advisorName] = {};
-    if(!masterRotaData[advisorName][day]) masterRotaData[advisorName][day] = { template: '' };
-    masterRotaData[advisorName][day].template = templateName || '';
-    saveToLocalStorage();
-    // update live preview
-    generateAllSchedules();
-  }
-
-  /* ================ SCHEDULE PROCESSING ================ */
-  function processDayWorkflow(templateData){
-    if(!templateData || !templateData.Start || !templateData.Finish) return [];
-    const platform = templateData.Platform || 'Emails';
-    const start = templateData.Start;
-    const finish = templateData.Finish;
-    if(start === finish) return [];
-
-    const events = [];
-    events.push({ time:start, type:'start' });
-    events.push({ time:finish, type:'finish' });
-    const breakRules = { Break1:15, Lunch:45, Break2:15 };
-    BREAK_SLOTS.forEach(slot => {
-      if(templateData[slot]){
-        events.push({ time:templateData[slot], type:slot, duration:breakRules[slot] || 15 });
-      }
-    });
-    events.sort((a,b) => a.time.localeCompare(b.time));
-
-    const activities = [];
-    let cursor = start;
-    for(let i=0;i<events.length;i++){
-      const ev = events[i];
-      if(ev.time > cursor){
-        activities.push({ activity: platform, start: cursor, end: ev.time });
-      }
-      if(ev.type === 'finish') break;
-      if(ev.duration && ev.duration > 0){
-        const temp = new Date(`2000-01-01T${ev.time}:00`);
-        temp.setMinutes(temp.getMinutes() + ev.duration);
-        const endTime = temp.toTimeString().substring(0,5);
-        activities.push({ activity: ev.type.replace(/\d/g,''), start: ev.time, end: endTime });
-        cursor = endTime;
-      } else {
-        cursor = ev.time;
-      }
-    }
-
-    return activities.filter(a => {
-      const ps = timeToPosition(a.start), pe = timeToPosition(a.end);
-      return ps !== null && pe !== null && pe > ps + 2;
-    });
-  }
-
-  /* ================ TIMELINE RENDER ================ */
-
-  function getColorMap(){
-    const map = {};
-    document.querySelectorAll('#settings-area input[type="text"]').forEach(inp => {
-      if(inp.id && inp.id.startsWith('color-')){
-        map[inp.id.replace('color-','')] = inp.value;
-      }
-    });
-    return map;
-  }
-
-  function updateColors(refresh=true){
-    const map = getColorMap();
-    Object.keys(map).forEach(k => {
-      if(map[k]) document.documentElement.style.setProperty(`--color-${k}`, map[k]);
-      const sw = document.querySelector(`[data-activity="${k}"]`);
-      if(sw) sw.style.backgroundColor = map[k];
-    });
-    if(refresh) generateAllSchedules();
-  }
-
-  function generateAllSchedules(){
-    ensureMasterStructure();
-    const grid = document.getElementById('master-timeline-grid');
-    grid.innerHTML = '';
-
-    const colorMap = getColorMap();
-
-    // build time axis left column (hour labels)
-    const axis = document.getElementById('time-axis');
-    axis.innerHTML = '';
-    axis.style.height = TIMELINE_HEIGHT_PX + 'px';
-    for(let h = START_HOUR; h <= END_HOUR; h++){
-      const t = `${String(h).padStart(2,'0')}:00`;
-      const lbl = document.createElement('div');
-      lbl.className = 'label';
-      const top = timeToPosition(t);
-      lbl.style.top = (top !== null ? top : 0) + 'px';
-      lbl.textContent = t;
-      axis.appendChild(lbl);
-    }
-
-    // For each advisor create a column (name header + timeline)
-    ADVISOR_NAMES.forEach(advisor => {
-      const col = document.createElement('div');
-      col.className = 'advisor-column';
-
-      const hdr = document.createElement('div');
-      hdr.className = 'advisor-header';
-      hdr.textContent = advisor;
-
-      const timelineBox = document.createElement('div');
-      timelineBox.className = 'advisor-timeline';
-      timelineBox.style.height = TIMELINE_HEIGHT_PX + 'px';
-      timelineBox.style.position = 'relative';
-
-      // For weekly view: we render each day stacked on top of each other within the same vertical timeline
-      // but to keep it simple and visually clear, we will overlay all activities for the whole week on the same vertical timeline,
-      // with a tiny label showing the day (Mon/Tue/...) inside each activity block.
-      // Each day's assigned template is processed and activities placed by time.
-
-      // Collect activities for all days (prefix day label)
-      Object.keys(shiftTemplates); // ensure existence
-      DAYS_FULL.forEach(day => {
-        const assigned = masterRotaData[advisor][day]?.template || '';
-        const templateData = shiftTemplates[assigned] || null;
-        const acts = templateData ? processDayWorkflow(templateData) : [];
-        // for each activity create block; add small day badge (first 3 letters)
-        acts.forEach(a => {
-          const top = timeToPosition(a.start);
-          const bottom = timeToPosition(a.end);
-          const height = Math.max(8, bottom - top);
-          const key = a.activity.toLowerCase();
-          const bg = colorMap[key] || getComputedStyle(document.documentElement).getPropertyValue(`--color-${key}`) || '#3b4252';
-          const block = document.createElement('div');
-          block.className = 'activity-block';
-          block.style.top = top + 'px';
-          block.style.height = height + 'px';
-          block.style.background = bg;
-          block.title = `${a.activity} (${a.start} - ${a.end}) — ${day}`;
-
-          // content: DAY badge (small) + activity + time
-          block.innerHTML = `<div style="font-size:0.78rem;opacity:0.95">${escapeHtml(day.substring(0,3))} • ${escapeHtml(a.activity)}</div>
-                             <span class="activity-time">${escapeHtml(a.start)} - ${escapeHtml(a.end)}</span>`;
-          timelineBox.appendChild(block);
-        });
-      });
-
-      // if no activities at all (week off) show day-off label
-      const anyAssigned = DAYS_FULL.some(day => {
-        const assigned = masterRotaData[advisor][day]?.template || '';
-        return assigned && shiftTemplates[assigned];
-      });
-      if(!anyAssigned){
-        const off = document.createElement('div');
-        off.className = 'day-off-label';
-        off.textContent = 'DAY OFF';
-        timelineBox.appendChild(off);
-      }
-
-      col.appendChild(hdr);
-      col.appendChild(timelineBox);
-      grid.appendChild(col);
-    });
-  }
-
-  function printGeneratedSchedule(){ window.print(); }
-
-  /* ================ SAVE / LOAD ================ */
-
-  function collectFullData(){
-    return {
-      dates: document.getElementById('start-date-input').value || '',
-      colors: getColorMap(),
-      rotas: masterRotaData,
-      templates: shiftTemplates
-    };
-  }
-
-  function saveToLocalStorage(){
-    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(collectFullData())); } catch(e){ console.warn('save fail', e); }
-  }
-
-  function loadDataFromStorage(){
-    try{
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if(!raw) return;
-      applyData(JSON.parse(raw));
-    } catch(e){ console.warn('load fail', e); }
-  }
-
-  function saveData(download=false){
-    saveToLocalStorage();
-    if(download) downloadData(collectFullData());
-    else alert('Saved to browser storage.');
-  }
-
-  function downloadData(data){
-    try{
-      const blob = new Blob([JSON.stringify(data,null,2)], { type:'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'team_schedule_data.json';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    } catch(e){ alert('Export failed'); }
-  }
-
-  function loadData(evt){
-    const f = evt.target.files && evt.target.files[0];
-    if(!f) return;
-    const r = new FileReader();
-    r.onload = e => {
-      try{ applyData(JSON.parse(e.target.result)); alert('Data loaded'); } catch(x){ alert('Invalid JSON file'); }
-    };
-    r.readAsText(f);
-    evt.target.value = '';
-  }
-
-  function applyData(data){
-    if(!data) return;
-    if(data.colors) {
-      Object.keys(data.colors).forEach(k => {
-        const el = document.getElementById('color-' + k);
-        if(el) el.value = data.colors[k];
-      });
-      updateColors(false);
-    }
-    if(data.templates) shiftTemplates = data.templates;
-    if(data.rotas) masterRotaData = data.rotas;
-    if(data.dates) document.getElementById('start-date-input').value = data.dates;
-    populateTemplateEditor();
-    updateDates();
-    populateMasterTable();
-    generateAllSchedules();
-    saveToLocalStorage();
-  }
-
-  /* ================ DATES / UI ================ */
-  function updateDates(){
-    const v = document.getElementById('start-date-input').value;
-    const fmt = { month:'short', day:'numeric' };
-    if(!v){
-      DAYS_FULL.forEach(day => {
-        const header = document.querySelector(`th[data-day="${day}"] .date-display`);
-        if(header) header.textContent = 'Date N/A';
-      });
-      return;
-    }
-    const dt = new Date(v + 'T00:00:00');
-    if(dt.getDay() !== 1){
-      alert('Please select a Monday as the week start.');
-      document.getElementById('start-date-input').value = '';
-      return;
-    }
-    DAYS_FULL.forEach((day, idx) => {
-      const d = new Date(dt);
-      d.setDate(d.getDate() + idx);
-      const formatted = d.toLocaleDateString('en-GB', fmt);
-      const header = document.querySelector(`th[data-day="${day}"] .date-display`);
-      if(header) header.textContent = formatted;
-    });
-    saveToLocalStorage();
-    generateAllSchedules();
-  }
-
-  /* ================ INIT ================ */
-  document.addEventListener('DOMContentLoaded', () => {
-    // init empty rota structure
-    ADVISOR_NAMES.forEach(name => {
-      masterRotaData[name] = {};
-      DAYS_FULL.forEach(day => masterRotaData[name][day] = { template: '' });
-    });
-
-    // sensible starter template if nothing else
-    shiftTemplates = {
-      'DefaultDay': { name:'DefaultDay', Start:'09:00', Finish:'17:30', Break1:'11:30', Lunch:'13:00', Break2:'15:30', Platform:'Emails' }
-    };
-
-    // load saved
-    loadDataFromStorage();
-
-    // populate UI
-    populateTemplateEditor();
-    populateMasterTable();
-    updateColors(false);
-    // default timeline if you want
-    // generateAllSchedules();
-  });
-  </script>
-</body>
-</html>
+<div class="header"><h1>Professional Team Rota System</h1></div>
+<div class="container">
+
+<div class="controls-panel">
+<div style="display:flex;gap:12px;align-items:center">
+<label style="font-weight:700">Week Start Date (Monday):</label>
+<input id="start-date" type="date" onchange="updateDates()" />
+</div>
+<div class="button-group">
+<button onclick="saveData(true)">💾 Save & Download</button>
+<button class="secondary" onclick="toggleSettings()">⚙️ Settings/Templates</button>
+<button onclick="renderTimeline()">🚀 Generate Timeline</button>
+</div>
+</div>
+
+<div id="settings-area" class="controls-panel hidden" style="align-items:flex-start">
+<div style="width:50%">
+<h2>🛠️ Shift Template Builder</h2>
+<div id="template-editor" style="padding:10px"></div>
+<div style="margin-top:8px">
+<button onclick="addTemplate()">➕ Add New Template</button>
+<button class="danger" onclick="resetTemplates()" style="margin-left:8px">Reset Templates</button>
+</div>
+</div>
+<div style="width:45%">
+<h2>🎨 Activity Color Key</h2>
+<div class="color-key-grid" style="padding:10px;background:var(--secondary-color);border-radius:6px" id="color-key"></div>
+</div>
+</div>
+
+<h2>📊 Timeline View</h2>
+<div style="margin-bottom:10px">
+<label>Select View:</label>
+<select id="view-select" onchange="renderTimeline()">
+<option value="team-day">Team Day Rota</option>
+<option value="advisor-week">Single Advisor Week</option>
+<option value="advisor-day">Single Advisor Day</option>
+</select>
+<select id="advisor-select" onchange="renderTimeline()" class="hidden"></select>
+</div>
+<div id="timeline-container"><div class="timeline-grid" id="timeline-grid"><p style="padding:20px;text-align:center;color:var(--text-dark)">No schedule generated yet.</p></div></div>
+<div style="margin-top:12px">
+<button onclick="printTimeline()">🖨️ Download/Print Timeline</button>
+</div>
+</div>
+
+<script>
+/* =================================
+   CONFIG
+================================= */
+const ADVISORS=[];
+const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const BREAK_SLOTS=['Break1','Lunch','Break2'];
+const PLATFORM_ACTIVITIES=['Emails','Mirakl','Social','Overtime','Meeting'];
+let shiftTemplates={};
+let masterRotaData={};
+const STORAGE_KEY='ultraFastRotasV5';
+const START_HOUR=7, END_HOUR=20;
+const TIMELINE_HEIGHT_PX=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-height'))||1000;
+const HEIGHT_PER_HOUR = TIMELINE_HEIGHT_PX/(END_HOUR-START_HOUR);
+const HEIGHT_PER_MINUTE=HEIGHT_PER_HOUR/60;
+
+/* ===========================
+   UTILITIES
+=========================== */
+function clamp(n,a,b){return Math.min(b,Math.max(a,n));}
+function toggleSettings(){document.getElementById('settings-area').classList.toggle('hidden');}
+function escapeHtml(str){return str?String(str).replace(/[&<>"]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s])):'';}
+function escapeJs(str){return str?String(str).replace(/'/g,"\\'") : '' ;}
+function timeToPosition(time){if(!time) return null; const [h,m]=time.split(':').map(Number); const px=(h*60+m - START_HOUR*60)*HEIGHT_PER_MINUTE; return clamp(px,0,TIMELINE_HEIGHT_PX);}
+
+/* ===========================
+   TEMPLATE MANAGEMENT
+=========================== */
+function addTemplate(){
+ const idx=Object.keys(shiftTemplates).length+1;
+ const t={name:`Shift${idx}`,Start:'09:00',Finish:'17:30',Break1:'11:30',Lunch:'13:00',Break2:'15:30',Platform:'Emails'};
+ shiftTemplates[t.name]=t;
+ populateTemplateEditor(); saveToLocalStorage(); renderTimeline();
+}
+function resetTemplates(){if(!confirm('Reset templates and rotas?')) return; shiftTemplates={}; masterRotaData={}; populateTemplateEditor(); saveToLocalStorage(); renderTimeline();}
+function populateTemplateEditor(){
+ const editor=document.getElementById('template-editor'); editor.innerHTML='';
+ Object.keys(shiftTemplates).forEach(k=>{
+ const t=shiftTemplates[k];
+ const row=document.createElement('div'); row.className='template-row';
+ row.innerHTML=`<label>Name</label><input type='text' value='${escapeHtml(t.name)}' oninput="updateTemplate('${escapeJs(k)}','name',this.value)" />
+<label>Shift</label><input type='time' value='${t.Start}' onchange="updateTemplate('${escapeJs(t.name)}','Start',this.value)" /><input type='time' value='${t.Finish}' onchange="updateTemplate('${escapeJs(t.name)}','Finish',this.value)" />
+<label>Breaks</label><input type='time' value='${t.Break1}' onchange="updateTemplate('${escapeJs(t.name)}','Break1',this.value)" /><input type='time' value='${t.Lunch}' onchange="updateTemplate('${escapeJs(t.name)}','Lunch',this.value)" /><input type='time' value='${t.Break2}' onchange="updateTemplate('${escapeJs(t.name)}','Break2',this.value)" />
+<label>Platform</label><select onchange="updateTemplate('${escapeJs(t.name)}','Platform',this.value)">${PLATFORM_ACTIVITIES.map(p=>`<option ${t.Platform===p?'selected':''} value='${p}'>${p}</option>`).join('')}</select>
+<button class='danger' onclick="deleteTemplate('${escapeJs(t.name)}')">X</button>`;
+ editor.appendChild(row);
+ });
+ populateColorKey();
+}
+function updateTemplate(old,key,value){
+ if(!shiftTemplates[old]) return;
+ if(key==='name'){let newName=value.trim()||old; if(newName!==old){shiftTemplates[newName]={...shiftTemplates[old],name:newName}; delete shiftTemplates[old]; masterRotaData=Object.fromEntries(Object.entries(masterRotaData).map(([a,d])=>[a,Object.fromEntries(Object.entries(d).map(([day,obj])=>[day,{...obj,template:obj.template===old?newName:obj.template}]))]));}}
+ else{shiftTemplates[old][key]=value;}
+ populateTemplateEditor(); saveToLocalStorage(); renderTimeline();}
+function deleteTemplate(name){if(!shiftTemplates[name]) return;if(!confirm('Delete template?')) return;delete shiftTemplates[name]; populateTemplateEditor(); renderTimeline();}
+function populateColorKey(){
+ const keyDiv=document.getElementById('color-key'); keyDiv.innerHTML='';
+ ['emails','mirakl','social','overtime','meeting','break','lunch'].forEach(act=>{
+ const div=document.createElement('div'); div.className='color-input-group';
+ div.innerHTML=`<span class='color-example' data-activity='${act}' style='background:${getComputedStyle(document.documentElement).getPropertyValue('--color-'+act)}'></span>
+ <label>${act.charAt(0).toUpperCase()+act.slice(1)}:</label>
+ <input type='text' value='${getComputedStyle(document.documentElement).getPropertyValue('--color-'+act)}' oninput='updateColors()' />`;
+ keyDiv.appendChild(div);
+ });
+}
+function updateColors(){document.querySelectorAll('#color-key input').forEach(inp=>{const act=inp.previousElementSibling.getAttribute('data-activity'); document.documentElement.style.setProperty('--color-'+act,inp.value);}); renderTimeline();}
+
+/* ===========================
+   MASTER ROTA
+=========================== */
+function ensureMasterRota(){ADVISORS.forEach(a=>{if(!masterRotaData[a]) masterRotaData[a]={}; DAYS.forEach(d=>{if(!masterRotaData[a][d]) masterRotaData[a][d]={template:'';});});}
+)
+}
+function saveAssignment(advisor,day,template){if(!masterRotaData[advisor]) masterRotaData[advisor]={}; masterRotaData[advisor][day]={template:template}; saveToLocalStorage(); renderTimeline();}
+
+/* ===========================
+   TIMELINE RENDER
+=========================== */
+function processTemplate(template){if(!template||!template.Start||!template.Finish) return[];
+ const events=[{time:template.Start,type:'start'},{time:template.Finish,type:'finish'}];
+ BREAK_SLOTS.forEach(b=>{if(template[b]) events.push({time:template[b],type:b,duration:b==='Lunch'?45:15});});
+ events.sort((a,b)=>a.time.localeCompare(b.time));
+ let cursor=template.Start; const activities=[];
+ events.forEach(ev=>{
+ if(ev.time>cursor&&ev.type!=='finish'){activities.push({activity:template.Platform,start:cursor,end:ev.time});}
+ if(ev.duration){const temp=new Date(`2000-01-01T${ev.time}:00`); temp.setMinutes(temp.getMinutes()+ev.duration); activities.push({activity:ev.type==='Break1'||ev.type==='Break2'?'Break':ev.type,start:ev.time,end:temp.toTimeString().substring(0,5)}); cursor=temp.toTimeString().substring(0,5);} else cursor=ev.time;
+ });
+ return activities.filter(a=>timeToPosition(a.start)!==null && timeToPosition(a.end)!==null && timeToPosition(a.end)-timeToPosition(a.start)>=4);
+}
+function renderTimeline(){
+ const grid=document.getElementById('timeline-grid'); grid.innerHTML='';
+ const view=document.getElementById('view-select').value;
+ const advisorSel=document.getElementById('advisor-select');
+ advisorSel.classList.add('hidden');
+ if(view!=='team-day') advisorSel.classList.remove('hidden');
+ ensureMasterRota();
+ if(ADVISORS.length===0){grid.innerHTML='<p style="padding:20px;text-align:center;color:#333">No advisors available</p>'; return;}
+ let advisorsToShow=[];
+ if(view==='team-day'){advisorsToShow=ADVISORS;} else if(advisorSel.value){advisorsToShow=[advisorSel.value];} else{advisorsToShow=[ADVISORS[0]];}
+ grid.style.gridTemplateColumns=`80px repeat(${advisorsToShow.length},
