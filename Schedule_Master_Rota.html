@@ -1,393 +1,788 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Professional Team Rota System</title>
 <style>
-/* --- THEME & VARIABLES --- */
-:root {
-  --primary-color: #0d47a1;
-  --secondary-color: #fafafa;
-  --background-dark: #263238;
-  --accent-color: #00c853;
-  --text-dark: #212121;
-  --text-light: #ffffff;
-  --border-color: #e0e0e0;
-  --timeline-start: 7;
-  --timeline-end: 20;
-  --timeline-height: 1000px;
+  /* --- PROFESSIONAL THEME & VARIABLES --- */
+  :root {
+    /* Aesthetic Theme: Navy, Charcoal, and Accent Green */
+    --primary-color: #0d47a1; /* Navy Blue (Professional) */
+    --secondary-color: #fafafa; /* Clean White/Off-White */
+    --background-dark: #263238; /* Charcoal Grey */
+    --accent-color: #00c853; /* Success Green */
+    --text-dark: #212121;
+    --text-light: #ffffff;
+    --border-color: #e0e0e0;
 
-  /* Activity Colors */
-  --color-emails: #2ecc71;
-  --color-mirakl: #ffb300;
-  --color-social: #5e35b1;
-  --color-overtime: #e53935;
-  --color-meeting: #ffd700;
-  --color-break: #90a4ae;
-  --color-lunch: #ff8f00;
-  --color-dayoff: #f4f4f4;
-}
+    /* Timeline config */
+    --timeline-start: 7;  /* Hour (7 AM) */
+    --timeline-end: 20;   /* Hour (8 PM) */
+    --timeline-height: 1000px;
 
-/* --- BASE & LAYOUT --- */
-body {
-  font-family: 'Roboto', sans-serif;
-  margin: 0;
-  padding: 0;
-  background-color: var(--secondary-color);
-  color: var(--text-dark);
-}
-.header {
-  background-color: var(--primary-color);
-  color: var(--text-light);
-  padding: 30px 40px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-}
-.header h1 { margin:0; font-size:2.4em; font-weight:700; }
-.container { padding:40px; max-width:100%; margin:auto; }
-h2 { border-bottom:2px solid var(--border-color); padding-bottom:10px; margin-top:30px; color:var(--primary-color); }
+    /* Activity Colors (Editable via Settings) */
+    --color-emails: #2ecc71;
+    --color-mirakl: #ffb300; /* Darker Amber */
+    --color-social: #5e35b1; /* Deep Purple */
+    --color-overtime: #e53935; /* Deep Red */
+    --color-meeting: #ffd700; /* Gold Yellow */
+    --color-break: #90a4ae; /* Light Blue-Grey */
+    --color-lunch: #ff8f00; /* Dark Orange */
+    --color-dayoff: #f4f4f4;
+  }
 
-/* --- CONTROLS & DATA --- */
-.controls-panel {
-  background-color: var(--text-light);
-  padding:20px;
-  border-radius:8px;
-  box-shadow:0 2px 8px rgba(0,0,0,0.1);
-  margin-bottom:20px;
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:space-between;
-}
-input[type="date"], input[type="text"], input[type="time"], select {
-  padding:8px 10px;
-  border:1px solid var(--border-color);
-  border-radius:4px;
-  box-sizing:border-box;
-  transition:border-color 0.2s;
-}
-input:focus, select:focus { border-color: var(--primary-color); }
-button {
-  background-color: var(--accent-color);
-  color: var(--text-light);
-  border:none;
-  padding:10px 20px;
-  border-radius:6px;
-  cursor:pointer;
-  font-weight:600;
-  transition: background-color 0.2s;
-}
-button:hover { background-color:#00a040; }
-.button-group { display:flex; gap:10px; }
-.hidden { display:none !important; }
+  /* --- BASE & LAYOUT --- */
+  html, body { height: 100%; }
+  body {
+    font-family: "Roboto", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: var(--secondary-color);
+    color: var(--text-dark);
+  }
+  .header {
+    background-color: var(--primary-color);
+    color: var(--text-light);
+    padding: 30px 40px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  }
+  .header h1 {
+    margin: 0;
+    font-size: 2.4em;
+    font-weight: 700;
+  }
+  .container {
+    padding: 24px 40px 40px;
+    max-width: 1400px;
+    margin: auto;
+  }
+  h2 {
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 10px;
+    margin-top: 30px;
+    color: var(--primary-color);
+  }
 
-/* --- TEMPLATE EDITOR --- */
-.template-row {
-  display:flex;
-  align-items:center;
-  gap:15px;
-  padding:10px;
-  border:1px solid #cfd8dc;
-  background-color: var(--secondary-color);
-  border-radius:4px;
-  margin-bottom:10px;
-  flex-wrap:wrap;
-}
-.template-row input, .template-row select { padding:5px; }
-.template-row button {
-  background-color:#dc3545;
-  color:white;
-  border:none;
-  padding:5px 10px;
-  border-radius:4px;
-  cursor:pointer;
-}
-.template-row label { font-size:0.9em; font-weight:600; }
-.template-row .time-block { display:flex; gap:5px; }
+  /* --- CONTROLS & DATA --- */
+  .controls-panel {
+    background-color: var(--text-light);
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .controls-panel .row {
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  }
+  label { font-weight: 700; }
+  input[type="date"], input[type="text"], input[type="time"], select {
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    box-sizing: border-box;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background: #fff;
+  }
+  input:focus, select:focus { border-color: var(--primary-color); outline: none; box-shadow: 0 0 0 2px rgba(13,71,161,0.15); }
+  button {
+    background-color: var(--accent-color);
+    color: var(--text-light);
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+    transition: transform 0.04s ease, background-color 0.15s ease;
+  }
+  button:hover { background-color: #00a040; }
+  button:active { transform: translateY(1px); }
+  .button-group { display: flex; gap: 10px; flex-wrap: wrap; }
+  .subtle { background: #eceff1; color: #263238; }
+  .hidden { display: none !important; }
 
-/* --- MASTER ROTA GRID --- */
-.master-table-container { overflow-x:auto; background-color: var(--text-light); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom:30px; }
-.master-table { width:100%; border-collapse:collapse; min-width:800px; }
-.master-table th, .master-table td { border:1px solid var(--border-color); padding:8px; text-align:center; }
-.master-table th { background-color: var(--primary-color); color: var(--text-light); font-weight:600; }
-.master-table td.advisor-name-cell { text-align:left; font-weight:700; background-color:#e3f2fd; color:var(--text-dark); }
-.master-table select { width:95%; padding:6px; }
+  /* --- TEMPLATE EDITOR --- */
+  .template-row {
+    display: grid;
+    grid-template-columns: auto 120px auto 1fr auto;
+    gap: 10px 14px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #cfd8dc;
+    background-color: var(--secondary-color);
+    border-radius: 8px;
+    margin-bottom: 10px;
+  }
+  .template-row .time-block { display: flex; gap: 6px; flex-wrap: wrap; }
+  .template-row .danger { background: #dc3545; }
+  .template-row select { padding: 6px; }
+  .key-row { display: grid; grid-template-columns: 18px 90px 1fr; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .swatch { width: 18px; height: 18px; border-radius: 3px; border: 1px solid #cfd8dc; }
 
-/* --- TIMELINE GRID --- */
-#team-timeline-container { background-color: var(--text-light); padding:10px; border-radius:8px; box-shadow:0 8px 16px rgba(0,0,0,0.1); overflow-x:auto; }
-.master-timeline-grid { display:grid; position:relative; }
-.time-axis { grid-column:1; padding-right:10px; text-align:right; border-right:1px solid var(--border-color); height: var(--timeline-height); position:relative; z-index:10; background-color: var(--text-light);}
-.time-label { position:absolute; font-size:0.8em; transform:translateY(-50%); left:0; width:100%; padding-right:5px; color:#757575; border-bottom:1px dashed #cfd8dc; }
-.advisor-header { grid-row:1; padding:10px 0; text-align:center; font-weight:700; background-color:var(--primary-color); color:var(--text-light); border:1px solid var(--border-color); border-left:none; position:sticky; top:0; z-index:20; }
-.day-cell { position:relative; border:1px solid var(--border-color); border-top:none; height:var(--timeline-height); overflow:hidden; }
-.activity-block {
-  position:absolute;
-  width:90%;
-  left:5%;
-  color:var(--text-light);
-  padding:5px;
-  box-sizing:border-box;
-  border-radius:4px;
-  font-size:0.75em;
-  overflow:hidden;
-  text-shadow:0 0 1px rgba(0,0,0,0.5);
-  cursor:help;
-  box-shadow:0 1px 3px rgba(0,0,0,0.2);
-  font-weight:600;
-  z-index:5;
-  display:flex;
-  flex-direction:column;
-  justify-content:center;
-  align-items:center;
-}
-.activity-time { font-size:0.7em; font-weight:normal; display:block; }
-.day-off-label { position:absolute; top:50%; transform:translateY(-50%); width:100%; text-align:center; color:#bdbdbd; font-size:1.2em; font-weight:600; }
+  /* --- MASTER ROTA GRID --- */
+  .master-table-container { overflow-x: auto; background-color: var(--text-light); border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); margin-bottom: 30px; }
+  .master-table { width: 100%; border-collapse: collapse; min-width: 860px; }
+  .master-table th, .master-table td { border: 1px solid var(--border-color); padding: 8px; text-align: center; }
+  .master-table th { background-color: var(--primary-color); color: var(--text-light); font-weight: 600; }
+  .master-table td.advisor-name-cell { text-align: left; font-weight: 700; background-color: #e3f2fd; color: var(--text-dark); position: sticky; left: 0; z-index: 5; }
+  .master-table thead th:first-child { position: sticky; left: 0; z-index: 6; }
+  .master-table select { width: 100%; padding: 6px; }
 
-/* --- PRINT --- */
-@media print {
-  .header, .controls-panel, .master-table-container, button { display:none !important; }
-  .container { padding:0 !important; }
-  .master-timeline-grid { page-break-inside:avoid; }
-  .time-axis { height:auto !important; }
-  .day-cell { height:1000px !important; page-break-inside:avoid; }
-  body { background-color:white !important; }
-}
+  /* --- TIMELINE GRID --- */
+  #team-timeline-container { background-color: var(--text-light); padding: 10px; border-radius: 8px; box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1); overflow: auto; }
+  .master-timeline-grid { display: grid; position: relative; grid-auto-rows: auto; }
+  /* Time Axis */
+  .time-axis { grid-column: 1; padding-right: 10px; text-align: right; border-right: 1px solid var(--border-color); height: var(--timeline-height); position: relative; z-index: 10; background-color: var(--text-light); }
+  .time-label { position: absolute; font-size: 0.8em; transform: translateY(-50%); left: 0; width: 100%; padding-right: 5px; color: #757575; border-bottom: 1px dashed #cfd8dc; }
+  /* Advisor/Day */
+  .advisor-header { grid-row: 1; padding: 10px 0; text-align: center; font-weight: 700; background-color: var(--primary-color); color: var(--text-light); border: 1px solid var(--border-color); border-left: none; position: sticky; top: 0; z-index: 20; }
+  .day-heading { text-align: center; font-weight: 700; background: var(--secondary-color); border-right: 1px solid var(--border-color); border-bottom: 1px solid var(--border-color); padding: 6px 0; }
+  .day-cell { position: relative; border: 1px solid var(--border-color); border-top: none; height: var(--timeline-height); overflow: hidden; }
+  .activity-block { position: absolute; width: 90%; left: 5%; color: var(--text-light); padding: 5px; box-sizing: border-box; border-radius: 6px; font-size: 0.75em; overflow: hidden; text-shadow: 0 0 1px rgba(0,0,0,0.5); cursor: help; box-shadow: 0 1px 3px rgba(0,0,0,0.2); font-weight: 700; z-index: 5; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+  .activity-time { font-size: 0.7em; font-weight: 500; display: block; }
+  .day-off-label { position: absolute; top: 50%; transform: translateY(-50%); width: 100%; text-align: center; color: #bdbdbd; font-size: 1.2em; font-weight: 700; }
+
+  /* Print Styles */
+  @media print {
+    .header, .controls-panel, .master-table-container, button { display: none !important; }
+    .container { padding: 0 !important; }
+    .master-timeline-grid { page-break-inside: avoid; }
+    .time-axis { height: auto !important; }
+    .day-cell { height: 1000px !important; page-break-inside: avoid; }
+    body { background-color: white !important; }
+  }
 </style>
 </head>
 <body>
-<div class="header">
-<h1>Professional Team Rota System</h1>
-</div>
-<div class="container">
+  <div class="header">
+    <h1>Professional Team Rota System</h1>
+  </div>
 
-<!-- CONTROLS PANEL -->
-<div class="controls-panel">
-<div style="display:flex; gap:15px; align-items:center;">
-<label for="start-date-input" style="font-weight:700;">Week Start Date (Monday):</label>
-<input type="date" id="start-date-input" onchange="updateDates()">
-</div>
-<div class="button-group">
-<button onclick="downloadData(collectFullData())">💾 Save & Download Data</button>
-<button onclick="toggleSettings()">⚙️ Toggle Settings/Templates</button>
-<button onclick="generateAllSchedules()">🚀 Generate Timeline View</button>
-</div>
-</div>
+  <div class="container">
+    <!-- Controls -->
+    <div class="controls-panel">
+      <div class="row">
+        <label for="start-date-input">Week Start Date (Monday):</label>
+        <input type="date" id="start-date-input" />
+      </div>
+      <div class="button-group">
+        <button id="btn-save-download">💾 Save & Download Data</button>
+        <button class="subtle" id="btn-toggle-settings">⚙️ Toggle Settings/Templates</button>
+        <button id="btn-generate">🚀 Generate Timeline View</button>
+      </div>
+    </div>
 
-<!-- SETTINGS -->
-<div id="settings-area" class="controls-panel hidden">
-<div style="width:55%;">
-<h2 style="color:var(--text-dark);">🛠️ Shift Template Builder</h2>
-<div id="template-editor" style="padding:10px;"></div>
-<button onclick="addTemplate()">➕ Add New Shift Template</button>
-</div>
-<div style="width:40%;">
-<h2 style="color:var(--text-dark);">🎨 Activity Color Key</h2>
-<div class="color-key-grid" style="padding:10px; background-color:var(--secondary-color); border-radius:4px;">
-<div class="color-input-group"><span class="color-example" data-activity="emails" style="background-color:var(--color-emails);"></span> <label>Emails:</label> <input type="text" id="color-emails" value="#2ecc71" oninput="updateColors()"></div>
-<div class="color-input-group"><span class="color-example" data-activity="mirakl" style="background-color:var(--color-mirakl);"></span> <label>Mirakl:</label> <input type="text" id="color-mirakl" value="#ffb300" oninput="updateColors()"></div>
-<div class="color-input-group"><span class="color-example" data-activity="social" style="background-color:var(--color-social);"></span> <label>Social:</label> <input type="text" id="color-social" value="#5e35b1" oninput="updateColors()"></div>
-<div class="color-input-group"><span class="color-example" data-activity="meeting" style="background-color:var(--color-meeting);"></span> <label>Meeting:</label> <input type="text" id="color-meeting" value="#ffd700" oninput="updateColors()"></div>
-<div class="color-input-group"><span class="color-example" data-activity="overtime" style="background-color:var(--color-overtime);"></span> <label>Overtime:</label> <input type="text" id="color-overtime" value="#e53935" oninput="updateColors()"></div>
-<div class="color-input-group"><span class="color-example" data-activity="break" style="background-color:var(--color-break);"></span> <label>Break:</label> <input type="text" id="color-break" value="#90a4ae" oninput="updateColors()"></div>
-<div class="color-input-group"><span class="color-example" data-activity="lunch" style="background-color:var(--color-lunch);"></span> <label>Lunch:</label> <input type="text" id="color-lunch" value="#ff8f00" oninput="updateColors()"></div>
-</div>
-<div class="button-group" style="margin-top:15px;">
-<input type="file" id="load-file" accept=".json" onchange="loadData(event)" style="display:none;">
-<button onclick="document.getElementById('load-file').click()">📂 Load Data from File</button>
-</div>
-</div>
-</div>
+    <!-- Settings / Templates -->
+    <div id="settings-area" class="controls-panel hidden">
+      <div style="flex: 1 1 58%; min-width: 440px;">
+        <h2 style="color: var(--text-dark);">🛠️ Shift Template Builder (Flexible shifts)</h2>
+        <div id="template-editor" style="padding: 10px;"></div>
+        <div class="button-group">
+          <button id="btn-add-template">➕ Add New Shift Template</button>
+          <button id="btn-add-defaults" class="subtle">↺ Load Sample Templates</button>
+        </div>
+      </div>
+      <div style="flex: 1 1 38%; min-width: 320px;">
+        <h2 style="color: var(--text-dark);">🎨 Activity Color Key</h2>
+        <div id="color-key" style="padding: 10px; background-color: var(--secondary-color); border-radius: 8px;"></div>
+        <div class="button-group" style="margin-top: 10px;">
+          <input type="file" id="load-file" accept=".json" style="display:none;" />
+          <button id="btn-load-file">📂 Load Data from File</button>
+          <button id="btn-reset" class="subtle">🧹 Clear Local Data</button>
+        </div>
+      </div>
+    </div>
 
-<!-- MASTER ROTA TABLE -->
-<h2>📅 Master Rota Assignment Grid</h2>
-<div class="master-table-container">
-<table class="master-table" id="master-rota-table">
-<thead>
-<tr>
-<th rowspan="2" class="advisor-name-cell" style="width:150px;">Advisor</th>
-<th colspan="7">Select Shift Template</th>
-</tr>
-<tr id="date-headers"></tr>
-</thead>
-<tbody></tbody>
-</table>
-</div>
-<button onclick="generateAllSchedules()" style="margin-top:20px;">🚀 Generate Timeline View</button>
+    <!-- Master Table -->
+    <h2>📅 Master Rota Assignment Grid</h2>
+    <div class="master-table-container">
+      <table class="master-table" id="master-rota-table" aria-label="Master rota table">
+        <thead>
+          <tr>
+            <th rowspan="2" class="advisor-name-cell" style="width: 200px;">Advisor</th>
+            <th colspan="7">Select Shift Template</th>
+          </tr>
+          <tr id="date-headers"></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
 
-<!-- TIMELINE -->
-<h2 style="margin-top:40px;">📊 Team Weekly Timeline Schedule</h2>
-<div id="team-timeline-container">
-<div class="master-timeline-grid" id="master-timeline-grid">
-<p style="padding:20px; text-align:center; color:var(--text-dark);">Select your shifts in the grid above and click 'Generate Timeline View' to see the schedule.</p>
-</div>
-</div>
-<button onclick="printGeneratedSchedule()" style="margin-top:20px;">🖨️ Download Team Rota (PDF)</button>
-</div>
+    <button id="btn-generate-2" style="margin-top: 10px;">🚀 Generate Timeline View</button>
+
+    <!-- Timeline -->
+    <h2 style="margin-top: 32px;">📊 Team Weekly Timeline Schedule</h2>
+    <div id="team-timeline-container">
+      <div class="master-timeline-grid" id="master-timeline-grid">
+        <p style="padding: 20px; text-align: center; color: var(--text-dark);">Select your shifts in the grid above and click 'Generate Timeline View' to see the schedule.</p>
+      </div>
+    </div>
+
+    <div class="button-group" style="margin-top: 16px;">
+      <button id="btn-print">🖨️ Download Team Rota (PDF)</button>
+    </div>
+  </div>
 
 <script>
-// --- CONFIG ---
-const ADVISOR_NAMES = ['Luke Pashley','Ameena Malik','Carrie-Ann Raw','Danielle Smith','Farwa Shaheen','Gemma Emmett','Laura Stockburn','Millie Walsh','Tunis Foley'];
-const DAYS_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-const PLATFORM_ACTIVITIES = ['Emails','Mirakl','Social','Overtime','Meeting'];
-const BREAK_SLOTS = ['Break1','Lunch','Break2'];
-const STORAGE_KEY = 'ultraFastRotasV4';
+  // === CONFIGURATION ===
+  const ADVISOR_NAMES = [
+    'Luke Pashley', 'Ameena Malik', 'Carrie-Ann Raw', 'Danielle Smith',
+    'Farwa Shaheen', 'Gemma Emmett', 'Laura Stockburn', 'Millie Walsh', 'Tunis Foley'
+  ];
+  const DAYS_FULL = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const PLATFORM_ACTIVITIES = ['Emails', 'Mirakl', 'Social', 'Overtime', 'Meeting'];
+  const BREAK_SLOTS = ['Break1', 'Lunch', 'Break2'];
+  const STORAGE_KEY = 'ultraFastRotasV4';
 
-let masterRotaData = {};
-let shiftTemplates = {};
+  // Timeline constants derived from CSS vars
+  const START_HOUR = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-start')) || 7;
+  const END_HOUR = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-end')) || 20;
+  const TOTAL_HOURS = END_HOUR - START_HOUR;
+  const TIMELINE_HEIGHT_PX = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-height')) || 1000;
+  const HEIGHT_PER_HOUR = TIMELINE_HEIGHT_PX / TOTAL_HOURS;
+  const HEIGHT_PER_MINUTE = HEIGHT_PER_HOUR / 60;
 
-// --- TIMELINE CONSTANTS ---
-const START_HOUR = 7;
-const END_HOUR = 20;
-const TOTAL_HOURS = END_HOUR - START_HOUR;
-const TIMELINE_HEIGHT_PX = 1000;
-const HEIGHT_PER_HOUR = TIMELINE_HEIGHT_PX / TOTAL_HOURS;
-const HEIGHT_PER_MINUTE = HEIGHT_PER_HOUR / 60;
+  // App State
+  let masterRotaData = {}; // { [advisor]: { [day]: { template: string } } }
+  let shiftTemplates = {}; // { [templateName]: { name, Start, Finish, Break1, Lunch, Break2, Platform } }
 
-// --- INIT ---
-function initApp(){
-  ADVISOR_NAMES.forEach(name=>{
-    masterRotaData[name]={};
-    DAYS_FULL.forEach(day=>{masterRotaData[name][day]={template:''};});
-  });
-  populateTemplateEditor();
-  populateMasterTable();
-  loadDataFromStorage();
-}
+  // === HELPERS ===
+  const $$ = (sel, ctx = document) => Array.from(ctx.querySelectorAll(sel));
+  const $ = (sel, ctx = document) => ctx.querySelector(sel);
 
-// --- UTIL ---
-function toggleSettings(){document.getElementById('settings-area').classList.toggle('hidden');}
-function timeToPosition(time){ if(!time) return 0; const [h,m]=time.split(':').map(Number); return ((h*60+m)-START_HOUR*60)*HEIGHT_PER_MINUTE; }
-function getColorMap(){ const map={}; document.querySelectorAll('#settings-area input[type="text"]').forEach(input=>{ if(input.id.startsWith('color-')) map[input.id.replace('color-','')]=input.value; }); return map; }
+  function pad2(n) { return String(n).padStart(2, '0'); }
 
-// --- TEMPLATE FUNCTIONS ---
-function addTemplate(){ const name='Shift'+(Object.keys(shiftTemplates).length+1); shiftTemplates[name]={name,Start:'',Finish:'',Break1:'',Lunch:'',Break2:'',Platform:'Emails'}; populateTemplateEditor(); populateMasterTable(); saveToLocalStorage();}
-function deleteTemplate(name){ delete shiftTemplates[name]; populateTemplateEditor(); populateMasterTable(); saveToLocalStorage();}
-function updateTemplate(oldName,key,value){ const template=shiftTemplates[oldName]; if(key==='name' && value!==oldName && value!==''){ shiftTemplates[value]={...template,name:value}; delete shiftTemplates[oldName]; populateTemplateEditor(); populateMasterTable(); } else {template[key]=value;} saveToLocalStorage();}
-function populateTemplateEditor(){ const editor=document.getElementById('template-editor'); editor.innerHTML=''; Object.keys(shiftTemplates).forEach(key=>{ const t=shiftTemplates[key]; const row=document.createElement('div'); row.className='template-row'; row.innerHTML=`
-<label>Name:</label><input type="text" value="${t.name}" oninput="updateTemplate('${key}','name',this.value)" style="width:100px;">
-<label>Shift:</label><input type="time" value="${t.Start}" oninput="updateTemplate('${t.name}','Start',this.value)" title="Start Time">
-<input type="time" value="${t.Finish}" oninput="updateTemplate('${t.name}','Finish',this.value)" title="Finish Time">
-<label>Breaks:</label><div class="time-block">
-<input type="time" value="${t.Break1}" oninput="updateTemplate('${t.name}','Break1',this.value)">
-<input type="time" value="${t.Lunch}" oninput="updateTemplate('${t.name}','Lunch',this.value)">
-<input type="time" value="${t.Break2}" oninput="updateTemplate('${t.name}','Break2',this.value)">
-</div>
-<label>Platform:</label>
-<select onchange="updateTemplate('${t.name}','Platform',this.value)" style="width:100px;">
-<option value="">-- Main --</option>
-${PLATFORM_ACTIVITIES.map(p=>`<option value="${p}" ${t.Platform===p?'selected':''}>${p}</option>`).join('')}
-</select>
-<button onclick="deleteTemplate('${t.name}')">X</button>`; editor.appendChild(row); }); }
+  // Parse HH:MM to minutes since midnight
+  function toMinutes(t) {
+    if (!t || !/^\d{2}:\d{2}$/.test(t)) return null;
+    const [h, m] = t.split(':').map(Number);
+    return h * 60 + m;
+  }
 
-// --- MASTER TABLE ---
-function populateMasterTable(){
-  const dateHeadersRow=document.getElementById('date-headers');
-  const masterBody=document.querySelector('#master-rota-table tbody');
-  dateHeadersRow.innerHTML=DAYS_FULL.map(day=>`<th data-day="${day}">${day.substring(0,3)}<br><span class="date-display">Date N/A</span></th>`).join('');
-  masterBody.innerHTML='';
-  const templateOptions=Object.keys(shiftTemplates).map(name=>`<option value="${name}">${name}</option>`).join('');
-  ADVISOR_NAMES.forEach(name=>{
-    const row=masterBody.insertRow();
-    let cell=row.insertCell(); cell.className='advisor-name-cell'; cell.textContent=name;
-    DAYS_FULL.forEach(day=>{
-      cell=row.insertCell(); cell.className='day-input-cell';
-      const currentTemplate=(masterRotaData[name] && masterRotaData[name][day]) ? masterRotaData[name][day].template : '';
-      cell.innerHTML=`<select onchange="saveAssignment('${name}','${day}',this.value)">
-      <option value="">-- DAY OFF --</option>
-      ${templateOptions.replace(new RegExp(`value="${currentTemplate}"`), `value="${currentTemplate}" selected`)}
-      </select>`;
+  function minutesToTime(mins) {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${pad2(h)}:${pad2(m)}`;
+  }
+
+  function timeToPosition(time) {
+    const mins = toMinutes(time);
+    if (mins == null) return -9999;
+    const startMinutes = START_HOUR * 60;
+    const offset = mins - startMinutes;
+    return offset * HEIGHT_PER_MINUTE;
+  }
+
+  function getColorMap() {
+    const inputs = $$('#color-key input[type="text"]');
+    const map = {};
+    inputs.forEach(inp => {
+      const key = inp.dataset.key;
+      if (key) map[key] = inp.value || '#343a40';
     });
-  });
-}
+    return map;
+  }
 
-function saveAssignment(advisorName,day,templateName){ masterRotaData[advisorName][day].template=templateName; saveToLocalStorage(); generateAllSchedules();}
+  function setCSSVar(name, val) {
+    document.documentElement.style.setProperty(name, val);
+  }
 
-// --- DATES ---
-function updateDates(){
-  const startDateInput=document.getElementById('start-date-input').value;
-  if(!startDateInput) return;
-  const startDate=new Date(startDateInput+'T00:00:00');
-  if(startDate.getDay()!==1){ alert("Please select a Monday."); document.getElementById('start-date-input').value=''; return;}
-  const format={month:'short', day:'numeric'};
-  DAYS_FULL.forEach((day,i)=>{
-    const date=new Date(startDate); date.setDate(date.getDate()+i);
-    const header=document.querySelector(`th[data-day="${day}"] .date-display`);
-    if(header) header.textContent=date.toLocaleDateString('en-GB',format);
-  });
-  generateAllSchedules();
-}
+  function updateColors(refresh = true) {
+    const map = getColorMap();
+    Object.keys(map).forEach(k => setCSSVar(`--color-${k}`, map[k]));
+    if (refresh) generateAllSchedules();
+    saveToLocalStorage();
+  }
 
-// --- COLORS ---
-function updateColors(refresh=true){
-  const root=document.documentElement;
-  const map=getColorMap();
-  Object.keys(map).forEach(a=>root.style.setProperty(`--color-${a}`,map[a]));
-  if(refresh) generateAllSchedules();
-}
+  // === TEMPLATE LOGIC ===
+  function addTemplate() {
+    const newName = `Shift${Object.keys(shiftTemplates).length + 1}`;
+    shiftTemplates[newName] = {
+      name: newName,
+      Start: '', Finish: '', Break1: '', Lunch: '', Break2: '',
+      Platform: 'Emails'
+    };
+    populateTemplateEditor();
+    populateMasterTable();
+    saveToLocalStorage();
+  }
 
-// --- SCHEDULE GENERATION ---
-function processDayWorkflow(template){
-  const activities=[]; if(!template.Start||!template.Finish||template.Start===template.Finish) return activities;
-  const events=[{time:template.Start,activity:template.Platform,isStart:true},{time:template.Finish,activity:template.Platform,isEnd:true}];
-  BREAK_SLOTS.forEach(b=>{ if(template[b]){ const duration=b==='Lunch'?45:15; events.push({time:template[b],activity:b.replace(/\d/g,''),duration}); }});
-  events.sort((a,b)=>a.time.localeCompare(b.time));
-  let currentTime=template.Start;
-  events.forEach(e=>{
-    if(e.time>currentTime) activities.push({activity:template.Platform,start:currentTime,end:e.time});
-    if(e.isEnd) return;
-    if(e.duration>0){ const [h,m]=e.time.split(':').map(Number); const d=new Date(0,0,0,h,m); d.setMinutes(d.getMinutes()+e.duration); const endTime=d.toTimeString().substr(0,5); activities.push({activity:e.activity,start:e.time,end:endTime}); currentTime=endTime; } else if(e.isStart){ currentTime=e.time;}
-  });
-  return activities.filter(a=>timeToPosition(a.end)>timeToPosition(a.start));
-}
+  function addDefaultTemplates() {
+    const defaults = [
+      { name: 'Early',   Start: '08:00', Finish: '16:00', Break1: '10:30', Lunch: '12:30', Break2: '15:00', Platform: 'Emails' },
+      { name: 'Core',    Start: '09:00', Finish: '17:30', Break1: '11:00', Lunch: '13:00', Break2: '16:00', Platform: 'Mirakl' },
+      { name: 'Late',    Start: '11:00', Finish: '19:00', Break1: '12:15', Lunch: '14:30', Break2: '17:00', Platform: 'Social' },
+      { name: 'Meeting', Start: '10:00', Finish: '18:00', Break1: '11:30', Lunch: '13:30', Break2: '16:30', Platform: 'Meeting' }
+    ];
+    defaults.forEach(t => { shiftTemplates[t.name] = { ...t }; });
+    populateTemplateEditor();
+    populateMasterTable();
+    saveToLocalStorage();
+  }
 
-function generateAllSchedules(){
-  const grid=document.getElementById('master-timeline-grid'); grid.innerHTML='';
-  const colorMap=getColorMap();
-  const advisorCount=ADVISOR_NAMES.length;
-  if(Object.keys(shiftTemplates).length===0){ grid.innerHTML='<p style="padding:20px;text-align:center;color:var(--text-dark);">Please define shift templates first.</p>'; return;}
-  grid.style.gridTemplateColumns=`80px repeat(${advisorCount},1fr)`; grid.style.minWidth=`${80+(180*advisorCount)}px`;
+  function deleteTemplate(name) {
+    delete shiftTemplates[name];
+    populateTemplateEditor();
+    populateMasterTable();
+    saveToLocalStorage();
+  }
 
-  // Time Axis
-  let timeAxisHTML=`<div class="time-axis" style="height:${TIMELINE_HEIGHT_PX}px;">`;
-  for(let h=START_HOUR;h<=END_HOUR;h++){ const t=`${String(h).padStart(2,'0')}:00`; const top=timeToPosition(t); timeAxisHTML+=`<div class="time-label" style="top:${top}px;">${t}</div>`;}
-  timeAxisHTML+='</div>';
+  function updateTemplate(oldName, key, value) {
+    const t = shiftTemplates[oldName];
+    if (!t) return;
+    if (key === 'name') {
+      const newName = value.trim();
+      if (!newName || newName === oldName) return;
+      // Rename key & update references in rota
+      shiftTemplates[newName] = { ...t, name: newName };
+      delete shiftTemplates[oldName];
+      ADVISOR_NAMES.forEach(a => {
+        DAYS_FULL.forEach(d => {
+          if (masterRotaData[a][d].template === oldName) {
+            masterRotaData[a][d].template = newName;
+          }
+        });
+      });
+    } else {
+      t[key] = value;
+    }
+    populateTemplateEditor();
+    populateMasterTable();
+    saveToLocalStorage();
+  }
 
-  // Headers
-  let headerHTML=ADVISOR_NAMES.map((name,i)=>`<div class="advisor-header" style="grid-column:${i+2};">${name}</div>`).join('');
-  headerHTML+=`<div style="grid-column:1;height:40px;border-right:1px solid var(--border-color);background-color:var(--secondary-color);"></div>`;
-  headerHTML+=DAYS_FULL.map((day,i)=>{ const dateDisplay=document.querySelector(`th[data-day="${day}"] .date-display`).textContent; return `<div style="grid-column:${i+2};height:40px;padding:5px 0;text-align:center;font-weight:600;background-color:var(--secondary-color);border-right:1px solid var(--border-color);border-bottom:1px solid var(--border-color);">${day.substring(0,3)}<br>${dateDisplay}</div>`}).join('');
+  function templateRowHTML(t, key) {
+    const options = PLATFORM_ACTIVITIES.map(p => `<option value="${p}" ${t.Platform === p ? 'selected' : ''}>${p}</option>`).join('');
+    return `
+      <div class="template-row" data-key="${key}">
+        <label>Name:</label>
+        <input type="text" value="${t.name}" data-field="name" style="width: 120px;" />
+        <label>Shift:</label>
+        <div class="time-block">
+          <input type="time" value="${t.Start || ''}" data-field="Start" title="Start Time" />
+          <input type="time" value="${t.Finish || ''}" data-field="Finish" title="Finish Time" />
+        </div>
+        <label>Breaks:</label>
+        <div class="time-block">
+          <input type="time" value="${t.Break1 || ''}" data-field="Break1" title="Break 1 (15m)" />
+          <input type="time" value="${t.Lunch || ''}" data-field="Lunch" title="Lunch (45m)" />
+          <input type="time" value="${t.Break2 || ''}" data-field="Break2" title="Break 2 (15m)" />
+        </div>
+        <label>Platform:</label>
+        <select data-field="Platform" style="width: 120px;">
+          <option value="">-- Main --</option>
+          ${options}
+        </select>
+        <button class="danger" data-action="delete">Delete</button>
+      </div>`;
+  }
 
-  // Day Cells
-  let cellsHTML='';
-  ADVISOR_NAMES.forEach((advisor,j)=>{
-    const col=j+2;
-    DAYS_FULL.forEach(day=>{
-      const templateName=masterRotaData[advisor][day].template;
-      const template=shiftTemplates[templateName];
-      const acts=template?processDayWorkflow(template):[];
-      let cell=`<div class="day-cell" style="grid-column:${col}; grid-row:3; position:relative;">`;
-      if(acts.length===0){ cell+=`<div class="day-off-label">DAY OFF</div>`;}
-      else{ acts.forEach(a=>{ const top=timeToPosition(a.start); const bottom=timeToPosition(a.end); const h=Math.max(10,bottom-top); const bg=colorMap[a.activity.toLowerCase()]||'#343a40'; cell+=`<div class="activity-block" style="top:${top}px;height:${h}px;background-color:${bg};" title="${a.activity} (${a.start}-${a.end})">${a.activity.toUpperCase()}<span class="activity-time">${a.start}-${a.end}</span></div>`; });}
-      cellsHTML+=cell+'</div>';
+  function populateTemplateEditor() {
+    const editor = $('#template-editor');
+    if (!editor) return;
+    const keys = Object.keys(shiftTemplates);
+    if (keys.length === 0) {
+      editor.innerHTML = `<p style="margin:8px 0; color:#546e7a;">No templates yet. Click <b>"Add New Shift Template"</b> to create one, or load <b>Sample Templates</b>.</p>`;
+      return;
+    }
+    editor.innerHTML = keys.map(k => templateRowHTML(shiftTemplates[k], k)).join('');
+
+    // Wire inputs
+    $$('#template-editor .template-row').forEach(row => {
+      const key = row.dataset.key;
+      $$("input, select", row).forEach(inp => {
+        const field = inp.dataset.field;
+        if (!field) return;
+        inp.addEventListener('input', () => updateTemplate(key, field, inp.value));
+        if (field === 'Platform') inp.value = shiftTemplates[key].Platform || '';
+      });
+      const delBtn = $('[data-action="delete"]', row);
+      delBtn.addEventListener('click', () => deleteTemplate(key));
     });
-  });
+  }
 
-  grid.innerHTML=timeAxisHTML+headerHTML+cellsHTML;
-  grid.style.gridTemplateRows=`auto auto ${TIMELINE_HEIGHT_PX}px`;
-}
+  // === MASTER GRID ===
+  function populateMasterTable() {
+    const dateHeadersRow = $('#date-headers');
+    const tbody = $('#master-rota-table tbody');
+    if (!dateHeadersRow || !tbody) return;
 
-// --- PRINT ---
-function printGeneratedSchedule(){ window.print(); }
+    // Date headers
+    dateHeadersRow.innerHTML = DAYS_FULL
+      .map(day => `<th class="day-col" data-day="${day}">${day.substring(0,3)}<br><span class="date-display">Date N/A</span></th>`) 
+      .join('');
 
-// --- DATA PERSISTENCE ---
-function saveToLocalStorage(){ try{ const data={dates:document.getElementById('start-date-input').value,colors:getColorMap(),rotas:masterRotaData,templates:shiftTemplates}; localStorage.setItem(STORAGE_KEY,JSON.stringify(data)); } catch(e){console.warn("Could not save");} }
-function loadDataFromStorage(){ try{ const s=localStorage.getItem(STORAGE_KEY); if(s) applyData(JSON.parse(s));} catch(e){console.warn("Could not load");} }
-function loadData(event){ const f=event.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=function(e){ try{ applyData(JSON.parse(e.target.result)); alert("Data loaded successfully!"); } catch{ alert("Invalid JSON."); } }; r.readAsText(f);}
-function applyData(data){ if(data.colors){ Object.keys(data.colors).forEach(a=>{ const input=document.getElementById(`color-${a}`); if(input) input.value=data.colors[a]; }); updateColors(false);}
-if(data.templates){ shiftTemplates=data.templates; populateTemplateEditor();}
-if(data.dates) document.getElementById('start-date-input').value=data.dates; updateDates();
-if(data.rotas) Object.assign(masterRotaData,data.rotas); populateMasterTable(); generateAllSchedules(); }
+    // Template options
+    const templateOptions = Object.keys(shiftTemplates)
+      .map(name => `<option value="${name}">${name}</option>`) 
+      .join('');
 
-document.addEventListener('DOMContentLoaded',()=>{ initApp(); });
+    // Rows
+    tbody.innerHTML = '';
+    ADVISOR_NAMES.forEach(name => {
+      const tr = document.createElement('tr');
+      const nameTd = document.createElement('td');
+      nameTd.className = 'advisor-name-cell';
+      nameTd.textContent = name;
+      tr.appendChild(nameTd);
 
+      DAYS_FULL.forEach(day => {
+        const td = document.createElement('td');
+        const sel = document.createElement('select');
+        sel.innerHTML = `<option value="">-- DAY OFF --</option>${templateOptions}`;
+        const current = masterRotaData[name][day].template || '';
+        sel.value = current;
+        sel.addEventListener('change', () => saveAssignment(name, day, sel.value));
+        td.appendChild(sel);
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+  }
+
+  function saveAssignment(advisorName, day, templateName) {
+    masterRotaData[advisorName][day].template = templateName;
+    saveToLocalStorage();
+    // Live update timeline for instant feedback
+    generateAllSchedules();
+  }
+
+  // === WORKFLOW / SLICING ===
+  // Turn a template into sequential activities with breaks
+  function processDayWorkflow(templateData) {
+    if (!templateData) return [];
+    const { Start, Finish } = templateData;
+    const startM = toMinutes(Start);
+    const endM = toMinutes(Finish);
+    if (startM == null || endM == null || startM === endM) return [];
+
+    // Collect break events
+    const events = [
+      { t: startM, kind: 'start' },
+      { t: endM,   kind: 'end' }
+    ];
+    BREAK_SLOTS.forEach(slot => {
+      const val = templateData[slot];
+      if (!val) return;
+      const t = toMinutes(val);
+      if (t == null) return;
+      const dur = (slot === 'Lunch') ? 45 : 15;
+      events.push({ t, kind: 'break', label: slot.replace(/\d/g, ''), dur });
+    });
+
+    // Sort by time, then end before break/start to avoid zero segments
+    events.sort((a, b) => a.t - b.t || (a.kind === 'end') - (b.kind === 'end'));
+
+    let cursor = startM;
+    const out = [];
+    const platform = templateData.Platform || 'Emails';
+
+    for (const ev of events) {
+      if (ev.t > cursor) {
+        out.push({ activity: platform, start: minutesToTime(cursor), end: minutesToTime(ev.t) });
+      }
+      if (ev.kind === 'break') {
+        const breakEnd = ev.t + ev.dur;
+        out.push({ activity: ev.label, start: minutesToTime(ev.t), end: minutesToTime(breakEnd) });
+        cursor = breakEnd;
+      } else if (ev.kind === 'start') {
+        cursor = ev.t;
+      } else if (ev.kind === 'end') {
+        cursor = ev.t; // finished
+      }
+    }
+
+    // Filter out-of-range items and zero/negative heights
+    return out.filter(a => timeToPosition(a.end) > timeToPosition(a.start));
+  }
+
+  // === DATE HEADERS ===
+  function updateDates() {
+    const inp = $('#start-date-input');
+    if (!inp || !inp.value) return;
+    const startDate = new Date(`${inp.value}T00:00:00`);
+    if (startDate.getDay() !== 1) { // Monday = 1
+      alert('Please select a Monday as the start date.');
+      inp.value = '';
+      return;
+    }
+    DAYS_FULL.forEach((day, i) => {
+      const d = new Date(startDate);
+      d.setDate(d.getDate() + i);
+      const formatted = d.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+      const header = $(`th[data-day="${day}"] .date-display`);
+      if (header) header.textContent = formatted;
+    });
+    generateAllSchedules();
+    saveToLocalStorage();
+  }
+
+  // === TIMELINE RENDER ===
+  function generateAllSchedules() {
+    const grid = $('#master-timeline-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+    const colors = getColorMap();
+    const advisors = ADVISOR_NAMES.length;
+
+    // Grid columns: time axis (80px) + N advisors (min 220px each)
+    const firstColWidth = 80;
+    const colWidth = 220;
+    grid.style.gridTemplateColumns = `${firstColWidth}px repeat(${advisors}, ${colWidth}px)`;
+    grid.style.gridTemplateRows = `auto auto ${TIMELINE_HEIGHT_PX}px`;
+    grid.style.minWidth = `${firstColWidth + advisors * colWidth}px`;
+
+    // Time axis
+    const axis = document.createElement('div');
+    axis.className = 'time-axis';
+    axis.style.height = `${TIMELINE_HEIGHT_PX}px`;
+    for (let h = START_HOUR; h <= END_HOUR; h++) {
+      const y = timeToPosition(`${pad2(h)}:00`);
+      if (y >= 0 && y <= TIMELINE_HEIGHT_PX) {
+        const lbl = document.createElement('div');
+        lbl.className = 'time-label';
+        lbl.style.top = `${y}px`;
+        lbl.textContent = `${pad2(h)}:00`;
+        axis.appendChild(lbl);
+      }
+    }
+    grid.appendChild(axis);
+
+    // Advisor headers (row 1)
+    ADVISOR_NAMES.forEach((name, i) => {
+      const head = document.createElement('div');
+      head.className = 'advisor-header';
+      head.style.gridColumn = String(i + 2);
+      head.textContent = name;
+      grid.appendChild(head);
+    });
+
+    // Day row (row 2)
+    DAYS_FULL.forEach((day, i) => {
+      const dHead = document.createElement('div');
+      dHead.className = 'day-heading';
+      dHead.style.gridColumn = String(i + 2);
+      const dateSpan = $(`th[data-day="${day}"] .date-display`);
+      const dateTxt = dateSpan ? dateSpan.textContent : '—';
+      dHead.innerHTML = `${day.substring(0,3)}<br>${dateTxt}`;
+      grid.appendChild(dHead);
+    });
+
+    // Day cells (row 3) for each advisor & day
+    ADVISOR_NAMES.forEach((advisor, colIdx) => {
+      DAYS_FULL.forEach(day => {
+        const cell = document.createElement('div');
+        cell.className = 'day-cell';
+        cell.style.gridColumn = String(colIdx + 2);
+        cell.style.gridRow = '3';
+
+        const tplName = masterRotaData[advisor][day].template;
+        const tpl = shiftTemplates[tplName];
+        const activities = processDayWorkflow(tpl);
+
+        if (!tpl || activities.length === 0) {
+          const off = document.createElement('div');
+          off.className = 'day-off-label';
+          off.textContent = 'DAY OFF';
+          cell.appendChild(off);
+        } else {
+          activities.forEach(a => {
+            const top = timeToPosition(a.start);
+            const bottom = timeToPosition(a.end);
+            const height = Math.max(10, bottom - top);
+            const key = (a.activity || '').toLowerCase();
+            const bg = colors[key] || '#37474f';
+
+            const block = document.createElement('div');
+            block.className = 'activity-block';
+            block.style.top = `${top}px`;
+            block.style.height = `${height}px`;
+            block.style.backgroundColor = bg;
+            block.title = `${a.activity} (${a.start} - ${a.end})`;
+            block.innerHTML = `${a.activity.toUpperCase()}<span class="activity-time">${a.start} - ${a.end}</span>`;
+            cell.appendChild(block);
+          });
+        }
+        grid.appendChild(cell);
+      });
+    });
+  }
+
+  // === DATA PERSISTENCE ===
+  function collectFullData() {
+    return {
+      dates: $('#start-date-input').value || '',
+      colors: getColorMap(),
+      rotas: masterRotaData,
+      templates: shiftTemplates
+    };
+  }
+
+  function saveToLocalStorage() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(collectFullData()));
+    } catch (e) { console.warn('localStorage save failed', e); }
+  }
+
+  function loadDataFromStorage() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      return JSON.parse(raw);
+    } catch (e) { console.warn('localStorage load failed', e); return null; }
+  }
+
+  function applyData(data) {
+    if (!data) return;
+    // Colors
+    if (data.colors) {
+      Object.entries(data.colors).forEach(([k, v]) => {
+        const input = $(`#color-key input[data-key="${k}"]`);
+        if (input) input.value = v;
+        setCSSVar(`--color-${k}`, v);
+      });
+    }
+
+    // Templates
+    if (data.templates) {
+      shiftTemplates = data.templates;
+    }
+
+    // Dates
+    if (data.dates) {
+      const inp = $('#start-date-input');
+      inp.value = data.dates;
+      // updateDates() will be called after table render to have headers ready
+    }
+
+    // Rotas
+    if (data.rotas) {
+      Object.assign(masterRotaData, data.rotas);
+    }
+
+    populateTemplateEditor();
+    populateMasterTable();
+    updateDates();
+    generateAllSchedules();
+  }
+
+  function downloadData(data) {
+    const json = JSON.stringify(data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'team_schedule_data.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // === ACTIONS ===
+  function handleLoadFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        applyData(data);
+        alert('Schedule data loaded successfully!');
+      } catch (err) {
+        alert('Error loading file: Invalid JSON.');
+      }
+    };
+    reader.readAsText(file);
+  }
+
+  function clearAllData() {
+    if (!confirm('Clear all local data and reset the app?')) return;
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    // Reset state
+    masterRotaData = {};
+    shiftTemplates = {};
+    initEmptyState();
+    populateTemplateEditor();
+    populateMasterTable();
+    $('#start-date-input').value = '';
+    $('#master-timeline-grid').innerHTML = '<p style="padding:20px; text-align:center; color:var(--text-dark);">Cleared. Add templates and assignments to begin.</p>';
+  }
+
+  function printGeneratedSchedule() { window.print(); }
+
+  // === INIT ===
+  function buildColorKey() {
+    const colors = [
+      ['emails', 'Emails', getComputedStyle(document.documentElement).getPropertyValue('--color-emails').trim() || '#2ecc71'],
+      ['mirakl', 'Mirakl', getComputedStyle(document.documentElement).getPropertyValue('--color-mirakl').trim() || '#ffb300'],
+      ['social', 'Social', getComputedStyle(document.documentElement).getPropertyValue('--color-social').trim() || '#5e35b1'],
+      ['meeting', 'Meeting/Coach', getComputedStyle(document.documentElement).getPropertyValue('--color-meeting').trim() || '#ffd700'],
+      ['overtime', 'Overtime', getComputedStyle(document.documentElement).getPropertyValue('--color-overtime').trim() || '#e53935'],
+      ['break', 'Break', getComputedStyle(document.documentElement).getPropertyValue('--color-break').trim() || '#90a4ae'],
+      ['lunch', 'Lunch', getComputedStyle(document.documentElement).getPropertyValue('--color-lunch').trim() || '#ff8f00']
+    ];
+    const key = $('#color-key');
+    key.innerHTML = colors.map(([k, label, val]) => `
+      <div class="key-row">
+        <span class="swatch" style="background:${val};" data-activity="${k}"></span>
+        <strong>${label}:</strong>
+        <input type="text" value="${val}" data-key="${k}" />
+      </div>`).join('');
+
+    // Wire updates
+    $$('#color-key input[type="text"]').forEach(inp => inp.addEventListener('input', updateColors));
+  }
+
+  function initEmptyState() {
+    // Rota data skeleton
+    ADVISOR_NAMES.forEach(name => {
+      masterRotaData[name] = {};
+      DAYS_FULL.forEach(day => { masterRotaData[name][day] = { template: '' }; });
+    });
+  }
+
+  function initApp() {
+    buildColorKey();
+    initEmptyState();
+    populateTemplateEditor();
+    populateMasterTable();
+
+    // Buttons
+    $('#btn-toggle-settings').addEventListener('click', () => $('#settings-area').classList.toggle('hidden'));
+    $('#btn-add-template').addEventListener('click', addTemplate);
+    $('#btn-add-defaults').addEventListener('click', addDefaultTemplates);
+
+    $('#btn-save-download').addEventListener('click', () => { saveToLocalStorage(); downloadData(collectFullData()); });
+    $('#btn-generate').addEventListener('click', generateAllSchedules);
+    $('#btn-generate-2').addEventListener('click', generateAllSchedules);
+    $('#btn-print').addEventListener('click', printGeneratedSchedule);
+
+    $('#load-file').addEventListener('change', handleLoadFile);
+    $('#btn-load-file').addEventListener('click', () => $('#load-file').click());
+    $('#btn-reset').addEventListener('click', clearAllData);
+
+    $('#start-date-input').addEventListener('change', updateDates);
+
+    // Load stored data
+    const stored = loadDataFromStorage();
+    if (stored) {
+      applyData(stored);
+    } else {
+      // Provide a couple of defaults so the grid is usable immediately
+      addDefaultTemplates();
+      generateAllSchedules();
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', initApp);
 </script>
 </body>
 </html>
+
