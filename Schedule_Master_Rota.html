@@ -41,8 +41,15 @@
   th,td{border:1px solid var(--line);padding:8px;text-align:center}
   thead th{background:#0d47a1;color:#fff;font-weight:800}
   td.name{position:sticky;left:0;background:#e8f1ff;font-weight:800}
+
+  /* Calendar */
   .calendar{border-top:1px solid var(--line)}
-  .cal-grid{display:grid;grid-template-columns:80px repeat(7,1fr);overflow:auto}
+  .cal-grid{
+    display:grid;
+    grid-template-columns:80px repeat(7,1fr);
+    grid-auto-flow: column; /* ensure day columns flow left->right */
+    overflow:auto;
+  }
   .hour-col{border-right:1px solid var(--line);background:#fafcfe}
   .hour{height:calc(var(--timeline-height)/(var(--timeline-end)-var(--timeline-start)));border-bottom:1px solid var(--line);font-size:12px;color:#748099;text-align:right;padding-right:6px;position:relative;box-sizing:border-box}
   .hour span{position:absolute;top:-7px;right:6px;background:#fafcfe;padding:0 4px}
@@ -201,6 +208,12 @@ const m2t=m=>`${pad(Math.floor(m/60))}:${pad(m%60)}`;
 function save(){ localStorage.setItem(STORAGE, JSON.stringify({advisors:ADVISORS,templates,rotas,weekStart:$('#weekStart').value})); }
 function load(){ try{ const d=JSON.parse(localStorage.getItem(STORAGE)||'null'); if(!d) return; ADVISORS=d.advisors||ADVISORS; templates=d.templates||templates; rotas=d.rotas||rotas; if(d.weekStart) $('#weekStart').value=d.weekStart; }catch{} }
 
+/* ========= GRID RESET (fixes stacking on next/prev) ========= */
+function resetGrid(){
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '<div class="hour-col"><div id="hours"></div></div>';
+}
+
 /* ========= COLOR KEY ========= */
 function buildColorKey(){
   const defs=[['emails','Emails','--color-emails'],['mirakl','Mirakl','--color-mirakl'],['social','Social','--color-social'],['meeting','Meeting/Coach','--color-meeting'],['overtime','Overtime','--color-overtime'],['break','Break','--color-break'],['lunch','Lunch','--color-lunch']];
@@ -280,9 +293,7 @@ function populateAssignTable(){
 
 /* ========= ADVISOR SIDEBAR & DROPDOWN ========= */
 function rebuildAdvisorUI(){
-  // Dropdown with Team (All)
   $('#advisorSelect').innerHTML = `<option value="__TEAM__">Team (All)</option>` + ADVISORS.map(a=>`<option>${a}</option>`).join('');
-  // Sidebar list
   const list=$('#advisorList'); list.innerHTML='';
   ADVISORS.forEach(a=>{
     const div=document.createElement('div'); div.className='pill';
@@ -334,17 +345,18 @@ function updateRangeLabel(){
     $('#rangeLabel').textContent=`${f(s)} – ${f(e)}`;
     $('#calTitle').textContent='Advisor Week (Calendar)';
   }
-  // Assignment table dates
   $$('#dateHeaders [data-date]').forEach((span,i)=>{ const d=new Date(s); d.setDate(d.getDate()+i); span.textContent=d.toLocaleDateString('en-GB',{month:'short',day:'numeric'}); });
 }
 
 function renderCalendar(){
-  $('#hours').innerHTML=hoursHTML();
-  $$('.day-col').forEach(n=>n.remove());
+  resetGrid();               /* <— important reset */
+  document.getElementById('hours').innerHTML=hoursHTML();
+
   const advVal=$('#advisorSelect').value||ADVISORS[0];
   if(advVal==='__TEAM__'){ renderTeamDayCalendar(); return; }
 
   const grid=$('#calGrid'); const ws=$('#weekStart').value; const s=ws?new Date(ws+'T00:00:00'):null; const adv=advVal;
+
   DAYS.forEach((day,idx)=>{
     const col=document.createElement('div'); col.className='day-col';
     let month='—', num=''; if(s){ const d=new Date(s); d.setDate(d.getDate()+idx); month=d.toLocaleDateString('en-GB',{month:'long'}); num=d.getDate(); }
@@ -361,16 +373,16 @@ function renderCalendar(){
 }
 
 function renderTeamDayCalendar(){
-  $('#hours').innerHTML=hoursHTML();
-  $$('.day-col').forEach(n=>n.remove());
+  resetGrid();               /* <— important reset */
+  document.getElementById('hours').innerHTML=hoursHTML();
+
   const grid=$('#calGrid'); const ws=$('#weekStart').value; const day=$('#teamDay').value||'Monday';
-  // Day header across
   const cols=1+ADVISORS.length; const head=document.createElement('div'); head.className='day-head'; head.style.gridColumn=`1 / span ${cols}`; head.style.height='56px';
   if(ws){ const s=new Date(ws); const idx=DAYS.indexOf(day); s.setDate(s.getDate()+idx); head.innerHTML=`<small>${s.toLocaleDateString('en-GB',{month:'long'})}</small>${day}<span style="float:right">${s.getDate()}</span>`; }
   grid.appendChild(head);
-  // Hour column
+
   const hourCol=document.createElement('div'); hourCol.className='hour-col'; hourCol.innerHTML=hoursHTML(); grid.appendChild(hourCol);
-  // Each advisor as a column
+
   ADVISORS.forEach(adv=>{
     const col=document.createElement('div'); col.className='day-col';
     col.insertAdjacentHTML('beforeend',`<div class="day-head" style="height:56px">${adv}</div>`);
@@ -434,11 +446,12 @@ function wire(){
   rebuildAdvisorUI(); populateTemplateEditor(); populateAssignTable();
   if(!$('#weekStart').value){ const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10); }
   updateRangeLabel();
-  $('#hours').innerHTML=hoursHTML();
+  document.getElementById('hours').innerHTML=hoursHTML();
   wire(); renderCalendar();
 })();
 </script>
 </body>
 </html>
+
 
 
