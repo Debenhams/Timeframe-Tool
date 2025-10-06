@@ -1,226 +1,1232 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Professional Team Rota System</title>
-<style>
-/* --- THEME & VARIABLES --- */
-:root {
-    --primary-color: #0d47a1;
-    --secondary-color: #fafafa;
-    --background-dark: #263238;
-    --accent-color: #00c853;
-    --text-dark: #212121;
-    --text-light: #ffffff;
-    --border-color: #e0e0e0;
-    --timeline-start: 7;
-    --timeline-end: 20;
-    --timeline-height: 1000px;
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Professional Team Rota System</title>
+  <meta name="description" content="Team rota: templates, color key, daily & weekly views, printable, save/load JSON, dark mode.">
+  <style>
+    /* ---------------- THEME & VARIABLES ---------------- */
+    :root{
+      --primary: #0d47a1;         /* deep navy */
+      --muted: #eceff1;           /* off white */
+      --card: #ffffff;
+      --surface: #f5f7fa;
+      --accent: #00c853;          /* accent green */
+      --text: #1f2937;
+      --muted-text: #6b7280;
+      --border: #e0e6ee;
+      --timeline-height: 1000px;
+      --start-hour: 7;
+      --end-hour: 20;
+      --height-per-hour: calc( (var(--timeline-height) / (var(--end-hour) - var(--start-hour))) );
+      --shadow-1: 0 6px 18px rgba(16,24,40,0.06);
+      --card-radius: 12px;
+      --success: #10b981;
+      --danger: #ef4444;
+      --glass: rgba(255,255,255,0.6);
+      /* Activity defaults (overridable by color inputs) */
+      --color-emails: #2ecc71;
+      --color-mirakl: #ffb300;
+      --color-social: #5e35b1;
+      --color-overtime: #e53935;
+      --color-meeting: #ffd700;
+      --color-break: #90a4ae;
+      --color-lunch: #ff8f00;
+      --color-dayoff: #f4f4f4;
+    }
 
-    --color-emails: #2ecc71;
-    --color-mirakl: #ffb300;
-    --color-social: #5e35b1;
-    --color-overtime: #e53935;
-    --color-meeting: #ffd700;
-    --color-break: #90a4ae;
-    --color-lunch: #ff8f00;
-    --color-dayoff: #f4f4f4;
-}
+    /* Dark mode variables (applied with .dark on body) */
+    .dark{
+      --primary: #08306b;
+      --muted: #121417;
+      --card: #0f1724;
+      --surface: #0b1220;
+      --accent: #00e676;
+      --text: #e6eef8;
+      --muted-text: #9aa7b7;
+      --border: rgba(255,255,255,0.06);
+      --glass: rgba(255,255,255,0.04);
+      --shadow-1: 0 8px 24px rgba(0,0,0,0.6);
+    }
 
-/* --- BASE & LAYOUT --- */
-body { font-family: 'Roboto', sans-serif; margin:0; padding:0; background-color:var(--secondary-color); color:var(--text-dark); }
-.header { background-color:var(--primary-color); color:var(--text-light); padding:30px 40px; box-shadow:0 4px 10px rgba(0,0,0,0.2);}
-.header h1 { margin:0; font-size:2.4em; font-weight:700;}
-.container { padding:40px; max-width:100%; margin:auto;}
-h2 { border-bottom:2px solid var(--border-color); padding-bottom:10px; margin-top:30px; color:var(--primary-color);}
+    /* ---------------- BASE ---------------- */
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;}
+    body{background:linear-gradient(180deg,var(--surface),var(--muted));color:var(--text);line-height:1.35;padding:24px;}
+    .app { max-width:1200px;margin:0 auto; }
+    header.app-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px;}
+    .brand { display:flex;gap:14px;align-items:center; }
+    .logo {
+      width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,var(--primary), #072f6b);display:flex;align-items:center;justify-content:center;
+      color:white;font-weight:800;font-size:20px;box-shadow:var(--shadow-1);
+    }
+    .title { font-size:20px;font-weight:700; }
+    .subtitle { color:var(--muted-text);font-size:13px;margin-top:3px }
 
-/* --- CONTROLS & DATA --- */
-.controls-panel { background-color:var(--text-light); padding:20px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1); margin-bottom:20px; display:flex; flex-wrap:wrap; justify-content:space-between;}
-input[type="date"], input[type="text"], input[type="time"], select { padding:8px 10px; border:1px solid var(--border-color); border-radius:4px; box-sizing:border-box; transition:border-color 0.2s;}
-input:focus, select:focus { border-color:var(--primary-color);}
-button { background-color:var(--accent-color); color:var(--text-light); border:none; padding:10px 20px; border-radius:6px; cursor:pointer; font-weight:600; transition: background-color 0.2s;}
-button:hover { background-color:#00a040;}
-.button-group { display:flex; gap:10px;}
-.hidden { display:none !important; }
+    /* header controls */
+    .header-controls { display:flex;gap:8px;align-items:center;flex-wrap:wrap; }
+    .btn { background:var(--accent); color:white; border:none;padding:10px 12px;border-radius:10px;font-weight:600;cursor:pointer;box-shadow:var(--shadow-1); }
+    .btn.secondary { background:transparent;color:var(--text);border:1px solid var(--border); }
+    .btn.ghost { background:transparent;border:1px dashed var(--border);color:var(--muted-text) }
+    .small { padding:7px 10px;font-size:14px;border-radius:8px; }
+    .icon { font-weight:700;margin-right:6px }
 
-/* --- TEMPLATE EDITOR --- */
-.template-row { display:flex; align-items:center; gap:15px; padding:10px; border:1px solid #cfd8dc; background-color:var(--secondary-color); border-radius:4px; margin-bottom:10px; flex-wrap:wrap;}
-.template-row input, .template-row select { padding:5px;}
-.template-row button { background-color:#dc3545; color:white; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;}
-.template-row label { font-size:0.9em; font-weight:600;}
-.template-row .time-block { display:flex; gap:5px;}
+    /* layout */
+    .grid { display:grid;grid-template-columns: 1fr 380px; gap:18px;align-items:start; }
+    .panel { background:var(--card);padding:16px;border-radius:var(--card-radius);box-shadow:var(--shadow-1);border:1px solid var(--border) }
+    .panel h3 { margin:0 0 10px 0;font-size:16px;color:var(--primary) }
+    .muted { color:var(--muted-text);font-size:13px }
 
-/* --- MASTER ROTA GRID --- */
-.master-table-container { overflow-x:auto; background-color:var(--text-light); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.05); margin-bottom:30px;}
-.master-table { width:100%; border-collapse:collapse; min-width:800px;}
-.master-table th, .master-table td { border:1px solid var(--border-color); padding:8px; text-align:center;}
-.master-table th { background-color:var(--primary-color); color:var(--text-light); font-weight:600;}
-.master-table td.advisor-name-cell { text-align:left; font-weight:700; background-color:#e3f2fd; color:var(--text-dark);}
-.master-table select { width:95%; padding:6px;}
+    /* controls and inputs */
+    .row { display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap; }
+    input[type="date"], input[type="time"], input[type="text"], select { padding:8px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text);min-width:140px; }
+    label.small { font-size:13px;color:var(--muted-text); }
 
-/* --- TIMELINE GRID --- */
-#team-timeline-container { background-color:var(--text-light); padding:10px; border-radius:8px; box-shadow:0 8px 16px rgba(0,0,0,0.1); overflow-x:auto;}
-.master-timeline-grid { display:grid; position:relative;}
-.time-axis { grid-column:1; padding-right:10px; text-align:right; border-right:1px solid var(--border-color); height: var(--timeline-height); position:relative; z-index:10; background-color: var(--text-light);}
-.time-label { position:absolute; font-size:0.8em; transform:translateY(-50%); left:0; width:100%; padding-right:5px; color:#757575; border-bottom:1px dashed #cfd8dc;}
-.advisor-header { grid-row:1; padding:10px 0; text-align:center; font-weight:700; background-color:var(--primary-color); color:var(--text-light); border:1px solid var(--border-color); border-left:none; position:sticky; top:0; z-index:20;}
-.day-cell { position:relative; border:1px solid var(--border-color); border-top:none; height:var(--timeline-height); overflow:hidden;}
-.activity-block { position:absolute; width:90%; left:5%; color:var(--text-light); padding:5px; box-sizing:border-box; border-radius:4px; font-size:0.75em; overflow:hidden; text-shadow:0 0 1px rgba(0,0,0,0.5); cursor:help; box-shadow:0 1px 3px rgba(0,0,0,0.2); font-weight:600; z-index:5; display:flex; flex-direction:column; justify-content:center; align-items:center;}
-.activity-time { font-size:0.7em; font-weight:normal; display:block;}
-.day-off-label { position:absolute; top:50%; transform:translateY(-50%); width:100%; text-align:center; color:#bdbdbd; font-size:1.2em; font-weight:600;}
+    /* advisor list area */
+    .advisor-list { display:flex;flex-direction:column;gap:8px;max-height:300px;overflow:auto;padding-right:6px }
+    .advisor-item { display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;border:1px solid var(--border);background:linear-gradient(180deg,transparent,var(--glass)); }
+    .advisor-item input { border:none;background:transparent;font-weight:600;flex:1 }
+    .advisor-item .remove { background:transparent;border:none;color:var(--danger);cursor:pointer;font-weight:700 }
 
-/* --- PRINT --- */
-@media print { .header, .controls-panel, .master-table-container, button { display:none !important;} .container { padding:0 !important;} .master-timeline-grid { page-break-inside:avoid;} .time-axis { height:auto !important;} .day-cell { height:1000px !important; page-break-inside:avoid;} body { background-color:white !important;} }
-</style>
+    /* template builder / color key */
+    .template-row { display:flex;gap:8px;align-items:center;padding:8px;border-radius:8px;border:1px dashed var(--border);background:transparent; }
+    .template-row input[type="time"], .template-row select { min-width:96px }
+    .colors-grid { display:grid;grid-template-columns: 1fr 1fr;gap:8px }
+    .color-box { display:flex;gap:8px;align-items:center;padding:8px;border-radius:8px;border:1px solid var(--border) }
+    .swatch { width:28px;height:28px;border-radius:6px;border:1px solid rgba(0,0,0,0.06) }
+
+    /* master rota grid (table) */
+    .master-table-container { overflow:auto }
+    table.master { width:100%; border-collapse:collapse; min-width:900px }
+    table.master th, table.master td { border:1px solid var(--border); padding:10px;text-align:center;vertical-align:middle }
+    table.master th { background:linear-gradient(90deg,var(--primary), #0b3f7a); color:white;font-weight:700;position:sticky;top:0;z-index:5 }
+    td.advisor-name { text-align:left;padding-left:14px;font-weight:700;background:linear-gradient(90deg, rgba(13,71,161,0.06), transparent); min-width:180px }
+    select.template-select { width:100%;padding:8px;border-radius:8px;border:1px solid var(--border) }
+    .day-off { color:var(--muted-text); font-weight:700 }
+
+    /* timeline / schedule */
+    #team-timeline-container { padding:12px;border-radius:12px;background:var(--card);box-shadow:var(--shadow-1);overflow:auto }
+    .master-timeline-grid { display:grid; align-items:start; gap:8px; }
+    .time-axis { padding-right:8px;text-align:right;border-right:1px solid var(--border); }
+    .time-label { position:relative;font-size:12px;color:var(--muted-text);height:calc(var(--height-per-hour) ); display:flex;align-items:center;justify-content:flex-end;padding-right:8px }
+    .timeline-row { display:grid; grid-auto-flow:column; grid-auto-columns: minmax(160px, 1fr); gap:8px; align-items:start; }
+    .timeline-person { background:linear-gradient(180deg,transparent,var(--glass)); border-radius:10px;padding:8px; border:1px solid var(--border); min-width:160px; }
+    .day-cell { position:relative;height:var(--timeline-height); border-radius:8px;border:1px solid var(--border); overflow:hidden;background:transparent }
+    .activity-block { position:absolute; left:6%; width:88%; color:white;padding:6px;border-radius:6px;font-size:12px;text-align:center;box-shadow:0 6px 12px rgba(2,6,23,0.15); font-weight:700; display:flex;flex-direction:column;align-items:center;justify-content:center }
+    .activity-time { font-size:11px; opacity:0.92;font-weight:600;margin-top:4px }
+    .day-off-label { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);color:var(--muted-text);font-weight:700;font-size:14px }
+
+    /* small helpers */
+    .flex { display:flex;gap:8px;align-items:center }
+    .stack { display:flex;flex-direction:column;gap:6px }
+    .muted-block { color:var(--muted-text);font-size:13px }
+    .controls-wrap { display:flex;gap:8px;align-items:center;flex-wrap:wrap }
+
+    /* responsive */
+    @media (max-width:980px){ .grid{grid-template-columns:1fr; } .timeline-row { grid-auto-columns: minmax(120px, 1fr) } }
+
+    /* print */
+    @media print {
+      body { padding:0;background:white;color:black }
+      header, .controls-panel, .panel .btn, .header-controls { display:none !important }
+      #team-timeline-container { box-shadow:none;border:none;padding:0 }
+      .activity-block { color:black !important; text-shadow:none }
+    }
+  </style>
 </head>
 <body>
-<div class="header"><h1>Professional Team Rota System</h1></div>
-<div class="container">
-    <div class="controls-panel">
-        <div style="display:flex; gap:15px; align-items:center;">
-            <label for="start-date-input" style="font-weight:700;">Week Start Date (Monday):</label>
-            <input type="date" id="start-date-input" onchange="updateDates()">
+  <div class="app">
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo">TR</div>
+        <div>
+          <div class="title">Professional Team Rota System</div>
+          <div class="subtitle">Daily & Weekly views · Templates · Save / Load · Print · Dark mode</div>
         </div>
-        <div class="button-group">
-            <button onclick="downloadData(collectFullData())">💾 Save & Download Data</button>
-            <button onclick="toggleSettings()">⚙️ Toggle Settings/Templates</button>
-            <button onclick="generateAllSchedules()">🚀 Generate Timeline View</button>
-        </div>
-    </div>
+      </div>
 
-    <div id="settings-area" class="controls-panel hidden">
-        <div style="width:55%;">
-            <h2 style="color:var(--text-dark);">🛠️ Shift Template Builder</h2>
-            <div id="template-editor" style="padding:10px;"></div>
-            <button onclick="addTemplate()">➕ Add New Shift Template</button>
-        </div>
-        <div style="width:40%;">
-            <h2 style="color:var(--text-dark);">🎨 Activity Color Key</h2>
-            <div class="color-key-grid" style="padding:10px; background-color:var(--secondary-color); border-radius:4px;">
-                <div class="color-input-group"><span class="color-example" data-activity="emails" style="background-color:var(--color-emails);"></span> <label>Emails:</label> <input type="text" id="color-emails" value="#2ecc71" oninput="updateColors()"></div>
-                <div class="color-input-group"><span class="color-example" data-activity="mirakl" style="background-color:var(--color-mirakl);"></span> <label>Mirakl:</label> <input type="text" id="color-mirakl" value="#ffb300" oninput="updateColors()"></div>
-                <div class="color-input-group"><span class="color-example" data-activity="social" style="background-color:var(--color-social);"></span> <label>Social:</label> <input type="text" id="color-social" value="#5e35b1" oninput="updateColors()"></div>
-                <div class="color-input-group"><span class="color-example" data-activity="meeting" style="background-color:var(--color-meeting);"></span> <label>Meeting:</label> <input type="text" id="color-meeting" value="#ffd700" oninput="updateColors()"></div>
-                <div class="color-input-group"><span class="color-example" data-activity="overtime" style="background-color:var(--color-overtime);"></span> <label>Overtime:</label> <input type="text" id="color-overtime" value="#e53935" oninput="updateColors()"></div>
-                <div class="color-input-group"><span class="color-example" data-activity="break" style="background-color:var(--color-break);"></span> <label>Break:</label> <input type="text" id="color-break" value="#90a4ae" oninput="updateColors()"></div>
-                <div class="color-input-group"><span class="color-example" data-activity="lunch" style="background-color:var(--color-lunch);"></span> <label>Lunch:</label> <input type="text" id="color-lunch" value="#ff8f00" oninput="updateColors()"></div>
-            </div>
-            <div class="button-group" style="margin-top:15px;">
-                <input type="file" id="load-file" accept=".json" onchange="loadData(event)" style="display:none;">
-                <button onclick="document.getElementById('load-file').click()">📂 Load Data from File</button>
-            </div>
-        </div>
-    </div>
+      <div class="header-controls">
+        <button class="btn small" id="prev-week-btn" title="Previous week">◀ Prev</button>
+        <input id="start-date-input" type="date" title="Week start (Monday)" />
+        <button class="btn small" id="next-week-btn" title="Next week">Next ▶</button>
 
-    <h2>📅 Master Rota Assignment Grid</h2>
-    <div class="master-table-container">
-        <table class="master-table" id="master-rota-table">
-            <thead>
+        <div style="width:10px"></div>
+
+        <button class="btn ghost small" id="toggle-view-btn" title="Toggle daily / weekly view">Toggle View</button>
+        <button class="btn secondary small" id="save-json-btn" title="Export JSON">💾 Export</button>
+        <button class="btn secondary small" id="load-json-btn" title="Import JSON">📂 Import</button>
+        <button class="btn small" id="print-btn" title="Print / Save PDF">🖨️ Print</button>
+        <button class="btn small" id="dark-mode-toggle" title="Toggle dark mode">🌙</button>
+      </div>
+    </header>
+
+    <main class="grid">
+      <!-- LEFT: Main Controls and Master Table -->
+      <section>
+        <div class="panel controls-panel" style="margin-bottom:14px;">
+          <div class="row" style="justify-content:space-between;align-items:center">
+            <div class="stack" style="flex:1">
+              <div class="flex">
+                <label class="small">Week Start (Monday)</label>
+                <div class="muted" style="margin-left:8px" id="week-range-label">—</div>
+              </div>
+              <div class="muted-block">Use the grid below to assign templates per advisor / per day. Then press "Generate Timeline" or use auto-generate.</div>
+            </div>
+
+            <div class="stack" style="align-items:flex-end">
+              <div class="controls-wrap">
+                <button class="btn small" id="generate-btn">🚀 Generate Timeline</button>
+                <button class="btn secondary small" id="toggle-settings-btn">⚙️ Settings</button>
+                <button class="btn secondary small" id="clear-rotas-btn" title="Clear all assignments">Clear</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Master rota assignment table -->
+        <div class="panel master-table-container">
+          <h3>📅 Master Rota Assignment Grid</h3>
+          <div style="overflow:auto">
+            <table class="master" id="master-rota-table">
+              <thead>
                 <tr>
-                    <th rowspan="2" class="advisor-name-cell" style="width:150px;">Advisor</th>
-                    <th colspan="7">Select Shift Template</th>
+                  <th class="advisor-name">Advisor</th>
+                  <th class="day-head">Mon <div class="muted">Date</div></th>
+                  <th class="day-head">Tue</th>
+                  <th class="day-head">Wed</th>
+                  <th class="day-head">Thu</th>
+                  <th class="day-head">Fri</th>
+                  <th class="day-head">Sat</th>
+                  <th class="day-head">Sun</th>
                 </tr>
-                <tr id="date-headers"></tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-    </div>
-    <button onclick="generateAllSchedules()" style="margin-top:20px;">🚀 Generate Timeline View</button>
-
-    <h2 style="margin-top:40px;">📊 Team Weekly Timeline Schedule</h2>
-    <div id="team-timeline-container">
-        <div class="master-timeline-grid" id="master-timeline-grid">
-            <p style="padding:20px; text-align:center; color:var(--text-dark);">Select your shifts in the grid above and click 'Generate Timeline View' to see the schedule.</p>
+              </thead>
+              <tbody id="master-rota-body">
+                <!-- populated by JS -->
+              </tbody>
+            </table>
+          </div>
         </div>
-    </div>
-    <button onclick="printGeneratedSchedule()" style="margin-top:20px;">🖨️ Download Team Rota (PDF)</button>
-</div>
 
-<script>
-// --- CONFIG ---
-const ADVISOR_NAMES = ['Luke Pashley','Ameena Malik','Carrie-Ann Raw','Danielle Smith','Farwa Shaheen','Gemma Emmett','Laura Stockburn','Millie Walsh','Tunis Foley'];
-const DAYS_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-const PLATFORM_ACTIVITIES = ['Emails','Mirakl','Social','Overtime','Meeting'];
-const BREAK_SLOTS = ['Break1','Lunch','Break2'];
-const STORAGE_KEY = 'ultraFastRotasV4';
-let masterRotaData = {};
-let shiftTemplates = {};
+        <!-- Timeline / schedule -->
+        <div class="panel" style="margin-top:14px">
+          <h3>📊 Team Schedule</h3>
+          <div class="muted-block" style="margin-bottom:8px">Switch between per-person daily view and the full team weekly timeline using the "Toggle View" button.</div>
+          <div id="team-timeline-container">
+            <!-- populated by JS -->
+            <div style="padding:18px;text-align:center;color:var(--muted-text)">Select shifts above and click "Generate Timeline" or wait for auto-generate.</div>
+          </div>
+        </div>
+      </section>
 
-// --- TIMELINE CONSTANTS ---
-const START_HOUR = 7;
-const END_HOUR = 20;
-const TOTAL_HOURS = END_HOUR - START_HOUR;
-const TIMELINE_HEIGHT_PX = 1000;
-const HEIGHT_PER_HOUR = TIMELINE_HEIGHT_PX / TOTAL_HOURS;
-const HEIGHT_PER_MINUTE = HEIGHT_PER_HOUR / 60;
+      <!-- RIGHT: Settings / Template Builder / Advisors -->
+      <aside>
+        <div class="panel">
+          <h3>🧑‍🤝‍🧑 Advisors</h3>
+          <div class="muted">Edit the team — add or remove advisors. Names are saved automatically.</div>
+          <div style="height:10px"></div>
+          <div class="advisor-list" id="advisor-list"></div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <input id="new-advisor-input" type="text" placeholder="Add advisor (full name)" />
+            <button class="btn small" id="add-advisor-btn">Add</button>
+          </div>
+        </div>
 
-// --- INIT ---
-function initApp(){
-    ADVISOR_NAMES.forEach(name=>{
-        masterRotaData[name]={};
-        DAYS_FULL.forEach(day=>{masterRotaData[name][day]={template:''};});
+        <div class="panel" id="settings-panel" style="margin-top:14px;display:none">
+          <h3>🛠 Shift Template Builder</h3>
+          <div class="muted">Create reusable shift templates (start, finish, breaks, platform).</div>
+          <div id="template-list" style="margin-top:10px;display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto"></div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <input id="new-template-name" type="text" placeholder="Template name (e.g. Early)" />
+            <button class="btn small" id="add-template-btn">➕ Add</button>
+          </div>
+
+          <hr style="margin:12px 0;border:none;border-top:1px dashed var(--border)">
+
+          <h3>🎨 Activity Color Key</h3>
+          <div class="colors-grid" style="margin-top:8px">
+            <div class="color-box"><div class="swatch" id="swatch-emails"></div><div style="flex:1"><label class="small">Emails</label><input id="color-emails" type="text" value="#2ecc71"></div></div>
+            <div class="color-box"><div class="swatch" id="swatch-mirakl"></div><div style="flex:1"><label class="small">Mirakl</label><input id="color-mirakl" type="text" value="#ffb300"></div></div>
+            <div class="color-box"><div class="swatch" id="swatch-social"></div><div style="flex:1"><label class="small">Social</label><input id="color-social" type="text" value="#5e35b1"></div></div>
+            <div class="color-box"><div class="swatch" id="swatch-meeting"></div><div style="flex:1"><label class="small">Meeting</label><input id="color-meeting" type="text" value="#ffd700"></div></div>
+            <div class="color-box"><div class="swatch" id="swatch-overtime"></div><div style="flex:1"><label class="small">Overtime</label><input id="color-overtime" type="text" value="#e53935"></div></div>
+            <div class="color-box"><div class="swatch" id="swatch-break"></div><div style="flex:1"><label class="small">Break</label><input id="color-break" type="text" value="#90a4ae"></div></div>
+            <div class="color-box"><div class="swatch" id="swatch-lunch"></div><div style="flex:1"><label class="small">Lunch</label><input id="color-lunch" type="text" value="#ff8f00"></div></div>
+            <div class="color-box"><div class="swatch" id="swatch-dayoff"></div><div style="flex:1"><label class="small">Day Off</label><input id="color-dayoff" type="text" value="#f4f4f4"></div></div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:12px">
+            <button class="btn small" id="save-local-btn">Save</button>
+            <button class="btn secondary small" id="load-local-btn">Load</button>
+            <button class="btn secondary small" id="reset-defaults-btn">Reset</button>
+          </div>
+
+          <div style="margin-top:10px;font-size:12px;color:var(--muted-text)">
+            Tip: You can import / export a single JSON containing templates, rotas, colors, advisors, and the week start.
+          </div>
+        </div>
+
+        <!-- hidden file input for import -->
+        <input id="import-file-input" type="file" accept=".json" style="display:none" />
+      </aside>
+    </main>
+
+    <footer style="max-width:1200px;margin:16px auto 60px;display:flex;justify-content:space-between;color:var(--muted-text);font-size:13px">
+      <div>Made for Luke — Professional Team Rota System</div>
+      <div>Local autosave · JSON import/export · Printable</div>
+    </footer>
+  </div>
+
+  <script>
+    /*******************************************************************
+     * Professional Team Rota System — Single-file app
+     * - Full-week grid assignment
+     * - Template builder
+     * - Color key
+     * - Daily per-person & full-team timeline
+     * - Dark mode, auto-save, load/export JSON, print
+     *
+     * Default advisors provided by the user.
+     *******************************************************************/
+
+    /* ------------- CONFIG & DEFAULTS -------------- */
+    const DEFAULT_ADVISORS = ['Luke Pashley','Ameena Malik','Carrie-Ann Raw','Danielle Smith','Farwa Shaheen','Gemma Emmett','Laura Stockburn','Millie Walsh','Tunis Foley'];
+    const DAYS_FULL = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    const PLATFORM_ACTIVITIES = ['Emails','Mirakl','Social','Overtime','Meeting'];
+    const STORAGE_KEY = 'professionalTeamRota_v1';
+    const COLOR_FIELDS = ['emails','mirakl','social','meeting','overtime','break','lunch','dayoff'];
+
+    /* App state */
+    let advisors = [];                  // array of names
+    let shiftTemplates = {};            // { name: { name, Start, Finish, Break1, Lunch, Break2, Platform } }
+    let masterRotaData = {};            // { advisorName: { Monday: { template: 'Early' }, ... } }
+    let startDateISO = '';              // Monday date string YYYY-MM-DD
+    let autoGenerate = true;            // whether to auto-generate timeline on changes
+    let viewMode = 'weekly';            // 'weekly' or 'daily'
+    let selectedDailyAdvisor = null;    // when in daily view, which advisor to show
+    let colorMap = {};                  // activity colors
+    let darkMode = false;
+
+    /* Timeline constants */
+    const START_HOUR = 7;
+    const END_HOUR = 20;
+    const TIMELINE_HEIGHT_PX = 1000;
+    const TOTAL_MINUTES = (END_HOUR - START_HOUR) * 60;
+    const PIXELS_PER_MIN = TIMELINE_HEIGHT_PX / TOTAL_MINUTES;
+
+    /* --------- DOM references -------- */
+    const advisorListEl = document.getElementById('advisor-list');
+    const addAdvisorBtn = document.getElementById('add-advisor-btn');
+    const newAdvisorInput = document.getElementById('new-advisor-input');
+    const templateListEl = document.getElementById('template-list');
+    const addTemplateBtn = document.getElementById('add-template-btn');
+    const newTemplateNameInput = document.getElementById('new-template-name');
+    const settingsPanelEl = document.getElementById('settings-panel');
+    const toggleSettingsBtn = document.getElementById('toggle-settings-btn');
+    const masterBody = document.getElementById('master-rota-body');
+    const generateBtn = document.getElementById('generate-btn');
+    const teamTimelineContainer = document.getElementById('team-timeline-container');
+    const startDateInput = document.getElementById('start-date-input');
+    const weekRangeLabel = document.getElementById('week-range-label');
+    const toggleViewBtn = document.getElementById('toggle-view-btn');
+    const prevWeekBtn = document.getElementById('prev-week-btn');
+    const nextWeekBtn = document.getElementById('next-week-btn');
+    const saveJsonBtn = document.getElementById('save-json-btn');
+    const loadJsonBtn = document.getElementById('load-json-btn');
+    const importFileInput = document.getElementById('import-file-input');
+    const printBtn = document.getElementById('print-btn');
+    const darkToggleBtn = document.getElementById('dark-mode-toggle');
+    const saveLocalBtn = document.getElementById('save-local-btn');
+    const loadLocalBtn = document.getElementById('load-local-btn');
+    const resetDefaultsBtn = document.getElementById('reset-defaults-btn');
+    const clearRotasBtn = document.getElementById('clear-rotas-btn');
+
+    /* color inputs */
+    const colorInputs = {};
+    COLOR_FIELDS.forEach(f => colorInputs[f] = document.getElementById('color-' + f));
+
+    /* swatches */
+    const swatches = {};
+    COLOR_FIELDS.forEach(f => swatches[f] = document.getElementById('swatch-' + f));
+
+    /* ------------- UTILITIES -------------- */
+    function uid() { return Math.random().toString(36).slice(2,9); }
+
+    function saveToLocalStorage() {
+      const payload = {
+        advisors,
+        shiftTemplates,
+        masterRotaData,
+        startDateISO,
+        colorMap,
+        darkMode
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (e) {
+        console.warn('Could not save local data', e);
+      }
+    }
+
+    function loadFromLocalStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return false;
+        const data = JSON.parse(raw);
+        if (data.advisors) advisors = data.advisors;
+        if (data.shiftTemplates) shiftTemplates = data.shiftTemplates;
+        if (data.masterRotaData) masterRotaData = data.masterRotaData;
+        if (data.startDateISO) startDateISO = data.startDateISO;
+        if (data.colorMap) colorMap = data.colorMap;
+        if (typeof data.darkMode === 'boolean') darkMode = data.darkMode;
+        return true;
+      } catch (e) {
+        console.warn('Failed to load local storage', e);
+        return false;
+      }
+    }
+
+    function downloadDataJSON(filename = 'team_schedule_data.json') {
+      const data = {
+        advisors,
+        shiftTemplates,
+        masterRotaData,
+        startDateISO,
+        colorMap
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    function applyImportedData(data) {
+      if (!data) return;
+      if (data.advisors) advisors = data.advisors;
+      if (data.shiftTemplates) shiftTemplates = data.shiftTemplates;
+      if (data.masterRotaData) masterRotaData = data.masterRotaData;
+      if (data.startDateISO) startDateISO = data.startDateISO;
+      if (data.colorMap) colorMap = data.colorMap;
+      persistAndRefresh();
+    }
+
+    function persistAndRefresh() {
+      saveToLocalStorage();
+      renderAdvisorList();
+      populateMasterTable();
+      updateColorsFromMap();
+      updateDateUI();
+      if (autoGenerate) generateAllSchedules();
+    }
+
+    /* ---------- Date helpers ---------- */
+    function isMonday(date) { return date.getDay() === 1; }
+    function toISODateString(d) { const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const day = String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
+    function parseISO(s) { if(!s) return null; const d = new Date(s + 'T00:00:00'); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+    function formatShortDate(s) { if(!s) return ''; const d = parseISO(s); return d.toLocaleDateString('en-GB', { day:'numeric', month:'short' }); }
+    function addDaysISO(iso, n) { const d = parseISO(iso); d.setDate(d.getDate()+n); return toISODateString(d); }
+
+    /* ---------- Time helpers ---------- */
+    function timeToMinutes(t) {
+      if (!t || typeof t !== 'string') return null;
+      const [hh,mm] = t.split(':').map(x => parseInt(x,10));
+      if (isNaN(hh) || isNaN(mm)) return null;
+      return hh*60 + mm;
+    }
+    function minutesToTime(mins) {
+      const hh = Math.floor(mins/60); const mm = mins%60;
+      return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+    }
+    function timeToPx(time) {
+      const mins = timeToMinutes(time);
+      if (mins === null) return 0;
+      const offset = mins - (START_HOUR*60);
+      return offset * PIXELS_PER_MIN;
+    }
+
+    /* ---------- Template processing ----------
+       Convert a template into ordered activity blocks with start/end times.
+       Break durations: Break1=15m, Lunch=45m, Break2=15m
+    */
+    function processDayWorkflow(template) {
+      if (!template || !template.Start || !template.Finish) return [];
+      // Build a list of events
+      const events = [];
+      events.push({ type: 'start', time: template.Start });
+      if (template.Break1) events.push({ type: 'break', subtype: 'Break', time: template.Break1, duration: 15 });
+      if (template.Lunch) events.push({ type: 'break', subtype: 'Lunch', time: template.Lunch, duration: 45 });
+      if (template.Break2) events.push({ type: 'break', subtype: 'Break', time: template.Break2, duration: 15 });
+      events.push({ type: 'end', time: template.Finish });
+
+      // Sort by time string
+      events.sort((a,b) => {
+        const ta = timeToMinutes(a.time||'00:00'); const tb = timeToMinutes(b.time||'00:00');
+        return ta - tb;
+      });
+
+      const activities = [];
+      let cursor = template.Start;
+
+      for (let i=0;i<events.length;i++){
+        const ev = events[i];
+        if (ev.type === 'start') {
+          cursor = ev.time;
+          continue;
+        }
+        if (ev.type === 'break') {
+          // Work segment from cursor to break start
+          if (timeToMinutes(ev.time) > timeToMinutes(cursor)) {
+            activities.push({ activity: template.Platform || 'Emails', start: cursor, end: ev.time });
+          }
+          // Break segment
+          const breakEndMins = timeToMinutes(ev.time) + ev.duration;
+          activities.push({ activity: ev.subtype, start: ev.time, end: minutesToTime(breakEndMins) });
+          cursor = minutesToTime(breakEndMins);
+        }
+        if (ev.type === 'end') {
+          if (timeToMinutes(ev.time) > timeToMinutes(cursor)) {
+            activities.push({ activity: template.Platform || 'Emails', start: cursor, end: ev.time });
+          }
+        }
+      }
+
+      // Filter out zero-length
+      return activities.filter(a => timeToMinutes(a.end) > timeToMinutes(a.start));
+    }
+
+    /* ---------- Rendering: Advisors & Templates ---------- */
+    function renderAdvisorList() {
+      advisorListEl.innerHTML = '';
+      advisors.forEach((name, idx) => {
+        const div = document.createElement('div');
+        div.className = 'advisor-item';
+        div.innerHTML = `
+          <div style="width:10px;font-weight:700;color:var(--muted-text)">${idx+1}</div>
+          <input value="${escapeHtml(name)}" data-index="${idx}" />
+          <button class="remove" title="Remove advisor" data-index="${idx}">✖</button>
+        `;
+        advisorListEl.appendChild(div);
+      });
+
+      // events
+      advisorListEl.querySelectorAll('input').forEach(inp => {
+        inp.addEventListener('change', (e) => {
+          const i = Number(e.target.dataset.index);
+          advisors[i] = e.target.value.trim() || `Advisor ${i+1}`;
+          // Update masterRotaData keys if name changed
+          rebuildMasterRotaForRenamed(advisors[i], i);
+          persistAndRefresh();
+        });
+      });
+
+      advisorListEl.querySelectorAll('.remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const i = Number(e.target.dataset.index);
+          const name = advisors[i];
+          if (!confirm(`Remove ${name} from the team? This will also remove their rota assignments.`)) return;
+          advisors.splice(i,1);
+          delete masterRotaData[name];
+          // Rebuild masterRotaData mapping to use new names
+          const newMaster = {};
+          advisors.forEach(a => {
+            if (!masterRotaData[a]) newMaster[a] = {}; else newMaster[a] = masterRotaData[a];
+          });
+          masterRotaData = newMaster;
+          persistAndRefresh();
+        });
+      });
+    }
+
+    function rebuildMasterRotaForRenamed(newName, index) {
+      // If index changed name, we need to map old key to new
+      // Simplest approach: rebuild masterRotaData from existing values in order
+      const oldKeys = Object.keys(masterRotaData);
+      const newMaster = {};
+      advisors.forEach((a, idx) => {
+        if (oldKeys[idx]) newMaster[a] = masterRotaData[oldKeys[idx]] || {};
+        else newMaster[a] = {};
+      });
+      masterRotaData = newMaster;
+    }
+
+    /* Templates */
+    function renderTemplates() {
+      templateListEl.innerHTML = '';
+      const keys = Object.keys(shiftTemplates);
+      if (keys.length === 0) {
+        templateListEl.innerHTML = `<div class="muted">No templates yet. Click "Add" to create a new shift template.</div>`;
+        return;
+      }
+      keys.forEach(name => {
+        const t = shiftTemplates[name];
+        const el = document.createElement('div');
+        el.className = 'template-row';
+        el.innerHTML = `
+          <input type="text" class="tpl-name" value="${escapeHtml(t.name)}" style="min-width:90px" data-name="${t.name}">
+          <label class="small" style="margin-left:6px">Start</label>
+          <input type="time" class="tpl-start" value="${escapeHtml(t.Start||'')}">
+          <label class="small">Finish</label>
+          <input type="time" class="tpl-finish" value="${escapeHtml(t.Finish||'')}">
+          <label class="small">Breaks (start)</label>
+          <input type="time" class="tpl-break1" value="${escapeHtml(t.Break1||'')}">
+          <input type="time" class="tpl-lunch" value="${escapeHtml(t.Lunch||'')}">
+          <input type="time" class="tpl-break2" value="${escapeHtml(t.Break2||'')}">
+          <select class="tpl-platform">${PLATFORM_ACTIVITIES.map(p => `<option ${t.Platform===p?'selected':''}>${p}</option>`).join('')}</select>
+          <button class="btn small tpl-save">Save</button>
+          <button class="btn secondary small tpl-delete">Delete</button>
+        `;
+        templateListEl.appendChild(el);
+
+        // wire events
+        el.querySelector('.tpl-save').addEventListener('click', () => {
+          const newName = el.querySelector('.tpl-name').value.trim() || 'Template';
+          const start = el.querySelector('.tpl-start').value;
+          const finish = el.querySelector('.tpl-finish').value;
+          const b1 = el.querySelector('.tpl-break1').value;
+          const lunch = el.querySelector('.tpl-lunch').value;
+          const b2 = el.querySelector('.tpl-break2').value;
+          const platform = el.querySelector('.tpl-platform').value || 'Emails';
+          const oldKey = name;
+          // if name changed, remove old entry
+          if (newName !== oldKey) {
+            delete shiftTemplates[oldKey];
+          }
+          shiftTemplates[newName] = { name: newName, Start: start, Finish: finish, Break1: b1, Lunch: lunch, Break2: b2, Platform: platform };
+          persistAndRefresh();
+        });
+
+        el.querySelector('.tpl-delete').addEventListener('click', () => {
+          if (!confirm(`Delete template "${name}"?`)) return;
+          delete shiftTemplates[name];
+          persistAndRefresh();
+        });
+      });
+    }
+
+    /* ---------- Master table population ---------- */
+    function populateMasterTable() {
+      masterBody.innerHTML = '';
+      // header dates
+      const start = startDateISO ? parseISO(startDateISO) : nextMonday(new Date());
+      const headers = document.querySelectorAll('#master-rota-table thead th.day-head');
+      // update header labels (in table's first row)
+      const headCells = document.querySelectorAll('#master-rota-table thead tr:first-child th');
+      // Build rows
+      advisors.forEach(name => {
+        const tr = document.createElement('tr');
+        const nameCell = document.createElement('td');
+        nameCell.className = 'advisor-name';
+        nameCell.textContent = name;
+        tr.appendChild(nameCell);
+
+        for (let d=0; d<7; d++){
+          const dayCell = document.createElement('td');
+          dayCell.dataset.day = DAYS_FULL[d];
+          const sel = document.createElement('select');
+          sel.className = 'template-select';
+          const defaultOpt = document.createElement('option'); defaultOpt.value = ''; defaultOpt.textContent = '-- DAY OFF --';
+          sel.appendChild(defaultOpt);
+          Object.keys(shiftTemplates).forEach(k => {
+            const opt = document.createElement('option'); opt.value = k; opt.textContent = k;
+            sel.appendChild(opt);
+          });
+
+          // ensure masterRotaData structure
+          if (!masterRotaData[name]) masterRotaData[name] = {};
+          if (!masterRotaData[name][DAYS_FULL[d]]) masterRotaData[name][DAYS_FULL[d]] = { template: '' };
+
+          sel.value = masterRotaData[name][DAYS_FULL[d]].template || '';
+
+          sel.addEventListener('change', (e) => {
+            masterRotaData[name][DAYS_FULL[d]] = masterRotaData[name][DAYS_FULL[d]] || {};
+            masterRotaData[name][DAYS_FULL[d]].template = e.target.value;
+            saveToLocalStorage();
+            if (autoGenerate) generateAllSchedules();
+          });
+
+          dayCell.appendChild(sel);
+          tr.appendChild(dayCell);
+        }
+        masterBody.appendChild(tr);
+      });
+
+      // update header dates text and small date display
+      updateDateUI();
+    }
+
+    function updateDateUI() {
+      if (!startDateISO) {
+        weekRangeLabel.textContent = '(no Monday selected)';
+        startDateInput.value = '';
+        // fill header short labels with Mon... Sun only
+        const ths = document.querySelectorAll('#master-rota-table thead th.day-head');
+        for (let i=0;i<ths.length;i++){
+          ths[i].innerHTML = `${DAYS_FULL[i].substring(0,3)}<div class="muted">Date</div>`;
+        }
+        return;
+      }
+      startDateInput.value = startDateISO;
+      const start = parseISO(startDateISO);
+      const end = new Date(start);
+      end.setDate(end.getDate()+6);
+      weekRangeLabel.textContent = `${formatShortDate(startDateISO)} — ${formatShortDate(toISODateString(end))}`;
+
+      // Update header cells
+      const ths = document.querySelectorAll('#master-rota-table thead th.day-head');
+      for (let i=0;i<7;i++){
+        const dateIso = addDaysISO(startDateISO, i);
+        ths[i].innerHTML = `${DAYS_FULL[i].substring(0,3)}<div class="muted">${formatShortDate(dateIso)}</div>`;
+      }
+    }
+
+    /* ---------- Timeline / Schedule Generation ---------- */
+    function generateAllSchedules() {
+      // Construct color map from inputs
+      mapColorsFromInputs();
+
+      // If weekly view, show full team grid
+      if (viewMode === 'weekly') {
+        renderWeeklyTimeline();
+        return;
+      }
+      // else daily view
+      renderDailyAdvisorView(selectedDailyAdvisor || advisors[0]);
+    }
+
+    function renderWeeklyTimeline() {
+      // grid with left column time axis and columns for each advisor/day
+      // We'll build a simple time-axis + persons rows of day-cells
+      const start = startDateISO ? parseISO(startDateISO) : nextMonday(new Date());
+      // build container
+      const grid = document.createElement('div');
+      grid.className = 'master-timeline-grid';
+
+      // top header row: empty left for time axis then 7 day columns
+      const headerRow = document.createElement('div');
+      headerRow.style.display = 'grid';
+      headerRow.style.gridTemplateColumns = `120px repeat(${advisors.length}, 1fr)`;
+      headerRow.style.alignItems = 'center';
+      headerRow.style.gap = '8px';
+      headerRow.style.marginBottom = '8px';
+
+      // left: place time label header
+      const leftHeader = document.createElement('div');
+      leftHeader.style.padding = '8px';
+      leftHeader.style.fontWeight = '700';
+      leftHeader.textContent = 'Time';
+      headerRow.appendChild(leftHeader);
+
+      // For each advisor create header cell
+      advisors.forEach(a => {
+        const h = document.createElement('div');
+        h.className = 'muted';
+        h.style.padding = '8px';
+        h.style.fontWeight = '700';
+        h.textContent = a;
+        headerRow.appendChild(h);
+      });
+      grid.appendChild(headerRow);
+
+      // build the main row — left time axis + advisor columns all with day-cells stacked vertically for each day
+      const mainRow = document.createElement('div');
+      mainRow.style.display = 'grid';
+      mainRow.style.gridTemplateColumns = `120px repeat(${advisors.length}, 1fr)`;
+      mainRow.style.gap = '8px';
+
+      // time axis: vertical stack of labels
+      const timeAxis = document.createElement('div');
+      timeAxis.className = 'time-axis';
+      timeAxis.style.height = TIMELINE_HEIGHT_PX + 'px';
+      timeAxis.style.padding = '6px';
+      // create labels every hour
+      for (let h=START_HOUR; h<=END_HOUR; h++){
+        const label = document.createElement('div');
+        label.className = 'time-label';
+        label.textContent = String(h).padStart(2,'0') + ':00';
+        label.style.height = `calc(${TIMELINE_HEIGHT_PX/(END_HOUR-START_HOUR)}px)`;
+        timeAxis.appendChild(label);
+      }
+      mainRow.appendChild(timeAxis);
+
+      // For each advisor, create a single large column that contains 7 stacked day-cells
+      advisors.forEach(a => {
+        const colWrap = document.createElement('div');
+        colWrap.style.display = 'grid';
+        colWrap.style.gridTemplateRows = 'repeat(7, 1fr)';
+        colWrap.style.gap = '8px';
+
+        for (let d=0; d<7; d++){
+          const dateIso = addDaysISO(startDateISO || toISODateString(start), d);
+          const dayCell = document.createElement('div');
+          dayCell.className = 'day-cell';
+          dayCell.style.height = Math.floor(TIMELINE_HEIGHT_PX/7) + 'px';
+          dayCell.dataset.advisor = a;
+          dayCell.dataset.date = dateIso;
+
+          // Find assigned template
+          const assigned = masterRotaData[a] && masterRotaData[a][DAYS_FULL[d]] ? masterRotaData[a][DAYS_FULL[d]].template : '';
+          if (!assigned || !shiftTemplates[assigned]) {
+            const off = document.createElement('div');
+            off.className = 'day-off-label';
+            off.textContent = 'DAY OFF';
+            dayCell.appendChild(off);
+          } else {
+            const template = shiftTemplates[assigned];
+            const activities = processDayWorkflow(template);
+
+            // render each activity block scaled for this smaller per-day small cell
+            activities.forEach(act => {
+              // compute proportional top & height within this small day cell
+              const startMin = timeToMinutes(act.start);
+              const endMin = timeToMinutes(act.end);
+              const dayStartMin = START_HOUR*60;
+              const dayRangeMin = (END_HOUR*60) - dayStartMin;
+              // normalized top percentage and height percent
+              const topPct = Math.max(0, (startMin - dayStartMin) / dayRangeMin);
+              const heightPct = Math.max(0.02, (endMin - startMin) / dayRangeMin);
+              const block = document.createElement('div');
+              block.className = 'activity-block';
+              const bg = colorMap[act.activity.toLowerCase()] || getComputedStyle(document.documentElement).getPropertyValue(`--color-${act.activity.toLowerCase()}`) || '#3b82f6';
+              block.style.background = bg;
+              block.style.top = (topPct * 100) + '%';
+              block.style.height = (heightPct * 100) + '%';
+              block.title = `${act.activity} (${act.start} - ${act.end})`;
+              block.innerHTML = `<div style="font-size:12px">${escapeHtml(act.activity)}</div><div class="activity-time">${act.start} - ${act.end}</div>`;
+              dayCell.appendChild(block);
+            });
+          }
+
+          colWrap.appendChild(dayCell);
+        }
+
+        mainRow.appendChild(colWrap);
+      });
+
+      grid.appendChild(mainRow);
+      // attach
+      teamTimelineContainer.innerHTML = '';
+      teamTimelineContainer.appendChild(grid);
+    }
+
+    function renderDailyAdvisorView(advisorName) {
+      if (!advisorName) advisorName = advisors[0];
+      if (!advisors.includes(advisorName)) advisorName = advisors[0];
+      selectedDailyAdvisor = advisorName;
+
+      // Build a single-person timeline: left axis with hours and right column showing day column with full height
+      const start = startDateISO ? parseISO(startDateISO) : nextMonday(new Date());
+      const grid = document.createElement('div');
+      grid.style.display = 'grid';
+      grid.style.gridTemplateColumns = '120px 1fr';
+      grid.style.alignItems = 'start';
+      grid.style.gap = '12px';
+
+      // time axis column
+      const axis = document.createElement('div');
+      axis.style.height = TIMELINE_HEIGHT_PX + 'px';
+      axis.style.borderRight = '1px solid var(--border)';
+      for (let h=START_HOUR; h<=END_HOUR; h++){
+        const label = document.createElement('div');
+        label.className = 'time-label';
+        label.style.height = `calc(${TIMELINE_HEIGHT_PX/(END_HOUR-START_HOUR)}px)`;
+        label.textContent = String(h).padStart(2,'0') + ':00';
+        axis.appendChild(label);
+      }
+      grid.appendChild(axis);
+
+      // right: a column with 7 stacked day-cells (larger vertical height per day)
+      const right = document.createElement('div');
+      right.style.display = 'grid';
+      right.style.gridTemplateRows = 'repeat(7, 1fr)';
+      right.style.gap = '8px';
+
+      for (let d=0; d<7; d++){
+        const dateIso = addDaysISO(startDateISO || toISODateString(start), d);
+        const dayCell = document.createElement('div');
+        dayCell.className = 'day-cell';
+        dayCell.style.height = Math.floor(TIMELINE_HEIGHT_PX/7) + 'px';
+        dayCell.dataset.date = dateIso;
+
+        const assigned = masterRotaData[advisorName] && masterRotaData[advisorName][DAYS_FULL[d]] ? masterRotaData[advisorName][DAYS_FULL[d]].template : '';
+        if (!assigned || !shiftTemplates[assigned]) {
+          const off = document.createElement('div');
+          off.className = 'day-off-label';
+          off.textContent = `${DAYS_FULL[d].substring(0,3)} — DAY OFF`;
+          dayCell.appendChild(off);
+        } else {
+          // show header small
+          const hdr = document.createElement('div');
+          hdr.style.position = 'absolute';
+          hdr.style.left = '8px';
+          hdr.style.top = '6px';
+          hdr.style.fontWeight = '700';
+          hdr.style.fontSize = '12px';
+          hdr.style.color = 'var(--muted-text)';
+          hdr.textContent = `${DAYS_FULL[d].substring(0,3)} ${formatShortDate(dateIso)} — ${assigned}`;
+          dayCell.appendChild(hdr);
+
+          const template = shiftTemplates[assigned];
+          const activities = processDayWorkflow(template);
+          activities.forEach(act => {
+            const top = timeToPx(act.start);
+            const bottom = timeToPx(act.end);
+            const height = Math.max(10, bottom - top);
+            const block = document.createElement('div');
+            block.className = 'activity-block';
+            const bg = colorMap[act.activity.toLowerCase()] || getComputedStyle(document.documentElement).getPropertyValue(`--color-${act.activity.toLowerCase()}`) || '#3b82f6';
+            block.style.background = bg;
+            block.style.top = top + 'px';
+            block.style.height = height + 'px';
+            block.title = `${act.activity} (${act.start} - ${act.end})`;
+            block.innerHTML = `${escapeHtml(act.activity)}<span class="activity-time">${act.start} - ${act.end}</span>`;
+            dayCell.appendChild(block);
+          });
+        }
+
+        right.appendChild(dayCell);
+      }
+
+      grid.appendChild(right);
+      teamTimelineContainer.innerHTML = '';
+      // header for daily view
+      const head = document.createElement('div');
+      head.style.display = 'flex';
+      head.style.justifyContent = 'space-between';
+      head.style.alignItems = 'center';
+      head.style.marginBottom = '8px';
+      head.innerHTML = `<div style="font-weight:800">${escapeHtml(advisorName)}</div><div class="muted">${formatShortDate(addDaysISO(startDateISO||toISODateString(start),0))} — ${formatShortDate(addDaysISO(startDateISO||toISODateString(start),6))}</div>`;
+      teamTimelineContainer.innerHTML = '';
+      teamTimelineContainer.appendChild(head);
+      teamTimelineContainer.appendChild(grid);
+    }
+
+    /* ---------- Color helpers ---------- */
+    function mapColorsFromInputs() {
+      COLOR_FIELDS.forEach(k => {
+        const val = colorInputs[k].value || window.getComputedStyle(document.documentElement).getPropertyValue(`--color-${k}`) || '';
+        colorMap[k] = val;
+      });
+      // apply to swatches and CSS variables
+      updateColorsFromMap();
+      saveToLocalStorage();
+    }
+
+    function updateColorsFromMap() {
+      COLOR_FIELDS.forEach(k => {
+        const v = colorMap[k] || colorInputs[k].value || getComputedStyle(document.documentElement).getPropertyValue(`--color-${k}`);
+        if (v) {
+          document.documentElement.style.setProperty(`--color-${k}`, v);
+          if (swatches[k]) swatches[k].style.background = v;
+          if (colorInputs[k]) colorInputs[k].value = v;
+        }
+      });
+    }
+
+    /* ---------- Helpers: next Monday ---------- */
+    function nextMonday(d) {
+      const copy = new Date(d);
+      const day = copy.getDay();
+      const diff = (day <= 1) ? (1 - day) : (8 - day);
+      copy.setDate(copy.getDate() + diff);
+      return new Date(copy.getFullYear(), copy.getMonth(), copy.getDate());
+    }
+
+    /* ---------- UI Wiring ---------- */
+    function wireUI() {
+      addAdvisorBtn.addEventListener('click', () => {
+        const val = newAdvisorInput.value.trim();
+        if (!val) return;
+        advisors.push(val);
+        // create empty rota entries
+        masterRotaData[val] = {};
+        DAYS_FULL.forEach(d => masterRotaData[val][d] = { template: '' });
+        newAdvisorInput.value = '';
+        persistAndRefresh();
+      });
+
+      addTemplateBtn.addEventListener('click', () => {
+        const name = newTemplateNameInput.value.trim() || `Shift ${Object.keys(shiftTemplates).length+1}`;
+        if (shiftTemplates[name]) {
+          alert('A template with that name already exists. Edit it in the list below.');
+          return;
+        }
+        shiftTemplates[name] = { name, Start:'07:00', Finish:'15:00', Break1:'10:00', Lunch:'12:30', Break2:'14:00', Platform:'Emails' };
+        newTemplateNameInput.value = '';
+        persistAndRefresh();
+      });
+
+      toggleSettingsBtn.addEventListener('click', () => {
+        settingsPanelEl.style.display = settingsPanelEl.style.display === 'none' ? 'block' : 'none';
+      });
+
+      generateBtn.addEventListener('click', () => {
+        generateAllSchedules();
+      });
+
+      toggleViewBtn.addEventListener('click', () => {
+        viewMode = viewMode === 'weekly' ? 'daily' : 'weekly';
+        // in daily mode select first advisor if none
+        if (viewMode === 'daily' && !selectedDailyAdvisor && advisors.length) selectedDailyAdvisor = advisors[0];
+        generateAllSchedules();
+      });
+
+      prevWeekBtn.addEventListener('click', () => {
+        if (!startDateISO) {
+          const mon = nextMonday(new Date());
+          startDateISO = toISODateString(mon);
+        }
+        startDateISO = addDaysISO(startDateISO, -7);
+        persistAndRefresh();
+      });
+
+      nextWeekBtn.addEventListener('click', () => {
+        if (!startDateISO) {
+          const mon = nextMonday(new Date());
+          startDateISO = toISODateString(mon);
+        }
+        startDateISO = addDaysISO(startDateISO, 7);
+        persistAndRefresh();
+      });
+
+      startDateInput.addEventListener('change', (e) => {
+        const val = e.target.value;
+        if (!val) {
+          startDateISO = '';
+          persistAndRefresh();
+          return;
+        }
+        const d = parseISO(val);
+        if (!d) return;
+        if (d.getDay() !== 1) {
+          alert('Please choose a Monday as the week start.');
+          startDateInput.value = '';
+          return;
+        }
+        startDateISO = toISODateString(d);
+        persistAndRefresh();
+      });
+
+      // export / import
+      saveJsonBtn.addEventListener('click', () => downloadDataJSON());
+      loadJsonBtn.addEventListener('click', () => importFileInput.click());
+      importFileInput.addEventListener('change', (e) => {
+        const f = e.target.files[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const parsed = JSON.parse(ev.target.result);
+            if (!confirm('Importing will overwrite current data. Continue?')) return;
+            applyImportedData(parsed);
+            saveToLocalStorage();
+            alert('Imported data applied.');
+          } catch (err) {
+            alert('Invalid JSON file.');
+          }
+        };
+        reader.readAsText(f);
+      });
+
+      // print
+      printBtn.addEventListener('click', () => { window.print(); });
+
+      // dark mode
+      darkToggleBtn.addEventListener('click', () => {
+        darkMode = !darkMode;
+        document.body.classList.toggle('dark', darkMode);
+        saveToLocalStorage();
+      });
+
+      // color input changes
+      COLOR_FIELDS.forEach(k => {
+        colorInputs[k] && colorInputs[k].addEventListener('input', (e) => {
+          colorMap[k] = e.target.value;
+          updateColorsFromMap();
+          saveToLocalStorage();
+          if (autoGenerate) generateAllSchedules();
+        });
+      });
+
+      // save/load local
+      saveLocalBtn.addEventListener('click', () => { saveToLocalStorage(); alert('Saved locally.'); });
+      loadLocalBtn.addEventListener('click', () => { if (loadFromLocalStorage()) { persistAndRefresh(); alert('Loaded local save.'); } else alert('No local save found.'); });
+      resetDefaultsBtn.addEventListener('click', () => { if (!confirm('Reset templates, colors and rotas to defaults?')) return; resetToDefaults(); });
+
+      clearRotasBtn.addEventListener('click', () => {
+        if (!confirm('Clear all rota assignments?')) return;
+        advisors.forEach(a => {
+          masterRotaData[a] = {};
+          DAYS_FULL.forEach(d => masterRotaData[a][d] = { template: '' });
+        });
+        persistAndRefresh();
+      });
+    }
+
+    /* ---------- Defaults / Reset ---------- */
+    function resetToDefaults() {
+      advisors = DEFAULT_ADVISORS.slice();
+      shiftTemplates = {
+        'Early': { name:'Early', Start:'07:00', Finish:'15:00', Break1:'10:00', Lunch:'12:30', Break2:'14:00', Platform:'Emails' },
+        'Mid': { name:'Mid', Start:'09:00', Finish:'17:00', Break1:'11:30', Lunch:'13:00', Break2:'15:30', Platform:'Mirakl' },
+        'Late': { name:'Late', Start:'12:00', Finish:'20:00', Break1:'15:00', Lunch:'16:00', Break2:'18:00', Platform:'Social' }
+      };
+      masterRotaData = {};
+      advisors.forEach(a => {
+        masterRotaData[a] = {};
+        DAYS_FULL.forEach(d => masterRotaData[a][d] = { template: '' });
+      });
+      startDateISO = toISODateString(nextMonday(new Date()));
+      colorMap = {
+        emails: '#2ecc71',
+        mirakl: '#ffb300',
+        social: '#5e35b1',
+        meeting: '#ffd700',
+        overtime: '#e53935',
+        break: '#90a4ae',
+        lunch: '#ff8f00',
+        dayoff: '#f4f4f4'
+      };
+      darkMode = false;
+      persistAndRefresh();
+    }
+
+    /* ---------- Helpers: escapeHtml ---------- */
+    function escapeHtml(s) {
+      return String(s || '').replace(/[&<>"']/g, (m) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+
+    /* ---------- Initialization ---------- */
+    function initApp() {
+      // Try load local
+      const loaded = loadFromLocalStorage();
+      if (!loaded) {
+        // create defaults
+        advisors = DEFAULT_ADVISORS.slice();
+        shiftTemplates = {}; // empty by default but we'll create a couple in reset so user can edit
+        masterRotaData = {};
+        advisors.forEach(a => {
+          masterRotaData[a] = {};
+          DAYS_FULL.forEach(d => masterRotaData[a][d] = { template: '' });
+        });
+        startDateISO = toISODateString(nextMonday(new Date()));
+        // colors default
+        colorMap = {
+          emails: '#2ecc71',
+          mirakl: '#ffb300',
+          social: '#5e35b1',
+          meeting: '#ffd700',
+          overtime: '#e53935',
+          break: '#90a4ae',
+          lunch: '#ff8f00',
+          dayoff: '#f4f4f4'
+        };
+        // small starter templates
+        shiftTemplates['Early'] = { name:'Early', Start:'07:00', Finish:'15:00', Break1:'10:00', Lunch:'12:30', Break2:'14:00', Platform:'Emails' };
+        shiftTemplates['Mid'] = { name:'Mid', Start:'09:00', Finish:'17:00', Break1:'11:30', Lunch:'13:00', Break2:'15:30', Platform:'Mirakl' };
+        shiftTemplates['Late'] = { name:'Late', Start:'12:00', Finish:'20:00', Break1:'15:00', Lunch:'16:00', Break2:'18:00', Platform:'Social' };
+      }
+
+      // apply dark mode
+      document.body.classList.toggle('dark', !!darkMode);
+      // render UI
+      renderAdvisorList();
+      renderTemplates();
+      populateMasterTable();
+      updateColorsFromMap();
+
+      wireUI();
+
+      // auto-generate initially
+      if (autoGenerate) generateAllSchedules();
+    }
+
+    /* Keep templates list refreshed when shiftTemplates changes */
+    function persistAndRenderTemplates() {
+      saveToLocalStorage();
+      renderTemplates();
+      populateMasterTable();
+      if (autoGenerate) generateAllSchedules();
+    }
+
+    /* Hook into changes to shiftTemplates from other places */
+    const templatesProxyHandler = {
+      set(target, key, value) {
+        target[key] = value;
+        persistAndRenderTemplates();
+        return true;
+      },
+      deleteProperty(target, key) {
+        delete target[key];
+        persistAndRenderTemplates();
+        return true;
+      }
+    };
+    shiftTemplates = new Proxy(shiftTemplates, templatesProxyHandler);
+
+    /* Start app */
+    document.addEventListener('DOMContentLoaded', () => {
+      initApp();
+      // Make sure rendering functions use latest templates proxy
+      renderTemplates = function() {
+        templateListEl.innerHTML = '';
+        const keys = Object.keys(shiftTemplates);
+        if (keys.length === 0) {
+          templateListEl.innerHTML = `<div class="muted">No templates yet. Click "Add" to create a new shift template.</div>`;
+          return;
+        }
+        keys.forEach(name => {
+          const t = shiftTemplates[name];
+          const el = document.createElement('div');
+          el.className = 'template-row';
+          el.innerHTML = `
+            <input type="text" class="tpl-name" value="${escapeHtml(t.name)}" style="min-width:90px" data-name="${t.name}">
+            <label class="small" style="margin-left:6px">Start</label>
+            <input type="time" class="tpl-start" value="${escapeHtml(t.Start||'')}">
+            <label class="small">Finish</label>
+            <input type="time" class="tpl-finish" value="${escapeHtml(t.Finish||'')}">
+            <label class="small">Breaks (start)</label>
+            <input type="time" class="tpl-break1" value="${escapeHtml(t.Break1||'')}">
+            <input type="time" class="tpl-lunch" value="${escapeHtml(t.Lunch||'')}">
+            <input type="time" class="tpl-break2" value="${escapeHtml(t.Break2||'')}">
+            <select class="tpl-platform">${PLATFORM_ACTIVITIES.map(p => `<option ${t.Platform===p?'selected':''}>${p}</option>`).join('')}</select>
+            <button class="btn small tpl-save">Save</button>
+            <button class="btn secondary small tpl-delete">Delete</button>
+          `;
+          templateListEl.appendChild(el);
+
+          el.querySelector('.tpl-save').addEventListener('click', () => {
+            const newName = el.querySelector('.tpl-name').value.trim() || 'Template';
+            const start = el.querySelector('.tpl-start').value;
+            const finish = el.querySelector('.tpl-finish').value;
+            const b1 = el.querySelector('.tpl-break1').value;
+            const lunch = el.querySelector('.tpl-lunch').value;
+            const b2 = el.querySelector('.tpl-break2').value;
+            const platform = el.querySelector('.tpl-platform').value || 'Emails';
+            const oldKey = name;
+            if (newName !== oldKey) delete shiftTemplates[oldKey];
+            shiftTemplates[newName] = { name: newName, Start: start, Finish: finish, Break1: b1, Lunch: lunch, Break2: b2, Platform: platform };
+            persistAndRenderTemplates();
+          });
+
+          el.querySelector('.tpl-delete').addEventListener('click', () => {
+            if (!confirm(`Delete template "${name}"?`)) return;
+            delete shiftTemplates[name];
+            persistAndRenderTemplates();
+          });
+        });
+      };
+
+      // Recreate the shiftTemplates proxy so set/delete trap fires
+      shiftTemplates = new Proxy(shiftTemplates, templatesProxyHandler);
+      // Ensure UI event wiring is done
+      wireUI();
     });
-    populateTemplateEditor();
-    populateMasterTable();
-    loadDataFromStorage();
-}
 
-// --- UTIL ---
-function toggleSettings(){document.getElementById('settings-area').classList.toggle('hidden');}
-function timeToPosition(time){
-    if(!time) return 0;
-    const [h,m] = time.split(':').map(Number);
-    const totalMinutes=(h*60)+m;
-    const offsetMinutes=totalMinutes-START_HOUR*60;
-    return offsetMinutes*HEIGHT_PER_MINUTE;
-}
-function getColorMap(){
-    const map={};
-    document.querySelectorAll('#settings-area input[type="text"]').forEach(input=>{
-        if(input.id.startsWith('color-')) map[input.id.replace('color-','')]=input.value;
-    });
-    return map;
-}
-
-// --- TEMPLATE LOGIC ---
-function addTemplate(){
-    const name='Shift'+(Object.keys(shiftTemplates).length+1);
-    shiftTemplates[name]={name,Start:'',Finish:'',Break1:'',Lunch:'',Break2:'',Platform:'Emails'};
-    populateTemplateEditor();
-    populateMasterTable();
-    saveToLocalStorage();
-}
-function deleteTemplate(name){
-    delete shiftTemplates[name];
-    populateTemplateEditor();
-    populateMasterTable();
-    saveToLocalStorage();
-}
-function updateTemplate(oldName,key,value){
-    const template=shiftTemplates[oldName];
-    if(key==='name' && value!==oldName && value!==''){
-        shiftTemplates[value]={...template,name:value};
-        delete shiftTemplates[oldName];
-        populateTemplateEditor();
-        populateMasterTable();
-    } else { template[key]=value; }
-    saveToLocalStorage();
-}
-function populateTemplateEditor(){
-    const editor=document.getElementById('template-editor');
-    editor.innerHTML='';
-    Object.keys(shiftTemplates).forEach(k=>{
-        const t=shiftTemplates[k];
-        const row=document.createElement('div');
-        row.className='template-row';
-        row.innerHTML=`
-            <label>Name:</label><input type="text" value="${t.name}" oninput="updateTemplate('${k}','name',this.value)" style="width:100px;">
-            <label>Shift:</label><input type="time" value="${t.Start}" oninput="updateTemplate('${t.name}','Start',this.value)">
-            <input type="time" value="${t.Finish}" oninput="updateTemplate('${t.name}','Finish',this.value)">
-            <label>Breaks:</label><div class="time-block">
-                <input type="time" value="${t.Break1}" oninput="updateTemplate('${t.name}','Break1',this.value)">
-                <input type="time" value="${t.Lunch}" oninput="updateTemplate('${t.name}','Lunch',this.value)">
-                <input type="time" value="${t.Break2}" oninput="updateTemplate('${t.name}','Break2',this.value)">
-            </div>
-            <label>Platform:</label>
-            <select onchange="updateTemplate('${t.name}','Platform
+  </script>
+</body>
+</html>
