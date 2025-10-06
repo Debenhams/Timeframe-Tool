@@ -2,164 +2,244 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Professional Team Rota System</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Rota System</title>
     <style>
-        :root {
-            --primary-color: #0d47a1;
-            --accent-color: #00c853;
-            --secondary-color: #f5f5f5;
-            --text-dark: #212121;
-            --text-light: #ffffff;
-            --border-color: #e0e0e0;
-            --timeline-height: 1000px;
-
-            --color-emails: #2ecc71;
-            --color-mirakl: #ffb300;
-            --color-social: #5e35b1;
-            --color-meeting: #ffd700;
-            --color-overtime: #e53935;
-            --color-break: #90a4ae;
-            --color-lunch: #ff8f00;
-            --color-dayoff: #f4f4f4;
+        /* Global Styles */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            color: #333;
         }
-
-        * {box-sizing:border-box;}
-        body {margin:0;font-family:Roboto, sans-serif;background:var(--secondary-color);color:var(--text-dark);}
-
-        .header{background:var(--primary-color);color:var(--text-light);padding:28px 36px;box-shadow:0 4px 10px rgba(0,0,0,0.18);}
-        .header h1{margin:0;font-size:1.9rem;font-weight:700;}
-
-        .container{padding:28px;max-width:1200px;margin:0 auto;}
-
-        .controls-panel{background:var(--text-light);padding:14px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:18px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;}
-        input, select{padding:8px 10px;border:1px solid var(--border-color);border-radius:6px;}
-        button{background:var(--accent-color);color:var(--text-light);border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;}
-        button.secondary{background:#1976d2;}
-        button.danger{background:#dc3545;}
-        .button-group{display:flex;gap:8px;}
-
-        .template-row{display:flex;gap:10px;align-items:center;padding:10px;border-radius:6px;border:1px solid #cfd8dc;background:var(--secondary-color);flex-wrap:wrap;margin-bottom:10px;}
-        .template-row input[type="text"]{width:120px;}
-        .template-row input[type="time"]{width:110px;}
-        .template-row select{width:130px;}
-
-        .master-table-container{overflow:auto;background:var(--text-light);border-radius:8px;padding:0;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,0.05);}
-        table.master-table{width:100%;border-collapse:collapse;min-width:760px;}
-        table.master-table th, table.master-table td{border:1px solid var(--border-color);padding:8px;text-align:center;}
-        th{background:var(--primary-color);color:var(--text-light);font-weight:600;}
-        td.advisor-name-cell{text-align:left;font-weight:700;background:#e3f2fd;color:var(--text-dark);width:200px;}
-
-        #team-timeline-container{background:var(--text-light);padding:12px;border-radius:8px;box-shadow:0 8px 16px rgba(0,0,0,0.08);overflow:auto;}
-        .master-timeline-grid{display:grid;position:relative;gap:0;align-items:start;}
-        .time-axis{padding-right:10px;text-align:right;border-right:1px solid var(--border-color);position:relative;background:var(--text-light);}
-        .time-label{position:absolute;font-size:0.8em;transform:translateY(-50%);left:0;width:100%;padding-right:6px;color:#616161;border-bottom:1px dashed #e0e0e0;}
-        .advisor-header{padding:10px 6px;text-align:center;font-weight:700;background:var(--primary-color);color:var(--text-light);position:sticky;top:0;z-index:20;border:1px solid var(--border-color);}
-        .day-cell{position:relative;border:1px solid var(--border-color);height:var(--timeline-height);overflow:hidden;background:transparent;}
-        .activity-block{position:absolute;left:6%;width:88%;color:var(--text-light);padding:6px;border-radius:6px;font-size:0.78em;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.15);font-weight:600;cursor:help;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-        .activity-time{font-size:0.72em;font-weight:400;display:block;opacity:0.95;}
-        .day-off-label{position:absolute;top:50%;transform:translateY(-50%);width:100%;text-align:center;color:#bdbdbd;font-size:1.05em;font-weight:700;}
-
-        @media print{.header,.controls-panel,button{display:none !important}.container{padding:0}.master-timeline-grid{page-break-inside:avoid}.day-cell{height:1200px !important}body{background:#fff}}
-        @media (max-width:820px){.controls-panel{flex-direction:column;align-items:stretch}.template-row{flex-direction:column;align-items:stretch}}
-
+        header {
+            background-color: #333;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+        }
+        .container {
+            width: 90%;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        select, input[type="date"], button {
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #5cb85c;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #4cae4c;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 12px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        td {
+            background-color: #fafafa;
+        }
+        .hidden {
+            display: none;
+        }
+        /* Timeline Styles */
+        .timeline {
+            display: grid;
+            grid-template-columns: 100px repeat(7, 1fr);
+            grid-gap: 5px;
+            margin-top: 20px;
+        }
+        .timeline div {
+            padding: 5px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+            text-align: center;
+        }
+        .timeline .time-slot {
+            background-color: #e9e9e9;
+        }
+        .timeline .shift {
+            background-color: #d9edf7;
+            cursor: pointer;
+        }
+        .timeline .shift:hover {
+            background-color: #bce8f1;
+        }
     </style>
 </head>
 <body>
-<div class="header"><h1>Professional Team Rota System</h1></div>
+
+<header>
+    <h1>Team Rota System</h1>
+</header>
+
 <div class="container">
-    <div class="controls-panel">
-        <div style="display:flex;gap:12px;align-items:center">
-            <label for="start-date-input" style="font-weight:700">Week Start Date (Monday):</label>
-            <input id="start-date-input" type="date" onchange="updateDates()" />
-        </div>
-        <div class="button-group">
-            <button onclick="saveData(true)">💾 Save & Download Data</button>
-            <button class="secondary" onclick="toggleSettings()">⚙️ Toggle Settings/Templates</button>
-            <button onclick="generateAllSchedules()">🚀 Generate Timeline View</button>
-        </div>
-    </div>
-
-    <div id="settings-area" class="controls-panel hidden" style="align-items:flex-start">
-        <div style="width:58%">
-            <h2 style="color:var(--text-dark);">🛠️ Shift Template Builder</h2>
-            <div id="template-editor" style="padding:10px"></div>
-            <div style="margin-top:8px">
-                <button onclick="addTemplate()">➕ Add New Shift Template</button>
-                <button class="danger" onclick="resetTemplates()" style="margin-left:8px">Reset Templates</button>
-            </div>
-        </div>
-        <div style="width:40%">
-            <h2 style="color:var(--text-dark);">🎨 Activity Color Key</h2>
-            <div class="color-key-grid" style="padding:10px;background:var(--secondary-color);border-radius:6px">
-                <div class="color-input-group"><span class="color-example" data-activity="emails" style="background:var(--color-emails)"></span><label>Emails:</label><input id="color-emails" type="text" value="#2ecc71" oninput="updateColors()" /></div>
-                <div class="color-input-group"><span class="color-example" data-activity="mirakl" style="background:var(--color-mirakl)"></span><label>Mirakl:</label><input id="color-mirakl" type="text" value="#ffb300" oninput="updateColors()" /></div>
-                <div class="color-input-group"><span class="color-example" data-activity="social" style="background:var(--color-social)"></span><label>Social:</label><input id="color-social" type="text" value="#5e35b1" oninput="updateColors()" /></div>
-                <div class="color-input-group"><span class="color-example" data-activity="meeting" style="background:var(--color-meeting)"></span><label>Meeting/Coach:</label><input id="color-meeting" type="text" value="#ffd700" oninput="updateColors()" /></div>
-                <div class="color-input-group"><span class="color-example" data-activity="overtime" style="background:var(--color-overtime)"></span><label>Overtime:</label><input id="color-overtime" type="text" value="#e53935" oninput="updateColors()" /></div>
-                <div class="color-input-group"><span class="color-example" data-activity="break" style="background:var(--color-break)"></span><label>Break:</label><input id="color-break" type="text" value="#90a4ae" oninput="updateColors()" /></div>
-                <div class="color-input-group"><span class="color-example" data-activity="lunch" style="background:var(--color-lunch)"></span><label>Lunch:</label><input id="color-lunch" type="text" value="#ff8f00" oninput="updateColors()" /></div>
-            </div>
-
-            <div style="margin-top:12px" class="button-group">
-                <input id="load-file" type="file" accept=".json" style="display:none" onchange="loadData(event)" />
-                <button onclick="document.getElementById('load-file').click()">📂 Load Data from File</button>
-                <button onclick="downloadData(collectFullData())" style="margin-left:8px">⬇️ Export JSON</button>
-            </div>
-        </div>
-    </div>
-
-    <h2>📅 Master Rota Assignment Grid</h2>
-    <div class="master-table-container">
-        <table class="master-table" id="master-rota-table">
-            <thead>
-                <tr>
-                    <th rowspan="2" class="advisor-name-cell" style="width:200px">Advisor</th>
-                    <th colspan="7">Select Shift Template</th>
-                </tr>
-                <tr id="date-headers"></tr>
-            </thead>
-            <tbody></tbody>
-        </table>
-    </div>
-
-    <div style="margin:10px 0">
-        <button onclick="generateAllSchedules()">🚀 Generate Timeline View</button>
-    </div>
-
-    <h2 style="margin-top:22px">📊 Team / Advisor Timeline Schedule</h2>
-    <div style="margin-bottom:12px">
-        <select id="view-mode" onchange="updateViewMode()">
-            <option value="team-day">Team Day Rota</option>
-            <option value="advisor-week">Single Advisor Week</option>
-            <option value="advisor-day">Single Advisor Day</option>
+    <div>
+        <label for="viewMode">View Mode:</label>
+        <select id="viewMode" onchange="changeViewMode()">
+            <option value="team">Team View</option>
+            <option value="individual">Individual View</option>
         </select>
-        <select id="advisor-select" onchange="updateViewMode()"></select>
-        <button onclick="prevPage()">⬅️ Prev</button> <span id="page-display">1</span> <button onclick="nextPage()">➡️ Next</button>
-    </div>
-    <div id="team-timeline-container">
-        <div class="master-timeline-grid" id="master-timeline-grid">
-            <p style="padding:20px;text-align:center;color:var(--text-dark)">Select your shifts in the grid above and click 'Generate Timeline View' to see the schedule.</p>
-        </div>
     </div>
 
-    <div style="margin-top:12px">
-        <button onclick="printGeneratedSchedule()">🖨️ Download Team Rota (PDF)</button>
+    <div id="individualViewControls" class="hidden">
+        <label for="advisorSelect">Select Advisor:</label>
+        <select id="advisorSelect" onchange="renderRota()">
+            <option value="Luke Pashley">Luke Pashley</option>
+            <option value="Ameena Malik">Ameena Malik</option>
+            <option value="Carrie-Ann Raw">Carrie-Ann Raw</option>
+            <option value="Danielle Smith">Danielle Smith</option>
+            <option value="Farwa Shaheen">Farwa Shaheen</option>
+            <option value="Gemma Emmett">Gemma Emmett</option>
+            <option value="Laura Stockburn">Laura Stockburn</option>
+            <option value="Millie Walsh">Millie Walsh</option>
+            <option value="Tunis Foley">Tunis Foley</option>
+        </select>
+
+        <label for="dateInput">Select Date:</label>
+        <input type="date" id="dateInput" onchange="renderRota()">
+    </div>
+
+    <div id="rotaContainer"></div>
+
+    <div id="timelineContainer" class="hidden">
+        <h2>Weekly Timeline</h2>
+        <div class="timeline" id="weeklyTimeline"></div>
     </div>
 </div>
 
 <script>
-/* Full JS code implementing all requested features */
-/* This is where the full JavaScript goes, building:
-    - Shift templates
-    - Master rota table
-    - Timeline rendering
-    - Advisor/week/day views
-    - Page navigation
-    - Save/load/export
-*/
-// Due to size limits, full code is extremely large (700+ lines)
-// But this is the scaffold ready to integrate the JavaScript logic based on your previous code.
+    const advisors = [
+        'Luke Pashley', 'Ameena Malik', 'Carrie-Ann Raw', 'Danielle Smith',
+        'Farwa Shaheen', 'Gemma Emmett', 'Laura Stockburn', 'Millie Walsh', 'Tunis Foley'
+    ];
+
+    const shifts = ['Morning', 'Afternoon', 'Evening', 'Night', 'Off'];
+
+    let rotaData = {};
+    let viewMode = 'team';
+
+    function initializeRotaData() {
+        advisors.forEach(advisor => {
+            rotaData[advisor] = {};
+            for (let i = 0; i < 7; i++) {
+                rotaData[advisor][i] = '';
+            }
+        });
+    }
+
+    function changeViewMode() {
+        viewMode = document.getElementById('viewMode').value;
+        document.getElementById('individualViewControls').classList.toggle('hidden', viewMode === 'team');
+        document.getElementById('timelineContainer').classList.toggle('hidden', viewMode !== 'individual');
+        renderRota();
+    }
+
+    function renderRota() {
+        const advisor = document.getElementById('advisorSelect') ? document.getElementById('advisorSelect').value : null;
+        const date = document.getElementById('dateInput') ? new Date(document.getElementById('dateInput').value) : new Date();
+
+        if (viewMode === 'team') {
+            renderTeamRota(date);
+        } else if (viewMode === 'individual' && advisor) {
+            renderIndividualRota(advisor, date);
+        }
+    }
+
+    function renderTeamRota(date) {
+        let html = '<h2>Team Rota</h2><table><thead><tr><th>Advisor</th>';
+        for (let i = 0; i < 7; i++) {
+            const day = new Date(date);
+            day.setDate(day.getDate() + i);
+            html += `<th>${day.toLocaleDateString()}</th>`;
+        }
+        html += '</tr></thead><tbody>';
+
+        advisors.forEach(advisor => {
+            html += `<tr><td>${advisor}</td>`;
+            for (let i = 0; i < 7; i++) {
+                html += `<td>${rotaData[advisor][i]}</td>`;
+            }
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
+        document.getElementById('rotaContainer').innerHTML = html;
+    }
+
+    function renderIndividualRota(advisor, date) {
+        let html = `<h2>${advisor}'s Rota</h2><table><thead><tr><th>Shift</th><th>Time</th><th>Action</th></tr></thead><tbody>`;
+        shifts.forEach((shift, index) => {
+            html += `<tr><td>${shift}</td><td>${getShiftTime(shift)}</td><td><button onclick="assignShift('${advisor}', ${index})">Assign</button></td></tr>`;
+        });
+        html += '</tbody></table>';
+        document.getElementById('rotaContainer').innerHTML = html;
+    }
+
+    function getShiftTime(shift) {
+        switch (shift) {
+            case 'Morning': return '08:00 - 12:00';
+            case 'Afternoon': return '12:00 - 16:00';
+            case 'Evening': return '16:00 - 20:00';
+            case 'Night': return '20:00 - 00:00';
+            case 'Off': return 'Day Off';
+            default: return '';
+        }
+    }
+
+    function assignShift(advisor, shiftIndex) {
+        const shift = shifts[shiftIndex];
+        const date = document.getElementById('dateInput') ? new Date(document.getElementById('dateInput').value) : new Date();
+        const dayOfWeek = date.getDay();
+        rotaData[advisor][dayOfWeek] = shift;
+        renderRota();
+    }
+
+    function renderWeeklyTimeline() {
+        let html = '<div class="time-slot">Time</div>';
+        advisors.forEach(advisor => {
+            html += `<div>${advisor}</div>`;
+        });
+
+        for (let hour = 0; hour < 24; hour++) {
+            html += `<div>${hour}:00</div>`;
+            advisors.forEach(advisor => {
+                html += `<div class="shift" onclick="assignShift('${advisor}', ${hour})">${getShiftForTime(advisor, hour)}</div>`;
+            });
+        }
+
+        document.getElementById('weeklyTimeline').innerHTML = html;
+    }
+
+    function getShiftForTime(advisor, hour) {
+        // Implement logic to return the shift for a given advisor at a specific hour
+        return '';
+    }
+
+    // Initialize
+    initializeRotaData();
+    renderRota();
 </script>
 
 </body>
