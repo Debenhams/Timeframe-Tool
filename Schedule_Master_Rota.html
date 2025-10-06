@@ -4,227 +4,305 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Professional Team Rota System</title>
-
 <style>
   :root{
     /* Brand */
-    --primary-color:#0d47a1; --accent-color:#00c853; --ink:#212121; --paper:#fff;
-    --muted:#f5f7fa; --line:#e0e6ee;
-
+    --brand:#0d47a1; --accent:#00c853; --ink:#1f2937; --paper:#ffffff; --wash:#f5f7fb; --line:#e4e9f2;
     /* Timeline */
-    --timeline-start:7;     /* 07:00 */
-    --timeline-end:20;      /* 20:00 */
-    --timeline-height:900px;
-
-    /* Activity colours (editable in Settings) */
-    --color-emails:#2ecc71; --color-mirakl:#b1b51e; --color-social:#5e35b1;
-    --color-overtime:#e53935; --color-meeting:#ffd700; --color-break:#cfd8dc; --color-lunch:#b0bec5;
+    --timeline-start:7;  /* 07:00 */
+    --timeline-end:20;   /* 20:00 */
+    --timeline-height:800px; /* slimmer to avoid tall bars */
+    /* Activity colours (editable) */
+    --color-emails:#2ecc71; --color-mirakl:#b1b51e; --color-social:#5e35b1; --color-overtime:#e53935; --color-meeting:#ffd700; --color-break:#cfd8dc; --color-lunch:#b0bec5;
   }
 
   /* Base */
   html,body{height:100%}
-  body{margin:0;background:#eef2f6;color:var(--ink);font-family:Roboto,Segoe UI,system-ui,Arial,Helvetica,sans-serif}
-  .header{background:var(--primary-color);color:#fff;padding:22px 32px;box-shadow:0 4px 10px rgba(0,0,0,.16)}
-  .header h1{margin:0;font-size:22px}
+  body{margin:0;background:#eef2f6;color:var(--ink);font-family:Inter,Roboto,Segoe UI,system-ui,Arial,Helvetica,sans-serif}
+  .topbar{background:var(--brand);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 14px rgba(13,71,161,.18)}
+  .topbar h1{margin:0;font-size:18px;font-weight:800}
 
-  .container{max-width:1400px;margin:16px auto;padding:0 16px}
+  .layout{display:grid;grid-template-columns:1fr 320px;gap:18px;max-width:1500px;margin:18px auto;padding:0 16px}
 
-  /* Controls */
-  .panel{background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 14px rgba(10,31,68,.06);padding:12px 14px;margin-bottom:12px}
-  .row{display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center}
-  label{font-weight:700}
-  input[type=date],input[type=text],input[type=time],select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff}
-  button{background:var(--accent-color);color:#fff;border:0;border-radius:8px;padding:10px 14px;font-weight:800;cursor:pointer}
-  button:hover{filter:brightness(.95)}
-  .subtle{background:#eceff1;color:#263238}
-  .danger{background:#dc3545}
-  .hidden{display:none !important}
+  /* Panels */
+  .panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 20px rgba(12,27,74,.06);}
+  .panel-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .panel-header h2{margin:0;font-size:15px}
+  .panel-body{padding:12px 14px}
+  .muted{color:#64748b}
+  .btn{background:var(--accent);color:#fff;border:0;border-radius:10px;padding:9px 12px;font-weight:800;cursor:pointer}
+  .btn:hover{filter:brightness(.95)}
+  .btn.subtle{background:#e9eef6;color:#0f172a}
+  .btn.icon{padding:7px 9px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg button{background:#fff;border:0;padding:8px 12px;cursor:pointer}
+  .seg button.active{background:#1e5fe0;color:#fff}
+  .input, select, input[type=date]{padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+
+  /* Settings collapsible */
+  .collapsible[open] .chev{transform:rotate(90deg)}
+  .chev{transition:transform .2s}
 
   /* Template editor */
   .template-row{display:grid;grid-template-columns:auto 140px auto 1fr auto;gap:10px 14px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fafcff;margin-bottom:10px}
   .time-block{display:flex;gap:6px;flex-wrap:wrap}
+  .danger{background:#dc3545;color:#fff;border:0;border-radius:8px;padding:6px 10px;cursor:pointer}
   .key-row{display:grid;grid-template-columns:18px 100px 1fr;gap:8px;align-items:center;margin-bottom:8px}
   .swatch{width:18px;height:18px;border-radius:3px;border:1px solid var(--line)}
 
-  /* Master Table (Team assignment) */
-  .table-wrap{overflow:auto;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 14px rgba(10,31,68,.06)}
-  table{width:100%;border-collapse:collapse;min-width:960px}
+  /* Advisor list (right) */
+  .list{display:flex;flex-direction:column;gap:6px}
+  .pill{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+
+  /* Assignment table */
+  .table-wrap{overflow:auto}
+  table{width:100%;border-collapse:collapse;min-width:900px}
   th,td{border:1px solid var(--line);padding:8px;text-align:center}
   thead th{background:#0d47a1;color:#fff;font-weight:800}
-  td.name{position:sticky;left:0;background:#e3f2fd;font-weight:800}
+  td.name{position:sticky;left:0;background:#e8f1ff;font-weight:800}
 
-  /* Calendar Skin (Advisor Week) */
-  .calendar{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:auto;box-shadow:0 6px 14px rgba(10,31,68,.06)}
-  .cal-grid{display:grid;grid-template-columns:80px repeat(7,1fr)}
-
+  /* Calendar skin */
+  .calendar{border-top:1px solid var(--line)}
+  .cal-grid{display:grid;grid-template-columns:80px repeat(7,1fr);overflow:auto}
   .hour-col{border-right:1px solid var(--line);background:#fafcfe}
-  .hour{height:calc(var(--timeline-height)/(var(--timeline-end) - var(--timeline-start)));
-         border-bottom:1px solid var(--line);font-size:12px;color:#748099;text-align:right;padding-right:6px;position:relative;box-sizing:border-box}
+  .hour{height:calc(var(--timeline-height)/(var(--timeline-end)-var(--timeline-start)));border-bottom:1px solid var(--line);font-size:12px;color:#748099;text-align:right;padding-right:6px;position:relative;box-sizing:border-box}
   .hour span{position:absolute;top:-7px;right:6px;background:#fafcfe;padding:0 4px}
 
   .day-col{border-left:1px solid var(--line)}
-  .day-head{height:60px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;padding:8px 10px;background:#f6f8fb;font-weight:800}
+  .day-head{height:56px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;padding:6px 10px;background:#f6f8fb;font-weight:800}
   .day-head small{font-weight:700;color:#8792a6}
-  .day-summary{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--line)}
-  .badge{background:#2a5934;color:#fff;border-radius:6px;padding:6px 8px;font-weight:800}
+  .day-summary{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line)}
+  .badge{background:#2a5934;color:#fff;border-radius:6px;padding:4px 6px;font-weight:800;white-space:nowrap}
   .summary-right{margin-left:auto;color:#5b6b7f;font-size:12px}
   .day-actions{display:flex;gap:6px;border-bottom:1px solid var(--line);padding:6px 10px}
   .iconbtn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:6px 8px;cursor:pointer}
-  .off{height:60px;border-bottom:1px solid var(--line);padding:8px 10px;background:
-       repeating-linear-gradient(45deg,#f2f3f7,#f2f3f7 8px,#e8ecf4 8px,#e8ecf4 16px);font-weight:800;color:#8892a0}
+  .off{height:40px;border-bottom:1px solid var(--line);padding:8px 10px;background:repeating-linear-gradient(45deg,#f2f3f7,#f2f3f7 8px,#e8ecf4 8px,#e8ecf4 16px);font-weight:800;color:#8892a0}
 
   .timeline-cell{position:relative;height:var(--timeline-height);background:
-     linear-gradient(#0000,#0000),
-     repeating-linear-gradient(180deg,#0000,#0000 calc(100%/(var(--timeline-end)-var(--timeline-start))),var(--line) 0,var(--line) calc(100%/(var(--timeline-end)-var(--timeline-start)) + 1px));}
+    linear-gradient(#0000,#0000),
+    repeating-linear-gradient(180deg,#0000,#0000 calc(100%/(var(--timeline-end) - var(--timeline-start))), var(--line) 0, var(--line) calc(100%/(var(--timeline-end) - var(--timeline-start)) + 1px));}
 
-  .block{position:absolute;left:10px;right:10px;border-radius:6px;padding:4px 6px;font-size:12px;font-weight:800;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.15)}
-  .block .time{display:block;font-weight:600;font-size:11px;opacity:.95}
+  .block{position:absolute;left:10px;right:10px;border-radius:6px;padding:3px 6px;font-size:11px;font-weight:800;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12);line-height:1.1}
+  .block .time{display:block;font-weight:700;font-size:10px;opacity:.95}
 
-  /* Activity colours */
   .c-emails{background:var(--color-emails)}
   .c-mirakl{background:var(--color-mirakl)}
   .c-social{background:var(--color-social)}
-  .c-overtime{background:var(--color-overtime)}
   .c-meeting{background:var(--color-meeting);color:#213}
   .c-break{background:var(--color-break);color:#213}
   .c-lunch{background:var(--color-lunch);color:#213}
+  .c-overtime{background:var(--color-overtime)}
 
-  /* Team Grid timeline blocks */
-  .timeline-wrap{background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 14px rgba(10,31,68,.06);padding:10px}
-  .grid{display:grid;position:relative}
-
-  .activity{position:absolute;width:90%;left:5%;border-radius:8px;color:#fff;padding:5px;font-size:12px;font-weight:800;text-shadow:0 0 1px rgba(0,0,0,.5);box-shadow:0 1px 3px rgba(0,0,0,.2);display:flex;flex-direction:column;align-items:center;justify-content:center}
-  .activity .t{font-size:11px;font-weight:600}
-
-  @media print{.panel,.controls-only,.no-print{display:none} .container{padding:0} .calendar,.timeline-wrap{box-shadow:none}}
+  @media print{.no-print{display:none} .panel{box-shadow:none}}
 </style>
 </head>
 <body>
-  <div class="header"><h1>Professional Team Rota System</h1></div>
-
-  <div class="container">
-    <!-- Controls -->
-    <div class="panel">
-      <div class="row">
-        <label>Week Start (Monday)</label>
-        <input type="date" id="startDate" />
-
-        <label>View</label>
-        <select id="viewMode">
-          <option value="advisor-week">Advisor – Week (Calendar)</option>
-          <option value="team-week">Team – Week (Grid)</option>
-          <option value="team-day">Team – Single Day</option>
-        </select>
-
-        <label id="lblDay" class="hidden">Day</label>
-        <select id="daySelect" class="hidden">
-          <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
-          <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
-        </select>
-
-        <label id="lblAdv">Advisor</label>
-        <select id="advisorSelect"></select>
-
-        <button id="btnGenerate">🚀 Generate</button>
-        <button id="btnPrint" class="subtle">🖨️ Print</button>
-        <button id="btnSave" class="subtle">💾 Save JSON</button>
-        <input type="file" id="file" accept=".json" class="hidden" />
-        <button id="btnLoad" class="subtle">📂 Load JSON</button>
-      </div>
+  <div class="topbar">
+    <h1>Professional Team Rota System</h1>
+    <div class="seg" style="margin-left:auto">
+      <button class="active" id="segWeek">Week</button>
+      <button id="segMonth" disabled class="muted">Month</button>
     </div>
+    <button class="btn subtle no-print" id="btnPrint">🖨️ Print</button>
+  </div>
 
-    <!-- Settings / Templates -->
-    <div class="panel">
-      <div class="row">
-        <strong>Settings / Templates</strong>
-        <input type="text" id="newAdvisor" placeholder="Add advisor name…" />
-        <button id="btnAddAdvisor" class="subtle">➕ Add Advisor</button>
-        <button id="btnAddTemplate">➕ Add Template</button>
-        <button id="btnDefaultTemplates" class="subtle">↺ Load Sample Templates</button>
-      </div>
-      <div class="row">
-        <div style="flex:1 1 60%;min-width:420px">
-          <div id="templateEditor" style="margin-top:8px"></div>
-        </div>
-        <div style="flex:1 1 38%;min-width:320px">
-          <h4 style="margin:8px 0">🎨 Activity Colours</h4>
-          <div id="colorKey"></div>
+  <div class="layout">
+    <!-- Main column -->
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <!-- Rota controls -->
+      <div class="panel">
+        <div class="panel-body" style="display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center">
+          <label>Week start (Monday)</label>
+          <input type="date" id="weekStart" class="input"/>
+          <label>Advisor</label>
+          <select id="advisorSelect" class="input"></select>
+          <button class="btn" id="btnGenerate">Generate</button>
+          <span class="muted" id="rangeLabel" style="margin-left:auto"></span>
         </div>
       </div>
-    </div>
 
-    <!-- Team Master Assignment Table -->
-    <div class="panel">
-      <h3 style="margin:8px 0">📅 Master Rota Assignment (Team)</h3>
-      <div class="table-wrap">
-        <table id="masterTable" aria-label="Master rota table">
-          <thead>
-            <tr><th rowspan="2" style="min-width:200px">Advisor</th><th colspan="7">Select Shift Template</th></tr>
-            <tr id="dateHeaders"></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Advisor Week Calendar -->
-    <div class="panel">
-      <h3 style="margin:8px 0">📊 Advisor Week (Calendar)</h3>
-      <div class="calendar">
-        <div class="cal-grid" id="calendarGrid">
-          <div class="hour-col">
-            <div class="day-head" style="height:60px"></div>
-            <div class="day-summary" style="display:none"></div>
-            <div class="day-actions" style="display:none"></div>
-            <div id="hours"></div>
+      <!-- Collapsible Settings / Templates / Assignment -->
+      <details class="panel collapsible no-print" id="settingsBox" open>
+        <summary class="panel-header" style="cursor:pointer"><h2>Settings / Templates</h2><span class="chev">▶</span></summary>
+        <div class="panel-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start">
+            <div>
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                <button class="btn subtle" id="btnAddTemplate">➕ Add Template</button>
+                <button class="btn subtle" id="btnLoadDefaults">↺ Load Sample Templates</button>
+              </div>
+              <div id="templateEditor"></div>
+            </div>
+            <div>
+              <h3 style="margin:6px 0">🎨 Activity Colours</h3>
+              <div id="colorKey"></div>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="btn subtle" id="btnSave">💾 Save JSON</button>
+                <input type="file" id="file" accept=".json" style="display:none"/>
+                <button class="btn subtle" id="btnLoad">📂 Load JSON</button>
+                <button class="btn danger" id="btnReset">🧹 Clear</button>
+              </div>
+            </div>
           </div>
-          <!-- 7 day columns injected -->
+
+          <div style="margin-top:16px">
+            <h3 style="margin:6px 0">📅 Master Assignment (Team)</h3>
+            <div class="table-wrap">
+              <table id="assignTable">
+                <thead>
+                  <tr><th rowspan="2">Advisor</th><th colspan="7">Select Shift Template</th></tr>
+                  <tr id="dateHeaders"></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Advisor Week Calendar (single rota view) -->
+      <div class="panel">
+        <div class="panel-header"><h2>Advisor Week (Calendar)</h2>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn subtle icon" id="prevWeek">◀</button>
+            <button class="btn subtle icon" id="btnToday">Today</button>
+            <button class="btn subtle icon" id="nextWeek">▶</button>
+          </div>
+        </div>
+        <div class="panel-body calendar">
+          <div class="cal-grid" id="calGrid">
+            <div class="hour-col"><div id="hours"></div></div>
+            <!-- day columns injected here -->
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- Team Timelines -->
-    <div class="panel no-print">
-      <h3 style="margin:8px 0">📈 Team Timeline (Grid)</h3>
-      <div class="timeline-wrap">
-        <div id="teamGrid" class="grid"></div>
+    <!-- Right sidebar: Advisors -->
+    <div class="panel">
+      <div class="panel-header"><h2>Advisors</h2></div>
+      <div class="panel-body">
+        <div style="display:flex;gap:6px;margin-bottom:8px"><input id="newAdvisor" class="input" placeholder="Add advisor name…"/><button class="btn subtle" id="addAdvisor">Add</button></div>
+        <div class="list" id="advisorList"></div>
       </div>
     </div>
   </div>
 
   <!-- Quick assign dialog -->
-  <dialog id="assignDlg" style="border:1px solid var(--line);border-radius:10px;padding:12px 14px">
+  <dialog id="assignDlg" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px">
     <div style="font-weight:800;margin-bottom:6px">Assign template for <span id="assignTitle"></span></div>
     <select id="assignSelect" style="width:100%"></select>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
-      <button id="assignOK">Assign</button>
-      <button onclick="assignDlg.close()" class="subtle">Cancel</button>
+      <button id="assignOK" class="btn">Assign</button>
+      <button onclick="assignDlg.close()" class="btn subtle">Cancel</button>
     </div>
   </dialog>
 
 <script>
-/* =====================  DATA + CONSTANTS  ===================== */
+// ====== DATA ======
 const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 let ADVISORS=['Luke Pashley','Ameena Malik','Carrie-Ann Raw','Danielle Smith','Farwa Shaheen','Gemma Emmett','Laura Stockburn','Millie Walsh','Tunis Foley'];
-let templates={};         // templates[name] = {name, Start, Finish, Break1, Lunch, Break2, Platform}
-let rotas={};             // rotas[advisor][day] = templateName | ''
-const STORAGE='ultraFastRotas_V6';
+let templates={};           // name -> template
+let rotas={};               // rotas[advisor][day] = templateName | ''
+const STORAGE='rota_single_v7';
 
 const css=getComputedStyle(document.documentElement);
 const START=+css.getPropertyValue('--timeline-start')||7;
 const END=+css.getPropertyValue('--timeline-end')||20;
-const HEIGHT=+css.getPropertyValue('--timeline-height').replace('px','')||900;
+const HEIGHT=+css.getPropertyValue('--timeline-height').replace('px','')||800;
 const PX_PER_MIN=HEIGHT/((END-START)*60);
 
-const $=sel=>document.querySelector(sel), $$=sel=>Array.from(document.querySelectorAll(sel));
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const pad=n=>String(n).padStart(2,'0');
 const toMin=t=>{ if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; };
 const m2t=m=>`${pad(Math.floor(m/60))}:${pad(m%60)}`;
 
-/* =====================  HELPERS  ===================== */
-function setVar(name,val){ document.documentElement.style.setProperty(name,val); }
-function buildHours(){ let h=''; for(let i=START;i<=END;i++){ h+=`<div class="hour"><span>${pad(i)}:00</span></div>`; } return h; }
-function durationHours(t){ if(!t.Start||!t.Finish) return ''; const d=(toMin(t.Finish)-toMin(t.Start))/60; return (d>0?d:0)+'h'; }
+function save(){ localStorage.setItem(STORAGE, JSON.stringify({advisors:ADVISORS,templates,rotas,weekStart:$('#weekStart').value})); }
+function load(){ try{ const d=JSON.parse(localStorage.getItem(STORAGE)||'null'); if(!d) return; ADVISORS=d.advisors||ADVISORS; templates=d.templates||templates; rotas=d.rotas||rotas; if(d.weekStart) $('#weekStart').value=d.weekStart; }catch{} }
+
+// ====== COLOR KEY ======
+function buildColorKey(){
+  const defs=[['emails','Emails','--color-emails'],['mirakl','Mirakl','--color-mirakl'],['social','Social','--color-social'],['meeting','Meeting/Coach','--color-meeting'],['overtime','Overtime','--color-overtime'],['break','Break','--color-break'],['lunch','Lunch','--color-lunch']];
+  const el=$('#colorKey'); el.innerHTML = defs.map(([k,l,cssVar])=>{ const v=getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim(); return `<div class="key-row"><span class="swatch" style="background:${v}"></span><strong>${l}</strong><input type="text" data-k="${cssVar}" value="${v}"></div>`; }).join('');
+  $$('#colorKey input').forEach(inp=>inp.addEventListener('input',()=>{ document.documentElement.style.setProperty(inp.dataset.k, inp.value); save(); renderCalendar(); }));
+}
+
+// ====== TEMPLATES ======
+function seedDefaults(){
+  templates={
+    'Early':  {name:'Early',  Start:'07:00', Finish:'16:00', Break1:'09:15', Lunch:'12:00', Break2:'15:15', Platform:'Emails'},
+    'Middle': {name:'Middle', Start:'11:00', Finish:'20:00', Break1:'11:30', Lunch:'15:30', Break2:'17:45', Platform:'Mirakl'},
+    'Late':   {name:'Late',   Start:'12:00', Finish:'21:00', Break1:'13:15', Lunch:'17:00', Break2:'19:15', Platform:'Social'},
+    'Coach':  {name:'Coach',  Start:'10:00', Finish:'18:00', Break1:'11:30', Lunch:'13:30', Break2:'16:00', Platform:'Meeting'}
+  };
+  ADVISORS.forEach(a=>{ if(!rotas[a]) rotas[a]={}; DAYS.forEach(d=>{ if(!(d in rotas[a])) rotas[a][d]=''; }); });
+}
+
+function templateRow(t,key){
+  const opts=['Emails','Mirakl','Social','Overtime','Meeting'].map(p=>`<option ${t.Platform===p?'selected':''}>${p}</option>`).join('');
+  return `<div class="template-row" data-k="${key}">
+    <label>Name</label><input data-f="name" type="text" value="${t.name}" style="width:140px">
+    <label>Shift</label><div class="time-block">
+      <input data-f="Start" type="time" value="${t.Start||''}" title="Start">
+      <input data-f="Finish" type="time" value="${t.Finish||''}" title="Finish">
+    </div>
+    <label>Breaks</label><div class="time-block">
+      <input data-f="Break1" type="time" value="${t.Break1||''}" title="Break 1 (15m)">
+      <input data-f="Lunch"  type="time" value="${t.Lunch||''}"  title="Lunch (45m)">
+      <input data-f="Break2" type="time" value="${t.Break2||''}" title="Break 2 (15m)">
+    </div>
+    <label>Platform</label><select data-f="Platform" style="width:140px"><option value="">--</option>${opts}</select>
+    <button class="danger" data-act="del">Delete</button>
+  </div>`;
+}
+function populateTemplateEditor(){
+  const ed=$('#templateEditor'); const keys=Object.keys(templates);
+  ed.innerHTML = keys.length? keys.map(k=>templateRow(templates[k],k)).join('') : '<div class="muted">No templates. Add or load samples.</div>';
+  $$('#templateEditor .template-row').forEach(row=>{
+    const key=row.dataset.k; $$('input,select',row).forEach(inp=>{
+      const f=inp.dataset.f; if(!f) return; inp.addEventListener('input',()=>{
+        if(f==='name'){ const nn=inp.value.trim(); if(!nn||nn===key) return; templates[nn]={...templates[key],name:nn}; delete templates[key]; // update references
+          ADVISORS.forEach(a=>DAYS.forEach(d=>{ if(rotas[a][d]===key) rotas[a][d]=nn; })); populateTemplateEditor(); populateAssignTable(); save(); renderCalendar(); }
+        else { templates[key][f]=inp.value; save(); renderCalendar(); }
+      });
+    });
+    row.querySelector('[data-act="del"]').onclick=()=>{ delete templates[key]; populateTemplateEditor(); populateAssignTable(); save(); renderCalendar(); };
+  });
+}
+
+// ====== ASSIGNMENT TABLE ======
+function populateAssignTable(){
+  const head=$('#dateHeaders'), body=$('#assignTable tbody');
+  head.innerHTML=DAYS.map(d=>`<th data-day="${d}">${d.slice(0,3)}<br><span class="muted" data-date></span></th>`).join('');
+  const opts=Object.keys(templates).map(n=>`<option value="${n}">${n}</option>`).join('');
+  body.innerHTML='';
+  ADVISORS.forEach(a=>{
+    const tr=document.createElement('tr'); const name=document.createElement('td'); name.className='name'; name.textContent=a; tr.appendChild(name);
+    DAYS.forEach(d=>{ const td=document.createElement('td'); const sel=document.createElement('select'); sel.innerHTML=`<option value="">-- Day Off --</option>${opts}`; sel.value=(rotas[a]&&rotas[a][d])||''; sel.onchange=()=>{ rotas[a][d]=sel.value; save(); renderCalendar(); }; td.appendChild(sel); tr.appendChild(td); });
+    body.appendChild(tr);
+  });
+}
+
+// ====== ADVISORS (SIDEBAR) ======
+function rebuildAdvisorUI(){
+  $('#advisorSelect').innerHTML=ADVISORS.map(a=>`<option>${a}</option>`).join('');
+  const list=$('#advisorList'); list.innerHTML='';
+  ADVISORS.forEach(a=>{ const div=document.createElement('div'); div.className='pill'; div.innerHTML=`<span>${a}</span><div><button class="btn subtle icon" data-a="${a}">✎</button> <button class="btn subtle icon" data-r="${a}">🗑️</button></div>`; list.appendChild(div); });
+  $$('#advisorList [data-r]').forEach(b=>b.onclick=()=>{ const name=b.dataset.r; if(!confirm(`Remove ${name}?`)) return; ADVISORS=ADVISORS.filter(x=>x!==name); delete rotas[name]; rebuildAdvisorUI(); populateAssignTable(); save(); renderCalendar(); });
+  $$('#advisorList [data-a]').forEach(b=>b.onclick=()=>{ const old=b.dataset.a; const nn=prompt('Rename advisor', old); if(!nn||nn===old) return; const i=ADVISORS.indexOf(old); ADVISORS[i]=nn; rotas[nn]=rotas[old]||{}; delete rotas[old]; rebuildAdvisorUI(); populateAssignTable(); save(); renderCalendar(); });
+}
+
+// ====== CALENDAR RENDER ======
+function updateRangeLabel(){
+  const ws=$('#weekStart').value; if(!ws){ $('#rangeLabel').textContent=''; return; }
+  const s=new Date(ws+'T00:00:00'); const e=new Date(s); e.setDate(e.getDate()+6);
+  const f=d=>d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
+  $('#rangeLabel').textContent=`${f(s)} – ${f(e)}`;
+  // also update assignment table dates
+  $$('#dateHeaders [data-date]').forEach((span,i)=>{ const d=new Date(s); d.setDate(d.getDate()+i); span.textContent=d.toLocaleDateString('en-GB',{month:'short',day:'numeric'}); });
+}
+
+function hoursHTML(){ let h=''; for(let i=START;i<=END;i++){ h+=`<div class="hour"><span>${pad(i)}:00</span></div>`; } return h; }
 
 function processTemplate(t){
   if(!t||!t.Start||!t.Finish) return [];
@@ -233,8 +311,7 @@ function processTemplate(t){
   [['Break1',15,'Break'],['Lunch',45,'Lunch'],['Break2',15,'Break']].forEach(([k,d,label])=>{ if(t[k]) ev.push({t:toMin(t[k]),type:'pause',d,label}); });
   ev.sort((a,b)=>a.t-b.t||((a.type==='end')-(b.type==='end')));
   const out=[]; let cur=s; const main=t.Platform||'Emails';
-  for(const evi of ev){ if(evi.t>cur) out.push({name:main,start:cur,end:evi.t});
-    if(evi.type==='pause'){ out.push({name:evi.label,start:evi.t,end:evi.t+evi.d}); cur=evi.t+evi.d; } }
+  for(const evn of ev){ if(evn.t>cur) out.push({name:main,start:cur,end:evn.t}); if(evn.type==='pause'){ out.push({name:evn.label,start:evn.t,end:evn.t+evn.d}); cur=evn.t+evn.d; } }
   return out;
 }
 function colorClass(name){
@@ -249,264 +326,75 @@ function colorClass(name){
   return 'c-emails';
 }
 
-/* =====================  SETTINGS / TEMPLATES UI  ===================== */
-function templateRow(t,key){
-  const opts=['Emails','Mirakl','Social','Overtime','Meeting'].map(p=>`<option ${t.Platform===p?'selected':''}>${p}</option>`).join('');
-  return `<div class="template-row" data-k="${key}">
-    <label>Name</label><input data-f="name" type="text" value="${t.name}" style="width:140px">
-    <label>Shift</label><div class="time-block">
-      <input data-f="Start" type="time" value="${t.Start||''}" title="Start">
-      <input data-f="Finish" type="time" value="${t.Finish||''}" title="Finish">
-    </div>
-    <label>Breaks</label><div class="time-block">
-      <input data-f="Break1" type="time" value="${t.Break1||''}" title="Break 1 (15m)">
-      <input data-f="Lunch" type="time" value="${t.Lunch||''}" title="Lunch (45m)">
-      <input data-f="Break2" type="time" value="${t.Break2||''}" title="Break 2 (15m)">
-    </div>
-    <label>Platform</label><select data-f="Platform" style="width:140px"><option value="">--</option>${opts}</select>
-    <button class="danger" data-act="del">Delete</button>
-  </div>`;
-}
-function populateTemplateEditor(){
-  const ed=$("#templateEditor"); const keys=Object.keys(templates);
-  ed.innerHTML = keys.length? keys.map(k=>templateRow(templates[k],k)).join('') :
-    `<div class="row" style="opacity:.7">No templates yet. Click “Add Template” or “Load Sample Templates”.</div>`;
-  $$("#templateEditor .template-row").forEach(row=>{
-    const key=row.dataset.k;
-    $$("input,select",row).forEach(inp=>{
-      const f=inp.dataset.f; if(!f) return;
-      inp.addEventListener('input',()=>{
-        if(f==='name'){ const nn=inp.value.trim(); if(!nn||nn===key) return; templates[nn]={...templates[key],name:nn}; delete templates[key];
-          // rename references
-          ADVISORS.forEach(a=>DAYS.forEach(d=>{ if(rotas[a]&&rotas[a][d]===key) rotas[a][d]=nn; }));
-          populateTemplateEditor(); populateMaster(); save(); renderAll();
-        } else { templates[key][f]=inp.value; save(); renderAll(); }
-      });
-    });
-    row.querySelector('[data-act="del"]').onclick=()=>{ delete templates[key]; populateTemplateEditor(); populateMaster(); save(); renderAll(); };
-  });
-}
-function buildColorKey(){
-  const defaults=[['emails','Emails','--color-emails'],['mirakl','Mirakl','--color-mirakl'],['social','Social','--color-social'],
-                  ['meeting','Meeting/Coach','--color-meeting'],['overtime','Overtime','--color-overtime'],
-                  ['break','Break','--color-break'],['lunch','Lunch','--color-lunch']];
-  $("#colorKey").innerHTML = defaults.map(([k,l,cssVar])=>{
-    const val=getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
-    return `<div class="key-row"><span class="swatch" style="background:${val}"></span><strong>${l}</strong><input data-k="${cssVar}" type="text" value="${val}"></div>`;
-  }).join('');
-  $$("#colorKey input").forEach(inp=>inp.addEventListener('input',()=>{ setVar(inp.dataset.k, inp.value); save(); renderAll(); }));
-}
-
-/* =====================  MASTER ASSIGNMENT TABLE (TEAM)  ===================== */
-function populateMaster(){
-  const head=$("#dateHeaders"), body=$("#masterTable tbody");
-  head.innerHTML=DAYS.map(d=>`<th data-day="${d}">${d.slice(0,3)}<br><span class="date">—</span></th>`).join('');
-  const opts=Object.keys(templates).map(n=>`<option value="${n}">${n}</option>`).join('');
-
-  body.innerHTML='';
-  ADVISORS.forEach(a=>{
-    const tr=document.createElement('tr');
-    const name=document.createElement('td'); name.className='name'; name.textContent=a; tr.appendChild(name);
-    DAYS.forEach(d=>{
-      const td=document.createElement('td'); const sel=document.createElement('select');
-      sel.innerHTML=`<option value="">-- Day Off --</option>${opts}`;
-      sel.value=(rotas[a]&&rotas[a][d])||'';
-      sel.onchange=()=>{ if(!rotas[a]) rotas[a]={}; rotas[a][d]=sel.value; save(); renderAll(); };
-      td.appendChild(sel); tr.appendChild(td);
-    });
-    body.appendChild(tr);
-  });
-}
-
-/* =====================  ADVISOR WEEK – CALENDAR RENDER  ===================== */
 function renderCalendar(){
-  $("#hours").innerHTML=buildHours();
-  $$(".day-col").forEach(n=>n.remove());
-
-  const grid=$("#calendarGrid");
-  const adv=$("#advisorSelect").value||ADVISORS[0];
-  const ws=$("#startDate").value;
-
+  $('#hours').innerHTML=hoursHTML();
+  $$('.day-col').forEach(n=>n.remove());
+  const grid=$('#calGrid');
+  const ws=$('#weekStart').value; const adv=$('#advisorSelect').value||ADVISORS[0];
+  const s=ws?new Date(ws+'T00:00:00'):null;
   DAYS.forEach((day,idx)=>{
     const col=document.createElement('div'); col.className='day-col';
-    // header
-    let month='—', num=''; if(ws){ const d=new Date(ws); d.setDate(d.getDate()+idx);
-      month=d.toLocaleDateString('en-GB',{month:'long'}); num=d.getDate(); }
+    // head
+    let month='—', num=''; if(s){ const d=new Date(s); d.setDate(d.getDate()+idx); month=d.toLocaleDateString('en-GB',{month:'long'}); num=d.getDate(); }
     col.insertAdjacentHTML('beforeend',`<div class="day-head"><small>${month}</small>${day}<span style="float:right">${num}</span></div>`);
+    const tplName=(rotas[adv]&&rotas[adv][day])||''; const tpl=templates[tplName];
+    if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
+    else { col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="badge">${tplName}</span> ${tpl.Start} – ${tpl.Finish}<span class="summary-right">${((toMin(tpl.Finish)-toMin(tpl.Start))/60)}h</span></div>`); }
+    col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}">＋</button><button class="iconbtn" data-day="${day}" data-edit>✎</button></div>`);
 
-    const tplName=(rotas[adv]&&rotas[adv][day])||'';
-    const tpl=templates[tplName];
-
-    if(!tplName){
-      col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`);
-    }else{
-      col.insertAdjacentHTML('beforeend',
-        `<div class="day-summary"><span class="badge">${tplName}</span> ${tpl.Start||''} – ${tpl.Finish||''}<span class="summary-right">${durationHours(tpl)}</span></div>`);
-    }
-
-    // actions
-    col.insertAdjacentHTML('beforeend',`<div class="day-actions">
-      <button class="iconbtn" data-day="${day}" data-act="add">＋</button>
-      <button class="iconbtn" data-day="${day}" data-act="edit">✎</button>
-    </div>`);
-
-    // timeline
     const cell=document.createElement('div'); cell.className='timeline-cell';
-    if(tpl){ processTemplate(tpl).forEach(b=>{
-      const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN;
-      const el=document.createElement('div'); el.className=`block ${colorClass(b.name)}`;
-      el.style.top=top+'px'; el.style.height=Math.max(18,h)+'px';
-      el.innerHTML=`${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span>`;
-      cell.appendChild(el);
-    }); }
-    col.appendChild(cell);
-    grid.appendChild(col);
+    if(tpl){ processTemplate(tpl).forEach(b=>{ const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN; const el=document.createElement('div'); el.className=`block ${colorClass(b.name)}`; el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px'; el.innerHTML=`${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span>`; cell.appendChild(el); }); }
+    col.appendChild(cell); grid.appendChild(col);
   });
-
-  // actions wiring
-  $$(".day-actions .iconbtn").forEach(b=>b.onclick=()=>openAssign(b.dataset.day));
+  $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day));
 }
 
-/* =====================  TEAM TIMELINE (GRID)  ===================== */
-function renderTeamGrid(){
-  const grid=$("#teamGrid"); grid.innerHTML='';
-  const first=90, col=260;
-  grid.style.gridTemplateColumns=`${first}px repeat(${ADVISORS.length}, ${col}px)`;
-  const rows=['40px']; for(let i=0;i<7;i++){ rows.push('28px', `${HEIGHT}px`); } grid.style.gridTemplateRows=rows.join(' ');
-
-  // header names
-  ADVISORS.forEach((n,i)=>{ const h=document.createElement('div'); h.className='day-head'; h.style.gridColumn=String(i+2); h.style.gridRow='1'; h.textContent=n; grid.appendChild(h); });
-
-  for(let d=0; d<7; d++){
-    // day heading across
-    const head=document.createElement('div'); head.className='day-head'; head.style.gridColumn=`1 / span ${1+ADVISORS.length}`; head.style.gridRow=String(2+d*2);
-    const ws=$("#startDate").value; let ds=''; if(ws){ const dt=new Date(ws); dt.setDate(dt.getDate()+d); ds=dt.toLocaleDateString('en-GB',{month:'short',day:'numeric'}); }
-    head.innerHTML=`${DAYS[d]} <small style="margin-left:8px">${ds}</small>`; grid.appendChild(head);
-
-    // time axis
-    const axis=document.createElement('div'); axis.style.gridColumn='1'; axis.style.gridRow=String(3+d*2); axis.className='hour-col';
-    axis.innerHTML=buildHours(); grid.appendChild(axis);
-
-    ADVISORS.forEach((a,i)=>{
-      const cell=document.createElement('div'); cell.style.gridColumn=String(i+2); cell.style.gridRow=String(3+d*2);
-      cell.className='timeline-cell';
-      const tpl=templates[(rotas[a]&&rotas[a][DAYS[d]])||''];
-      if(!tpl){ const off=document.createElement('div'); off.className='off'; off.style.height='44px'; off.style.position='absolute'; off.style.left='10px'; off.style.right='10px'; off.style.top='8px'; off.textContent='Day Off'; cell.appendChild(off); }
-      else {
-        processTemplate(tpl).forEach(b=>{
-          const top=(b.start-START*60)*PX_PER_MIN, h=(b.end-b.start)*PX_PER_MIN;
-          const el=document.createElement('div'); el.className=`activity ${colorClass(b.name)}`.replace('c-',''); // reuse class color names
-          el.style.background=getComputedStyle(document.documentElement).getPropertyValue(`--color-${colorClass(b.name).split('-')[1]}`).trim();
-          el.style.top=top+'px'; el.style.height=Math.max(18,h)+'px';
-          el.innerHTML=`${b.name}<span class="t">${m2t(b.start)} – ${m2t(b.end)}</span>`;
-          cell.appendChild(el);
-        });
-      }
-      grid.appendChild(cell);
-    });
-  }
-}
-
-/* =====================  VIEW SWITCH  ===================== */
-function renderAll(){
-  const mode=$("#viewMode").value;
-  $("#lblDay").classList.toggle('hidden', mode!=='team-day');
-  $("#daySelect").classList.toggle('hidden', mode!=='team-day');
-  $("#lblAdv").classList.toggle('hidden', mode==='team-week' || mode==='team-day');
-  $("#advisorSelect").classList.toggle('hidden', mode==='team-week' || mode==='team-day');
-
-  updateDateHeaders();
-  if(mode==='advisor-week'){ renderCalendar(); }
-  else if(mode==='team-week'){ renderTeamGrid(); }
-  else { // team-day: renderTeamGrid then scroll to selected day row
-    renderTeamGrid();
-  }
-}
-
-/* =====================  DATE HEADERS  ===================== */
-function updateDateHeaders(){
-  const ws=$("#startDate").value; if(!ws){ $$("#dateHeaders .date").forEach(n=>n.textContent='—'); return; }
-  const d0=new Date(ws); if(d0.getDay()!==1){ alert('Please select a Monday.'); $("#startDate").value=''; return; }
-  DAYS.forEach((day,i)=>{ const d=new Date(d0); d.setDate(d.getDate()+i);
-    const txt=d.toLocaleDateString('en-GB',{month:'short',day:'numeric'});
-    const el=$(`#dateHeaders th[data-day="${day}"] .date`); if(el) el.textContent=txt;
-  });
-}
-
-/* =====================  STORAGE  ===================== */
-function save(){ localStorage.setItem(STORAGE, JSON.stringify({
-  advisors:ADVISORS, templates, rotas, weekStart:$("#startDate").value
-})); }
-function load(){ try{
-  const d=JSON.parse(localStorage.getItem(STORAGE)||'null'); if(!d) return;
-  ADVISORS=d.advisors||ADVISORS; templates=d.templates||templates; rotas=d.rotas||rotas; if(d.weekStart) $("#startDate").value=d.weekStart;
-}catch{}}
-
-/* =====================  ASSIGNMENT DIALOG  ===================== */
-const assignDlg=$("#assignDlg"), assignSelect=$("#assignSelect"), assignTitle=$("#assignTitle");
+// ====== DIALOG ASSIGN ======
+const assignDlg=$('#assignDlg'), assignSelect=$('#assignSelect'), assignTitle=$('#assignTitle');
 function openAssign(day){
-  const adv=$("#advisorSelect").value||ADVISORS[0];
-  assignTitle.textContent=`${day} — ${adv}`;
-  assignSelect.innerHTML=`<option value="">— Day Off —</option>`+Object.keys(templates).map(n=>`<option>${n}</option>`).join('');
-  $("#assignOK").onclick=()=>{ if(!rotas[adv]) rotas[adv]={}; rotas[adv][day]=assignSelect.value; save(); assignDlg.close(); renderAll(); };
+  const adv=$('#advisorSelect').value||ADVISORS[0];
+  assignTitle.textContent=`${day} for ${adv}`; assignSelect.innerHTML=`<option value="">— Day Off —</option>`+Object.keys(templates).map(n=>`<option>${n}</option>`).join('');
+  $('#assignOK').onclick=()=>{ if(!rotas[adv]) rotas[adv]={}; rotas[adv][day]=assignSelect.value; save(); assignDlg.close(); renderCalendar(); };
   assignDlg.showModal();
 }
 
-/* =====================  BOOTSTRAP  ===================== */
-function seedDefaults(){
-  templates={
-    'Early': {name:'Early', Start:'07:00', Finish:'16:00', Break1:'09:15', Lunch:'12:00', Break2:'15:30', Platform:'Emails'},
-    'Middle':{name:'Middle',Start:'11:00', Finish:'20:00', Break1:'11:15', Lunch:'15:30', Break2:'17:45', Platform:'Mirakl'},
-    'Late':  {name:'Late',  Start:'12:00', Finish:'21:00', Break1:'13:15', Lunch:'17:00', Break2:'19:15', Platform:'Social'},
-    'Coach': {name:'Coach', Start:'10:00', Finish:'18:00', Break1:'11:30', Lunch:'13:30', Break2:'16:00', Platform:'Meeting'}
-  };
-  ADVISORS.forEach(a=>{ if(!rotas[a]) rotas[a]={}; DAYS.forEach(d=>rotas[a][d]=''); });
-}
-function fillAdvisorSelect(){ $("#advisorSelect").innerHTML=ADVISORS.map(a=>`<option>${a}</option>`).join(''); }
+// ====== DATE HELPERS ======
+function setToMonday(d){ const day=d.getDay(); const diff=(day===0?-6:1)-day; d.setDate(d.getDate()+diff); return d; }
 
-/* events */
+// ====== WIRE ======
 function wire(){
-  $("#btnAddAdvisor").onclick=()=>{ const n=$("#newAdvisor").value.trim(); if(!n) return; if(ADVISORS.includes(n)) return alert('Advisor exists'); ADVISORS.push(n); if(!rotas[n]) rotas[n]={}; DAYS.forEach(d=>rotas[n][d]=''); $("#newAdvisor").value=''; fillAdvisorSelect(); populateMaster(); save(); renderAll(); };
+  $('#btnPrint').onclick=()=>window.print();
+  $('#btnGenerate').onclick=()=>{ updateRangeLabel(); renderCalendar(); };
+  $('#btnToday').onclick=()=>{ const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10); updateRangeLabel(); renderCalendar(); };
+  $('#prevWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()-7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); renderCalendar(); };
+  $('#nextWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()+7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); renderCalendar(); };
 
-  $("#btnAddTemplate").onclick=()=>{ const name='Shift'+(Object.keys(templates).length+1); templates[name]={name,Start:'',Finish:'',Break1:'',Lunch:'',Break2:'',Platform:'Emails'}; populateTemplateEditor(); save(); };
-  $("#btnDefaultTemplates").onclick=()=>{ seedDefaults(); populateTemplateEditor(); populateMaster(); save(); renderAll(); };
+  $('#btnSave').onclick=()=>{ const blob=new Blob([JSON.stringify({advisors:ADVISORS,templates,rotas,weekStart:$('#weekStart').value},null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota.json'; a.click(); };
+  $('#btnLoad').onclick=()=>$('#file').click();
+  $('#file').addEventListener('change',e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>{ try{ const d=JSON.parse(ev.target.result); ADVISORS=d.advisors||ADVISORS; templates=d.templates||templates; rotas=d.rotas||rotas; if(d.weekStart) $('#weekStart').value=d.weekStart; rebuildAdvisorUI(); populateTemplateEditor(); populateAssignTable(); save(); updateRangeLabel(); renderCalendar(); }catch{ alert('Invalid JSON'); } }; r.readAsText(f); });
 
-  $("#btnGenerate").onclick=renderAll;
-  $("#viewMode").onchange=renderAll;
-  $("#daySelect").onchange=renderAll;
-  $("#advisorSelect").onchange=renderAll;
-  $("#startDate").onchange=()=>{ updateDateHeaders(); save(); renderAll(); };
+  $('#btnReset').onclick=()=>{ if(!confirm('Clear all local data?')) return; localStorage.removeItem(STORAGE); location.reload(); };
 
-  $("#btnPrint").onclick=()=>window.print();
-  $("#btnSave").onclick=()=>{ const blob=new Blob([JSON.stringify({advisors:ADVISORS,templates,rotas,weekStart:$("#startDate").value},null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota.json'; a.click(); };
-  $("#btnLoad").onclick=()=>$("#file").click();
-  $("#file").addEventListener('change',e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>{ try{ const d=JSON.parse(ev.target.result);
-    ADVISORS=d.advisors||ADVISORS; templates=d.templates||templates; rotas=d.rotas||rotas; if(d.weekStart) $("#startDate").value=d.weekStart;
-    fillAdvisorSelect(); populateTemplateEditor(); populateMaster(); save(); renderAll();
-  }catch{ alert('Invalid JSON'); } }; r.readAsText(f); });
+  $('#btnAddTemplate').onclick=()=>{ const name='Shift'+(Object.keys(templates).length+1); templates[name]={name,Start:'',Finish:'',Break1:'',Lunch:'',Break2:'',Platform:'Emails'}; populateTemplateEditor(); save(); };
+  $('#btnLoadDefaults').onclick=()=>{ seedDefaults(); populateTemplateEditor(); populateAssignTable(); save(); renderCalendar(); };
+
+  $('#addAdvisor').onclick=()=>{ const n=$('#newAdvisor').value.trim(); if(!n) return; if(ADVISORS.includes(n)) return alert('Advisor exists'); ADVISORS.push(n); rotas[n]={}; DAYS.forEach(d=>rotas[n][d]=''); $('#newAdvisor').value=''; rebuildAdvisorUI(); populateAssignTable(); save(); renderCalendar(); };
+
+  $('#advisorSelect').onchange=renderCalendar;
+  $('#weekStart').onchange=()=>{ updateRangeLabel(); renderCalendar(); };
 }
 
-/* init */
+// ====== INIT ======
 (function init(){
-  // colour key
-  $("#colorKey").innerHTML='';
-  buildColorKey();
-
-  load();
-  if(Object.keys(templates).length===0) seedDefaults();
-
-  fillAdvisorSelect();
-  populateTemplateEditor();
-  populateMaster();
-
-  // default week start -> current Monday if empty
-  if(!$("#startDate").value){ const t=new Date(); const mon=new Date(t); const diff=(t.getDay()===0?-6:1)-t.getDay(); mon.setDate(t.getDate()+diff); $("#startDate").value=mon.toISOString().slice(0,10); }
-  updateDateHeaders();
-
-  wire();
-  renderAll(); // default Advisor – Week calendar
+  buildColorKey(); load(); if(Object.keys(templates).length===0) seedDefaults();
+  rebuildAdvisorUI(); populateTemplateEditor(); populateAssignTable();
+  if(!$('#weekStart').value){ const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10); }
+  updateRangeLabel();
+  $('#hours').innerHTML=hoursHTML();
+  wire(); renderCalendar();
 })();
 </script>
 </body>
 </html>
+
 
