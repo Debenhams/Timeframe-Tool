@@ -115,7 +115,11 @@
           <label>Week start (Monday)</label>
           <input type="date" id="weekStart" class="input"/>
           <label>Advisor</label>
-          <select id="advisorSelect" class="input"></select>
+          <select id=\"advisorSelect\" class=\"input\"></select>
+          <label id=\"lblTeamDay\" class=\"muted\" style=\"display:none\">Team Day</label>
+          <select id=\"teamDay\" class=\"input\" style=\"display:none\">
+            <option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
+          </select>
           <button class="btn" id="btnGenerate">Generate</button>
           <span class="muted" id="rangeLabel" style="margin-left:auto"></span>
         </div>
@@ -285,7 +289,15 @@ function populateAssignTable(){
 
 // ====== ADVISORS (SIDEBAR) ======
 function rebuildAdvisorUI(){
-  $('#advisorSelect').innerHTML=ADVISORS.map(a=>`<option>${a}</option>`).join('');
+  // Build advisor dropdown with Team option
+  const sel = $('#advisorSelect');
+  sel.innerHTML = `<option value="__TEAM__">Team (All)</option>` + ADVISORS.map(a=>`<option>${a}</option>`).join('');
+  // Right list
+  const list=$('#advisorList'); list.innerHTML='';
+  ADVISORS.forEach(a=>{ const div=document.createElement('div'); div.className='pill'; div.innerHTML=`<span>${a}</span><div><button class="btn subtle icon" data-a="${a}">✎</button> <button class="btn subtle icon" data-r="${a}">🗑️</button></div>`; list.appendChild(div); });
+  $$('#advisorList [data-r]').forEach(b=>b.onclick=()=>{ const name=b.dataset.r; if(!confirm(`Remove ${name}?`)) return; ADVISORS=ADVISORS.filter(x=>x!==name); delete rotas[name]; rebuildAdvisorUI(); populateAssignTable(); save(); renderCalendar(); });
+  $$('#advisorList [data-a]').forEach(b=>b.onclick=()=>{ const old=b.dataset.a; const nn=prompt('Rename advisor', old); if(!nn||nn===old) return; const i=ADVISORS.indexOf(old); ADVISORS[i]=nn; rotas[nn]=rotas[old]||{}; delete rotas[old]; rebuildAdvisorUI(); populateAssignTable(); save(); renderCalendar(); });
+}</option>`).join('');
   const list=$('#advisorList'); list.innerHTML='';
   ADVISORS.forEach(a=>{ const div=document.createElement('div'); div.className='pill'; div.innerHTML=`<span>${a}</span><div><button class="btn subtle icon" data-a="${a}">✎</button> <button class="btn subtle icon" data-r="${a}">🗑️</button></div>`; list.appendChild(div); });
   $$('#advisorList [data-r]').forEach(b=>b.onclick=()=>{ const name=b.dataset.r; if(!confirm(`Remove ${name}?`)) return; ADVISORS=ADVISORS.filter(x=>x!==name); delete rotas[name]; rebuildAdvisorUI(); populateAssignTable(); save(); renderCalendar(); });
@@ -293,8 +305,19 @@ function rebuildAdvisorUI(){
 }
 
 // ====== CALENDAR RENDER ======
-function updateRangeLabel(){
-  const ws=$('#weekStart').value; if(!ws){ $('#rangeLabel').textContent=''; return; }
+function function updateRangeLabel(){
+  const ws=$('#weekStart').value; const adv=$('#advisorSelect').value;
+  if(!ws){ $('#rangeLabel').textContent=''; return; }
+  const s=new Date(ws+'T00:00:00'); const e=new Date(s); e.setDate(e.getDate()+6);
+  const f=d=>d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
+  if(adv==='__TEAM__'){
+    const idx=DAYS.indexOf($('#teamDay').value||'Monday'); const d=new Date(s); d.setDate(d.getDate()+idx);
+    $('#rangeLabel').textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+  } else {
+    $('#rangeLabel').textContent=`${f(s)} – ${f(e)}`;
+  }
+  $$('#dateHeaders [data-date]').forEach((span,i)=>{ const d=new Date(s); d.setDate(d.getDate()+i); span.textContent=d.toLocaleDateString('en-GB',{month:'short',day:'numeric'}); });
+}
   const s=new Date(ws+'T00:00:00'); const e=new Date(s); e.setDate(e.getDate()+6);
   const f=d=>d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
   $('#rangeLabel').textContent=`${f(s)} – ${f(e)}`;
@@ -330,12 +353,25 @@ function renderCalendar(){
   $('#hours').innerHTML=hoursHTML();
   $$('.day-col').forEach(n=>n.remove());
   const grid=$('#calGrid');
-  const ws=$('#weekStart').value; const adv=$('#advisorSelect').value||ADVISORS[0];
+  const ws=$('#weekStart').value; const advVal=$('#advisorSelect').value||ADVISORS[0];
+  if(advVal==='__TEAM__'){ return renderTeamDayCalendar(); }
   const s=ws?new Date(ws+'T00:00:00'):null;
+  const adv=advVal;
   DAYS.forEach((day,idx)=>{
     const col=document.createElement('div'); col.className='day-col';
-    // head
     let month='—', num=''; if(s){ const d=new Date(s); d.setDate(d.getDate()+idx); month=d.toLocaleDateString('en-GB',{month:'long'}); num=d.getDate(); }
+    col.insertAdjacentHTML('beforeend',`<div class="day-head"><small>${month}</small>${day}<span style="float:right">${num}</span></div>`);
+    const tplName=(rotas[adv]&&rotas[adv][day])||''; const tpl=templates[tplName];
+    if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
+    else { col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="badge">${tplName}</span> ${tpl.Start} – ${tpl.Finish}<span class="summary-right">${((toMin(tpl.Finish)-toMin(tpl.Start))/60)}h</span></div>`); }
+    col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}">＋</button><button class="iconbtn" data-day="${day}" data-edit>✎</button></div>`);
+
+    const cell=document.createElement('div'); cell.className='timeline-cell';
+    if(tpl){ processTemplate(tpl).forEach(b=>{ const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN; const el=document.createElement('div'); el.className=`block ${colorClass(b.name)}`; el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px'; el.innerHTML=`${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span>`; cell.appendChild(el); }); }
+    col.appendChild(cell); grid.appendChild(col);
+  });
+  $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day));
+}); num=d.getDate(); }
     col.insertAdjacentHTML('beforeend',`<div class="day-head"><small>${month}</small>${day}<span style="float:right">${num}</span></div>`);
     const tplName=(rotas[adv]&&rotas[adv][day])||''; const tpl=templates[tplName];
     if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
@@ -393,6 +429,50 @@ function wire(){
   $('#hours').innerHTML=hoursHTML();
   wire(); renderCalendar();
 })();
+function renderTeamDayCalendar(){
+  $('#hours').innerHTML=hoursHTML();
+  $$('.day-col').forEach(n=>n.remove());
+  const grid=$('#calGrid');
+  const ws=$('#weekStart').value; const day=$('#teamDay').value||'Monday';
+  // Day heading spanning all columns
+  const cols = 1 + ADVISORS.length; // time + advisors
+  const head=document.createElement('div'); head.className='day-head'; head.style.gridColumn=`1 / span ${cols}`; head.style.borderTop='1px solid var(--line)'; head.style.height='56px';
+  if(ws){ const s=new Date(ws); const idx=DAYS.indexOf(day); s.setDate(s.getDate()+idx); head.innerHTML=`<small>${s.toLocaleDateString('en-GB',{month:'long'})}</small>${day}<span style="float:right">${s.getDate()}</span>`; }
+  grid.appendChild(head);
+  // Hour column below header
+  const hourCol=document.createElement('div'); hourCol.className='hour-col'; hourCol.innerHTML=hoursHTML(); grid.appendChild(hourCol);
+  // For each advisor: header name + summary + actions + timeline
+  ADVISORS.forEach((adv,i)=>{
+    const col=document.createElement('div'); col.className='day-col';
+    col.insertAdjacentHTML('beforeend',`<div class="day-head" style="height:56px">${adv}</div>`);
+    const tplName=(rotas[adv]&&rotas[adv][day])||''; const tpl=templates[tplName];
+    if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
+    else { col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="badge">${tplName}</span> ${tpl.Start} – ${tpl.Finish}<span class="summary-right">${((toMin(tpl.Finish)-toMin(tpl.Start))/60)}h</span></div>`); }
+    col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}" data-adv="${adv}">＋</button><button class="iconbtn" data-day="${day}" data-adv="${adv}" data-edit>✎</button></div>`);
+    const cell=document.createElement('div'); cell.className='timeline-cell';
+    if(tpl){ processTemplate(tpl).forEach(b=>{ const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN; const el=document.createElement('div'); el.className=`block ${colorClass(b.name)}`; el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px'; el.innerHTML=`${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span>`; cell.appendChild(el); }); }
+    col.appendChild(cell); grid.appendChild(col);
+  });
+  // wire
+  $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day, b.dataset.adv));
+}
+
+// overload openAssign to accept advisor
+function openAssign(day, advisor){
+  const adv = advisor || ($('#advisorSelect').value==='__TEAM__' ? ADVISORS[0] : $('#advisorSelect').value);
+  assignTitle.textContent=`${day} for ${adv}`; assignSelect.innerHTML=`<option value="">— Day Off —</option>`+Object.keys(templates).map(n=>`<option>${n}</option>`).join('');
+  $('#assignOK').onclick=()=>{ if(!rotas[adv]) rotas[adv]={}; rotas[adv][day]=assignSelect.value; save(); assignDlg.close(); renderCalendar(); };
+  assignDlg.showModal();
+}
+
+// adapt UI show/hide team day controls
+$('#advisorSelect').addEventListener('change',()=>{
+  const team=$('#advisorSelect').value==='__TEAM__';
+  $('#lblTeamDay').style.display= team ? 'inline' : 'none';
+  $('#teamDay').style.display= team ? 'inline' : 'none';
+  updateRangeLabel(); renderCalendar();
+});
+$('#teamDay').addEventListener('change',()=>{ updateRangeLabel(); renderCalendar(); });
 </script>
 </body>
 </html>
