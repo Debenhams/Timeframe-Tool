@@ -71,6 +71,12 @@
   .c-meeting{background:var(--color-meeting);color:#213} .c-break{background:var(--color-break);color:#213} .c-lunch{background:var(--color-lunch);color:#213}
   .c-overtime{background:var(--color-overtime)}
   @media print{.no-print{display:none} .panel{box-shadow:none}}
+
+  /* Split editor */
+  .row{display:flex;gap:8px;align-items:center;margin:6px 0}
+  .row .del{background:#ffe2e2;color:#b42318;border:1px solid #f2b8b5;border-radius:6px;padding:4px 8px;cursor:pointer}
+  .modebar{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  .tag{display:inline-block;background:#eef2ff;border:1px solid #d6dcff;border-radius:6px;padding:3px 6px;font-size:12px;color:#334155}
 </style>
 </head>
 <body>
@@ -141,6 +147,9 @@
                 <tbody></tbody>
               </table>
             </div>
+            <div class="muted" style="margin-top:8px">
+              Tip: if a day is set via <span class="tag">Split Segments</span>, the table won’t show it (it’s custom). Use the day’s ✎ button to edit those segments.
+            </div>
           </div>
         </div>
       </details>
@@ -176,12 +185,35 @@
     </div>
   </div>
 
-  <!-- Quick assign dialog -->
-  <dialog id="assignDlg" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px">
-    <div style="font-weight:800;margin-bottom:6px">Assign template for <span id="assignTitle"></span></div>
-    <select id="assignSelect" style="width:100%"></select>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
-      <button id="assignOK" class="btn">Assign</button>
+  <!-- Assign / Split dialog -->
+  <dialog id="assignDlg" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;max-width:680px;width:95%">
+    <div style="font-weight:800;margin-bottom:6px">
+      <span id="assignTitle">Assign</span>
+    </div>
+
+    <!-- mode bar -->
+    <div class="modebar">
+      <label><input type="radio" name="mode" value="template" id="modeTemplate"> Use template</label>
+      <label><input type="radio" name="mode" value="split" id="modeSplit"> Use split segments</label>
+    </div>
+
+    <!-- template select -->
+    <div id="templateMode">
+      <select id="assignSelect" style="width:100%"></select>
+      <div class="muted" style="margin-top:6px">Choosing a template replaces any existing split segments for this day.</div>
+    </div>
+
+    <!-- split segments editor -->
+    <div id="splitMode" style="display:none">
+      <div id="segmentsWrap"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn subtle" id="addSegment">＋ Add segment</button>
+        <span class="muted">Activities: Emails, Mirakl, Social, Meeting, Overtime, Break, Lunch.</span>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button id="assignOK" class="btn">Save</button>
       <button onclick="assignDlg.close()" class="btn subtle">Cancel</button>
     </div>
   </dialog>
@@ -192,7 +224,7 @@ const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunda
 let ADVISORS=['Luke Pashley','Ameena Malik','Carrie-Ann Raw','Danielle Smith','Farwa Shaheen','Gemma Emmett','Laura Stockburn','Millie Walsh','Tunis Foley'];
 let templates={};
 let rotas={};
-const STORAGE='rota_single_v7_teamOption';
+const STORAGE='rota_single_v8_split';
 
 const css=getComputedStyle(document.documentElement);
 const START=+css.getPropertyValue('--timeline-start')||7;
@@ -283,8 +315,16 @@ function populateAssignTable(){
     const tr=document.createElement('tr'); const name=document.createElement('td'); name.className='name'; name.textContent=a; tr.appendChild(name);
     DAYS.forEach(d=>{
       const td=document.createElement('td'); const sel=document.createElement('select');
-      sel.innerHTML=`<option value="">-- Day Off --</option>${opts}`; sel.value=(rotas[a]&&rotas[a][d])||'';
-      sel.onchange=()=>{ rotas[a][d]=sel.value; save(); renderCalendar(); };
+      sel.innerHTML=`<option value="">-- Day Off --</option>${opts}`;
+      // If the day is a split object, leave selector blank (won't show "(Split)")
+      const val = (rotas[a] && typeof rotas[a][d]==='string') ? rotas[a][d] : '';
+      sel.value = val;
+      sel.onchange=()=>{ 
+        // When using the table, we always write a plain template (overwriting any split)
+        if(!rotas[a]) rotas[a]={};
+        rotas[a][d]=sel.value; 
+        save(); renderCalendar(); 
+      };
       td.appendChild(sel); tr.appendChild(td);
     });
     body.appendChild(tr);
@@ -331,6 +371,24 @@ function colorClass(name){
   return 'c-emails';
 }
 
+/* ========= SEGMENTS: read/render ========= */
+function dayHasSegments(v){ return v && typeof v==='object' && Array.isArray(v.segments); }
+function processDayValue(dayValue, templateMap){
+  if(dayHasSegments(dayValue)){
+    // normalize segments
+    return dayValue.segments
+      .filter(s=>s.activity && s.start && s.end)
+      .map(s=>({name:s.activity,start:toMin(s.start),end:toMin(s.end)}))
+      .filter(b=>b.end>b.start)
+      .sort((a,b)=>a.start-b.start);
+  }
+  // fallback to template string
+  if(typeof dayValue==='string' && templateMap[dayValue]){
+    return processTemplate(templateMap[dayValue]);
+  }
+  return [];
+}
+
 /* ========= RENDERERS ========= */
 function updateRangeLabel(){
   const ws=$('#weekStart').value; const adv=$('#advisorSelect').value;
@@ -349,7 +407,7 @@ function updateRangeLabel(){
 }
 
 function renderCalendar(){
-  resetGrid();               /* <— important reset */
+  resetGrid();
   document.getElementById('hours').innerHTML=hoursHTML();
 
   const advVal=$('#advisorSelect').value||ADVISORS[0];
@@ -361,19 +419,39 @@ function renderCalendar(){
     const col=document.createElement('div'); col.className='day-col';
     let month='—', num=''; if(s){ const d=new Date(s); d.setDate(d.getDate()+idx); month=d.toLocaleDateString('en-GB',{month:'long'}); num=d.getDate(); }
     col.insertAdjacentHTML('beforeend',`<div class="day-head"><small>${month}</small>${day}<span style="float:right">${num}</span></div>`);
-    const tplName=(rotas[adv]&&rotas[adv][day])||''; const tpl=templates[tplName];
-    if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
-    else { col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="badge">${tplName}</span> ${tpl.Start} – ${tpl.Finish}<span class="summary-right">${((toMin(tpl.Finish)-toMin(tpl.Start))/60)}h</span></div>`); }
+
+    const dayVal = rotas[adv]?.[day];
+    // summary line
+    if(dayHasSegments(dayVal)){
+      const totalMins = processDayValue(dayVal, templates).reduce((acc,b)=>acc+(b.end-b.start),0);
+      col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="badge">Split</span> custom segments<span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
+    } else {
+      const tplName = typeof dayVal==='string' ? dayVal : '';
+      const tpl=templates[tplName];
+      if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
+      else { col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="badge">${tplName}</span> ${tpl.Start} – ${tpl.Finish}<span class="summary-right">${((toMin(tpl.Finish)-toMin(tpl.Start))/60)}h</span></div>`); }
+    }
+
     col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}">＋</button><button class="iconbtn" data-day="${day}" data-edit>✎</button></div>`);
     const cell=document.createElement('div'); cell.className='timeline-cell';
-    if(tpl){ processTemplate(tpl).forEach(b=>{ const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN; const el=document.createElement('div'); el.className=`block ${colorClass(b.name)}`; el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px'; el.innerHTML=`${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span>`; cell.appendChild(el); }); }
+
+    // blocks
+    const blocks = processDayValue(dayVal, templates);
+    blocks.forEach(b=>{
+      const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN;
+      const el=document.createElement('div'); el.className=`block ${colorClass(b.name)}`;
+      el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px';
+      el.innerHTML=`${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span>`;
+      cell.appendChild(el);
+    });
+
     col.appendChild(cell); grid.appendChild(col);
   });
   $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day));
 }
 
 function renderTeamDayCalendar(){
-  resetGrid();               /* <— important reset */
+  resetGrid();
   document.getElementById('hours').innerHTML=hoursHTML();
 
   const grid=$('#calGrid'); const ws=$('#weekStart').value; const day=$('#teamDay').value||'Monday';
@@ -386,24 +464,134 @@ function renderTeamDayCalendar(){
   ADVISORS.forEach(adv=>{
     const col=document.createElement('div'); col.className='day-col';
     col.insertAdjacentHTML('beforeend',`<div class="day-head" style="height:56px">${adv}</div>`);
-    const tplName=(rotas[adv]&&rotas[adv][day])||''; const tpl=templates[tplName];
-    if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
-    else { col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="badge">${tplName}</span> ${tpl.Start} – ${tpl.Finish}<span class="summary-right">${((toMin(tpl.Finish)-toMin(tpl.Start))/60)}h</span></div>`); }
+
+    const dayVal = rotas[adv]?.[day];
+    if(dayHasSegments(dayVal)){
+      const totalMins = processDayValue(dayVal, templates).reduce((acc,b)=>acc+(b.end-b.start),0);
+      col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="badge">Split</span> custom segments<span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
+    } else {
+      const tplName = typeof dayVal==='string' ? dayVal : '';
+      const tpl=templates[tplName];
+      if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
+      else { col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="badge">${tplName}</span> ${tpl.Start} – ${tpl.Finish}<span class="summary-right">${((toMin(tpl.Finish)-toMin(tpl.Start))/60)}h</span></div>`); }
+    }
+
     col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}" data-adv="${adv}">＋</button><button class="iconbtn" data-day="${day}" data-adv="${adv}" data-edit>✎</button></div>`);
     const cell=document.createElement('div'); cell.className='timeline-cell';
-    if(tpl){ processTemplate(tpl).forEach(b=>{ const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN; const el=document.createElement('div'); el.className=`block ${colorClass(b.name)}`; el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px'; el.innerHTML=`${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span>`; cell.appendChild(el); }); }
+
+    const blocks = processDayValue(dayVal, templates);
+    blocks.forEach(b=>{
+      const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN;
+      const el=document.createElement('div'); el.className=`block ${colorClass(b.name)}`;
+      el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px';
+      el.innerHTML=`${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span>`;
+      cell.appendChild(el);
+    });
+
     col.appendChild(cell); grid.appendChild(col);
   });
   $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day, b.dataset.adv));
 }
 
-/* ========= ASSIGN DIALOG ========= */
+/* ========= ASSIGN / SPLIT DIALOG ========= */
 const assignDlg=$('#assignDlg'), assignSelect=$('#assignSelect'), assignTitle=$('#assignTitle');
+const modeTemplate=$('#modeTemplate'), modeSplit=$('#modeSplit');
+const templateMode=$('#templateMode'), splitMode=$('#splitMode');
+const segmentsWrap=$('#segmentsWrap');
+
+const ACTS=['Emails','Mirakl','Social','Meeting','Overtime','Break','Lunch'];
+
+function segmentRowHTML(s, idx){
+  const opts = ACTS.map(a=>`<option ${s.activity===a?'selected':''}>${a}</option>`).join('');
+  return `<div class="row" data-i="${idx}">
+    <select class="seg-act">${opts}</select>
+    <input type="time" class="seg-start" value="${s.start||''}">
+    <span>–</span>
+    <input type="time" class="seg-end" value="${s.end||''}">
+    <button class="del">Delete</button>
+  </div>`;
+}
+function loadSegmentsUI(arr){
+  if(!arr || !Array.isArray(arr)) arr=[];
+  segmentsWrap.innerHTML = arr.map((s,i)=>segmentRowHTML(s,i)).join('') || '<div class="muted">No segments yet. Add one.</div>';
+  $$('#segmentsWrap .row .del').forEach(btn=>{
+    btn.onclick=()=>{
+      const i=+btn.parentElement.dataset.i;
+      const rows=$$('#segmentsWrap .row');
+      rows[i].remove();
+      // reindex
+      $$('#segmentsWrap .row').forEach((r,ix)=>r.dataset.i=ix);
+      if($$('#segmentsWrap .row').length===0) segmentsWrap.innerHTML='<div class="muted">No segments yet. Add one.</div>';
+    };
+  });
+}
+function readSegmentsUI(){
+  const rows=$$('#segmentsWrap .row');
+  const list=rows.map(r=>{
+    return {
+      activity:r.querySelector('.seg-act').value,
+      start:r.querySelector('.seg-start').value,
+      end:r.querySelector('.seg-end').value
+    };
+  }).filter(s=>s.activity && s.start && s.end && toMin(s.end)>toMin(s.start));
+  // sort and ensure no overlaps (soft check)
+  list.sort((a,b)=>toMin(a.start)-toMin(b.start));
+  for(let i=1;i<list.length;i++){
+    if(toMin(list[i].start)<toMin(list[i-1].end)){
+      alert('Segments overlap. Please adjust times.'); return null;
+    }
+  }
+  return list;
+}
+
 function openAssign(day, advisor){
   const adv = advisor || ($('#advisorSelect').value==='__TEAM__' ? ADVISORS[0] : $('#advisorSelect').value);
   assignTitle.textContent=`${day} for ${adv}`;
+
+  // populate template select
   assignSelect.innerHTML=`<option value="">— Day Off —</option>`+Object.keys(templates).map(n=>`<option>${n}</option>`).join('');
-  $('#assignOK').onclick=()=>{ if(!rotas[adv]) rotas[adv]={}; rotas[adv][day]=assignSelect.value; save(); assignDlg.close(); renderCalendar(); };
+  const current = rotas[adv]?.[day];
+
+  // set mode + values
+  if(dayHasSegments(current)){
+    modeSplit.checked=true; modeTemplate.checked=false;
+    templateMode.style.display='none'; splitMode.style.display='block';
+    loadSegmentsUI(current.segments);
+  } else {
+    modeTemplate.checked=true; modeSplit.checked=false;
+    templateMode.style.display='block'; splitMode.style.display='none';
+    assignSelect.value = (typeof current==='string')? current : '';
+  }
+
+  // add segment
+  $('#addSegment').onclick=()=>{
+    if($('#segmentsWrap .muted')) { const n=$('#segmentsWrap .muted'); if(n) n.remove(); }
+    const idx=$$('#segmentsWrap .row').length;
+    const div=document.createElement('div'); div.className='row'; div.dataset.i=idx;
+    div.innerHTML=segmentRowHTML({activity:'Emails',start:'08:00',end:'12:00'}, idx);
+    segmentsWrap.appendChild(div);
+    div.querySelector('.del').onclick=()=>{ div.remove(); if($$('#segmentsWrap .row').length===0) segmentsWrap.innerHTML='<div class="muted">No segments yet. Add one.</div>'; };
+  };
+
+  // mode toggle
+  modeTemplate.onchange = modeSplit.onchange = ()=>{
+    const tmpl = modeTemplate.checked;
+    templateMode.style.display = tmpl ? 'block':'none';
+    splitMode.style.display = tmpl ? 'none':'block';
+  };
+
+  // save
+  $('#assignOK').onclick=()=>{
+    if(!rotas[adv]) rotas[adv]={};
+    if(modeTemplate.checked){
+      rotas[adv][day] = assignSelect.value; // string or empty
+    } else {
+      const segs=readSegmentsUI(); if(!segs) return; // invalid overlap
+      rotas[adv][day] = { segments: segs };
+    }
+    save(); assignDlg.close(); renderCalendar(); populateAssignTable();
+  };
+
   assignDlg.showModal();
 }
 
@@ -452,6 +640,3 @@ function wire(){
 </script>
 </body>
 </html>
-
-
-
