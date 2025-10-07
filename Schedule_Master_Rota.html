@@ -332,7 +332,7 @@ let selectedAdvisors = new Set();
 /* Templates with WorkCode */
 let templates={};
 let rotas={};
-const STORAGE='rota_v14_leader_indeterminate_and_advisor_list';
+const STORAGE='rota_v15_fix_buttons_and_preserve_segments';
 
 /* CSS timings */
 const css=getComputedStyle(document.documentElement);
@@ -649,7 +649,7 @@ function processDayValue(dayValue){
   }
   return [];
 }
-function toEditableSegments(dayValueOrTemplateName{
+function toEditableSegments(dayValueOrTemplateName){
   if(dayHasSegments(dayValueOrTemplateName)) return JSON.parse(JSON.stringify(dayValueOrTemplateName.segments));
   if(typeof dayValueOrTemplateName==='string' && templates[dayValueOrTemplateName]){
     return processTemplateToSegments(templates[dayValueOrTemplateName]);
@@ -964,6 +964,7 @@ function onBlockClick(e){
   const origStart = el.dataset.start, origEnd   = el.dataset.end, origCode=el.dataset.code||'';
 
   const dayVal = rotas[adv]?.[day];
+  // If this day is still a template name, convert it to editable segments first
   if(!dayHasSegments(dayVal)){
     const segs = toEditableSegments(dayVal || '');
     if(!rotas[adv]) rotas[adv] = {};
@@ -1000,6 +1001,7 @@ function onBlockClick(e){
     if(idx===-1){ alert('Could not find block to edit.'); return; }
 
     if(bmWhole.checked){
+      // Replace inside the original block, keep before/after remainders
       const c=bwCode.value, s = bwStart.value, e = bwEnd.value;
       if(!s || !e || toMin(e)<=toMin(s)){ alert('Enter a valid time range.'); return; }
       if(toMin(s)<oS || toMin(e)>oE){ alert('You cannot extend beyond the original block.'); return; }
@@ -1012,6 +1014,7 @@ function onBlockClick(e){
       save(); blockDlg.close(); renderCalendar(); populateAssignTable();
       return;
     } else {
+      // Insert a sub-range (overlay) inside the block, keeping before/after
       const c=bsCode.value, s = bsStart.value, e = bsEnd.value;
       if(!s || !e || toMin(e)<=toMin(s)){ alert('Enter a valid sub-range.'); return; }
       if(toMin(s)<oS || toMin(e)>oE){ alert('Sub-range must be inside the original block.'); return; }
