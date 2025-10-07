@@ -14,7 +14,7 @@
   body{margin:0;background:#eef2f6;color:var(--ink);font-family:Inter,Roboto,Segoe UI,system-ui,Arial,Helvetica,sans-serif}
   .topbar{background:var(--brand);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 14px rgba(13,71,161,.18)}
   .topbar h1{margin:0;font-size:18px;font-weight:800}
-  .layout{display:grid;grid-template-columns:1fr 320px;gap:18px;max-width:1500px;margin:18px auto;padding:0 16px}
+  .layout{display:grid;grid-template-columns:1fr 360px;gap:18px;max-width:1500px;margin:18px auto;padding:0 16px}
   .panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 20px rgba(12,27,74,.06)}
   .panel-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line)}
   .panel-header h2{margin:0;font-size:15px}
@@ -32,10 +32,8 @@
   .template-row{display:grid;grid-template-columns:auto 140px auto 1fr auto;gap:10px 14px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fafcff;margin-bottom:10px}
   .time-block{display:flex;gap:6px;flex-wrap:wrap}
   .danger{background:#dc3545;color:#fff;border:0;border-radius:8px;padding:6px 10px;cursor:pointer}
-  .key-row{display:grid;grid-template-columns:18px 100px 1fr;gap:8px;align-items:center;margin-bottom:8px}
+  .key-row{display:grid;grid-template-columns:18px 120px 1fr;gap:8px;align-items:center;margin-bottom:8px}
   .swatch{width:18px;height:18px;border-radius:3px;border:1px solid var(--line)}
-  .list{display:flex;flex-direction:column;gap:6px}
-  .pill{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}
   .table-wrap{overflow:auto}
   table{width:100%;border-collapse:collapse;min-width:900px}
   th,td{border:1px solid var(--line);padding:8px;text-align:center}
@@ -44,12 +42,7 @@
 
   /* Calendar */
   .calendar{border-top:1px solid var(--line)}
-  .cal-grid{
-    display:grid;
-    grid-template-columns:80px repeat(7,1fr);
-    grid-auto-flow: column;
-    overflow:auto;
-  }
+  .cal-grid{display:grid;grid-template-columns:80px repeat(7,1fr);grid-auto-flow:column;overflow:auto}
   .hour-col{border-right:1px solid var(--line);background:#fafcfe}
   .hour{height:calc(var(--timeline-height)/(var(--timeline-end)-var(--timeline-start)));border-bottom:1px solid var(--line);font-size:12px;color:#748099;text-align:right;padding-right:6px;position:relative;box-sizing:border-box}
   .hour span{position:absolute;top:-7px;right:6px;background:#fafcfe;padding:0 4px}
@@ -57,7 +50,7 @@
   .day-head{height:56px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;padding:6px 10px;background:#f6f8fb;font-weight:800}
   .day-head small{font-weight:700;color:#8792a6}
   .day-summary{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line)}
-  .badge{background:#2a5934;color:#fff;border-radius:6px;padding:4px 6px;font-weight:800;white-space:nowrap}
+  .badge{background:#2a5934;color:#fff;border-radius:6px;padding:2px 6px;font-weight:800;white-space:nowrap;font-size:11px}
   .summary-right{margin-left:auto;color:#5b6b7f;font-size:12px}
   .day-actions{display:flex;gap:6px;border-bottom:1px solid var(--line);padding:6px 10px}
   .iconbtn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:6px 8px;cursor:pointer}
@@ -65,21 +58,32 @@
   .timeline-cell{position:relative;height:var(--timeline-height);background:
     linear-gradient(#0000,#0000),
     repeating-linear-gradient(180deg,#0000,#0000 calc(100%/(var(--timeline-end) - var(--timeline-start))), var(--line) 0, var(--line) calc(100%/(var(--timeline-end) - var(--timeline-start)) + 1px));}
-  .block{position:absolute;left:10px;right:10px;border-radius:6px;padding:3px 6px;font-size:11px;font-weight:800;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12);line-height:1.1;cursor:pointer}
+  .block{position:absolute;left:10px;right:10px;border-radius:6px;padding:3px 6px;font-size:11px;font-weight:800;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12);line-height:1.1;cursor:pointer;display:flex;justify-content:space-between;gap:6px;align-items:flex-start}
   .block .time{display:block;font-weight:700;font-size:10px;opacity:.95}
+  .codepill{background:#ffffffd0;color:#0f172a;border:1px solid #e2e8f0;border-radius:6px;padding:1px 6px;font-size:10px;font-weight:800;white-space:nowrap}
   .c-emails{background:var(--color-emails)} .c-mirakl{background:var(--color-mirakl)} .c-social{background:var(--color-social)}
   .c-meeting{background:var(--color-meeting);color:#213} .c-break{background:var(--color-break);color:#213} .c-lunch{background:var(--color-lunch);color:#213}
   .c-overtime{background:var(--color-overtime)}
   @media print{.no-print{display:none} .panel{box-shadow:none}}
 
-  /* Split editor / Block editor */
+  /* Editors */
   .row{display:flex;gap:8px;align-items:center;margin:6px 0}
   .row .del{background:#ffe2e2;color:#b42318;border:1px solid #f2b8b5;border-radius:6px;padding:4px 8px;cursor:pointer}
   .modebar{display:flex;gap:8px;align-items:center;margin-bottom:8px}
   .tag{display:inline-block;background:#eef2ff;border:1px solid #d6dcff;border-radius:6px;padding:3px 6px;font-size:12px;color:#334155}
   .overlaybar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;padding:8px;border:1px dashed var(--line);border-radius:8px;background:#f9fbff}
 
-  dialog{max-width:740px;width:95%}
+  dialog{max-width:780px;width:95%}
+
+  /* Schedules tree (right sidebar) */
+  .tree-search{display:flex;gap:8px;margin-bottom:8px}
+  .tree{max-height:70vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px;background:#fff}
+  .tree details{padding:3px 4px;border-radius:6px}
+  .tree summary{list-style:none;cursor:pointer;font-weight:800}
+  .tree summary::-webkit-details-marker{display:none}
+  .tree .node{display:flex;gap:6px;align-items:center;padding:2px 2px}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:#eef2ff;border:1px solid #d6dcff;border-radius:999px;padding:3px 8px;font-size:12px}
+  .node-actions button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:3px 6px;cursor:pointer;font-size:11px}
 </style>
 </head>
 <body>
@@ -100,10 +104,9 @@
         <div class="panel-body" style="display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center">
           <label>Week start (Monday)</label>
           <input type="date" id="weekStart" class="input"/>
-          <label>Advisor</label>
+          <label>View</label>
           <select id="advisorSelect" class="input"></select>
-          <!-- Team (All) day selector appears only when Team is chosen -->
-          <label id="lblTeamDay" class="muted" style="display:none">Team Day</label>
+          <label id="lblTeamDay" class="muted" style="display:none">Day</label>
           <select id="teamDay" class="input" style="display:none">
             <option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option>
             <option>Friday</option><option>Saturday</option><option>Sunday</option>
@@ -157,7 +160,7 @@
         </div>
       </details>
 
-      <!-- Advisor Week Calendar (single rota view) OR Team (All) Day -->
+      <!-- Advisor Week Calendar (single rota view) OR Team (Selected) Day -->
       <div class="panel">
         <div class="panel-header"><h2 id="calTitle">Advisor Week (Calendar)</h2>
           <div style="display:flex;gap:6px;align-items:center">
@@ -169,21 +172,21 @@
         <div class="panel-body calendar">
           <div class="cal-grid" id="calGrid">
             <div class="hour-col"><div id="hours"></div></div>
-            <!-- day or advisor columns injected here -->
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Right sidebar: Advisors -->
+    <!-- Right sidebar: Schedules tree -->
     <div class="panel">
-      <div class="panel-header"><h2>Advisors</h2></div>
+      <div class="panel-header"><h2>Schedules</h2></div>
       <div class="panel-body">
-        <div style="display:flex;gap:6px;margin-bottom:8px">
-          <input id="newAdvisor" class="input" placeholder="Add advisor name…"/>
-          <button class="btn subtle" id="addAdvisor">Add</button>
+        <div class="tree-search">
+          <input id="treeSearch" class="input" placeholder="Select sites / leaders / advisors…" style="flex:1"/>
+          <button class="btn subtle" id="btnClearSel">Clear</button>
         </div>
-        <div class="list" id="advisorList"></div>
+        <div class="tree" id="tree"></div>
+        <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px" id="activeChips"></div>
       </div>
     </div>
   </div>
@@ -213,21 +216,18 @@
         <strong>Pick block to split:</strong>
         <select id="ovBlock" style="min-width:220px"></select>
         <strong>Insert override:</strong>
-        <select id="ovActivity">
-          <option>Emails</option><option>Mirakl</option><option>Social</option>
-          <option>Meeting</option><option>Overtime</option><option>Break</option><option>Lunch</option>
-        </select>
+        <select id="ovActivity"></select>
+        <select id="ovCode"></select>
         <input type="time" id="ovStart" value="13:00">
         <span>–</span>
         <input type="time" id="ovEnd" value="13:30">
         <button class="btn subtle" id="btnInsertOverlay">Insert</button>
-        <span class="muted">Splits the chosen block and drops your override in place.</span>
       </div>
 
       <div id="segmentsWrap"></div>
       <div style="display:flex;gap:8px;margin-top:8px">
         <button class="btn subtle" id="addSegment">＋ Add segment</button>
-        <span class="muted">Edit rows directly, or use “Pick block to split” + “Insert override”.</span>
+        <span class="muted">Each segment = Activity + Code + Start–End.</span>
       </div>
     </div>
 
@@ -237,7 +237,7 @@
     </div>
   </dialog>
 
-  <!-- NEW: Click-a-block Editor -->
+  <!-- Click-a-block Editor -->
   <dialog id="blockDlg" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;">
     <div style="font-weight:800;margin-bottom:6px">
       <span id="blockTitle">Edit block</span>
@@ -252,31 +252,33 @@
     <div id="blockWhole">
       <div class="row">
         <label style="min-width:90px">Activity</label>
-        <select id="bwActivity">
-          <option>Emails</option><option>Mirakl</option><option>Social</option>
-          <option>Meeting</option><option>Overtime</option><option>Break</option><option>Lunch</option>
-        </select>
+        <select id="bwActivity"></select>
+      </div>
+      <div class="row">
+        <label style="min-width:90px">Code</label>
+        <select id="bwCode"></select>
       </div>
       <div class="row">
         <label style="min-width:90px">Start–End</label>
         <input type="time" id="bwStart"> <span>–</span> <input type="time" id="bwEnd">
       </div>
-      <div class="muted">You can’t extend beyond the original block. If you shrink it, we’ll keep the before/after time with the original activity so no gaps appear.</div>
+      <div class="muted">You can’t extend beyond the original block. If you shrink it, we keep the before/after with the original activity & code so no gaps appear.</div>
     </div>
 
     <div id="blockSub" style="display:none">
       <div class="row">
         <label style="min-width:90px">New activity</label>
-        <select id="bsActivity">
-          <option>Emails</option><option>Mirakl</option><option>Social</option>
-          <option>Meeting</option><option>Overtime</option><option>Break</option><option>Lunch</option>
-        </select>
+        <select id="bsActivity"></select>
+      </div>
+      <div class="row">
+        <label style="min-width:90px">New code</label>
+        <select id="bsCode"></select>
       </div>
       <div class="row">
         <label style="min-width:90px">Sub-range</label>
         <input type="time" id="bsStart"> <span>–</span> <input type="time" id="bsEnd">
       </div>
-      <div class="muted">We’ll split the original block into left remainder + your new activity + right remainder. Neighbours stay the same.</div>
+      <div class="muted">We split into left remainder + your new block + right remainder. Neighbours stay the same; codes preserved.</div>
     </div>
 
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
@@ -289,10 +291,44 @@
 /* ========= DATA & CONSTANTS ========= */
 const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 let ADVISORS=['Luke Pashley','Ameena Malik','Carrie-Ann Raw','Danielle Smith','Farwa Shaheen','Gemma Emmett','Laura Stockburn','Millie Walsh','Tunis Foley'];
+
+// ----- Purpose codes from your screenshot -----
+const CODE_GROUPS = {
+  "Activity":[
+    "2nd Line","Admin","BH Email","BH Social","BH WhatsApp","DEB Email","DEB Social","DEB WhatsApp",
+    "Ebay","KM Email","KM Social","KM WhatsApp","Mirakl","Mixing","PayPlus","PLT Email","PLT Social","PLT WhatsApp","QA","Overtime"
+  ],
+  "Absence":[ "AL","Break","Lunch","Sick","Split Shift","RDO","Maternity","LTS" ],
+  "Shrinkage":[ "121","ATL","Coaching","Huddle","ITI","Projects","Team Meeting","Training" ]
+};
+
+// Activities (visual color) – keep your core set
+const ACTS=['Emails','Mirakl','Social','Meeting','Overtime','Break','Lunch'];
+
+// Build flat code list with groups (for selects)
+const ALL_CODES = Object.entries(CODE_GROUPS).flatMap(([grp,codes])=>codes.map(c=>({group:grp, code:c})));
+
+// Hierarchy (Sites → Leaders → Advisors)
+let org = {
+  sites: {
+    "Admin":        { leaders: {} },
+    "Boohoo":       { leaders: {} },
+    "Debenhams":    { leaders: {} },
+    "Karen Millen": { leaders: {} },
+    "PayPlus":      { leaders: {} },
+    "PLT":          { leaders: {} },
+    "Quality":      { leaders: {} }
+  }
+};
+
+// Selected advisors from tree
+let selectedAdvisors = new Set();
+
 let templates={};
 let rotas={};
-const STORAGE='rota_single_v10_block_click_edit';
+const STORAGE='rota_v11_sites_tree_codes';
 
+// CSS timings
 const css=getComputedStyle(document.documentElement);
 const START=+css.getPropertyValue('--timeline-start')||7;
 const END=+css.getPropertyValue('--timeline-end')||20;
@@ -304,14 +340,11 @@ const pad=n=>String(n).padStart(2,'0');
 const toMin=t=>{ if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; };
 const m2t=m=>`${pad(Math.floor(m/60))}:${pad(m%60)}`;
 
-function save(){ localStorage.setItem(STORAGE, JSON.stringify({advisors:ADVISORS,templates,rotas,weekStart:$('#weekStart').value})); }
-function load(){ try{ const d=JSON.parse(localStorage.getItem(STORAGE)||'null'); if(!d) return; ADVISORS=d.advisors||ADVISORS; templates=d.templates||templates; rotas=d.rotas||rotas; if(d.weekStart) $('#weekStart').value=d.weekStart; }catch{} }
+function save(){ localStorage.setItem(STORAGE, JSON.stringify({advisors:ADVISORS,templates,rotas,weekStart:$('#weekStart').value, org})); }
+function load(){ try{ const d=JSON.parse(localStorage.getItem(STORAGE)||'null'); if(!d) return; ADVISORS=d.advisors||ADVISORS; templates=d.templates||templates; rotas=d.rotas||rotas; if(d.weekStart) $('#weekStart').value=d.weekStart; if(d.org) org=d.org; }catch{} }
 
 /* ========= GRID RESET ========= */
-function resetGrid(){
-  const grid = document.getElementById('calGrid');
-  grid.innerHTML = '<div class="hour-col"><div id="hours"></div></div>';
-}
+function resetGrid(){ $('#calGrid').innerHTML = '<div class="hour-col"><div id="hours"></div></div>'; }
 
 /* ========= COLOR KEY ========= */
 function buildColorKey(){
@@ -336,7 +369,7 @@ function seedDefaults(){
 }
 
 function templateRow(t,key){
-  const opts=['Emails','Mirakl','Social','Overtime','Meeting'].map(p=>`<option ${t.Platform===p?'selected':''}>${p}</option>`).join('');
+  const opts=ACTS.map(p=>`<option ${t.Platform===p?'selected':''}>${p}</option>`).join('');
   return `<div class="template-row" data-k="${key}">
     <label>Name</label><input data-f="name" type="text" value="${t.name}" style="width:140px">
     <label>Shift</label><div class="time-block">
@@ -348,7 +381,7 @@ function templateRow(t,key){
       <input data-f="Lunch"  type="time" value="${t.Lunch||''}"  title="Lunch (45m)">
       <input data-f="Break2" type="time" value="${t.Break2||''}" title="Break 2 (15m)">
     </div>
-    <label>Platform</label><select data-f="Platform" style="width:140px"><option value="">--</option>${opts}</select>
+    <label>Activity</label><select data-f="Platform" style="width:140px"><option value="">--</option>${opts}</select>
     <button class="danger" data-act="del">Delete</button>
   </div>`;
 }
@@ -378,7 +411,8 @@ function populateAssignTable(){
   head.innerHTML=DAYS.map(d=>`<th data-day="${d}">${d.slice(0,3)}<br><span class="muted" data-date></span></th>`).join('');
   const opts=Object.keys(templates).map(n=>`<option value="${n}">${n}</option>`).join('');
   body.innerHTML='';
-  ADVISORS.forEach(a=>{
+  const list = selectedAdvisors.size ? ADVISORS.filter(a=>selectedAdvisors.has(a)) : ADVISORS;
+  list.forEach(a=>{
     const tr=document.createElement('tr'); const name=document.createElement('td'); name.className='name'; name.textContent=a; tr.appendChild(name);
     DAYS.forEach(d=>{
       const td=document.createElement('td'); const sel=document.createElement('select');
@@ -392,17 +426,125 @@ function populateAssignTable(){
   });
 }
 
-/* ========= ADVISOR SIDEBAR & DROPDOWN ========= */
-function rebuildAdvisorUI(){
-  $('#advisorSelect').innerHTML = `<option value="__TEAM__">Team (All)</option>` + ADVISORS.map(a=>`<option>${a}</option>`).join('');
-  const list=$('#advisorList'); list.innerHTML='';
-  ADVISORS.forEach(a=>{
-    const div=document.createElement('div'); div.className='pill';
-    div.innerHTML=`<span>${a}</span><div><button class="btn subtle icon" data-a="${a}">✎</button> <button class="btn subtle icon" data-r="${a}">🗑️</button></div>`;
-    list.appendChild(div);
+/* ========= TREE (Sites → Leaders → Advisors) ========= */
+function rebuildTree(){
+  const t=$('#tree'); const q=$('#treeSearch').value.trim().toLowerCase();
+  const contains=(str)=>!q||str.toLowerCase().includes(q);
+
+  function advisorNode(name){
+    const chk = selectedAdvisors.has(name) ? 'checked' : '';
+    return `<div class="node">
+      <input type="checkbox" data-adv="${name}" ${chk}/>
+      <span>${name}</span>
+      <div class="node-actions" style="margin-left:auto;display:flex;gap:6px">
+        <button data-rename-adv="${name}">✎</button>
+        <button data-remove-adv="${name}">🗑</button>
+      </div>
+    </div>`;
+  }
+  function leaderBlock(site, leader, arr){
+    if(q && !contains(leader) && !arr.some(a=>contains(a))) return '';
+    return `<details>
+      <summary class="node"><span>👤 ${leader}</span>
+        <div class="node-actions" style="margin-left:auto;display:flex;gap:6px">
+          <button data-add-adv="${site}::${leader}">+ Advisor</button>
+          <button data-rename-lead="${site}::${leader}">✎</button>
+          <button data-remove-lead="${site}::${leader}">🗑</button>
+        </div>
+      </summary>
+      ${arr.map(advisorNode).join('')}
+    </details>`;
+  }
+  function siteBlock(site,obj){
+    const leaders=obj.leaders||{};
+    const blocks = Object.entries(leaders).map(([leader,arr])=>leaderBlock(site,leader,arr||[])).filter(Boolean);
+    if(q && !contains(site) && blocks.join('')==='') return '';
+    return `<details open>
+      <summary class="node"><strong>📁 ${site}</strong>
+        <div class="node-actions" style="margin-left:auto;display:flex;gap:6px">
+          <button data-add-lead="${site}">+ Leader</button>
+          <button data-rename-site="${site}">✎</button>
+          <button data-remove-site="${site}">🗑</button>
+        </div>
+      </summary>
+      ${blocks.join('')}
+    </details>`;
+  }
+  t.innerHTML = Object.entries(org.sites).map(([site,obj])=>siteBlock(site,obj)).filter(Boolean).join('') || '<div class="muted">No sites yet.</div>';
+
+  // Wire checkbox changes
+  $$('#tree [data-adv]').forEach(ch=>{
+    ch.onchange=()=>{ const n=ch.dataset.adv; ch.checked?selectedAdvisors.add(n):selectedAdvisors.delete(n); refreshChips(); populateAssignTable(); renderCalendar(); };
   });
-  $$('#advisorList [data-r]').forEach(b=>b.onclick=()=>{ const name=b.dataset.r; if(!confirm(`Remove ${name}?`)) return; ADVISORS=ADVISORS.filter(x=>x!==name); delete rotas[name]; rebuildAdvisorUI(); populateAssignTable(); save(); renderCalendar(); });
-  $$('#advisorList [data-a]').forEach(b=>b.onclick=()=>{ const old=b.dataset.a; const nn=prompt('Rename advisor', old); if(!nn||nn===old) return; const i=ADVISORS.indexOf(old); ADVISORS[i]=nn; rotas[nn]=rotas[old]||{}; delete rotas[old]; rebuildAdvisorUI(); populateAssignTable(); save(); renderCalendar(); });
+
+  // Site actions
+  $$('#tree [data-add-lead]').forEach(b=>b.onclick=()=>{ const site=b.dataset.addLead; const name=prompt('Leader name'); if(!name) return; org.sites[site].leaders[ name ] = org.sites[site].leaders[ name ] || []; save(); rebuildTree(); });
+  $$('#tree [data-rename-site]').forEach(b=>b.onclick=()=>{ const site=b.dataset.renameSite; const nn=prompt('Rename site', site); if(!nn||nn===site) return; org.sites[nn]=org.sites[site]; delete org.sites[site]; save(); rebuildTree(); });
+  $$('#tree [data-remove-site]').forEach(b=>b.onclick=()=>{ const site=b.dataset.removeSite; if(!confirm(`Delete site ${site}?`)) return; delete org.sites[site]; save(); rebuildTree(); });
+
+  // Leader actions
+  $$('#tree [data-add-adv]').forEach(b=>b.onclick=()=>{ const [site,leader]=b.dataset.addAdv.split('::'); const n=prompt('Advisor name'); if(!n) return; org.sites[site].leaders[leader] = org.sites[site].leaders[leader] || []; if(!org.sites[site].leaders[leader].includes(n)) org.sites[site].leaders[leader].push(n); if(!ADVISORS.includes(n)) { ADVISORS.push(n); rotas[n]={}; DAYS.forEach(d=>rotas[n][d]=''); } save(); rebuildTree(); rebuildAdvisorDropdown(); populateAssignTable(); renderCalendar(); });
+  $$('#tree [data-rename-lead]').forEach(b=>b.onclick=()=>{ const [site,leader]=b.dataset.renameLead.split('::'); const nn=prompt('Rename leader', leader); if(!nn||nn===leader) return; org.sites[site].leaders[nn]=org.sites[site].leaders[leader]; delete org.sites[site].leaders[leader]; save(); rebuildTree(); });
+  $$('#tree [data-remove-lead]').forEach(b=>b.onclick=()=>{ const [site,leader]=b.dataset.removeLead.split('::'); if(!confirm(`Remove leader ${leader}?`)) return; delete org.sites[site].leaders[leader]; save(); rebuildTree(); });
+
+  // Advisor actions
+  $$('#tree [data-rename-adv]').forEach(b=>b.onclick=()=>{ const old=b.dataset.renameAdv; const nn=prompt('Rename advisor', old); if(!nn||nn===old) return; // rename in ADVISORS + rotas + org
+    const idx=ADVISORS.indexOf(old); if(idx>-1) ADVISORS[idx]=nn;
+    rotas[nn]=rotas[old]||{}; delete rotas[old];
+    Object.values(org.sites).forEach(s=>Object.entries(s.leaders).forEach(([L,arr])=>{
+      const i=arr.indexOf(old); if(i>-1) arr[i]=nn;
+    }));
+    // selection move
+    if(selectedAdvisors.has(old)){ selectedAdvisors.delete(old); selectedAdvisors.add(nn); }
+    save(); rebuildTree(); rebuildAdvisorDropdown(); populateAssignTable(); renderCalendar();
+  });
+  $$('#tree [data-remove-adv]').forEach(b=>b.onclick=()=>{ const name=b.dataset.removeAdv; if(!confirm(`Remove ${name} from tree? (rota data kept)`)) return;
+    Object.values(org.sites).forEach(s=>Object.entries(s.leaders).forEach(([L,arr])=>{
+      const i=arr.indexOf(name); if(i>-1) arr.splice(i,1);
+    }));
+    selectedAdvisors.delete(name); save(); rebuildTree(); refreshChips(); populateAssignTable(); renderCalendar();
+  });
+
+  // Clicking a leader name selects their team for Team (Selected)
+  $$('#tree summary').forEach(s=>{
+    const text=s.textContent.trim();
+    if(text.startsWith('👤 ')){
+      s.onclick=(e)=>{
+        // Avoid toggling when clicking buttons
+        if(e.target.tagName==='BUTTON' || e.target.closest('button')) return;
+        const label=text.replace('👤 ','').trim();
+        // find in org
+        for(const [site,obj] of Object.entries(org.sites)){
+          const leaders=obj.leaders||{};
+          if(leaders[label]){
+            selectedAdvisors=new Set(leaders[label]);
+            refreshChips();
+            $('#advisorSelect').value='__TEAM_SELECTED__';
+            updateViewSelector();
+            updateRangeLabel(); renderCalendar(); populateAssignTable();
+            break;
+          }
+        }
+      };
+    }
+  });
+}
+
+function refreshChips(){
+  const box=$('#activeChips'); box.innerHTML='';
+  if(!selectedAdvisors.size){ box.innerHTML='<span class="muted">No advisors selected.</span>'; return; }
+  selectedAdvisors.forEach(a=>{
+    const span=document.createElement('span'); span.className='chip'; span.textContent=a;
+    const x=document.createElement('button'); x.textContent='×'; x.style.border='none'; x.style.background='transparent'; x.style.cursor='pointer';
+    x.onclick=()=>{ selectedAdvisors.delete(a); rebuildTree(); refreshChips(); populateAssignTable(); renderCalendar(); };
+    span.appendChild(x); box.appendChild(span);
+  });
+}
+
+/* ========= ADVISOR DROPDOWN ========= */
+function rebuildAdvisorDropdown(){
+  const sel=$('#advisorSelect');
+  sel.innerHTML = `<option value="__TEAM_SELECTED__">Team (Selected)</option><option value="__TEAM_ALL__">Team (All)</option>` + ADVISORS.map(a=>`<option>${a}</option>`).join('');
 }
 
 /* ========= HOUR GRID ========= */
@@ -416,8 +558,8 @@ function processTemplate(t){
   [['Break1',15,'Break'],['Lunch',45,'Lunch'],['Break2',15,'Break']].forEach(([k,d,label])=>{ if(t[k]) ev.push({t:toMin(t[k]),type:'pause',d,label}); });
   ev.sort((a,b)=>a.t-b.t||((a.type==='end')-(b.type==='end')));
   const out=[]; let cur=s; const main=t.Platform||'Emails';
-  for(const evi of ev){ if(evi.t>cur) out.push({name:main,start:cur,end:evi.t});
-    if(evi.type==='pause'){ out.push({name:evi.label,start:evi.t,end:evi.t+evi.d}); cur=evi.t+evi.d; } }
+  for(const evi of ev){ if(evi.t>cur) out.push({name:main,start:cur,end:evi.t, code:main}); // default code = activity name
+    if(evi.type==='pause'){ out.push({name:evi.label,start:evi.t,end:evi.t+evi.d, code:evi.label}); cur=evi.t+evi.d; } }
   return out;
 }
 function colorClass(name){
@@ -438,50 +580,43 @@ function processDayValue(dayValue, templateMap){
   if(dayHasSegments(dayValue)){
     return dayValue.segments
       .filter(s=>s.activity && s.start && s.end)
-      .map(s=>({name:s.activity,start:toMin(s.start),end:toMin(s.end)}))
+      .map(s=>({name:s.activity,start:toMin(s.start),end:toMin(s.end), code:s.code||''}))
       .filter(b=>b.end>b.start)
       .sort((a,b)=>a.start-b.start);
   }
   if(typeof dayValue==='string' && templateMap[dayValue]) return processTemplate(templateMap[dayValue]);
   return [];
 }
-
-/* Convert to editable segments */
 function toEditableSegments(dayValue){
   if(dayHasSegments(dayValue)) return JSON.parse(JSON.stringify(dayValue.segments));
   if(typeof dayValue==='string' && templates[dayValue]){
     const blocks=processTemplate(templates[dayValue]);
-    return blocks.map(b=>({activity:b.name, start:m2t(b.start), end:m2t(b.end)}));
+    return blocks.map(b=>({activity:b.name, start:m2t(b.start), end:m2t(b.end), code:b.code || b.name}));
   }
   return [];
 }
-
-/* Merge adjacent same-activity segments */
 function mergeAdjacent(segs){
   const s=[...segs].sort((a,b)=>toMin(a.start)-toMin(b.start));
   const out=[];
   for(const x of s){
     if(!out.length){ out.push({...x}); continue; }
     const p=out[out.length-1];
-    if(p.activity===x.activity && toMin(p.end)===toMin(x.start)){ p.end=x.end; }
+    if(p.activity===x.activity && p.code===x.code && toMin(p.end)===toMin(x.start)){ p.end=x.end; }
     else out.push({...x});
   }
   return out;
 }
-
-/* Insert an overlay sub-range */
 function insertOverlay(segments, newSeg){
-  const ns = { activity:newSeg.activity, start:toMin(newSeg.start), end:toMin(newSeg.end) };
+  const ns = { activity:newSeg.activity, code:newSeg.code, start:toMin(newSeg.start), end:toMin(newSeg.end) };
   if(!(ns.activity && ns.start!=null && ns.end!=null && ns.end>ns.start)) return segments;
-
   const out=[];
   for(const s of segments){
     const a=toMin(s.start), b=toMin(s.end);
     if(b<=ns.start || a>=ns.end){ out.push({...s}); continue; }
-    if(a<ns.start){ out.push({activity:s.activity,start:m2t(a),end:m2t(ns.start)}); }
-    if(b>ns.end){ out.push({activity:s.activity,start:m2t(ns.end),end:m2t(b)}); }
+    if(a<ns.start){ out.push({activity:s.activity,code:s.code,start:m2t(a),end:m2t(ns.start)}); }
+    if(b>ns.end){ out.push({activity:s.activity,code:s.code,start:m2t(ns.end),end:m2t(b)}); }
   }
-  out.push({activity:ns.activity,start:m2t(ns.start),end:m2t(ns.end)});
+  out.push({activity:ns.activity,code:ns.code,start:m2t(ns.start),end:m2t(ns.end)});
   return mergeAdjacent(out);
 }
 
@@ -491,10 +626,10 @@ function updateRangeLabel(){
   if(!ws){ $('#rangeLabel').textContent=''; return; }
   const s=new Date(ws+'T00:00:00'); const e=new Date(s); e.setDate(e.getDate()+6);
   const f=d=>d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
-  if(adv==='__TEAM__'){
+  if(adv==='__TEAM_SELECTED__' || adv==='__TEAM_ALL__'){
     const idx=DAYS.indexOf($('#teamDay').value||'Monday'); const d=new Date(s); d.setDate(d.getDate()+idx);
     $('#rangeLabel').textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
-    $('#calTitle').textContent='Team (All) – Single Day';
+    $('#calTitle').textContent=(adv==='__TEAM_ALL__'?'Team (All)':'Team (Selected)')+' – Single Day';
   } else {
     $('#rangeLabel').textContent=`${f(s)} – ${f(e)}`;
     $('#calTitle').textContent='Advisor Week (Calendar)';
@@ -503,11 +638,9 @@ function updateRangeLabel(){
 }
 
 function renderCalendar(){
-  resetGrid();
-  document.getElementById('hours').innerHTML=hoursHTML();
-
+  resetGrid(); $('#hours').innerHTML=hoursHTML();
   const advVal=$('#advisorSelect').value||ADVISORS[0];
-  if(advVal==='__TEAM__'){ renderTeamDayCalendar(); return; }
+  if(advVal==='__TEAM_SELECTED__' || advVal==='__TEAM_ALL__'){ renderTeamDayCalendar(advVal==='__TEAM_ALL__'); return; }
 
   const grid=$('#calGrid'); const ws=$('#weekStart').value; const s=ws?new Date(ws+'T00:00:00'):null; const adv=advVal;
 
@@ -535,12 +668,8 @@ function renderCalendar(){
       const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN;
       const el=document.createElement('div'); el.className=`block ${colorClass(b.name)}`;
       el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px';
-      el.innerHTML=`${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span>`;
-      el.dataset.day = day;
-      el.dataset.adv = adv;
-      el.dataset.start = m2t(b.start);
-      el.dataset.end = m2t(b.end);
-      el.dataset.activity = b.name;
+      el.innerHTML=`<div>${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span></div><span class="codepill">${b.code||''}</span>`;
+      el.dataset.day = day; el.dataset.adv = adv; el.dataset.start = m2t(b.start); el.dataset.end = m2t(b.end); el.dataset.activity = b.name; el.dataset.code=b.code||'';
       el.addEventListener('click', onBlockClick);
       cell.appendChild(el);
     });
@@ -550,21 +679,18 @@ function renderCalendar(){
   $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day));
 }
 
-function renderTeamDayCalendar(){
-  resetGrid();
-  document.getElementById('hours').innerHTML=hoursHTML();
-
+function renderTeamDayCalendar(showAll){
+  resetGrid(); $('#hours').innerHTML=hoursHTML();
   const grid=$('#calGrid'); const ws=$('#weekStart').value; const day=$('#teamDay').value||'Monday';
-  const cols=1+ADVISORS.length; const head=document.createElement('div'); head.className='day-head'; head.style.gridColumn=`1 / span ${cols}`; head.style.height='56px';
+  const list = showAll ? ADVISORS : (selectedAdvisors.size? [...selectedAdvisors] : ADVISORS);
+  const cols=1+list.length; const head=document.createElement('div'); head.className='day-head'; head.style.gridColumn=`1 / span ${cols}`; head.style.height='56px';
   if(ws){ const s=new Date(ws); const idx=DAYS.indexOf(day); s.setDate(s.getDate()+idx); head.innerHTML=`<small>${s.toLocaleDateString('en-GB',{month:'long'})}</small>${day}<span style="float:right">${s.getDate()}</span>`; }
   grid.appendChild(head);
-
   const hourCol=document.createElement('div'); hourCol.className='hour-col'; hourCol.innerHTML=hoursHTML(); grid.appendChild(hourCol);
 
-  ADVISORS.forEach(adv=>{
+  list.forEach(adv=>{
     const col=document.createElement('div'); col.className='day-col';
     col.insertAdjacentHTML('beforeend',`<div class="day-head" style="height:56px">${adv}</div>`);
-
     const dayVal = rotas[adv]?.[day];
     if(dayHasSegments(dayVal)){
       const totalMins = processDayValue(dayVal, templates).reduce((acc,b)=>acc+(b.end-b.start),0);
@@ -575,25 +701,18 @@ function renderTeamDayCalendar(){
       if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
       else { col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="badge">${tplName}</span> ${tpl.Start} – ${tpl.Finish}<span class="summary-right">${((toMin(tpl.Finish)-toMin(tpl.Start))/60)}h</span></div>`); }
     }
-
     col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}" data-adv="${adv}">＋</button><button class="iconbtn" data-day="${day}" data-adv="${adv}" data-edit>✎</button></div>`);
     const cell=document.createElement('div'); cell.className='timeline-cell';
-
     const blocks = processDayValue(dayVal, templates);
     blocks.forEach(b=>{
       const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN;
       const el=document.createElement('div'); el.className=`block ${colorClass(b.name)}`;
       el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px';
-      el.innerHTML=`${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span>`;
-      el.dataset.day = day;
-      el.dataset.adv = adv;
-      el.dataset.start = m2t(b.start);
-      el.dataset.end = m2t(b.end);
-      el.dataset.activity = b.name;
+      el.innerHTML=`<div>${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span></div><span class="codepill">${b.code||''}</span>`;
+      el.dataset.day = day; el.dataset.adv = adv; el.dataset.start = m2t(b.start); el.dataset.end = m2t(b.end); el.dataset.activity = b.name; el.dataset.code=b.code||'';
       el.addEventListener('click', onBlockClick);
       cell.appendChild(el);
     });
-
     col.appendChild(cell); grid.appendChild(col);
   });
   $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day, b.dataset.adv));
@@ -605,12 +724,18 @@ const modeTemplate=$('#modeTemplate'), modeSplit=$('#modeSplit'), modeHint=$('#m
 const templateMode=$('#templateMode'), splitMode=$('#splitMode');
 const segmentsWrap=$('#segmentsWrap');
 
-const ACTS=['Emails','Mirakl','Social','Meeting','Overtime','Break','Lunch'];
+function codeSelectHTML(val=''){
+  return `<select class="seg-code">${Object.entries(CODE_GROUPS).map(([grp,codes])=>
+    `<optgroup label="${grp}">${codes.map(c=>`<option ${val===c?'selected':''}>${c}</option>`).join('')}</optgroup>`).join('')}</select>`;
+}
+function actSelectHTML(val=''){
+  return `<select class="seg-act">${ACTS.map(a=>`<option ${val===a?'selected':''}>${a}</option>`).join('')}</select>`;
+}
 
 function segmentRowHTML(s, idx){
-  const opts = ACTS.map(a=>`<option ${s.activity===a?'selected':''}>${a}</option>`).join('');
   return `<div class="row" data-i="${idx}">
-    <select class="seg-act">${opts}</select>
+    ${actSelectHTML(s.activity)}
+    ${codeSelectHTML(s.code||'')}
     <input type="time" class="seg-start" value="${s.start||''}">
     <span>–</span>
     <input type="time" class="seg-end" value="${s.end||''}">
@@ -622,17 +747,13 @@ function loadSegmentsUI(arr){
   segmentsWrap.innerHTML = arr.length ? arr.map((s,i)=>segmentRowHTML(s,i)).join('') : '<div class="muted">No segments yet. Add one.</div>';
   $$('#segmentsWrap .row .del').forEach(btn=>{
     btn.onclick=()=>{
-      const i=+btn.parentElement.dataset.i;
-      const rows=$$('#segmentsWrap .row');
-      rows[i].remove();
-      $$('#segmentsWrap .row').forEach((r,ix)=>r.dataset.i=ix);
+      btn.parentElement.remove();
       if($$('#segmentsWrap .row').length===0) segmentsWrap.innerHTML='<div class="muted">No segments yet. Add one.</div>';
       refreshOverlayBlockOptions();
     };
   });
-  $$('#segmentsWrap .seg-start, #segmentsWrap .seg-end, #segmentsWrap .seg-act').forEach(inp=>{
-    inp.addEventListener('input',()=>refreshOverlayBlockOptions());
-    inp.addEventListener('change',()=>refreshOverlayBlockOptions());
+  $$('#segmentsWrap .seg-start, #segmentsWrap .seg-end, #segmentsWrap .seg-act, #segmentsWrap .seg-code').forEach(inp=>{
+    ['input','change'].forEach(ev=>inp.addEventListener(ev,refreshOverlayBlockOptions));
   });
   refreshOverlayBlockOptions();
 }
@@ -641,6 +762,7 @@ function readSegmentsUI(){
   const list=rows.map(r=>{
     return {
       activity:r.querySelector('.seg-act').value,
+      code:r.querySelector('.seg-code').value,
       start:r.querySelector('.seg-start').value,
       end:r.querySelector('.seg-end').value
     };
@@ -661,41 +783,47 @@ function refreshOverlayBlockOptions(){
   const rows=$$('#segmentsWrap .row');
   const blocks = rows.map(r=>{
     const act=r.querySelector('.seg-act').value;
+    const code=r.querySelector('.seg-code').value;
     const s=r.querySelector('.seg-start').value;
     const e=r.querySelector('.seg-end').value;
-    return (act && s && e && toMin(e)>toMin(s)) ? {act,s,e} : null;
+    return (act && s && e && toMin(e)>toMin(s)) ? {act,code,s,e} : null;
   }).filter(Boolean);
   if(blocks.length===0){
     sel.innerHTML = `<option value="">(no valid blocks yet)</option>`;
     return;
   }
-  sel.innerHTML = blocks.map((b,i)=>`<option value="${i}">${b.act} — ${b.s}–${b.e}</option>`).join('');
+  sel.innerHTML = blocks.map((b,i)=>`<option value="${i}">${b.act} — ${b.s}–${b.e} (${b.code})</option>`).join('');
   sel.onchange = ()=>{
     const i = +sel.value;
     if(Number.isInteger(i) && blocks[i]){
-      document.getElementById('ovStart').value = blocks[i].s;
-      document.getElementById('ovEnd').value   = blocks[i].e;
+      $('#ovStart').value = blocks[i].s;
+      $('#ovEnd').value   = blocks[i].e;
+      $('#ovActivity').value = blocks[i].act;
+      $('#ovCode').value = blocks[i].code;
     }
   };
 }
 
-/* Overlay helper */
+/* build selects in split overlay bar */
+function buildOverlaySelects(){
+  $('#ovActivity').innerHTML = ACTS.map(a=>`<option>${a}</option>`).join('');
+  $('#ovCode').innerHTML = Object.entries(CODE_GROUPS).map(([grp,codes])=>`<optgroup label="${grp}">${codes.map(c=>`<option>${c}</option>`).join('')}</optgroup>`).join('');
+}
 function wireOverlayButtons(){
-  document.getElementById('btnInsertOverlay').onclick=()=>{
-    const act=document.getElementById('ovActivity').value,
-          s=document.getElementById('ovStart').value,
-          e=document.getElementById('ovEnd').value;
+  $('#btnInsertOverlay').onclick=()=>{
+    const act=$('#ovActivity').value, code=$('#ovCode').value, s=$('#ovStart').value, e=$('#ovEnd').value;
     if(!s || !e || toMin(e)<=toMin(s)){ alert('Please enter a valid time range.'); return; }
     const cur=readSegmentsUI(); if(!cur) return;
-    const updated=insertOverlay(cur, {activity:act,start:s,end:e});
+    const updated=insertOverlay(cur, {activity:act,code,start:s,end:e});
     loadSegmentsUI(updated);
   };
 }
 
 function openAssign(day, advisor){
-  const adv = advisor || ($('#advisorSelect').value==='__TEAM__' ? ADVISORS[0] : $('#advisorSelect').value);
+  const adv = advisor || ($('#advisorSelect').value.startsWith('__TEAM_') ? (selectedAdvisors.values().next().value || ADVISORS[0]) : $('#advisorSelect').value);
   assignTitle.textContent=`${day} for ${adv}`;
   modeHint.textContent='';
+  buildOverlaySelects();
 
   assignSelect.innerHTML=`<option value="">— Day Off —</option>`+Object.keys(templates).map(n=>`<option>${n}</option>`).join('');
   const current = rotas[adv]?.[day];
@@ -713,7 +841,7 @@ function openAssign(day, advisor){
     if(tplName) modeHint.textContent=`Current: ${tplName}. Use “Convert to editable segments” to tweak a small part.`;
   }
 
-  document.getElementById('btnConvertToSplit').onclick=()=>{
+  $('#btnConvertToSplit').onclick=()=>{
     const tplName = assignSelect.value;
     if(!tplName){ alert('Choose a template first.'); return; }
     const segs = toEditableSegments(tplName);
@@ -723,23 +851,19 @@ function openAssign(day, advisor){
     wireOverlayButtons();
   };
 
-  document.getElementById('addSegment').onclick=()=>{
-    const wrap=document.getElementById('segmentsWrap');
-    const mut=wrap.querySelector('.muted'); if(mut) mut.remove();
-    const idx=$$('#segmentsWrap .row').length;
-    const div=document.createElement('div'); div.className='row'; div.dataset.i=idx;
-    div.innerHTML=`
-      <select class="seg-act">${ACTS.map(a=>`<option>${a}</option>`).join('')}</select>
-      <input type="time" class="seg-start" value="08:00">
-      <span>–</span>
-      <input type="time" class="seg-end" value="12:00">
+  $('#addSegment').onclick=()=>{
+    const wrap=$('#segmentsWrap'); const mut=wrap.querySelector('.muted'); if(mut) mut.remove();
+    const div=document.createElement('div'); div.className='row';
+    div.innerHTML= `${actSelectHTML('Emails')} ${codeSelectHTML('Admin')}
+      <input type="time" class="seg-start" value="08:00"> <span>–</span> <input type="time" class="seg-end" value="12:00">
       <button class="del">Delete</button>`;
     wrap.appendChild(div);
-    div.querySelector('.del').onclick=()=>{ div.remove(); if($$('#segmentsWrap .row').length===0) segmentsWrap.innerHTML='<div class="muted">No segments yet. Add one.</div>'; refreshOverlayBlockOptions(); };
+    div.querySelector('.del').onclick=()=>{ div.remove(); if($$('#segmentsWrap .row').length===0) $('#segmentsWrap').innerHTML='<div class="muted">No segments yet. Add one.</div>'; refreshOverlayBlockOptions(); };
     ['input','change'].forEach(evt=>{
       div.querySelector('.seg-start').addEventListener(evt,refreshOverlayBlockOptions);
       div.querySelector('.seg-end').addEventListener(evt,refreshOverlayBlockOptions);
       div.querySelector('.seg-act').addEventListener(evt,refreshOverlayBlockOptions);
+      div.querySelector('.seg-code').addEventListener(evt,refreshOverlayBlockOptions);
     });
     refreshOverlayBlockOptions();
   };
@@ -757,7 +881,7 @@ function openAssign(day, advisor){
     }
   };
 
-  document.getElementById('assignOK').onclick=()=>{
+  $('#assignOK').onclick=()=>{
     if(!rotas[adv]) rotas[adv]={};
     if(modeTemplate.checked){
       rotas[adv][day] = assignSelect.value;
@@ -775,93 +899,81 @@ function openAssign(day, advisor){
 const blockDlg = $('#blockDlg');
 const bmWhole = $('#bmWhole'), bmSub = $('#bmSub');
 const blockWhole = $('#blockWhole'), blockSub = $('#blockSub');
-const bwActivity=$('#bwActivity'), bwStart=$('#bwStart'), bwEnd=$('#bwEnd');
-const bsActivity=$('#bsActivity'), bsStart=$('#bsStart'), bsEnd=$('#bsEnd');
-let currentBlockCtx = null; // {adv, day, origActivity, origStart, origEnd}
+const bwActivity=$('#bwActivity'), bwStart=$('#bwStart'), bwEnd=$('#bwEnd'), bwCode=$('#bwCode');
+const bsActivity=$('#bsActivity'), bsStart=$('#bsStart'), bsEnd=$('#bsEnd'), bsCode=$('#bsCode');
+let currentBlockCtx = null;
+
+function buildBlockSelects(){
+  const acts = ACTS.map(a=>`<option>${a}</option>`).join('');
+  const codes = Object.entries(CODE_GROUPS).map(([grp,codes])=>`<optgroup label="${grp}">${codes.map(c=>`<option>${c}</option>`).join('')}</optgroup>`).join('');
+  [bwActivity, bsActivity].forEach(sel=> sel.innerHTML=acts);
+  [bwCode, bsCode].forEach(sel=> sel.innerHTML=codes);
+}
 
 function onBlockClick(e){
   const el = e.currentTarget;
-  const adv = el.dataset.adv;
-  const day = el.dataset.day;
-  const origActivity = el.dataset.activity;
-  const origStart = el.dataset.start; // "HH:MM"
-  const origEnd   = el.dataset.end;
+  const adv = el.dataset.adv, day = el.dataset.day;
+  const origActivity = el.dataset.activity, origStart = el.dataset.start, origEnd   = el.dataset.end, origCode=el.dataset.code||'';
 
-  // Ensure the day is in editable segments (auto-convert from template if needed)
   const dayVal = rotas[adv]?.[day];
   if(!dayHasSegments(dayVal)){
-    // convert current display (template expansion) into segments
     const segs = toEditableSegments(dayVal || '');
     if(!rotas[adv]) rotas[adv] = {};
     rotas[adv][day] = { segments: segs };
     save();
   }
 
-  currentBlockCtx = {adv, day, origActivity, origStart, origEnd};
+  currentBlockCtx = {adv, day, origActivity, origStart, origEnd, origCode};
   $('#blockTitle').textContent = `Edit ${day} for ${adv}`;
-  $('#blockHint').textContent = `Block: ${origActivity} ${origStart}–${origEnd}`;
+  $('#blockHint').textContent = `Block: ${origActivity} ${origStart}–${origEnd} (${origCode||'no code'})`;
 
-  // Default mode: Change part of block (most common)
+  buildBlockSelects();
+
   bmSub.checked = true; bmWhole.checked = false;
   blockSub.style.display='block'; blockWhole.style.display='none';
 
-  // Prefill both UIs with original values
-  ;[bwActivity,bwStart,bwEnd].forEach(()=>{});
-  bwActivity.value = ACTS.includes(origActivity)? origActivity : 'Emails';
+  bwActivity.value = ACTS.includes(origActivity)? origActivity : ACTS[0];
+  bwCode.value = origCode || 'Admin';
   bwStart.value = origStart; bwEnd.value = origEnd;
 
-  bsActivity.value = ACTS.includes(origActivity)? origActivity : 'Emails';
+  bsActivity.value = ACTS.includes(origActivity)? origActivity : ACTS[0];
+  bsCode.value = origCode || 'Admin';
   bsStart.value = origStart; bsEnd.value = origEnd;
 
-  // Toggle handlers
   bmWhole.onchange = bmSub.onchange = ()=>{
     const whole = bmWhole.checked;
     blockWhole.style.display = whole ? 'block' : 'none';
     blockSub.style.display   = whole ? 'none'  : 'block';
   };
 
-  // Save action
   $('#blockOK').onclick = ()=>{
-    const {adv, day, origActivity, origStart, origEnd} = currentBlockCtx;
+    const {adv, day, origActivity, origStart, origEnd, origCode} = currentBlockCtx;
     const segs = (rotas[adv][day] && rotas[adv][day].segments) ? JSON.parse(JSON.stringify(rotas[adv][day].segments)) : [];
     const oS = toMin(origStart), oE = toMin(origEnd);
+    const idx = segs.findIndex(s=>s.activity===origActivity && s.start===origStart && s.end===origEnd && (s.code||'')===origCode);
 
-    // find the segment that exactly matches the clicked block
-    const idx = segs.findIndex(s=>s.activity===origActivity && s.start===origStart && s.end===origEnd);
     if(idx===-1){ alert('Could not find block to edit.'); return; }
 
     if(bmWhole.checked){
-      // Edit whole block inside original boundaries
-      const a = bwActivity.value, s = bwStart.value, e = bwEnd.value;
+      const a = bwActivity.value, c=bwCode.value, s = bwStart.value, e = bwEnd.value;
       if(!s || !e || toMin(e)<=toMin(s)){ alert('Enter a valid time range.'); return; }
       if(toMin(s)<oS || toMin(e)>oE){ alert('You cannot extend beyond the original block.'); return; }
-
-      const leftNeeded  = toMin(s)>oS;
-      const rightNeeded = toMin(e)<oE;
-      const originals = [...segs];
-      originals.splice(idx,1); // remove original
-
-      if(leftNeeded) originals.splice(idx,0,{activity:origActivity,start:m2t(oS),end:s});
-      originals.splice(idx+(leftNeeded?1:0),0,{activity:a,start:s,end:e}); // insert edited
-      if(rightNeeded) originals.splice(idx+(leftNeeded?1:0)+1,0,{activity:origActivity,start:e,end:m2t(oE)});
-
+      const leftNeeded  = toMin(s)>oS, rightNeeded = toMin(e)<oE;
+      const originals = [...segs]; originals.splice(idx,1);
+      if(leftNeeded) originals.splice(idx,0,{activity:origActivity,code:origCode,start:m2t(oS),end:s});
+      originals.splice(idx+(leftNeeded?1:0),0,{activity:a,code:c,start:s,end:e});
+      if(rightNeeded) originals.splice(idx+(leftNeeded?1:0)+1,0,{activity:origActivity,code:origCode,start:e,end:m2t(oE)});
       rotas[adv][day] = { segments: mergeAdjacent(originals) };
       save(); blockDlg.close(); renderCalendar(); populateAssignTable();
       return;
     } else {
-      // Change part of block: overlay a subrange (must be within original)
-      const a = bsActivity.value, s = bsStart.value, e = bsEnd.value;
+      const a = bsActivity.value, c=bsCode.value, s = bsStart.value, e = bsEnd.value;
       if(!s || !e || toMin(e)<=toMin(s)){ alert('Enter a valid sub-range.'); return; }
       if(toMin(s)<oS || toMin(e)>oE){ alert('Sub-range must be inside the original block.'); return; }
-
-      // perform a targeted split on that original block:
-      // replace the original segment at idx by left remainder + new + right remainder
-      const originals = [...segs];
-      originals.splice(idx,1); // remove original
-      if(toMin(s)>oS) originals.splice(idx,0,{activity:origActivity,start:m2t(oS),end:s});
-      originals.splice(idx+(toMin(s)>oS?1:0),0,{activity:a,start:s,end:e});
-      if(toMin(e)<oE) originals.splice(idx+(toMin(s)>oS?1:0)+1,0,{activity:origActivity,start:e,end:m2t(oE)});
-
+      const originals = [...segs]; originals.splice(idx,1);
+      if(toMin(s)>oS) originals.splice(idx,0,{activity:origActivity,code:origCode,start:m2t(oS),end:s});
+      originals.splice(idx+(toMin(s)>oS?1:0),0,{activity:a,code:c,start:s,end:e});
+      if(toMin(e)<oE) originals.splice(idx+(toMin(s)>oS?1:0)+1,0,{activity:origActivity,code:origCode,start:e,end:m2t(oE)});
       rotas[adv][day] = { segments: mergeAdjacent(originals) };
       save(); blockDlg.close(); renderCalendar(); populateAssignTable();
       return;
@@ -874,6 +986,14 @@ function onBlockClick(e){
 /* ========= DATE HELPERS ========= */
 function setToMonday(d){ const day=d.getDay(); const diff=(day===0?-6:1)-day; d.setDate(d.getDate()+diff); return d; }
 
+/* ========= VIEW SELECTOR ========= */
+function updateViewSelector(){
+  const team = $('#advisorSelect').value;
+  const showTeam = team==='__TEAM_SELECTED__' || team==='__TEAM_ALL__';
+  $('#lblTeamDay').style.display = showTeam ? 'inline' : 'none';
+  $('#teamDay').style.display     = showTeam ? 'inline' : 'none';
+}
+
 /* ========= WIRE ========= */
 function wire(){
   $('#btnPrint').onclick=()=>window.print();
@@ -882,35 +1002,33 @@ function wire(){
   $('#prevWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()-7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); renderCalendar(); };
   $('#nextWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()+7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); renderCalendar(); };
 
-  $('#btnSave').onclick=()=>{ const blob=new Blob([JSON.stringify({advisors:ADVISORS,templates,rotas,weekStart:$('#weekStart').value},null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota.json'; a.click(); };
+  $('#btnSave').onclick=()=>{ const blob=new Blob([JSON.stringify({advisors:ADVISORS,templates,rotas,weekStart:$('#weekStart').value, org},null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota.json'; a.click(); };
   $('#btnLoad').onclick=()=>$('#file').click();
-  $('#file').addEventListener('change',e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>{ try{ const d=JSON.parse(ev.target.result); ADVISORS=d.advisors||ADVISORS; templates=d.templates||templates; rotas=d.rotas||rotas; if(d.weekStart) $('#weekStart').value=d.weekStart; rebuildAdvisorUI(); populateTemplateEditor(); populateAssignTable(); save(); updateRangeLabel(); renderCalendar(); }catch{ alert('Invalid JSON'); } }; r.readAsText(f); });
+  $('#file').addEventListener('change',e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>{ try{ const d=JSON.parse(ev.target.result); ADVISORS=d.advisors||ADVISORS; templates=d.templates||templates; rotas=d.rotas||rotas; if(d.weekStart) $('#weekStart').value=d.weekStart; if(d.org) org=d.org; rebuildTree(); rebuildAdvisorDropdown(); populateTemplateEditor(); populateAssignTable(); save(); updateRangeLabel(); renderCalendar(); }catch{ alert('Invalid JSON'); } }; r.readAsText(f); });
 
   $('#btnReset').onclick=()=>{ if(!confirm('Clear all local data?')) return; localStorage.removeItem(STORAGE); location.reload(); };
 
   $('#btnAddTemplate').onclick=()=>{ const name='Shift'+(Object.keys(templates).length+1); templates[name]={name,Start:'',Finish:'',Break1:'',Lunch:'',Break2:'',Platform:'Emails'}; populateTemplateEditor(); save(); };
   $('#btnLoadDefaults').onclick=()=>{ seedDefaults(); populateTemplateEditor(); populateAssignTable(); save(); renderCalendar(); };
 
-  $('#addAdvisor').onclick=()=>{ const n=$('#newAdvisor').value.trim(); if(!n) return; if(ADVISORS.includes(n)) return alert('Advisor exists'); ADVISORS.push(n); rotas[n]={}; DAYS.forEach(d=>rotas[n][d]=''); $('#newAdvisor').value=''; rebuildAdvisorUI(); populateAssignTable(); save(); renderCalendar(); };
+  $('#advisorSelect').addEventListener('change',()=>{ updateViewSelector(); updateRangeLabel(); renderCalendar(); });
 
-  $('#advisorSelect').addEventListener('change',()=>{
-    const team=$('#advisorSelect').value==='__TEAM__';
-    $('#lblTeamDay').style.display= team ? 'inline' : 'none';
-    $('#teamDay').style.display= team ? 'inline' : 'none';
-    updateRangeLabel(); renderCalendar();
-  });
   $('#teamDay').addEventListener('change',()=>{ updateRangeLabel(); renderCalendar(); });
 
   $('#weekStart').onchange=()=>{ updateRangeLabel(); renderCalendar(); };
+
+  $('#treeSearch').addEventListener('input',rebuildTree);
+  $('#btnClearSel').onclick=()=>{ selectedAdvisors.clear(); rebuildTree(); refreshChips(); populateAssignTable(); renderCalendar(); };
 }
 
 /* ========= INIT ========= */
 (function init(){
   buildColorKey(); load(); if(Object.keys(templates).length===0) seedDefaults();
-  rebuildAdvisorUI(); populateTemplateEditor(); populateAssignTable();
+  rebuildAdvisorDropdown(); populateTemplateEditor(); populateAssignTable();
   if(!$('#weekStart').value){ const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10); }
-  updateRangeLabel();
+  updateViewSelector(); updateRangeLabel();
   document.getElementById('hours').innerHTML=hoursHTML();
+  rebuildTree(); refreshChips();
   wire(); renderCalendar();
 })();
 </script>
