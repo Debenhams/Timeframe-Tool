@@ -65,19 +65,21 @@
   .timeline-cell{position:relative;height:var(--timeline-height);background:
     linear-gradient(#0000,#0000),
     repeating-linear-gradient(180deg,#0000,#0000 calc(100%/(var(--timeline-end) - var(--timeline-start))), var(--line) 0, var(--line) calc(100%/(var(--timeline-end) - var(--timeline-start)) + 1px));}
-  .block{position:absolute;left:10px;right:10px;border-radius:6px;padding:3px 6px;font-size:11px;font-weight:800;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12);line-height:1.1}
+  .block{position:absolute;left:10px;right:10px;border-radius:6px;padding:3px 6px;font-size:11px;font-weight:800;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12);line-height:1.1;cursor:pointer}
   .block .time{display:block;font-weight:700;font-size:10px;opacity:.95}
   .c-emails{background:var(--color-emails)} .c-mirakl{background:var(--color-mirakl)} .c-social{background:var(--color-social)}
   .c-meeting{background:var(--color-meeting);color:#213} .c-break{background:var(--color-break);color:#213} .c-lunch{background:var(--color-lunch);color:#213}
   .c-overtime{background:var(--color-overtime)}
   @media print{.no-print{display:none} .panel{box-shadow:none}}
 
-  /* Split editor */
+  /* Split editor / Block editor */
   .row{display:flex;gap:8px;align-items:center;margin:6px 0}
   .row .del{background:#ffe2e2;color:#b42318;border:1px solid #f2b8b5;border-radius:6px;padding:4px 8px;cursor:pointer}
   .modebar{display:flex;gap:8px;align-items:center;margin-bottom:8px}
   .tag{display:inline-block;background:#eef2ff;border:1px solid #d6dcff;border-radius:6px;padding:3px 6px;font-size:12px;color:#334155}
   .overlaybar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;padding:8px;border:1px dashed var(--line);border-radius:8px;background:#f9fbff}
+
+  dialog{max-width:740px;width:95%}
 </style>
 </head>
 <body>
@@ -187,19 +189,17 @@
   </div>
 
   <!-- Assign / Split dialog -->
-  <dialog id="assignDlg" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;max-width:720px;width:95%">
+  <dialog id="assignDlg" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;">
     <div style="font-weight:800;margin-bottom:6px">
       <span id="assignTitle">Assign</span>
     </div>
 
-    <!-- mode bar -->
     <div class="modebar">
       <label><input type="radio" name="mode" value="template" id="modeTemplate"> Use template</label>
       <label><input type="radio" name="mode" value="split" id="modeSplit"> Use split segments</label>
       <span class="muted" id="modeHint" style="margin-left:6px"></span>
     </div>
 
-    <!-- template select -->
     <div id="templateMode">
       <select id="assignSelect" style="width:100%"></select>
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
@@ -208,9 +208,7 @@
       </div>
     </div>
 
-    <!-- split segments editor -->
     <div id="splitMode" style="display:none">
-      <!-- NEW: quick pick of an existing block to prefill override -->
       <div class="overlaybar">
         <strong>Pick block to split:</strong>
         <select id="ovBlock" style="min-width:220px"></select>
@@ -239,13 +237,61 @@
     </div>
   </dialog>
 
+  <!-- NEW: Click-a-block Editor -->
+  <dialog id="blockDlg" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;">
+    <div style="font-weight:800;margin-bottom:6px">
+      <span id="blockTitle">Edit block</span>
+    </div>
+
+    <div class="modebar">
+      <label><input type="radio" name="blockmode" value="whole" id="bmWhole"> Edit block</label>
+      <label><input type="radio" name="blockmode" value="sub" id="bmSub"> Change part of block</label>
+      <span class="muted" id="blockHint" style="margin-left:6px"></span>
+    </div>
+
+    <div id="blockWhole">
+      <div class="row">
+        <label style="min-width:90px">Activity</label>
+        <select id="bwActivity">
+          <option>Emails</option><option>Mirakl</option><option>Social</option>
+          <option>Meeting</option><option>Overtime</option><option>Break</option><option>Lunch</option>
+        </select>
+      </div>
+      <div class="row">
+        <label style="min-width:90px">Start–End</label>
+        <input type="time" id="bwStart"> <span>–</span> <input type="time" id="bwEnd">
+      </div>
+      <div class="muted">You can’t extend beyond the original block. If you shrink it, we’ll keep the before/after time with the original activity so no gaps appear.</div>
+    </div>
+
+    <div id="blockSub" style="display:none">
+      <div class="row">
+        <label style="min-width:90px">New activity</label>
+        <select id="bsActivity">
+          <option>Emails</option><option>Mirakl</option><option>Social</option>
+          <option>Meeting</option><option>Overtime</option><option>Break</option><option>Lunch</option>
+        </select>
+      </div>
+      <div class="row">
+        <label style="min-width:90px">Sub-range</label>
+        <input type="time" id="bsStart"> <span>–</span> <input type="time" id="bsEnd">
+      </div>
+      <div class="muted">We’ll split the original block into left remainder + your new activity + right remainder. Neighbours stay the same.</div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button id="blockOK" class="btn">Save</button>
+      <button onclick="blockDlg.close()" class="btn subtle">Cancel</button>
+    </div>
+  </dialog>
+
 <script>
 /* ========= DATA & CONSTANTS ========= */
 const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 let ADVISORS=['Luke Pashley','Ameena Malik','Carrie-Ann Raw','Danielle Smith','Farwa Shaheen','Gemma Emmett','Laura Stockburn','Millie Walsh','Tunis Foley'];
 let templates={};
 let rotas={};
-const STORAGE='rota_single_v9_split_overlay_pick';
+const STORAGE='rota_single_v10_block_click_edit';
 
 const css=getComputedStyle(document.documentElement);
 const START=+css.getPropertyValue('--timeline-start')||7;
@@ -400,7 +446,7 @@ function processDayValue(dayValue, templateMap){
   return [];
 }
 
-/* Convert a template or current value to editable segments */
+/* Convert to editable segments */
 function toEditableSegments(dayValue){
   if(dayHasSegments(dayValue)) return JSON.parse(JSON.stringify(dayValue.segments));
   if(typeof dayValue==='string' && templates[dayValue]){
@@ -410,7 +456,20 @@ function toEditableSegments(dayValue){
   return [];
 }
 
-/* Overlay insertion: split existing segments to insert new one without overlaps */
+/* Merge adjacent same-activity segments */
+function mergeAdjacent(segs){
+  const s=[...segs].sort((a,b)=>toMin(a.start)-toMin(b.start));
+  const out=[];
+  for(const x of s){
+    if(!out.length){ out.push({...x}); continue; }
+    const p=out[out.length-1];
+    if(p.activity===x.activity && toMin(p.end)===toMin(x.start)){ p.end=x.end; }
+    else out.push({...x});
+  }
+  return out;
+}
+
+/* Insert an overlay sub-range */
 function insertOverlay(segments, newSeg){
   const ns = { activity:newSeg.activity, start:toMin(newSeg.start), end:toMin(newSeg.end) };
   if(!(ns.activity && ns.start!=null && ns.end!=null && ns.end>ns.start)) return segments;
@@ -418,23 +477,12 @@ function insertOverlay(segments, newSeg){
   const out=[];
   for(const s of segments){
     const a=toMin(s.start), b=toMin(s.end);
-    if(b<=ns.start || a>=ns.end){ out.push(s); continue; }
+    if(b<=ns.start || a>=ns.end){ out.push({...s}); continue; }
     if(a<ns.start){ out.push({activity:s.activity,start:m2t(a),end:m2t(ns.start)}); }
     if(b>ns.end){ out.push({activity:s.activity,start:m2t(ns.end),end:m2t(b)}); }
   }
   out.push({activity:ns.activity,start:m2t(ns.start),end:m2t(ns.end)});
-  out.sort((x,y)=>toMin(x.start)-toMin(y.start));
-  const merged=[];
-  for(const s of out){
-    if(!merged.length){ merged.push(s); continue; }
-    const prev=merged[merged.length-1];
-    if(prev.activity===s.activity && toMin(prev.end)===toMin(s.start)){
-      prev.end=s.end;
-    } else {
-      merged.push(s);
-    }
-  }
-  return merged;
+  return mergeAdjacent(out);
 }
 
 /* ========= RENDERERS ========= */
@@ -488,6 +536,12 @@ function renderCalendar(){
       const el=document.createElement('div'); el.className=`block ${colorClass(b.name)}`;
       el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px';
       el.innerHTML=`${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span>`;
+      el.dataset.day = day;
+      el.dataset.adv = adv;
+      el.dataset.start = m2t(b.start);
+      el.dataset.end = m2t(b.end);
+      el.dataset.activity = b.name;
+      el.addEventListener('click', onBlockClick);
       cell.appendChild(el);
     });
 
@@ -531,6 +585,12 @@ function renderTeamDayCalendar(){
       const el=document.createElement('div'); el.className=`block ${colorClass(b.name)}`;
       el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px';
       el.innerHTML=`${b.name}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span>`;
+      el.dataset.day = day;
+      el.dataset.adv = adv;
+      el.dataset.start = m2t(b.start);
+      el.dataset.end = m2t(b.end);
+      el.dataset.activity = b.name;
+      el.addEventListener('click', onBlockClick);
       cell.appendChild(el);
     });
 
@@ -567,13 +627,12 @@ function loadSegmentsUI(arr){
       rows[i].remove();
       $$('#segmentsWrap .row').forEach((r,ix)=>r.dataset.i=ix);
       if($$('#segmentsWrap .row').length===0) segmentsWrap.innerHTML='<div class="muted">No segments yet. Add one.</div>';
-      refreshOverlayBlockOptions(); // keep the pick-list in sync
+      refreshOverlayBlockOptions();
     };
   });
-  // Keep the pick-list in sync when editing times/activities
   $$('#segmentsWrap .seg-start, #segmentsWrap .seg-end, #segmentsWrap .seg-act').forEach(inp=>{
-    inp.addEventListener('input', ()=>refreshOverlayBlockOptions());
-    inp.addEventListener('change', ()=>refreshOverlayBlockOptions());
+    inp.addEventListener('input',()=>refreshOverlayBlockOptions());
+    inp.addEventListener('change',()=>refreshOverlayBlockOptions());
   });
   refreshOverlayBlockOptions();
 }
@@ -595,7 +654,7 @@ function readSegmentsUI(){
   return list;
 }
 
-/* NEW: populate the "Pick block to split" dropdown from current rows */
+/* Pick-block list for overlay */
 function refreshOverlayBlockOptions(){
   const sel = document.getElementById('ovBlock');
   if(!sel) return;
@@ -611,18 +670,16 @@ function refreshOverlayBlockOptions(){
     return;
   }
   sel.innerHTML = blocks.map((b,i)=>`<option value="${i}">${b.act} — ${b.s}–${b.e}</option>`).join('');
-  // when a block is picked, prefill override start/end to that block range
   sel.onchange = ()=>{
     const i = +sel.value;
     if(Number.isInteger(i) && blocks[i]){
       document.getElementById('ovStart').value = blocks[i].s;
       document.getElementById('ovEnd').value   = blocks[i].e;
-      // don’t force activity; user chooses what to overlay
     }
   };
 }
 
-/* Overlay helper UI */
+/* Overlay helper */
 function wireOverlayButtons(){
   document.getElementById('btnInsertOverlay').onclick=()=>{
     const act=document.getElementById('ovActivity').value,
@@ -714,44 +771,144 @@ function openAssign(day, advisor){
   assignDlg.showModal();
 }
 
+/* ========= CLICK-A-BLOCK EDITOR ========= */
+const blockDlg = $('#blockDlg');
+const bmWhole = $('#bmWhole'), bmSub = $('#bmSub');
+const blockWhole = $('#blockWhole'), blockSub = $('#blockSub');
+const bwActivity=$('#bwActivity'), bwStart=$('#bwStart'), bwEnd=$('#bwEnd');
+const bsActivity=$('#bsActivity'), bsStart=$('#bsStart'), bsEnd=$('#bsEnd');
+let currentBlockCtx = null; // {adv, day, origActivity, origStart, origEnd}
+
+function onBlockClick(e){
+  const el = e.currentTarget;
+  const adv = el.dataset.adv;
+  const day = el.dataset.day;
+  const origActivity = el.dataset.activity;
+  const origStart = el.dataset.start; // "HH:MM"
+  const origEnd   = el.dataset.end;
+
+  // Ensure the day is in editable segments (auto-convert from template if needed)
+  const dayVal = rotas[adv]?.[day];
+  if(!dayHasSegments(dayVal)){
+    // convert current display (template expansion) into segments
+    const segs = toEditableSegments(dayVal || '');
+    if(!rotas[adv]) rotas[adv] = {};
+    rotas[adv][day] = { segments: segs };
+    save();
+  }
+
+  currentBlockCtx = {adv, day, origActivity, origStart, origEnd};
+  $('#blockTitle').textContent = `Edit ${day} for ${adv}`;
+  $('#blockHint').textContent = `Block: ${origActivity} ${origStart}–${origEnd}`;
+
+  // Default mode: Change part of block (most common)
+  bmSub.checked = true; bmWhole.checked = false;
+  blockSub.style.display='block'; blockWhole.style.display='none';
+
+  // Prefill both UIs with original values
+  ;[bwActivity,bwStart,bwEnd].forEach(()=>{});
+  bwActivity.value = ACTS.includes(origActivity)? origActivity : 'Emails';
+  bwStart.value = origStart; bwEnd.value = origEnd;
+
+  bsActivity.value = ACTS.includes(origActivity)? origActivity : 'Emails';
+  bsStart.value = origStart; bsEnd.value = origEnd;
+
+  // Toggle handlers
+  bmWhole.onchange = bmSub.onchange = ()=>{
+    const whole = bmWhole.checked;
+    blockWhole.style.display = whole ? 'block' : 'none';
+    blockSub.style.display   = whole ? 'none'  : 'block';
+  };
+
+  // Save action
+  $('#blockOK').onclick = ()=>{
+    const {adv, day, origActivity, origStart, origEnd} = currentBlockCtx;
+    const segs = (rotas[adv][day] && rotas[adv][day].segments) ? JSON.parse(JSON.stringify(rotas[adv][day].segments)) : [];
+    const oS = toMin(origStart), oE = toMin(origEnd);
+
+    // find the segment that exactly matches the clicked block
+    const idx = segs.findIndex(s=>s.activity===origActivity && s.start===origStart && s.end===origEnd);
+    if(idx===-1){ alert('Could not find block to edit.'); return; }
+
+    if(bmWhole.checked){
+      // Edit whole block inside original boundaries
+      const a = bwActivity.value, s = bwStart.value, e = bwEnd.value;
+      if(!s || !e || toMin(e)<=toMin(s)){ alert('Enter a valid time range.'); return; }
+      if(toMin(s)<oS || toMin(e)>oE){ alert('You cannot extend beyond the original block.'); return; }
+
+      const leftNeeded  = toMin(s)>oS;
+      const rightNeeded = toMin(e)<oE;
+      const originals = [...segs];
+      originals.splice(idx,1); // remove original
+
+      if(leftNeeded) originals.splice(idx,0,{activity:origActivity,start:m2t(oS),end:s});
+      originals.splice(idx+(leftNeeded?1:0),0,{activity:a,start:s,end:e}); // insert edited
+      if(rightNeeded) originals.splice(idx+(leftNeeded?1:0)+1,0,{activity:origActivity,start:e,end:m2t(oE)});
+
+      rotas[adv][day] = { segments: mergeAdjacent(originals) };
+      save(); blockDlg.close(); renderCalendar(); populateAssignTable();
+      return;
+    } else {
+      // Change part of block: overlay a subrange (must be within original)
+      const a = bsActivity.value, s = bsStart.value, e = bsEnd.value;
+      if(!s || !e || toMin(e)<=toMin(s)){ alert('Enter a valid sub-range.'); return; }
+      if(toMin(s)<oS || toMin(e)>oE){ alert('Sub-range must be inside the original block.'); return; }
+
+      // perform a targeted split on that original block:
+      // replace the original segment at idx by left remainder + new + right remainder
+      const originals = [...segs];
+      originals.splice(idx,1); // remove original
+      if(toMin(s)>oS) originals.splice(idx,0,{activity:origActivity,start:m2t(oS),end:s});
+      originals.splice(idx+(toMin(s)>oS?1:0),0,{activity:a,start:s,end:e});
+      if(toMin(e)<oE) originals.splice(idx+(toMin(s)>oS?1:0)+1,0,{activity:origActivity,start:e,end:m2t(oE)});
+
+      rotas[adv][day] = { segments: mergeAdjacent(originals) };
+      save(); blockDlg.close(); renderCalendar(); populateAssignTable();
+      return;
+    }
+  };
+
+  blockDlg.showModal();
+}
+
 /* ========= DATE HELPERS ========= */
 function setToMonday(d){ const day=d.getDay(); const diff=(day===0?-6:1)-day; d.setDate(d.getDate()+diff); return d; }
 
 /* ========= WIRE ========= */
 function wire(){
-  document.getElementById('btnPrint').onclick=()=>window.print();
-  document.getElementById('btnGenerate').onclick=()=>{ updateRangeLabel(); renderCalendar(); };
-  document.getElementById('btnToday').onclick=()=>{ const t=setToMonday(new Date()); document.getElementById('weekStart').value=t.toISOString().slice(0,10); updateRangeLabel(); renderCalendar(); };
-  document.getElementById('prevWeek').onclick=()=>{ const d=new Date(document.getElementById('weekStart').value||new Date()); d.setDate(d.getDate()-7); document.getElementById('weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); renderCalendar(); };
-  document.getElementById('nextWeek').onclick=()=>{ const d=new Date(document.getElementById('weekStart').value||new Date()); d.setDate(d.getDate()+7); document.getElementById('weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); renderCalendar(); };
+  $('#btnPrint').onclick=()=>window.print();
+  $('#btnGenerate').onclick=()=>{ updateRangeLabel(); renderCalendar(); };
+  $('#btnToday').onclick=()=>{ const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10); updateRangeLabel(); renderCalendar(); };
+  $('#prevWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()-7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); renderCalendar(); };
+  $('#nextWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()+7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); renderCalendar(); };
 
-  document.getElementById('btnSave').onclick=()=>{ const blob=new Blob([JSON.stringify({advisors:ADVISORS,templates,rotas,weekStart:document.getElementById('weekStart').value},null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota.json'; a.click(); };
-  document.getElementById('btnLoad').onclick=()=>document.getElementById('file').click();
-  document.getElementById('file').addEventListener('change',e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>{ try{ const d=JSON.parse(ev.target.result); ADVISORS=d.advisors||ADVISORS; templates=d.templates||templates; rotas=d.rotas||rotas; if(d.weekStart) document.getElementById('weekStart').value=d.weekStart; rebuildAdvisorUI(); populateTemplateEditor(); populateAssignTable(); save(); updateRangeLabel(); renderCalendar(); }catch{ alert('Invalid JSON'); } }; r.readAsText(f); });
+  $('#btnSave').onclick=()=>{ const blob=new Blob([JSON.stringify({advisors:ADVISORS,templates,rotas,weekStart:$('#weekStart').value},null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota.json'; a.click(); };
+  $('#btnLoad').onclick=()=>$('#file').click();
+  $('#file').addEventListener('change',e=>{ const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=ev=>{ try{ const d=JSON.parse(ev.target.result); ADVISORS=d.advisors||ADVISORS; templates=d.templates||templates; rotas=d.rotas||rotas; if(d.weekStart) $('#weekStart').value=d.weekStart; rebuildAdvisorUI(); populateTemplateEditor(); populateAssignTable(); save(); updateRangeLabel(); renderCalendar(); }catch{ alert('Invalid JSON'); } }; r.readAsText(f); });
 
-  document.getElementById('btnReset').onclick=()=>{ if(!confirm('Clear all local data?')) return; localStorage.removeItem(STORAGE); location.reload(); };
+  $('#btnReset').onclick=()=>{ if(!confirm('Clear all local data?')) return; localStorage.removeItem(STORAGE); location.reload(); };
 
-  document.getElementById('btnAddTemplate').onclick=()=>{ const name='Shift'+(Object.keys(templates).length+1); templates[name]={name,Start:'',Finish:'',Break1:'',Lunch:'',Break2:'',Platform:'Emails'}; populateTemplateEditor(); save(); };
-  document.getElementById('btnLoadDefaults').onclick=()=>{ seedDefaults(); populateTemplateEditor(); populateAssignTable(); save(); renderCalendar(); };
+  $('#btnAddTemplate').onclick=()=>{ const name='Shift'+(Object.keys(templates).length+1); templates[name]={name,Start:'',Finish:'',Break1:'',Lunch:'',Break2:'',Platform:'Emails'}; populateTemplateEditor(); save(); };
+  $('#btnLoadDefaults').onclick=()=>{ seedDefaults(); populateTemplateEditor(); populateAssignTable(); save(); renderCalendar(); };
 
-  document.getElementById('addAdvisor').onclick=()=>{ const n=document.getElementById('newAdvisor').value.trim(); if(!n) return; if(ADVISORS.includes(n)) return alert('Advisor exists'); ADVISORS.push(n); rotas[n]={}; DAYS.forEach(d=>rotas[n][d]=''); document.getElementById('newAdvisor').value=''; rebuildAdvisorUI(); populateAssignTable(); save(); renderCalendar(); };
+  $('#addAdvisor').onclick=()=>{ const n=$('#newAdvisor').value.trim(); if(!n) return; if(ADVISORS.includes(n)) return alert('Advisor exists'); ADVISORS.push(n); rotas[n]={}; DAYS.forEach(d=>rotas[n][d]=''); $('#newAdvisor').value=''; rebuildAdvisorUI(); populateAssignTable(); save(); renderCalendar(); };
 
-  document.getElementById('advisorSelect').addEventListener('change',()=>{
-    const team=document.getElementById('advisorSelect').value==='__TEAM__';
-    document.getElementById('lblTeamDay').style.display= team ? 'inline' : 'none';
-    document.getElementById('teamDay').style.display= team ? 'inline' : 'none';
+  $('#advisorSelect').addEventListener('change',()=>{
+    const team=$('#advisorSelect').value==='__TEAM__';
+    $('#lblTeamDay').style.display= team ? 'inline' : 'none';
+    $('#teamDay').style.display= team ? 'inline' : 'none';
     updateRangeLabel(); renderCalendar();
   });
-  document.getElementById('teamDay').addEventListener('change',()=>{ updateRangeLabel(); renderCalendar(); });
+  $('#teamDay').addEventListener('change',()=>{ updateRangeLabel(); renderCalendar(); });
 
-  document.getElementById('weekStart').onchange=()=>{ updateRangeLabel(); renderCalendar(); };
+  $('#weekStart').onchange=()=>{ updateRangeLabel(); renderCalendar(); };
 }
 
 /* ========= INIT ========= */
 (function init(){
   buildColorKey(); load(); if(Object.keys(templates).length===0) seedDefaults();
   rebuildAdvisorUI(); populateTemplateEditor(); populateAssignTable();
-  if(!document.getElementById('weekStart').value){ const t=setToMonday(new Date()); document.getElementById('weekStart').value=t.toISOString().slice(0,10); }
+  if(!$('#weekStart').value){ const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10); }
   updateRangeLabel();
   document.getElementById('hours').innerHTML=hoursHTML();
   wire(); renderCalendar();
@@ -759,4 +916,3 @@ function wire(){
 </script>
 </body>
 </html>
-
