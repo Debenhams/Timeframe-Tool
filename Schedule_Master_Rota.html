@@ -262,24 +262,31 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ===== App State (in-memory) ===== */
+/* ===== App State ===== */
 const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-let ORG = { sites:{} };                // sites -> leaders -> advisors
-let TEMPLATES = {};                    // name -> object
-let ADVISORS_LIST = [];                // [{id,name,leader_id}]
-let ADVISOR_BY_NAME = new Map();       // name -> id
-let ADVISOR_BY_ID = new Map();         // id -> name
-let ROTAS = new Map();                 // key `${advisor_id}::${weekStartISO}` -> data json
-let selectedAdvisors = new Set();      // set of advisor names for “Team (Selected)”
+let ORG = { sites:{} };
+let TEMPLATES = {};
+let ADVISORS_LIST = [];
+let ADVISOR_BY_NAME = new Map();
+let ADVISOR_BY_ID = new Map();
+let ROTAS = new Map();
+let selectedAdvisors = new Set();
 
-/* ===== Utility ===== */
+/* ===== Helpers ===== */
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const pad=n=>String(n).padStart(2,'0');
+const fmt=(t)=>t?t.slice(0,5):''; // HH:MM from HH:MM:SS
 function setToMonday(d){ const day=d.getDay(); const diff=(day===0?-6:1)-day; d.setDate(d.getDate()+diff); return d; }
 function toMin(t){ if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
 function m2t(m){ return `${pad(Math.floor(m/60))}:${pad(m%60)}`; }
 
-/* ===== Colors UI ===== */
+const css=getComputedStyle(document.documentElement);
+const START=+css.getPropertyValue('--timeline-start')||7;
+const END=+css.getPropertyValue('--timeline-end')||20;
+const HEIGHT=+css.getPropertyValue('--timeline-height').replace('px','')||800;
+const PX_PER_MIN = HEIGHT/((END-START)*60);
+
+/* ===== Colours UI ===== */
 function buildColorKey(){
   const defs=[['email','Email','--color-email'],['mirakl','Mirakl','--color-mirakl'],['social','Social','--color-social'],['overtime','Overtime','--color-overtime'],['break','Break','--color-break'],['lunch','Lunch','--color-lunch'],['absence','Absence','--color-absence'],['shrink','Shrinkage','--color-shrink']];
   const el=$('#colorKey');
@@ -290,7 +297,7 @@ function buildColorKey(){
   $$('#colorKey input').forEach(inp=>inp.addEventListener('input',()=>{ document.documentElement.style.setProperty(inp.dataset.k, inp.value); }));
 }
 
-/* ===== Code groups (for segment editing) ===== */
+/* ===== Code groups for selectors ===== */
 const CODE_GROUPS = {
   "Activity":[
     "2nd Line","Admin","BH Email","BH Social","BH WhatsApp","DEB Email","DEB Social","DEB WhatsApp","Ebay",
@@ -318,13 +325,6 @@ function classForCode(code){
   return 'c-email';
 }
 
-/* ===== Timeline metrics ===== */
-const css=getComputedStyle(document.documentElement);
-const START=+css.getPropertyValue('--timeline-start')||7;
-const END=+css.getPropertyValue('--timeline-end')||20;
-const HEIGHT=+css.getPropertyValue('--timeline-height').replace('px','')||800;
-const PX_PER_MIN = HEIGHT/((END-START)*60);
-
 /* ===== Templates UI ===== */
 function templateRow(t){
   return `<div class="template-row" data-name="${t.name}">
@@ -335,14 +335,14 @@ function templateRow(t){
     <select data-f="work_code">${codeSelectGroupedHTML(t.work_code||'Admin')}</select>
 
     <label>Start / Finish</label>
-    <div class="inline"><input data-f="start_time" type="time" value="${t.start_time||''}">
-      <input data-f="finish_time" type="time" value="${t.finish_time||''}"></div>
+    <div class="inline"><input data-f="start_time" type="time" value="${fmt(t.start_time)||''}">
+      <input data-f="finish_time" type="time" value="${fmt(t.finish_time)||''}"></div>
 
     <label>Breaks</label>
     <div class="inline">
-      <input data-f="break1" type="time" value="${t.break1||''}"  title="Break 1 (15m)">
-      <input data-f="lunch"  type="time" value="${t.lunch||''}"   title="Lunch (30m)">
-      <input data-f="break2" type="time" value="${t.break2||''}"  title="Break 2 (15m)">
+      <input data-f="break1" type="time" value="${fmt(t.break1)||''}"  title="Break 1 (15m)">
+      <input data-f="lunch"  type="time" value="${fmt(t.lunch)||''}"   title="Lunch (30m)">
+      <input data-f="break2" type="time" value="${fmt(t.break2)||''}"  title="Break 2 (15m)">
     </div>
 
     <div class="full" style="display:flex;justify-content:flex-end">
@@ -358,27 +358,27 @@ function populateTemplateEditor(){
     $$('input,select',row).forEach(inp=>{
       const f=inp.dataset.f; if(!f) return;
       inp.addEventListener('input', async()=>{
-        const updated = Object.assign({}, TEMPLATES[origName], { [f]: inp.value });
+        const updated = Object.assign({}, TEMPLATES[origName], { [f]: inp.value || null });
         if(f==='name' && inp.value.trim()!==origName){
           await sb.from('templates').delete().eq('name', origName);
           const {error} = await sb.from('templates').insert([{
             name: (updated.name||'').trim(),
             work_code: updated.work_code || 'Admin',
-            start_time: updated.start_time || null,
-            finish_time: updated.finish_time || null,
-            break1: updated.break1 || null,
-            lunch: updated.lunch || null,
-            break2: updated.break2 || null
+            start_time: updated.start_time,
+            finish_time: updated.finish_time,
+            break1: updated.break1,
+            lunch: updated.lunch,
+            break2: updated.break2
           }]);
           if(error) alert('Template rename failed: '+error.message);
         } else {
           const {error} = await sb.from('templates').update({
             work_code: updated.work_code || 'Admin',
-            start_time: updated.start_time || null,
-            finish_time: updated.finish_time || null,
-            break1: updated.break1 || null,
-            lunch: updated.lunch || null,
-            break2: updated.break2 || null
+            start_time: updated.start_time,
+            finish_time: updated.finish_time,
+            break1: updated.break1,
+            lunch: updated.lunch,
+            break2: updated.break2
           }).eq('name', origName);
           if(error) alert('Template update failed: '+error.message);
         }
@@ -392,8 +392,9 @@ function populateTemplateEditor(){
   });
 }
 $('#btnAddTemplate').onclick = async()=>{
+  // Safe defaults to avoid NOT NULL issues
   const name='Shift '+(Object.keys(TEMPLATES).length+1);
-  const {error}=await sb.from('templates').insert([{name,work_code:'Admin',start_time:null,finish_time:null,break1:null,lunch:null,break2:null}]);
+  const {error}=await sb.from('templates').insert([{name,work_code:'Admin',start_time:'09:00',finish_time:'17:00',break1:null,lunch:'12:30',break2:null}]);
   if(error) alert('Add failed: '+error.message);
 };
 $('#btnLoadDefaults').onclick = async()=>{
@@ -428,7 +429,7 @@ async function loadOrg(){
   ADVISOR_BY_ID   = new Map(ADVISORS_LIST.map(a=>[a.id,a.name]));
 }
 
-/* ===== Schedules Tree (expand/collapse with + / −) ===== */
+/* ===== Schedules Tree ===== */
 function rebuildTree(){
   const t=$('#tree'); const q=$('#treeSearch').value.trim().toLowerCase();
 
@@ -489,20 +490,20 @@ function rebuildTree(){
 
   t.innerHTML = Object.entries(ORG.sites).sort((a,b)=>a[0].localeCompare(b[0])).map(([sn,so])=>siteBlock(sn,so)).join('') || '<div class="muted">No sites yet.</div>';
 
-  // Twisties: show + when closed, − when open
+  // Twisties update
   $$('#tree details').forEach(d=>{
     const twisty = d.querySelector('[data-twisty]');
-    const update = ()=>{ if(d.open) twisty.textContent='−'; else twisty.textContent='+'; };
+    const update = ()=>{ twisty.textContent = d.open ? '−' : '+'; };
     d.addEventListener('toggle', update); update();
   });
 
-  // Leader select-all
+  // Leader select-all (visibly ticks children)
   $$('#tree [data-leader]').forEach(cb=>{
     cb.onchange=()=>{
       const leaderId=cb.dataset.leader;
-      const leaderNode = Object.values(ORG.sites).flatMap(s=>Object.entries(s.leaders).map(([ln,l])=>l)).find(l=>l.id===leaderId);
+      const leaderNode = Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===leaderId);
       (leaderNode?.advisors||[]).forEach(a=> cb.checked ? selectedAdvisors.add(a.name) : selectedAdvisors.delete(a.name));
-      refreshChips(); populateAssignTable(); renderCalendar();
+      refreshChips(); populateAssignTable(); renderCalendar(); rebuildTree(); // re-render to show ticks
     };
   });
 
@@ -563,7 +564,7 @@ function rebuildAdvisorDropdown(){
   sel.innerHTML = `<option value="__TEAM_SELECTED__">Team (Selected)</option><option value="__TEAM_ALL__">Team (All)</option>` + names.map(n=>`<option>${n}</option>`).join('');
 }
 
-/* ===== Assignment table (blank until selection) ===== */
+/* ===== Assignment table ===== */
 function populateAssignTable(){
   const head=$('#dateHeaders'), body=$('#assignTable tbody');
   head.innerHTML=DAYS.map(d=>`<th>${d.slice(0,3)}<br><span class="muted" data-date></span></th>`).join('');
@@ -607,9 +608,9 @@ function resetGrid(){ $('#calGrid').innerHTML = '<div class="hour-col"><div id="
 /* ===== Templates → segments ===== */
 function processTemplateToSegments(t){
   if(!t||!t.start_time||!t.finish_time) return [];
-  const s=toMin(t.start_time), e=toMin(t.finish_time); if(e<=s) return [];
+  const s=toMin(fmt(t.start_time)), e=toMin(fmt(t.finish_time)); if(e<=s) return [];
   const ev=[{t:s,type:'start'},{t:e,type:'end'}];
-  [['break1',15,'Break'],['lunch',30,'Lunch'],['break2',15,'Break']].forEach(([k,d,label])=>{ if(t[k]) ev.push({t:toMin(t[k]),type:'pause',d,label}); });
+  [['break1',15,'Break'],['lunch',30,'Lunch'],['break2',15,'Break']].forEach(([k,d,label])=>{ if(t[k]) ev.push({t:toMin(fmt(t[k])),type:'pause',d,label}); });
   ev.sort((a,b)=>a.t-b.t||((a.type==='end')-(b.type==='end')));
   const out=[]; let cur=s;
   for(const evn of ev){
@@ -683,7 +684,7 @@ function renderCalendar(){
       const tplName = (typeof dayVal==='string') ? dayVal : '';
       const tpl=TEMPLATES[tplName];
       if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
-      else { col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">${tplName}</span> ${tpl.start_time} – ${tpl.finish_time}<span class="summary-right">${((toMin(tpl.finish_time)-toMin(tpl.start_time))/60)}h</span></div>`); }
+      else { col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">${tplName}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${((toMin(fmt(tpl.finish_time))-toMin(fmt(tpl.start_time)))/60)}h</span></div>`); }
     }
 
     col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}">＋</button><button class="iconbtn" data-day="${day}" data-edit>✎</button></div>`);
@@ -706,14 +707,17 @@ function renderCalendar(){
   $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day, advName));
 }
 function renderTeamDayCalendar(showAll){
-  resetGrid();
+  resetGrid(); // already adds a single hour column
   const grid=$('#calGrid'); const ws=$('#weekStart').value; const day=$('#teamDay').value||'Monday';
   const names = showAll ? ADVISORS_LIST.map(a=>a.name) : [...selectedAdvisors];
   const s=new Date(ws+'T00:00:00'); const idx=DAYS.indexOf(day); s.setDate(s.getDate()+idx);
+
+  // Header row spanning all advisor columns + hour column
   const head=document.createElement('div'); head.className='day-head'; head.style.gridColumn=`1 / span ${1+names.length}`; head.style.height='56px';
   head.innerHTML=`<small>${s.toLocaleDateString('en-GB',{month:'long'})}</small>${day}<span style="float:right">${s.getDate()}</span>`;
   grid.appendChild(head);
-  const hourCol=document.createElement('div'); hourCol.className='hour-col'; hourCol.innerHTML=hoursHTML(); grid.appendChild(hourCol);
+
+  // DO NOT add another hour column here (resetGrid already did)
 
   names.sort((a,b)=>a.localeCompare(b)).forEach(advName=>{
     const aId=ADVISOR_BY_NAME.get(advName); if(!aId) return;
@@ -727,7 +731,7 @@ function renderTeamDayCalendar(showAll){
     } else {
       const tplName=(typeof dayVal==='string')?dayVal:''; const tpl=TEMPLATES[tplName];
       if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
-      else{ col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">${tplName}</span> ${tpl.start_time} – ${tpl.finish_time}<span class="summary-right">${((toMin(tpl.finish_time)-toMin(tpl.start_time))/60)}h</span></div>`); }
+      else{ col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">${tplName}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${((toMin(fmt(tpl.finish_time))-toMin(fmt(tpl.start_time)))/60)}h</span></div>`); }
     }
     col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}" data-adv="${advName}">＋</button><button class="iconbtn" data-day="${day}" data-adv="${advName}" data-edit>✎</button></div>`);
     const cell=document.createElement('div'); cell.className='timeline-cell';
@@ -875,7 +879,7 @@ function onBlockClick(e){
   blockDlg.showModal();
 }
 
-/* ===== Rotas: DB upsert & fetch ===== */
+/* ===== Rotas DB ===== */
 async function upsertRota(advisorId, weekStartISO, dataObj){
   const { data, error } = await sb.from('rotas').upsert({
     advisor_id: advisorId,
@@ -956,7 +960,7 @@ function wire(){
   $('#btnClearSel').onclick=()=>{ selectedAdvisors.clear(); rebuildTree(); refreshChips(); populateAssignTable(); renderCalendar(); };
 }
 
-/* ===== Realtime subscriptions ===== */
+/* ===== Realtime ===== */
 function subscribeRealtime(){
   sb.channel('any-changes')
     .on('postgres_changes', { event:'*', schema:'public', table:'sites' },   ()=> loadOrg().then(rebuildTree))
