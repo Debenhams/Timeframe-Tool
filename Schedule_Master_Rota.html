@@ -557,11 +557,42 @@ function rebuildTree(){
   });
 }
 
-/* ===== Advisor dropdown ===== */
+/* ===== Helper: get leader team names ===== */
+function getLeaderTeamNames(leaderId){
+  const leader = Object.values(ORG.sites)
+    .flatMap(s => Object.values(s.leaders || {}))
+    .find(l => l.id === leaderId);
+  if(!leader) return [];
+  return (leader.advisors || []).map(a => a.name).sort((a,b)=>a.localeCompare(b));
+}
+
+/* ===== Advisor dropdown (View) ===== */
 function rebuildAdvisorDropdown(){
-  const sel=$('#advisorSelect');
-  const names = ADVISORS_LIST.map(a=>a.name).sort((a,b)=>a.localeCompare(b));
-  sel.innerHTML = `<option value="__TEAM_SELECTED__">Team (Selected)</option><option value="__TEAM_ALL__">Team (All)</option>` + names.map(n=>`<option>${n}</option>`).join('');
+  const sel = $('#advisorSelect');
+
+  // Leaders
+  const leaders = [];
+  Object.values(ORG.sites).forEach(site => {
+    Object.entries(site.leaders || {}).forEach(([lname, lobj]) => {
+      leaders.push({ id: lobj.id, name: lname, advisors: lobj.advisors || [] });
+    });
+  });
+  leaders.sort((a,b)=>a.name.localeCompare(b.name));
+
+  // Advisors
+  const advisors = ADVISORS_LIST
+    .map(a => ({ id: a.id, name: a.name }))
+    .sort((a,b)=>a.name.localeCompare(b.name));
+
+  const leaderOpts = leaders.map(l => `<option value="leader::${l.id}">${l.name} — Team</option>`).join('');
+  const advisorOpts = advisors.map(a => `<option value="advisor::${a.id}">${a.name}</option>`).join('');
+
+  sel.innerHTML = `
+    <option value="__TEAM_SELECTED__">Team (Selected)</option>
+    <option value="__TEAM_ALL__">Team (All)</option>
+    ${leaders.length ? `<optgroup label="Team Leaders">${leaderOpts}</optgroup>` : ''}
+    ${advisors.length ? `<optgroup label="Advisors">${advisorOpts}</optgroup>` : ''}
+  `;
 }
 
 /* ===== Assignment table ===== */
@@ -664,9 +695,21 @@ function updateRangeLabel(){
 function renderCalendar(){
   resetGrid();
   const advVal=$('#advisorSelect').value;
+
+  // Team views
   if(advVal==='__TEAM_SELECTED__' || advVal==='__TEAM_ALL__'){ renderTeamDayCalendar(advVal==='__TEAM_ALL__'); return; }
 
-  const advName=advVal; const aId=ADVISOR_BY_NAME.get(advName); if(!aId) return;
+  // Single advisor view (support both "advisor::ID" and legacy name values)
+  let aId=null, advName=null;
+  if(advVal.startsWith && advVal.startsWith('advisor::')){
+    aId = advVal.split('::')[1];
+    advName = ADVISOR_BY_ID.get(aId) || '';
+  } else {
+    advName = advVal;
+    aId = ADVISOR_BY_NAME.get(advName);
+  }
+  if(!aId) return;
+
   const ws=$('#weekStart').value; const key=`${aId}::${ws}`;
   const data=ROTAS.get(key) || {};
   const grid=$('#calGrid'); const s=ws?new Date(ws+'T00:00:00'):null;
@@ -707,17 +750,14 @@ function renderCalendar(){
   $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day, advName));
 }
 function renderTeamDayCalendar(showAll){
-  resetGrid(); // already adds a single hour column
+  resetGrid();
   const grid=$('#calGrid'); const ws=$('#weekStart').value; const day=$('#teamDay').value||'Monday';
   const names = showAll ? ADVISORS_LIST.map(a=>a.name) : [...selectedAdvisors];
   const s=new Date(ws+'T00:00:00'); const idx=DAYS.indexOf(day); s.setDate(s.getDate()+idx);
 
-  // Header row spanning all advisor columns + hour column
   const head=document.createElement('div'); head.className='day-head'; head.style.gridColumn=`1 / span ${1+names.length}`; head.style.height='56px';
   head.innerHTML=`<small>${s.toLocaleDateString('en-GB',{month:'long'})}</small>${day}<span style="float:right">${s.getDate()}</span>`;
   grid.appendChild(head);
-
-  // DO NOT add another hour column here (resetGrid already did)
 
   names.sort((a,b)=>a.localeCompare(b)).forEach(advName=>{
     const aId=ADVISOR_BY_NAME.get(advName); if(!aId) return;
@@ -952,7 +992,24 @@ function wire(){
 
   $('#btnReset').onclick=()=>{ if(!confirm('Clear only local cache (does not delete Supabase data)?')) return; ROTAS.clear(); sessionStorage.clear(); localStorage.clear(); location.reload(); };
 
-  $('#advisorSelect').addEventListener('change',()=>{ updateViewSelector(); updateRangeLabel(); renderCalendar(); });
+  // NEW: View change logic (supports leader picks)
+  $('#advisorSelect').addEventListener('change', ()=>{
+    const v = $('#advisorSelect').value;
+
+    if(v.startsWith && v.startsWith('leader::')){
+      const leaderId = v.split('::')[1];
+      const names = getLeaderTeamNames(leaderId);
+      selectedAdvisors = new Set(names);
+      refreshChips();
+      populateAssignTable();
+      $('#advisorSelect').value = '__TEAM_SELECTED__'; // switch to Team view
+    }
+
+    updateViewSelector();
+    updateRangeLabel();
+    renderCalendar();
+  });
+
   $('#teamDay').addEventListener('change',()=>{ updateRangeLabel(); renderCalendar(); });
   $('#weekStart').onchange=()=>{ updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
 
@@ -963,8 +1020,8 @@ function wire(){
 /* ===== Realtime ===== */
 function subscribeRealtime(){
   sb.channel('any-changes')
-    .on('postgres_changes', { event:'*', schema:'public', table:'sites' },   ()=> loadOrg().then(rebuildTree))
-    .on('postgres_changes', { event:'*', schema:'public', table:'leaders' }, ()=> loadOrg().then(rebuildTree))
+    .on('postgres_changes', { event:'*', schema:'public', table:'sites' },   ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
+    .on('postgres_changes', { event:'*', schema:'public', table:'leaders' }, ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
     .on('postgres_changes', { event:'*', schema:'public', table:'advisors'}, ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
     .on('postgres_changes', { event:'*', schema:'public', table:'templates'},()=> loadTemplates().then(()=>{ populateTemplateEditor(); renderCalendar(); }))
     .on('postgres_changes', { event:'*', schema:'public', table:'rotas' },   ()=>{
@@ -996,3 +1053,4 @@ function subscribeRealtime(){
   </script>
 </body>
 </html>
+
