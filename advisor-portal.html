@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Advisor Portal – My Rota</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --primary:#0d47a1; --bg:#fafafa; --card:#fff; --text:#212121; --muted:#6b7280; --border:#e5e7eb; --accent:#00c853;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:var(--bg);color:var(--text);}
+  header{background:var(--primary);color:#fff;padding:18px 20px;font-weight:700}
+  .wrap{max-width:980px;margin:24px auto;padding:0 16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:16px;margin-bottom:16px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+  input[type="email"],input[type="date"]{padding:10px 12px;border:1px solid var(--border);border-radius:8px;min-width:260px}
+  button{background:var(--accent);color:#fff;border:0;padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:600}
+  button.secondary{background:#111827}
+  .muted{color:var(--muted);font-size:0.9rem}
+  .title{font-weight:700;margin:0 0 4px 0}
+  .json{white-space:pre-wrap; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; background:#0b1020; color:#cde3ff; border-radius:10px; padding:12px; overflow:auto}
+  .pill{display:inline-block;background:#eef2ff;color:#1e3a8a;border:1px solid #c7d2fe;border-radius:999px;padding:4px 10px;font-size:0.85rem;margin-right:8px}
+  .spacer{flex:1}
+  .hint{font-size:.9rem;padding:8px 12px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  // === YOUR SUPABASE PROJECT KEYS ===
+  const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+ 
+  // Helpers
+  const $ = sel => document.querySelector(sel);
+  const fmt = d => d.toISOString().slice(0,10);
+  function mondayOf(date){
+    const d = new Date(date); const day = d.getDay(); // Sun=0
+    const diff = (day===0 ? -6 : 1 - day);
+    d.setDate(d.getDate() + diff); d.setHours(0,0,0,0); return d;
+  }
+ 
+  async function init(){
+    const { data: { user } } = await supabase.auth.getUser();
+    if(!user){ $('#loginCard').style.display='block'; return; }
+ 
+    $('#loginCard').style.display='none';
+    $('#portalCard').style.display='block';
+    $('#whoami').textContent = user.email || 'Signed in';
+ 
+    // Load profile → get advisor_id
+    const { data: prof, error: pErr } = await supabase
+      .from('profiles')
+      .select('advisor_id, role, advisors:advisor_id(name)')
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if(pErr){ alert('Profile error: '+pErr.message); return; }
+ 
+    if(!prof || !prof.advisor_id){
+      $('#profileWarn').style.display='block';
+      return;
+    }
+    window.PROFILE = prof;
+    $('#advisorName').textContent = prof.advisors?.name ?? '(Advisor)';
+ 
+    // Default week = this Monday
+    const monday = mondayOf(new Date());
+    $('#weekStart').value = fmt(monday);
+    await loadWeek();
+ 
+    // Realtime: refresh when this advisor’s rota changes
+    supabase
+      .channel('adv-rotas')
+      .on('postgres_changes',
+          { event: '*', schema: 'public', table: 'rotas',
+            filter: `advisor_id=eq.${prof.advisor_id}` },
+          payload => {
+            const selected = $('#weekStart').value;
+            if(payload.new?.week_start === selected || payload.old?.week_start === selected){
+              loadWeek();
+            }
+          })
+      .subscribe();
+  }
+ 
+  async function sendMagicLink(){
+    const email = $('#email').value.trim();
+    if(!email){ alert('Enter your work email'); return; }
+    const { error } = await supabase.auth.signInWithOtp({ email });
+    if(error){ alert(error.message); return; }
+    $('#magicInfo').textContent = 'Check your email for the sign-in link.';
+  }
+ 
+  async function signOut(){
+    await supabase.auth.signOut();
+    location.reload();
+  }
+ 
+  async function loadWeek(){
+    if(!window.PROFILE?.advisor_id) return;
+    const week = $('#weekStart').value;
+    $('#weekLabel').textContent = week;
+ 
+    const { data, error } = await supabase
+      .from('rotas')
+      .select('id, data, week_start')
+      .eq('advisor_id', window.PROFILE.advisor_id)
+      .eq('week_start', week)
+      .maybeSingle();
+ 
+    const out = $('#rotaOut');
+    if(error){ out.textContent = 'Error: '+error.message; return; }
+    if(!data){ out.textContent = 'No rota for this week yet.'; return; }
+ 
+    // For now we show pretty JSON so it always works with your current schema.
+    // (When you’re ready, I can swap this to your nice week grid, read-only.)
+    out.textContent = JSON.stringify(data.data, null, 2);
+  }
+ 
+  function shiftWeek(delta){
+    const d = mondayOf(new Date($('#weekStart').value));
+    d.setDate(d.getDate() + (7*delta));
+    $('#weekStart').value = fmt(d);
+    loadWeek();
+  }
+ 
+  window.addEventListener('DOMContentLoaded', init);
+</script>
+</head>
+<body>
+<header>Advisor Portal – My Rota</header>
+<div class="wrap">
+ 
+  <!-- Login -->
+  <div id="loginCard" class="card" style="display:none">
+    <p class="title">Sign in</p>
+    <p class="muted">Use your work email. We’ll send a one-time login link.</p>
+    <div class="row">
+      <input id="email" type="email" placeholder="name@company.com" />
+      <button onclick="sendMagicLink()">Send magic link</button>
+    </div>
+    <p id="magicInfo" class="muted" style="margin-top:8px;"></p>
+  </div>
+ 
+  <!-- Portal -->
+  <div id="portalCard" class="card" style="display:none">
+    <div class="row">
+      <div><span class="pill" id="whoami">Signed in</span></div>
+      <div><span class="pill" id="advisorName"></span></div>
+      <div class="spacer"></div>
+      <button class="secondary" onclick="signOut()">Sign out</button>
+    </div>
+    <hr/>
+ 
+    <div class="row" style="margin-bottom:8px;">
+      <label for="weekStart" class="muted">Week start (Monday):</label>
+      <input id="weekStart" type="date" onchange="loadWeek()" />
+      <button onclick="shiftWeek(-1)">◀ Prev Week</button>
+      <button onclick="shiftWeek(1)">Next Week ▶</button>
+      <div class="spacer"></div>
+      <span class="muted">Selected: <strong id="weekLabel"></strong></span>
+    </div>
+ 
+    <div class="hint" style="margin-bottom:12px;">
+      If you see “not linked”, ask an admin to link your account in <code>profiles</code>.
+    </div>
+ 
+    <div class="card" style="background:#0f172a;border-color:#0b1220">
+      <div class="title" style="color:#c7d2fe;margin-bottom:8px;">Rota (read-only, raw JSON for now)</div>
+      <div id="rotaOut" class="json">Loading…</div>
+    </div>
+ 
+    <p id="profileWarn" class="muted" style="display:none">
+      Your account isn’t linked to an advisor yet. An admin should set
+      <code>profiles.advisor_id</code> to your advisor record.
+    </p>
+  </div>
+ 
+</div>
+</body>
+</html>
