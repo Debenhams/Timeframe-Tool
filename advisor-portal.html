@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>Advisor Portal – Weekly Rota</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <style>
     :root{
@@ -22,6 +23,7 @@
     input[type="email"],input[type="date"]{border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:260px}
     .card{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:12px}
     .notice{background:#fff3cd;border:1px solid #ffe69c;color:#8a6d3b;padding:10px 12px;border-radius:8px;margin:12px 0}
+
     /* Calendar */
     .cal{overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
     .cal-head{display:grid;grid-template-columns:80px repeat(7,1fr);border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:2}
@@ -87,14 +89,16 @@
   </div>
 
 <script>
-/* ========================= Supabase – project config ========================= */
+/* =========================
+   Supabase – project config
+   ========================= */
 const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ================ DOM refs ================ */
+/* ================   DOM references   ================ */
 const authBox = document.getElementById("authBox");
-const appBox = document.getElementById("appBox");
+const appBox  = document.getElementById("appBox");
 const emailInput = document.getElementById("emailInput");
 const sendLinkBtn = document.getElementById("sendLinkBtn");
 const userEmailTag = document.getElementById("userEmail");
@@ -106,15 +110,17 @@ const signOutBtn = document.getElementById("signOutBtn");
 const calBox = document.getElementById("calBox");
 const infoNote = document.getElementById("infoNote");
 
-/* ================ Helpers ================ */
+/* ================   Helpers   ================ */
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const START_H = 7, END_H = 20;
-function toMonday(d){ const x=new Date(d); const day=x.getDay(); const diff=(day===0?-6:1-day); x.setDate(x.getDate()+diff); x.setHours(0,0,0,0); return x; }
+const pad = n => String(n).padStart(2,'0');
+function toMonday(d){ const x=new Date(d); const day=x.getDay(); const diff=(day===0?-6:1-day); x.setDate(x.getDate()+diff); x.setHours(0,0,0,0); return x;}
 function fmtDateISO(d){ return d.toISOString().slice(0,10); }
 function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
 function hhmmToMinutes(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
+function time5(t){ if(!t) return ""; return String(t).slice(0,5); } // "HH:MM:SS" -> "HH:MM"
 function colorForCode(code){
-  const k=(code||"").toLowerCase();
+  const k = (code||"").toLowerCase();
   if (k.includes("email")) return "var(--emails)";
   if (k.includes("mirakl")) return "var(--mirakl)";
   if (k.includes("social")) return "var(--social)";
@@ -125,15 +131,14 @@ function colorForCode(code){
   return "var(--primary)";
 }
 
-/* ========================================= State ========================================= */
+/* ================   State   ================ */
 let sessionUser = null;
 let advisorId = null;
 let advisorName = "";
 let monday = toMonday(new Date());
 let rotaRealtimeChannel = null;
-let TEMPLATES = {}; // name -> template row
 
-/* ========================================= Auth ========================================= */
+/* ================   Auth flow   ================ */
 async function init(){
   await supabase.auth.getSession();
   const { data: { user } } = await supabase.auth.getUser();
@@ -148,11 +153,11 @@ async function init(){
   appBox.style.display = "";
   userEmailTag.textContent = user.email;
 
-  // Resolve advisor_id
+  // Resolve advisor_id (profiles.advisor_id preferred)
   advisorId = null; advisorName = "";
   const { data: profile } = await supabase
     .from("profiles").select("advisor_id, role").eq("user_id", user.id).maybeSingle();
-  if (profile?.advisor_id){
+  if (profile && profile.advisor_id){
     advisorId = profile.advisor_id;
   } else {
     const { data: adv } = await supabase
@@ -168,12 +173,9 @@ async function init(){
   // controls
   weekStartInput.value = fmtDateISO(monday);
   prevBtn.onclick = ()=>{ monday = addDays(monday,-7); weekStartInput.value = fmtDateISO(monday); loadAndRender(); restartRealtime(); };
-  nextBtn.onclick = ()=>{ monday = addDays(monday, 7); weekStartInput.value = fmtDateISO(monday); loadAndRender(); restartRealtime(); };
+  nextBtn.onclick = ()=>{ monday = addDays(monday,7);  weekStartInput.value = fmtDateISO(monday); loadAndRender(); restartRealtime(); };
   weekStartInput.onchange = ()=>{ monday = toMonday(new Date(weekStartInput.value)); loadAndRender(); restartRealtime(); };
   signOutBtn.onclick = async ()=>{ await supabase.auth.signOut(); location.href = location.pathname; };
-
-  // Preload templates for name->segments conversion
-  await loadTemplates();
 
   await loadAndRender();
   await startRealtime();
@@ -194,60 +196,64 @@ sendLinkBtn.onclick = async ()=>{
   finally{ sendLinkBtn.disabled = false; }
 };
 
-/* ================ Templates loader & converter ================ */
-async function loadTemplates(){
-  const { data, error } = await supabase.from("templates")
-    .select("name, work_code, start_time, finish_time, break1, lunch, break2");
-  TEMPLATES = {};
-  (data||[]).forEach(t => { TEMPLATES[t.name] = t; });
-}
-
-// Convert either template-name string OR {segments:[...]} into {segments:[...]}
-function toSegments(dayVal){
-  if (!dayVal) return [];
-  if (typeof dayVal === "object" && Array.isArray(dayVal.segments)) return dayVal.segments;
-
-  if (typeof dayVal === "string" && TEMPLATES[dayVal]){
-    const t = TEMPLATES[dayVal];
-    const segs = [];
-    const add = (code, start, end)=>{ if(start&&end) segs.push({code,start,end}); };
-
-    const s = (t.start_time||"").slice(0,5);
-    const e = (t.finish_time||"").slice(0,5);
-    if (s && e){
-      // Breaks/lunch assume 15/30/15 mins like your master rota
-      const b1 = (t.break1||"") ? t.break1.slice(0,5) : null;
-      const lu = (t.lunch||"") ? t.lunch.slice(0,5) : null;
-      const b2 = (t.break2||"") ? t.break2.slice(0,5) : null;
-
-      // Build simple timeline: work block split by pauses
-      let cursor = s;
-      const pushPause = (at, mins, label)=>{
-        if (at){
-          add(t.work_code||"Admin", cursor, at);
-          const endPause = addMinutes(at, mins);
-          add(label, at, endPause);
-          cursor = endPause;
-        }
-      };
-      pushPause(b1, 15, "Break");
-      pushPause(lu, 30, "Lunch");
-      pushPause(b2, 15, "Break");
-      add(t.work_code||"Admin", cursor, e);
-    }
-    return segs;
+/* ================   Templates -> segments   ================ */
+function segmentsFromTemplate(t){
+  if(!t || !t.start_time || !t.finish_time) return [];
+  const s = time5(t.start_time), e = time5(t.finish_time);
+  const out = [{ code: t.work_code || "Admin", start: s, end: e }];
+  // Insert breaks as separate segments
+  const ins = [];
+  if (t.break1){ ins.push({ code:"Break", start: time5(t.break1), end: time5(addMinutes(t.break1,15)) }); }
+  if (t.lunch){  ins.push({ code:"Lunch", start: time5(t.lunch),  end: time5(addMinutes(t.lunch,30)) }); }
+  if (t.break2){ ins.push({ code:"Break", start: time5(t.break2), end: time5(addMinutes(t.break2,15)) }); }
+  // Split out break/lunch inside the work block
+  let base = [{ code:t.work_code||"Admin", start:s, end:e }];
+  for(const seg of ins){
+    base = splitSegment(base, seg);
   }
-  return [];
+  return base.concat([]).filter(Boolean);
 }
 function addMinutes(hhmm, mins){
-  const [h,m]=hhmm.split(":").map(Number);
-  const total = h*60+m+mins;
-  const hh = String(Math.floor(total/60)).padStart(2,"0");
-  const mm = String(total%60).padStart(2,"0");
-  return `${hh}:${mm}`;
+  const [h,m]=time5(hhmm).split(":").map(Number);
+  const tot = h*60 + m + mins;
+  return pad(Math.floor(tot/60))+":"+pad(tot%60);
+}
+function splitSegment(baseList, insertion){
+  const res=[];
+  const sI = hhmmToMinutes(insertion.start);
+  const eI = hhmmToMinutes(insertion.end);
+  for(const b of baseList){
+    const sB = hhmmToMinutes(b.start), eB = hhmmToMinutes(b.end);
+    if (eI<=sB || sI>=eB){ res.push(b); continue; } // no overlap
+    // left remainder
+    if(sI>sB) res.push({ code:b.code, start:b.start, end: insertion.start });
+    // the insertion itself
+    res.push({ code: insertion.code, start: insertion.start, end: insertion.end });
+    // right remainder
+    if(eI<eB) res.push({ code:b.code, start: insertion.end, end: b.end });
+  }
+  return res;
+}
+function normalizePublishedData(pubData, templateMap){
+  const result = {};
+  for(const day of DAYS){
+    const v = pubData?.[day];
+    if(!v){ continue; }
+    if (typeof v === "object" && Array.isArray(v.segments)){
+      result[day] = { segments: v };
+      continue;
+    }
+    if (typeof v === "string"){
+      const t = templateMap.get(v);
+      if (t){
+        result[day] = { segments: segmentsFromTemplate(t) };
+      }
+    }
+  }
+  return result;
 }
 
-/* ========================================= Data load + render ========================================= */
+/* ================   Data load + render   ================ */
 async function loadAndRender(){
   calBox.innerHTML = ""; infoNote.style.display="none";
   if (!advisorId){
@@ -256,34 +262,43 @@ async function loadAndRender(){
   }
   const mondayISO = fmtDateISO(monday);
 
-  // READ ONLY from published table
-  const { data, error } = await supabase
+  // Prefetch templates once per load (RLS policy required for templates SELECT)
+  const { data: tmplRows, error: tmplErr } = await supabase
+    .from("templates").select("name, work_code, start_time, finish_time, break1, lunch, break2");
+  const templateMap = new Map((tmplRows||[]).map(t=>[t.name, t]));
+
+  // Read PUBLISHED rota
+  const { data: pubRow, error } = await supabase
     .from("rotas_published")
     .select("data")
     .eq("advisor_id", advisorId)
     .eq("week_start", mondayISO)
     .maybeSingle();
 
+  // Build skeleton grid
   renderSkeleton();
 
-  if (!data || !data.data){
+  if (!pubRow || !pubRow.data){
     infoNote.style.display="";
     infoNote.textContent = "No published rota for this week yet.";
+    console.log("[Portal] No published row", {advisorId, mondayISO, error});
     return;
   }
 
-  // Map each day to segments (template name -> segments)
-  const normalised = {};
-  DAYS.forEach(d=>{
-    const v = data.data[d];
-    normalised[d] = { segments: toSegments(v) };
-  });
+  // Expand to segments and render
+  const expanded = normalizePublishedData(pubRow.data, templateMap);
+  const hasAny = DAYS.some(d => expanded[d]?.segments?.length);
+  if (!hasAny){
+    infoNote.style.display="";
+    infoNote.textContent = "Published rota found but uses templates that aren’t in the Templates table (e.g., “Early”).";
+    console.log("[Portal] Published row has no expandable days", pubRow.data);
+    return;
+  }
 
-  drawRota(normalised);
+  drawRota(expanded);
 }
 
 function renderSkeleton(){
-  // Head
   const head = document.createElement("div");
   head.className = "cal-head";
   head.innerHTML = `<div class="cal-hcell"> </div>`;
@@ -293,17 +308,18 @@ function renderSkeleton(){
   }
   calBox.appendChild(head);
 
-  // Body grid
   const body = document.createElement("div");
   body.className="cal-body";
 
-  // Time ticks + day columns
+  // time rows (labels)
   for (let h=START_H; h<=END_H; h++){
     const t = document.createElement("div");
     t.className="trow";
     t.textContent = String(h).padStart(2,"0")+":00";
     body.appendChild(t);
   }
+
+  // day columns
   for (let i=0;i<7;i++){
     const col = document.createElement("div");
     col.className="day-col";
@@ -312,6 +328,7 @@ function renderSkeleton(){
     col.style.gridRow = `1 / span ${END_H-START_H+1}`;
     body.appendChild(col);
   }
+
   const timeCol = document.createElement("div");
   timeCol.className="time-col";
   timeCol.style.gridColumn = "1";
@@ -331,29 +348,29 @@ function drawRota(json){
     const dayName = DAYS[i];
     const dayData = json[dayName];
     if (!dayData || !dayData.segments) return;
+
     dayData.segments.forEach(seg=>{
       const startM = Math.max(0, hhmmToMinutes(seg.start||"07:00") - START_H*60);
-      const endM = Math.min((END_H-START_H)*60, hhmmToMinutes(seg.end||"07:10") - START_H*60);
+      const endM   = Math.min((END_H-START_H)*60, hhmmToMinutes(seg.end||"07:10") - START_H*60);
       const top = startM * pxPerMin;
       const height = Math.max(10, (endM - startM) * pxPerMin);
+
       const el = document.createElement("div");
       el.className="slot";
       el.style.top = `${top}px`;
       el.style.height = `${height}px`;
       el.style.background = colorForCode(seg.code||"");
-      el.innerHTML = `
-        <div>${(seg.code||"").toUpperCase()}</div>
-        <span>${(seg.start||"")} – ${(seg.end||"")}</span>
-      `;
+      el.innerHTML = `<div>${(seg.code||"").toUpperCase()}</div><span>${(seg.start||"")} – ${(seg.end||"")}</span>`;
       col.appendChild(el);
     });
   });
 }
 
-/* ========================================= Realtime (published only) ========================================= */
+/* ================   Realtime (published only)   ================ */
 async function startRealtime(){
   if (!advisorId) return;
   const mondayISO = fmtDateISO(monday);
+
   rotaRealtimeChannel = supabase.channel(`rotas_pub_${advisorId}_${mondayISO}`)
     .on("postgres_changes",
       { event:"*", schema:"public", table:"rotas_published", filter:`advisor_id=eq.${advisorId}` },
@@ -364,18 +381,7 @@ async function startRealtime(){
           calBox.innerHTML = `<div class="empty-note">This week has no published rota.</div>`;
           return;
         }
-        const row = payload.new;
-        if (row?.data){
-          const normalised = {};
-          DAYS.forEach(d=>{
-            const v = row.data[d];
-            normalised[d] = { segments: toSegments(v) };
-          });
-          calBox.innerHTML = "";
-          renderSkeleton();
-          drawRota(normalised);
-          infoNote.style.display="none";
-        }
+        loadAndRender(); // re-fetch + re-render
       })
     .subscribe();
 }
