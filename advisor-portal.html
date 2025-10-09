@@ -102,7 +102,7 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
    DOM references
    ================ */
 const authBox = document.getElementById("authBox");
-const appBox  = document.getElementById("appBox");
+const appBox = document.getElementById("appBox");
 const emailInput = document.getElementById("emailInput");
 const sendLinkBtn = document.getElementById("sendLinkBtn");
 const userEmailTag = document.getElementById("userEmail");
@@ -150,7 +150,8 @@ let sessionUser = null;
 let advisorId = null;
 let advisorName = "";
 let monday = toMonday(new Date());
-let rotaRealtimeChannel = null;
+let rotaRealtimeChannelPub = null;
+let rotaRealtimeChannelDraft = null;
 
 /* =========================================
    Authentication flow
@@ -245,18 +246,34 @@ async function loadAndRender(){
     return;
   }
   const mondayISO = fmtDateISO(monday);
-  const { data, error } = await supabase
-    .from("rotas").select("data").eq("advisor_id", advisorId).eq("week_start", mondayISO).maybeSingle();
 
-  // Build skeleton grid
+  // 1) Try the published rota first
+  const { data: pubRow, error: pubErr } = await supabase
+    .from("rotas_published").select("data").eq("advisor_id", advisorId).eq("week_start", mondayISO).maybeSingle();
+
+  // Build skeleton grid (same layout you already had)
   renderSkeleton();
 
-  if (!data || !data.data){
-    infoNote.style.display="";
-    infoNote.textContent = "No rota saved for this week yet. Once planning saves changes you’ll see them here automatically.";
+  if (pubRow && pubRow.data){
+    drawRota(pubRow.data);
+    infoNote.style.display="none";
     return;
   }
-  drawRota(data.data);
+
+  // 2) Fallback to draft (rotas) so people can still see something if not published yet
+  const { data: draftRow } = await supabase
+    .from("rotas").select("data").eq("advisor_id", advisorId).eq("week_start", mondayISO).maybeSingle();
+
+  if (draftRow && draftRow.data){
+    drawRota(draftRow.data);
+    infoNote.style.display="";
+    infoNote.textContent = "This week hasn’t been published yet. Showing latest draft.";
+    return;
+  }
+
+  // 3) Nothing at all
+  infoNote.style.display="";
+  infoNote.textContent = "No rota saved for this week yet. Once planning publishes you’ll see it here automatically.";
 }
 
 function renderSkeleton(){
@@ -273,23 +290,15 @@ function renderSkeleton(){
   // Body grid
   const body = document.createElement("div");
   body.className="cal-body";
-  // Time col
+
   for (let h=START_H; h<=END_H; h++){
     const t = document.createElement("div");
     t.className="trow";
     t.textContent = String(h).padStart(2,"0")+":00";
     body.appendChild(t);
-    for(let i=0;i<7;i++){
-      // Add empty day rows; slots are absolutely positioned later
-      if (h===START_H){
-        const dayCol = document.createElement("div");
-        dayCol.className="day-col";
-        dayCol.style.gridColumn = (i+2);
-        dayCol.style.gridRow = `1 / span ${END_H-START_H+1}`;
-      }
-    }
   }
-  // Build day columns (one container per day)
+
+  // one container per day
   for (let i=0;i<7;i++){
     const col = document.createElement("div");
     col.className="day-col";
@@ -298,21 +307,20 @@ function renderSkeleton(){
     col.style.gridRow = `1 / span ${END_H-START_H+1}`;
     body.appendChild(col);
   }
-  // Move time column to left (as grid col 1)
+
+  // time column (visual)
   const timeCol = document.createElement("div");
   timeCol.className="time-col";
   timeCol.style.gridColumn = "1";
   timeCol.style.gridRow = `1 / span ${END_H-START_H+1}`;
   timeCol.style.position="relative";
-
-  // Render time ticks (overlap with trows already added for visuals)
   body.insertBefore(timeCol, body.firstChild);
 
   calBox.appendChild(body);
 }
 
 function drawRota(json){
-  // json shape expected: { "Monday": { segments:[{start:"07:00", end:"09:15", code:"DEB Email"} , ...] }, ... }
+  // json shape: { "Monday": { segments:[{start:"07:00", end:"09:15", code:"DEB Email"} , ...] }, ... }
   const body = calBox.querySelector(".cal-body");
   const dayCols = [...body.querySelectorAll(".day-col")];
   const pxPerMin = 60/60; // 60px per hour → 1px per min
@@ -323,7 +331,7 @@ function drawRota(json){
     if (!dayData || !dayData.segments) return;
     dayData.segments.forEach(seg=>{
       const startM = Math.max(0, hhmmToMinutes(seg.start||"07:00") - START_H*60);
-      const endM   = Math.min((END_H-START_H)*60, hhmmToMinutes(seg.end||"07:10") - START_H*60);
+      const endM = Math.min((END_H-START_H)*60, hhmmToMinutes(seg.end||"07:10") - START_H*60);
       const top = startM * pxPerMin;
       const height = Math.max(10, (endM - startM) * pxPerMin);
       const el = document.createElement("div");
@@ -341,27 +349,26 @@ function drawRota(json){
 }
 
 /* =========================================
-   Realtime
+   Realtime (listen to published first, rotas second)
    ========================================= */
 async function startRealtime(){
   if (!advisorId) return;
   const mondayISO = fmtDateISO(monday);
 
-  // ensure enabled in DB (UI: Enable Realtime on `rotas`)
-  rotaRealtimeChannel = supabase.channel(`rotas_${advisorId}_${mondayISO}`)
+  // Published channel
+  rotaRealtimeChannelPub = supabase.channel(`rotas_published_${advisorId}_${mondayISO}`)
     .on("postgres_changes",
-      { event:"*", schema:"public", table:"rotas", filter:`advisor_id=eq.${advisorId}` },
+      { event:"*", schema:"public", table:"rotas_published", filter:`advisor_id=eq.${advisorId}` },
       payload=>{
-        // Update only if current week matches
         const wk = payload.new?.week_start || payload.old?.week_start;
         if (wk !== mondayISO) return;
         if (payload.eventType === "DELETE"){
-          calBox.innerHTML = `<div class="empty-note">This week was cleared.</div>`;
+          // If published is deleted, fallback will show if exists
+          loadAndRender();
           return;
         }
         const data = payload.new?.data;
         if (data) {
-          // re-render quickly
           calBox.innerHTML = "";
           renderSkeleton();
           drawRota(data);
@@ -369,10 +376,25 @@ async function startRealtime(){
         }
       })
     .subscribe();
+
+  // Draft (rotas) channel as fallback
+  rotaRealtimeChannelDraft = supabase.channel(`rotas_${advisorId}_${mondayISO}`)
+    .on("postgres_changes",
+      { event:"*", schema:"public", table:"rotas", filter:`advisor_id=eq.${advisorId}` },
+      payload=>{
+        const wk = payload.new?.week_start || payload.old?.week_start;
+        if (wk !== mondayISO) return;
+
+        // Only react to draft if there is no published record currently
+        // Re-check and render so the rule "published wins" stays true.
+        loadAndRender();
+      })
+    .subscribe();
 }
 
 function restartRealtime(){
-  if (rotaRealtimeChannel) supabase.removeChannel(rotaRealtimeChannel);
+  if (rotaRealtimeChannelPub) supabase.removeChannel(rotaRealtimeChannelPub);
+  if (rotaRealtimeChannelDraft) supabase.removeChannel(rotaRealtimeChannelDraft);
   startRealtime();
 }
 
