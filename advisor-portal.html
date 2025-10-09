@@ -92,7 +92,7 @@
     </div>
   </div>
 
-  <script>
+<script>
 /* =========================
    Supabase – project config
    ========================= */
@@ -100,9 +100,7 @@ const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ================
-   DOM references
-   ================ */
+/* ================   DOM refs   ================ */
 const authBox = document.getElementById("authBox");
 const appBox  = document.getElementById("appBox");
 const emailInput = document.getElementById("emailInput");
@@ -116,25 +114,15 @@ const signOutBtn = document.getElementById("signOutBtn");
 const calBox = document.getElementById("calBox");
 const infoNote = document.getElementById("infoNote");
 
-/* ================
-   Helpers
-   ================ */
+/* ================   Helpers   ================ */
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const START_H = 7, END_H = 20;
-
-function toMonday(d){
-  const x = new Date(d);
-  const day = x.getDay(); // 0 Sun .. 6 Sat
-  const diff = (day === 0 ? -6 : 1 - day);
-  x.setDate(x.getDate() + diff);
-  x.setHours(0,0,0,0);
-  return x;
-}
+function toMonday(d){ const x=new Date(d); const day=x.getDay(); const diff=(day===0?-6:1-day); x.setDate(x.getDate()+diff); x.setHours(0,0,0,0); return x; }
 function fmtDateISO(d){ return d.toISOString().slice(0,10); }
 function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
-function hhmmToMinutes(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
+function hhmmToMinutes(t){ const [h,m]=String(t).split(":").map(Number); return h*60+m; }
 function colorForCode(code){
-  const k = (code||"").toLowerCase();
+  const k=(code||"").toLowerCase();
   if (k.includes("email")) return "var(--emails)";
   if (k.includes("mirakl")) return "var(--mirakl)";
   if (k.includes("social")) return "var(--social)";
@@ -145,22 +133,17 @@ function colorForCode(code){
   return "var(--primary)";
 }
 
-/* =========================================
-   State
-   ========================================= */
+/* ================   State   ================ */
 let sessionUser = null;
 let advisorId = null;
 let advisorName = "";
 let monday = toMonday(new Date());
 let rotaRealtimeChannel = null;
 
-/* =========================================
-   Authentication flow
-   ========================================= */
+/* ================   Auth flow   ================ */
 async function init(){
-  // Handle OAuth/OTP callbacks automatically
   await supabase.auth.getSession();
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data:{ user } } = await supabase.auth.getUser();
 
   if (!user){
     authBox.style.display = "";
@@ -171,68 +154,37 @@ async function init(){
   sessionUser = user;
   authBox.style.display = "none";
   appBox.style.display = "";
-  userEmailTag.textContent = user.email || "";
+  userEmailTag.textContent = user.email;
 
-  // Resolve advisor_id (profiles.advisor_id preferred)
+  // Resolve advisor_id (profiles first, else email match on advisors)
   advisorId = null; advisorName = "";
-
   const { data: profile } = await supabase
-    .from("profiles")
-    .select("advisor_id, role")
-    .eq("user_id", user.id)
-    .maybeSingle();
+      .from("profiles")
+      .select("advisor_id, role")
+      .eq("user_id", user.id)
+      .maybeSingle();
+  if (profile?.advisor_id){ advisorId = profile.advisor_id; }
 
-  if (profile && profile.advisor_id){
-    advisorId = profile.advisor_id;
-  } else {
-    // fallback by email in advisors
+  if (!advisorId){
     const { data: adv } = await supabase
       .from("advisors")
       .select("id,name")
       .eq("email", user.email)
       .maybeSingle();
-    if (adv){
-      advisorId = adv.id;
-      advisorName = adv.name || "";
-    }
+    if (adv){ advisorId = adv.id; advisorName = adv.name || ""; }
   }
-
-  // If we still don't know name, fetch by id
   if (!advisorName && advisorId){
-    const { data: adv2 } = await supabase
-      .from("advisors")
-      .select("name")
-      .eq("id", advisorId)
-      .maybeSingle();
+    const { data: adv2 } = await supabase.from("advisors").select("name").eq("id", advisorId).maybeSingle();
     advisorName = adv2?.name || "";
   }
-
   advisorNamePill.textContent = advisorName || "Not linked";
 
-  // controls
+  // Controls
   weekStartInput.value = fmtDateISO(monday);
-
-  prevBtn.onclick = ()=>{
-    monday = addDays(monday,-7);
-    weekStartInput.value = fmtDateISO(monday);
-    loadAndRender();
-    restartRealtime();
-  };
-  nextBtn.onclick = ()=>{
-    monday = addDays(monday,7);
-    weekStartInput.value = fmtDateISO(monday);
-    loadAndRender();
-    restartRealtime();
-  };
-  weekStartInput.onchange = ()=>{
-    monday = toMonday(new Date(weekStartInput.value));
-    loadAndRender();
-    restartRealtime();
-  };
-  signOutBtn.onclick = async ()=>{
-    await supabase.auth.signOut();
-    location.href = location.pathname; // clean url
-  };
+  prevBtn.onclick = ()=>{ monday = addDays(monday,-7); weekStartInput.value = fmtDateISO(monday); loadAndRender(); restartRealtime(); };
+  nextBtn.onclick = ()=>{ monday = addDays(monday, 7); weekStartInput.value = fmtDateISO(monday); loadAndRender(); restartRealtime(); };
+  weekStartInput.onchange = ()=>{ monday = toMonday(new Date(weekStartInput.value)); loadAndRender(); restartRealtime(); };
+  signOutBtn.onclick = async ()=>{ await supabase.auth.signOut(); location.href = location.pathname; };
 
   await loadAndRender();
   await startRealtime();
@@ -253,12 +205,9 @@ sendLinkBtn.onclick = async ()=>{
   finally{ sendLinkBtn.disabled = false; }
 };
 
-/* =========================================
-   Data load + render (PUBLISHED ONLY)
-   ========================================= */
+/* ================   Data load + render   ================ */
 async function loadAndRender(){
   calBox.innerHTML = ""; infoNote.style.display="none";
-
   if (!advisorId){
     calBox.innerHTML = `<div class="empty-note">Your account isn’t linked to an advisor yet. Ask planning to link your email to your advisor profile.</div>`;
     return;
@@ -266,7 +215,7 @@ async function loadAndRender(){
 
   const mondayISO = fmtDateISO(monday);
 
-  // Only pull from rotas_published
+  // READ ONLY FROM rotas_published
   const { data, error } = await supabase
     .from("rotas_published")
     .select("data")
@@ -274,26 +223,22 @@ async function loadAndRender(){
     .eq("week_start", mondayISO)
     .maybeSingle();
 
-  // Build skeleton grid (always)
   renderSkeleton();
 
   if (error){
-    infoNote.style.display="";
-    infoNote.textContent = "Cannot load published rota (permissions or connection).";
+    infoNote.style.display = "";
+    infoNote.textContent = "Error loading published rota.";
     return;
   }
-
   if (!data || !data.data){
-    infoNote.style.display="";
+    infoNote.style.display = "";
     infoNote.textContent = "No published rota for this week yet.";
     return;
   }
-
   drawRota(data.data);
 }
 
 function renderSkeleton(){
-  // Head
   const head = document.createElement("div");
   head.className = "cal-head";
   head.innerHTML = `<div class="cal-hcell"> </div>`;
@@ -303,11 +248,9 @@ function renderSkeleton(){
   }
   calBox.appendChild(head);
 
-  // Body grid
   const body = document.createElement("div");
   body.className="cal-body";
 
-  // Time rows (visual grid)
   for (let h=START_H; h<=END_H; h++){
     const t = document.createElement("div");
     t.className="trow";
@@ -315,7 +258,6 @@ function renderSkeleton(){
     body.appendChild(t);
   }
 
-  // Build day columns (one container per day)
   for (let i=0;i<7;i++){
     const col = document.createElement("div");
     col.className="day-col";
@@ -325,22 +267,19 @@ function renderSkeleton(){
     body.appendChild(col);
   }
 
-  // Time column
   const timeCol = document.createElement("div");
   timeCol.className="time-col";
   timeCol.style.gridColumn = "1";
   timeCol.style.gridRow = `1 / span ${END_H-START_H+1}`;
   timeCol.style.position="relative";
-  body.insertBefore(timeCol, body.firstChild);
-
+  calBox.appendChild(head);
   calBox.appendChild(body);
 }
 
 function drawRota(json){
-  // json shape: { "Monday": { segments:[{start:"07:00", end:"09:15", code:"DEB Email"}, ...] }, ... }
   const body = calBox.querySelector(".cal-body");
   const dayCols = [...body.querySelectorAll(".day-col")];
-  const pxPerMin = 60/60; // 60px per hour → 1px per min
+  const pxPerMin = 60/60; // 60px per hour -> 1px per min
 
   dayCols.forEach((col, i)=>{
     const dayName = DAYS[i];
@@ -367,37 +306,30 @@ function drawRota(json){
   });
 }
 
-/* =========================================
-   Realtime (PUBLISHED ONLY)
-   ========================================= */
+/* ================   Realtime (published only)   ================ */
 async function startRealtime(){
   if (!advisorId) return;
   const mondayISO = fmtDateISO(monday);
 
-  // Subscribe to published only
   rotaRealtimeChannel = supabase.channel(`rotas_pub_${advisorId}_${mondayISO}`)
-    .on(
-      "postgres_changes",
+    .on("postgres_changes",
       { event:"*", schema:"public", table:"rotas_published", filter:`advisor_id=eq.${advisorId}` },
       payload=>{
-        const wk = (payload.new && payload.new.week_start) || (payload.old && payload.old.week_start);
+        const wk = payload.new?.week_start || payload.old?.week_start;
         if (wk !== mondayISO) return;
 
         if (payload.eventType === "DELETE"){
           calBox.innerHTML = `<div class="empty-note">This week has no published rota.</div>`;
-          infoNote.style.display=""; infoNote.textContent="No published rota for this week.";
           return;
         }
-
-        const data = payload.new && payload.new.data;
-        if (data){
+        const data = payload.new?.data;
+        if (data) {
           calBox.innerHTML = "";
           renderSkeleton();
           drawRota(data);
           infoNote.style.display="none";
         }
-      }
-    )
+      })
     .subscribe();
 }
 
@@ -408,6 +340,6 @@ function restartRealtime(){
 
 /* boot */
 init();
-  </script>
+</script>
 </body>
 </html>
