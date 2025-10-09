@@ -1,217 +1,27 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Refund & Returns Calculator</title>
+  <meta charset="utf-8" />
+  <title>Redirecting…</title>
+  <meta http-equiv="refresh" content="0; url=https://debenhams.github.io/Timeframe-Tool/advisor-portal.html" />
+  <link rel="canonical" href="https://debenhams.github.io/Timeframe-Tool/advisor-portal.html" />
   <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #f5f8fb;
-      color: #333;
-      max-width: 800px;
-      margin: 40px auto;
-      padding: 20px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.1);
-      border-radius: 10px;
-    }
-
-    h1 {
-      text-align: center;
-      color: #2c3e50;
-    }
-
-    .section {
-      margin-top: 40px;
-    }
-
-    .section h2 {
-      border-left: 5px solid #4F81BD;
-      padding-left: 10px;
-      color: #4F81BD;
-    }
-
-    label, input, select {
-      display: block;
-      margin-top: 10px;
-      font-size: 16px;
-    }
-
-    input[type="date"], select {
-      padding: 8px;
-      width: 220px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-top: 20px;
-    }
-
-    th, td {
-      border: 1px solid #ddd;
-      padding: 10px;
-      text-align: center;
-    }
-
-    th {
-      background: #4F81BD;
-      color: white;
-    }
-
-    .note {
-      font-size: 14px;
-      color: #666;
-    }
-
-    #today {
-      font-weight: bold;
-    }
-
-    @media (max-width: 600px) {
-      body {
-        padding: 10px;
-      }
-      table, th, td {
-        font-size: 14px;
-      }
-    }
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;display:grid;place-items:center;height:100dvh;margin:0;background:#fafafa;color:#111}
+    a{color:#0d47a1;font-weight:600}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.05);text-align:center}
   </style>
 </head>
 <body>
-
-  <h1>Refund & Returns Calculator</h1>
-  <div>Today (UK): <span id="today">loading…</span></div>
-
-  <div class="section">
-    <h2>Refund Completion Dates</h2>
-    <table>
-      <thead>
-        <tr><th>Refund Method</th><th>Completion Date</th></tr>
-      </thead>
-      <tbody id="refund-results"></tbody>
-    </table>
+  <div class="card">
+    <h1>Redirecting…</h1>
+    <p>If you’re not redirected automatically, <a href="https://debenhams.github.io/Timeframe-Tool/advisor-portal.html">click here to open the Advisor Portal</a>.</p>
   </div>
-
-  <!-- NEW SECTION: Select Payment Method + Date -->
-  <div class="section">
-    <h2>Custom Refund Calculator</h2>
-    <label for="refund-method">Select Payment Method:</label>
-    <select id="refund-method">
-      <option value="">-- Select Method --</option>
-      <option value="Card">Card</option>
-      <option value="Apple Pay">Apple Pay</option>
-      <option value="Klarna">Klarna</option>
-      <option value="Clearpay">Clearpay</option>
-      <option value="PayPal">PayPal</option>
-    </select>
-
-    <label for="refund-date">Select Refund Processed Date:</label>
-    <input type="date" id="refund-date" />
-
-    <p><strong>Calculated Completion Date:</strong> <span id="custom-refund-date">—</span></p>
-  </div>
-
-  <div class="section">
-    <h2>Return Deadline Calculator</h2>
-    <label for="dispatch-date">Enter Delivery Date:</label>
-    <input type="date" id="dispatch-date" />
-    <div class="note">You’ll see the 28-day return window deadline.</div>
-    <p><strong>Return Window Ends:</strong> <span id="return-deadline">—</span></p>
-  </div>
-
-  <div class="section">
-    <h2>NRG Completion Date</h2>
-    <label for="nrg-start">Enter Last Tracked Date:</label>
-    <input type="date" id="nrg-start" />
-    <div class="note">NRG is 11 days since last tracked (UK)</div>
-    <p><strong>NRG Due:</strong> <span id="nrg-due">—</span></p>
-  </div>
-
-  <div class="section">
-    <h2>PA Resolution</h2>
-    <label for="pa-start">Enter Dispatch Date:</label>
-    <input type="date" id="pa-start" />
-    <div class="note">PA is 6 days since dispatch</div>
-    <p><strong>PA Deadline:</strong> <span id="pa-due">—</span></p>
-  </div>
-
   <script>
-    function formatUK(date) {
-      return date.toLocaleDateString('en-GB');
-    }
-
-    function getTodayUK() {
-      return formatUK(new Date());
-    }
-
-    document.getElementById("today").textContent = getTodayUK();
-
-    function addDays(dateStr, days) {
-      const date = new Date(dateStr);
-      date.setDate(date.getDate() + days);
-      return formatUK(date);
-    }
-
-    const refundTimeframes = {
-      "Card": 19,
-      "Apple Pay": 19,
-      "Klarna": 15,
-      "Clearpay": 15,
-      "PayPal": 15
-    };
-
-    // Populate table with today's dates
-    const today = new Date();
-    const todayISO = today.toISOString().split('T')[0];
-    document.getElementById("refund-date").value = todayISO;
-
-    const refundTbody = document.getElementById("refund-results");
-    Object.entries(refundTimeframes).forEach(([method, days]) => {
-      const row = document.createElement("tr");
-      row.innerHTML = `<td>${method}</td><td>${addDays(todayISO, days)}</td>`;
-      refundTbody.appendChild(row);
-    });
-
-    // Custom refund calculator
-    const refundMethodSelect = document.getElementById("refund-method");
-    const refundDateInput = document.getElementById("refund-date");
-    const customRefundDate = document.getElementById("custom-refund-date");
-
-    function calculateCustomRefund() {
-      const method = refundMethodSelect.value;
-      const date = refundDateInput.value;
-      if (method && date) {
-        const days = refundTimeframes[method];
-        customRefundDate.textContent = addDays(date, days);
-      } else {
-        customRefundDate.textContent = "—";
-      }
-    }
-
-    refundMethodSelect.addEventListener("change", calculateCustomRefund);
-    refundDateInput.addEventListener("change", calculateCustomRefund);
-
-    // Return 28-day deadline
-    document.getElementById("dispatch-date").addEventListener("change", function() {
-      const val = this.value;
-      if (val) document.getElementById("return-deadline").textContent = addDays(val, 28);
-    });
-
-    // NRG 11 calendar days
-    document.getElementById("nrg-start").addEventListener("change", function() {
-      const val = this.value;
-      if (val) document.getElementById("nrg-due").textContent = addDays(val, 11);
-    });
-
-    // PA 6 calendar days
-    document.getElementById("pa-start").addEventListener("change", function() {
-      const val = this.value;
-      if (val) document.getElementById("pa-due").textContent = addDays(val, 6);
-    });
+    location.replace("https://debenhams.github.io/Timeframe-Tool/advisor-portal.html");
   </script>
 </body>
 </html>
-
+Advisor Portal – My Rota
+ 
 
       
