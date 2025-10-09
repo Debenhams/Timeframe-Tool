@@ -4,19 +4,16 @@
 <meta charset="UTF-8" />
 <title>Advisor Portal – Weekly Rota</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="preconnect" href="https://cdn.jsdelivr.net">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --primary:#0d47a1; --accent:#00c853; --bg:#f5f7fb; --card:#fff; --text:#212121; --muted:#6b7280; --border:#e5e7eb;
     --emails:#2ecc71; --mirakl:#ffb300; --social:#5e35b1; --break:#90a4ae; --lunch:#ff8f00; --meeting:#ffd700; --overtime:#e53935;
-    --start:07; --end:20;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
   header{background:var(--primary);color:#fff;padding:16px 18px;font-weight:700}
   .wrap{max-width:1200px;margin:20px auto;padding:0 16px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:16px}
+  .card{background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:16px}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
   input[type="email"],input[type="date"]{padding:10px 12px;border:1px solid var(--border);border-radius:8px;min-width:260px}
   button{background:var(--accent);color:#fff;border:0;padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:600}
@@ -25,9 +22,9 @@
   .muted{color:var(--muted);font-size:.9rem}
   .error{background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d;border-radius:8px;padding:8px 12px;margin-bottom:10px}
   .hint{font-size:.9rem;padding:8px 12px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;margin-top:10px}
- 
+
   /* Calendar */
-  .calendar{display:grid;grid-template-columns:80px repeat(7,1fr);gap:0;border:1px solid var(--border);border-radius:10px;overflow:auto;background:#fff}
+  .calendar{display:grid;grid-template-columns:80px repeat(7,1fr);border:1px solid var(--border);border-radius:10px;overflow:auto;background:#fff}
   .time-col{border-right:1px solid var(--border);background:#fbfcff;position:relative}
   .time-label{position:absolute;left:0;right:0;padding-right:6px;text-align:right;font-size:12px;color:#8a8fa0;transform:translateY(-50%);border-bottom:1px dashed #e6e8f2}
   .day-head{position:sticky;top:0;background:#f1f5ff;border-left:1px solid var(--border);border-bottom:1px solid var(--border);text-align:center;padding:8px 6px;font-weight:700;z-index:2}
@@ -38,14 +35,16 @@
   .code{font-weight:700}
   .t{font-size:11px;opacity:.95}
   .off{position:absolute;top:45%;left:0;right:0;text-align:center;color:#b5b8c5;font-weight:600}
+  #boot{margin:16px 0;padding:10px 12px;border-radius:8px;border:1px solid #e5e7eb;background:#fff;color:#374151;display:none}
 </style>
 </head>
 <body>
 <header>Advisor Portal – Weekly Rota</header>
 <div class="wrap">
- 
+  <div id="boot">Loading…</div>
+
   <div id="authError" class="error" style="display:none"></div>
- 
+
   <!-- Login -->
   <div id="loginCard" class="card" style="display:none">
     <p class="muted">Use your work email. We’ll send you a one-time sign-in link.</p>
@@ -55,7 +54,7 @@
     </div>
     <div class="hint">If Outlook Safe Links breaks the first email, request a new link and open the newest one.</div>
   </div>
- 
+
   <!-- Portal -->
   <div id="portalCard" class="card" style="display:none">
     <div class="row" style="margin-bottom:10px;">
@@ -64,7 +63,7 @@
       <div style="flex:1"></div>
       <button class="secondary" onclick="signOut()">Sign out</button>
     </div>
- 
+
     <div class="row" style="margin-bottom:10px;">
       <label class="muted">Week start (Monday):</label>
       <input id="weekStart" type="date" onchange="loadWeek()"/>
@@ -73,148 +72,172 @@
       <div style="flex:1"></div>
       <span class="muted">Selected: <strong id="weekLabel"></strong></span>
     </div>
- 
+
     <div id="calendarWrap" class="calendar" aria-live="polite"></div>
- 
+
     <div id="profileWarn" class="hint" style="display:none">
       Your account isn’t linked to an advisor yet. An admin should set <code>profiles.advisor_id</code>.
     </div>
   </div>
 </div>
- 
+
 <script>
-/* ---------- Supabase client (your project) ---------- */
-const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const REDIRECT_URL = 'https://debenhams.github.io/Timeframe-Tool/advisor-portal.html';
- 
-/* ---------- Helpers ---------- */
-const $ = s => document.querySelector(s);
-const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-const START_HOUR = 7, END_HOUR = 20, TOTAL_HOURS = END_HOUR - START_HOUR, HEIGHT = 1000;
-const PX_PER_MIN = (HEIGHT / TOTAL_HOURS) / 60;
- 
-function mondayOf(date){ const d=new Date(date);const day=d.getDay();const diff=(day===0?-6:1-day);d.setDate(d.getDate()+diff);d.setHours(0,0,0,0);return d; }
-const fmt = d => d.toISOString().slice(0,10);
-const toMin = s => {const [h,m]=s.split(':').map(Number);return h*60+m;}
-function topFor(t){ const mins = toMin(t) - START_HOUR*60; return Math.max(0, mins*PX_PER_MIN); }
-function heightFor(a,b){ return Math.max(10, (toMin(b)-toMin(a))*PX_PER_MIN); }
-function colorFor(code){
-  const c = (code||'').toLowerCase();
-  if(c.includes('email')) return getComputedStyle(document.documentElement).getPropertyValue('--emails')||'#2ecc71';
-  if(c.includes('mirakl')) return getComputedStyle(document.documentElement).getPropertyValue('--mirakl')||'#ffb300';
-  if(c.includes('social')) return getComputedStyle(document.documentElement).getPropertyValue('--social')||'#5e35b1';
-  if(c.includes('break'))  return getComputedStyle(document.documentElement).getPropertyValue('--break')||'#90a4ae';
-  if(c.includes('lunch'))  return getComputedStyle(document.documentElement).getPropertyValue('--lunch')||'#ff8f00';
-  if(c.includes('meeting')||c.includes('coach')) return getComputedStyle(document.documentElement).getPropertyValue('--meeting')||'#ffd700';
-  if(c.includes('overtime')) return getComputedStyle(document.documentElement).getPropertyValue('--overtime')||'#e53935';
-  return '#0ea5e9';
+/* ------- Boot helper & dynamic CDN fallback ------- */
+const boot = (m)=>{ const b=document.getElementById('boot'); if(b){ b.style.display='block'; b.textContent=m; } };
+
+function loadSupabase(ready){
+  // Try jsDelivr first
+  const s1=document.createElement('script');
+  s1.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js';
+  s1.onload=()=> ready();
+  s1.onerror=()=>{
+    // Fallback to unpkg
+    boot('Primary CDN blocked. Switching to backup…');
+    const s2=document.createElement('script');
+    s2.src='https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js';
+    s2.onload=()=> ready();
+    s2.onerror=()=> boot('Unable to load Supabase library. Check network / firewall.');
+    document.head.appendChild(s2);
+  };
+  document.head.appendChild(s1);
 }
- 
-/* ---------- Auth / init ---------- */
-async function init(){
-  const q = new URL(location.href).searchParams;
-  if(q.get('error')){ $('#authError').style.display='block'; $('#authError').textContent = 'Login error: '+(q.get('error_description')||q.get('error')); }
- 
-  const { data:{ user } } = await supabase.auth.getUser();
-  if(!user){ $('#loginCard').style.display='block'; return; }
- 
-  $('#loginCard').style.display='none'; $('#portalCard').style.display='block';
-  $('#whoami').textContent = user.email || 'Signed in';
- 
-  const { data: prof, error: pErr } = await supabase
+
+loadSupabase(()=>{ (async function main(){
+  boot('Initialising…');
+
+  /* ---------- Supabase client ---------- */
+  const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
+  const REDIRECT_URL = 'https://debenhams.github.io/Timeframe-Tool/advisor-portal.html';
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const $ = s => document.querySelector(s);
+  const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const START_HOUR = 7, END_HOUR = 20, TOTAL_HOURS = END_HOUR - START_HOUR, HEIGHT = 1000;
+  const PX_PER_MIN = (HEIGHT / TOTAL_HOURS) / 60;
+
+  const mondayOf = (date)=>{ const d=new Date(date); const day=d.getDay(); const diff=(day===0?-6:1-day); d.setDate(d.getDate()+diff); d.setHours(0,0,0,0); return d; };
+  const fmt = d => d.toISOString().slice(0,10);
+  const toMin = s => {const [h,m]=s.split(':').map(Number);return h*60+m;};
+  const topFor = t => Math.max(0, (toMin(t) - START_HOUR*60) * PX_PER_MIN);
+  const heightFor = (a,b) => Math.max(10, (toMin(b)-toMin(a))*PX_PER_MIN);
+  const colorFor = (code)=>{
+    const c=(code||'').toLowerCase();
+    if(c.includes('email')) return '#2ecc71';
+    if(c.includes('mirakl')) return '#ffb300';
+    if(c.includes('social')) return '#5e35b1';
+    if(c.includes('break'))  return '#90a4ae';
+    if(c.includes('lunch'))  return '#ff8f00';
+    if(c.includes('meeting')||c.includes('coach')) return '#ffd700';
+    if(c.includes('overtime')) return '#e53935';
+    return '#0ea5e9';
+  };
+
+  function show(id, on){ const el=$(id); if(el) el.style.display = on?'block':'none'; }
+
+  async function init(){
+    const q = new URL(location.href).searchParams;
+    if(q.get('error')){ show('#authError',true); $('#authError').textContent='Login error: '+(q.get('error_description')||q.get('error')); }
+
+    const { data:{ user } } = await supabase.auth.getUser();
+    if(!user){ show('#loginCard',true); boot(''); return; }
+
+    show('#loginCard',false); show('#portalCard',true); boot('');
+    $('#whoami').textContent = user.email || 'Signed in';
+
+    const { data: prof } = await supabase
       .from('profiles')
       .select('advisor_id, role, advisors:advisor_id(name)')
       .eq('user_id', user.id)
       .maybeSingle();
- 
-  if(pErr){ $('#authError').style.display='block'; $('#authError').textContent='Profile error: '+pErr.message; return; }
-  if(!prof || !prof.advisor_id){ $('#profileWarn').style.display='block'; return; }
- 
-  window.PROFILE = prof;
-  $('#advisorName').textContent = prof.advisors?.name ?? '(Advisor)';
- 
-  const monday = mondayOf(new Date());
-  $('#weekStart').value = fmt(monday);
-  await loadWeek();
- 
-  supabase.channel('adv-rotas')
-    .on('postgres_changes',
-        {event:'*', schema:'public', table:'rotas', filter:`advisor_id=eq.${prof.advisor_id}`},
-        () => loadWeek())
-    .subscribe();
-}
- 
-async function sendMagicLink(){
-  const email = $('#email').value.trim();
-  if(!email){ alert('Enter your work email'); return; }
-  const { error } = await supabase.auth.signInWithOtp({
-    email,
-    options:{ emailRedirectTo: REDIRECT_URL }
-  });
-  if(error){ alert(error.message); return; }
-  alert('Check your inbox for the sign-in link (use the newest email).');
-}
- 
-async function signOut(){ await supabase.auth.signOut(); location.href = REDIRECT_URL; }
- 
-/* ---------- Load / render week ---------- */
-async function loadWeek(){
-  if(!window.PROFILE?.advisor_id) return;
-  const week = $('#weekStart').value;
-  $('#weekLabel').textContent = week;
- 
-  const { data, error } = await supabase
-    .from('rotas')
-    .select('data, week_start')
-    .eq('advisor_id', window.PROFILE.advisor_id)
-    .eq('week_start', week)
-    .maybeSingle();
- 
-  renderCalendar(error ? null : (data?.data || {}));
-}
- 
-function shiftWeek(d){ const m=mondayOf(new Date($('#weekStart').value)); m.setDate(m.getDate()+7*d); $('#weekStart').value=fmt(m); loadWeek(); }
- 
-function renderCalendar(data){
-  const cal = $('#calendarWrap'); cal.innerHTML='';
-  /* headers */
-  cal.appendChild(headerCell(''));// time column
-  // compute header dates
-  const start = new Date($('#weekStart').value+'T00:00:00');
-  const headers=[];
-  for(let i=0;i<7;i++){ const d=new Date(start); d.setDate(d.getDate()+i);
-    const title = `${d.toLocaleString('en-GB',{month:'long'})}<br><strong>${DAYS[i]}</strong><br>${d.getDate()}`;
-    headers.push(title); cal.appendChild(dayHead(title));
+
+    if(!prof || !prof.advisor_id){ $('#profileWarn').style.display='block'; return; }
+
+    window.PROFILE = prof;
+    $('#advisorName').textContent = prof.advisors?.name ?? '(Advisor)';
+
+    const monday = mondayOf(new Date());
+    $('#weekStart').value = fmt(monday);
+    await loadWeek();
+
+    supabase.channel('adv-rotas')
+      .on('postgres_changes',{event:'*',schema:'public',table:'rotas',filter:`advisor_id=eq.${prof.advisor_id}`},
+        ()=> loadWeek())
+      .subscribe();
   }
-  /* time axis */
-  const axis=document.createElement('div'); axis.className='time-col';
-  const axisInner=document.createElement('div'); axisInner.className='axis'; axis.appendChild(axisInner);
-  for(let h=START_HOUR; h<=END_HOUR; h++){
-    const y = topFor(String(h).padStart(2,'0')+':00');
-    const lab=document.createElement('div'); lab.className='time-label'; lab.style.top = y+'px';
-    lab.textContent = String(h).padStart(2,'0')+':00'; axisInner.appendChild(lab);
+
+  window.sendMagicLink = async function(){
+    const email = $('#email').value.trim();
+    if(!email){ alert('Enter your work email'); return; }
+    const { error } = await supabase.auth.signInWithOtp({ email, options:{ emailRedirectTo: REDIRECT_URL } });
+    if(error){ alert(error.message); return; }
+    alert('Check your inbox for the sign-in link (use the newest email).');
+  };
+
+  window.signOut = async function(){ await supabase.auth.signOut(); location.href = REDIRECT_URL; };
+
+  window.loadWeek = async function(){
+    if(!window.PROFILE?.advisor_id) return;
+    const week = $('#weekStart').value;
+    $('#weekLabel').textContent = week;
+
+    const { data } = await supabase
+      .from('rotas')
+      .select('data, week_start')
+      .eq('advisor_id', window.PROFILE.advisor_id)
+      .eq('week_start', week)
+      .maybeSingle();
+
+    renderCalendar(data?.data || {});
+  };
+
+  window.shiftWeek = function(d){
+    const m=mondayOf(new Date($('#weekStart').value)); m.setDate(m.getDate()+7*d);
+    $('#weekStart').value=fmt(m); loadWeek();
+  };
+
+  function headerCell(txt){ const e=document.createElement('div'); e.className='day-head'; e.innerHTML=txt; return e; }
+  function dayHead(html){ const e=document.createElement('div'); e.className='day-head'; e.innerHTML=html; return e; }
+
+  function renderCalendar(data){
+    const cal = $('#calendarWrap'); cal.innerHTML='';
+    cal.appendChild(headerCell(''));
+    const start = new Date($('#weekStart').value+'T00:00:00');
+    for(let i=0;i<7;i++){ const d=new Date(start); d.setDate(d.getDate()+i);
+      const title = `${d.toLocaleString('en-GB',{month:'long'})}<br><strong>${['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][i]}</strong><br>${d.getDate()}`;
+      cal.appendChild(dayHead(title));
+    }
+    const axis=document.createElement('div'); axis.className='time-col';
+    const axisInner=document.createElement('div'); axisInner.className='axis'; axis.appendChild(axisInner);
+    for(let h=START_HOUR; h<=END_HOUR; h++){
+      const lab=document.createElement('div'); lab.className='time-label';
+      lab.style.top = ( (h-START_HOUR)*60 * ((1000/(20-7))/60) )+'px';
+      lab.textContent = String(h).padStart(2,'0')+':00'; axisInner.appendChild(lab);
+    }
+    cal.appendChild(axis);
+
+    const dayNames=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    for(let i=0;i<7;i++){
+      const cell=document.createElement('div'); cell.className='day-cell'; cal.appendChild(cell);
+      const list = Array.isArray(data?.[dayNames[i].slice(0,3)]) ? data[dayNames[i].slice(0,3)]
+                 : Array.isArray(data?.[dayNames[i]]) ? data[dayNames[i]] : [];
+      if(!list || list.length===0){ const off=document.createElement('div'); off.className='off'; off.textContent='Roster Day Off'; cell.appendChild(off); continue; }
+      list.forEach(seg=>{
+        if(!seg?.start || !seg?.end) return;
+        const b=document.createElement('div'); b.className='block';
+        b.style.top = topFor(seg.start)+'px';
+        b.style.height = heightFor(seg.start, seg.end)+'px';
+        b.style.background = colorFor(seg.code||seg.activity||'');
+        b.innerHTML = `<div class="code">${(seg.code||seg.activity||'').toString()}</div>
+                       <div class="t">${seg.start} – ${seg.end}</div>`;
+        cell.appendChild(b);
+      });
+    }
   }
-  cal.appendChild(axis);
- 
-  /* day cells */
-  for(let i=0;i<7;i++){
-    const cell=document.createElement('div'); cell.className='day-cell'; cal.appendChild(cell);
-    const list = Array.isArray(data?.[DAYS[i].slice(0,3)]) ? data[DAYS[i].slice(0,3)]
-               : Array.isArray(data?.[DAYS[i]]) ? data[DAYS[i]] : [];
-    if(!list || list.length===0){ const off=document.createElement('div'); off.className='off'; off.textContent='Roster Day Off'; cell.appendChild(off); continue; }
-    list.forEach(seg=>{
-      if(!seg?.start || !seg?.end) return;
-      const b=document.createElement('div'); b.className='block';
-      b.style.top = topFor(seg.start)+'px';
-      b.style.height = heightFor(seg.start, seg.end)+'px';
-      b.style.background = colorFor(seg.code||seg.activity||'');
-      b.innerHTML = `<div class="code">${(seg.code||seg.activity||'').toString()}</div>
-                     <div class="t">${seg.start} – ${seg.end}</div>`;
-      cell.appendChild(b);
-    });
-  }
-}
- 
-function headerCell(txt){ const e=document.createElement('div');
+
+  // Start
+  init().catch(e=>{ boot('Error: '+e.message); console.error(e); });
+})(); });
+</script>
+</body>
+</html>
