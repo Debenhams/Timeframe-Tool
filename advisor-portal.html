@@ -1,215 +1,275 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Advisor Rota — Published</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Advisor Portal — Weekly Rota</title>
 <style>
   :root{
-    --brand:#0d47a1; --ink:#1f2937; --paper:#ffffff; --wash:#f5f7fb; --line:#e4e9f2;
+    --ink:#1f2937; --paper:#ffffff; --wash:#f6f8fb; --line:#e5e9f2;
+    --brand:#0d47a1;
+    --color-email:#2ecc71; --color-mirakl:#b1b51e; --color-social:#5e35b1;
+    --color-overtime:#e53935; --color-meeting:#ffd700; --color-break:#cfd8dc; --color-lunch:#b0bec5;
+    --color-absence:#b0c4de; --color-shrink:#ffd166;
   }
   html,body{height:100%}
   body{margin:0;background:#eef2f6;color:var(--ink);font-family:Inter,Roboto,Segoe UI,system-ui,Arial,Helvetica,sans-serif}
-  .topbar{background:var(--brand);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 14px rgba(13,71,161,.18)}
+  .topbar{background:var(--brand);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:14px}
   .topbar h1{margin:0;font-size:18px;font-weight:800}
-  .layout{max-width:1000px;margin:18px auto;padding:0 16px}
-  .panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 20px rgba(12,27,74,.06);overflow:hidden}
+  .wrap{max-width:1100px;margin:18px auto;padding:0 16px;display:flex;flex-direction:column;gap:14px}
+  .panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 20px rgba(12,27,74,.06)}
   .panel-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line)}
   .panel-body{padding:12px 14px}
-  .muted{color:#64748b}
-  .btn{background:#e9eef6;color:#0f172a;border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-weight:700;cursor:pointer}
+  .muted{color:#6b7280}
+  .btn{background:#e9eef6;color:#0f172a;border:1px solid var(--line);border-radius:10px;padding:8px 11px;font-weight:700;cursor:pointer}
   .btn:hover{filter:brightness(.97)}
-  table{width:100%;border-collapse:collapse}
-  th,td{border:1px solid var(--line);padding:10px;text-align:left}
-  thead th{background:#f6f8fb}
-  .ok{color:#059669;font-weight:700}
-  .warn{color:#b45309;font-weight:700}
-  .err{color:#b91c1c;font-weight:700}
-  .pill{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid var(--line);background:#f7fafc;font-size:12px}
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
+  .day{border:1px solid var(--line);border-radius:10px;background:#fff;display:flex;flex-direction:column;min-height:140px}
+  .day-h{padding:8px 10px;font-weight:800;border-bottom:1px solid var(--line);background:#f6f8fb;display:flex;justify-content:space-between}
+  .seg{margin:8px 10px;padding:8px;border-radius:8px;font-size:13px;font-weight:700;color:#0b1320;border:1px solid var(--line);background:#f9fbff}
+  .seg .t{font-weight:800}
+  .legend{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 8px;font-size:12px}
+  .sw{width:12px;height:12px;border-radius:3px;border:1px solid var(--line)}
+  .err{padding:10px 12px;border-radius:10px;background:#fde8e8;color:#b42318;border:1px solid #f2b8b5;font-weight:700}
 </style>
- 
-<!-- Supabase client -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div class="topbar">
-    <h1>Advisor Rota — Published</h1>
-    <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
-      <button class="btn" id="prevBtn">◀ Prev</button>
-      <button class="btn" id="todayBtn">Today</button>
-      <button class="btn" id="nextBtn">Next ▶</button>
-    </div>
+    <h1>Advisor Portal</h1>
+    <div style="margin-left:auto" id="weekRange" class="muted"></div>
   </div>
  
-  <div class="layout">
+  <div class="wrap">
     <div class="panel">
       <div class="panel-header">
-        <div>
-          <div id="who" style="font-weight:800">Advisor</div>
-          <div class="muted" id="rangeLabel">Week</div>
+        <div style="display:flex;gap:10px;align-items:center">
+          <button class="btn" id="prev">◀ Previous</button>
+          <button class="btn" id="today">This Week</button>
+          <button class="btn" id="next">Next ▶</button>
         </div>
-        <div class="muted" id="status">Loading…</div>
+        <div class="legend">
+          <span class="chip"><span class="sw" style="background:var(--color-email)"></span>Email</span>
+          <span class="chip"><span class="sw" style="background:var(--color-mirakl)"></span>Mirakl</span>
+          <span class="chip"><span class="sw" style="background:var(--color-social)"></span>Social</span>
+          <span class="chip"><span class="sw" style="background:var(--color-break)"></span>Break</span>
+          <span class="chip"><span class="sw" style="background:var(--color-lunch)"></span>Lunch</span>
+          <span class="chip"><span class="sw" style="background:var(--color-absence)"></span>Absence</span>
+          <span class="chip"><span class="sw" style="background:var(--color-shrink)"></span>Shrinkage</span>
+          <span class="chip"><span class="sw" style="background:var(--color-overtime)"></span>Overtime</span>
+        </div>
       </div>
       <div class="panel-body">
-        <div id="notice" class="muted" style="margin-bottom:10px"></div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th style="width:160px">Day</th><th>Assignment</th></tr>
-            </thead>
-            <tbody id="tbody">
-              <!-- rows injected -->
-            </tbody>
-          </table>
-        </div>
+        <div id="notice"></div>
+        <div id="grid" class="grid"></div>
       </div>
     </div>
   </div>
  
 <script>
-/* ========= CONFIG ========= */
-const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/* ========= Supabase ========= */
+const SUPABASE_URL  = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
+const SUPABASE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
  
-/* ========= UTILS ========= */
-const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-const $ = sel => document.querySelector(sel);
-function pad(n){ return String(n).padStart(2,'0'); }
-function mondayOf(d){
-  const x = new Date(d); const day = x.getDay(); const diff = (day===0?-6:1)-day; x.setDate(x.getDate()+diff); x.setHours(0,0,0,0); return x;
+/* ========= Helpers ========= */
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+ 
+function qp(k){ return new URLSearchParams(location.search).get(k); }
+const pad = n => String(n).padStart(2,'0');
+function toMin(t){ if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
+function m2t(m){ return `${pad(Math.floor(m/60))}:${pad(m%60)}`; }
+ 
+function startOfWeekMonday(d){
+  const dt = new Date(d);
+  const day = dt.getDay(); // 0..6 (Sun..Sat)
+  const diff = (day === 0 ? -6 : 1) - day; // move to Monday
+  dt.setDate(dt.getDate()+diff);
+  dt.setHours(0,0,0,0);
+  return dt;
 }
-function fmtDate(d){ return d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'}); }
-function getParam(name){ const u=new URL(location.href); return u.searchParams.get(name); }
-function setParam(name,val){
-  const u = new URL(location.href);
-  if(val==null) u.searchParams.delete(name); else u.searchParams.set(name,val);
-  history.replaceState(null,'',u.toString());
+function mondayISO(any){
+  return startOfWeekMonday(any).toISOString().slice(0,10);
 }
- 
-/* ========= CORE LOAD ========= */
-async function load(){
-  $("#status").textContent = "Loading…";
-  const weekStr = getParam('week') || mondayOf(new Date()).toISOString().slice(0,10);
-  const byId    = getParam('advisor_id');
-  const byName  = getParam('name');
- 
-  // Header info
-  const s = new Date(weekStr+"T00:00:00");
+function formatRangeLabel(mondayISOstr){
+  const s = new Date(mondayISOstr+'T00:00:00');
   const e = new Date(s); e.setDate(e.getDate()+6);
-  $("#rangeLabel").textContent = `${fmtDate(s)} – ${fmtDate(e)}`;
- 
-  // Resolve advisor id + name
-  let advisorId = byId || null;
-  let advisorName = byName || null;
- 
-  if(!advisorId && advisorName){
-    const { data: advRow } = await sb.from('advisors')
-      .select('id,name')
-      .ilike('name', advisorName)
-      .maybeSingle();
-    advisorId = advRow?.id || null;
-    advisorName = advRow?.name || advisorName;
-  }
- 
-  if(advisorId){
-    const { data: adv } = await sb.from('advisors').select('name').eq('id', advisorId).maybeSingle();
-    advisorName = adv?.name || advisorName;
-  }
- 
-  $("#who").textContent = advisorName ? advisorName : (advisorId ? advisorId : "Advisor");
- 
-  // 1) Try published
-  let rota = null, src = 'rotas_published';
-  {
-    const { data, error } = await sb
-      .from('rotas_published')
-      .select('data, week_start')
-      .eq('week_start', weekStr)
-      .eq(advisorId ? 'advisor_id' : 'name', advisorId ? advisorId : advisorName)
-      .maybeSingle();
-    if(!error && data){ rota = data; }
-  }
- 
-  // 2) Fallback to draft rotas (only if nothing published)
-  if(!rota){
-    src = 'rotas (draft)';
-    const { data, error } = await sb
-      .from('rotas')
-      .select('data, week_start, advisor_id')
-      .eq('week_start', weekStr)
-      .eq(advisorId ? 'advisor_id' : 'advisor_id', advisorId || '')
-      .maybeSingle();
- 
-    if(data){ rota = data; }
-  }
- 
-  // Render
-  render(rota?.data || {}, src, !!rota);
+  const f = d => d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
+  return `${f(s)} – ${f(e)}`;
 }
  
-function render(data, src, hasData){
-  const tbody = $("#tbody"); tbody.innerHTML = "";
-  let any = false;
+function classForCode(code=''){
+  const k = code.toLowerCase();
+  if(/\blunch\b/.test(k)) return 'background:var(--color-lunch)';
+  if(/\bbreak\b/.test(k)) return 'background:var(--color-break)';
+  if(/\bovertime\b/.test(k)) return 'background:var(--color-overtime);color:#fff';
+  if(/\bmirakl\b/.test(k))  return 'background:var(--color-mirakl);color:#fff';
+  if(/\bsocial\b/.test(k))  return 'background:var(--color-social);color:#fff';
+  if(/\bemail\b/.test(k))   return 'background:var(--color-email);color:#fff';
+  if(['al','sick','rdo','maternity','lts','split shift'].some(w=>k.includes(w))) return 'background:var(--color-absence)';
+  if(['121','atl','coaching','huddle','iti','projects','team meeting','training'].some(w=>k.includes(w))) return 'background:var(--color-shrink)';
+  return 'background:#f9fbff';
+}
  
-  for(const day of DAYS){
-    const cell = document.createElement('tr');
-    const left = document.createElement('td'); left.textContent = day;
-    const right = document.createElement('td');
+/* ========= Resolve advisor & week ========= */
+async function resolveAdvisorId(){
+  const idFromUrl = qp('advisor_id');
+  if (idFromUrl) return idFromUrl;
  
-    const dayVal = data?.[day];
+  const name = qp('name');
+  if (!name) return null;
  
-    if(!dayVal){
-      right.innerHTML = `<span class="pill muted">Day Off</span>`;
-    } else if (typeof dayVal === 'string'){
-      // Template name
-      right.innerHTML = `<span class="pill">${dayVal}</span>`;
-      any = true;
-    } else if (dayVal && Array.isArray(dayVal.segments)){
-      // Custom segments
-      const bits = dayVal.segments
-        .map(s => `${s.code} <span class="muted">(${s.start}–${s.end})</span>`)
-        .join(' &nbsp;•&nbsp; ');
-      right.innerHTML = bits || `<span class="pill muted">No segments</span>`;
-      any = true;
+  // exact (case-insensitive)
+  let { data, error } = await sb.from('advisors').select('id,name').ilike('name', name).limit(1).maybeSingle();
+  if (data && data.id) return data.id;
+ 
+  // loose fallback
+  const tidy = name.trim();
+  const res = await sb.from('advisors').select('id,name').ilike('name', `%${tidy}%`).limit(1).maybeSingle();
+  return (res.data && res.data.id) ? res.data.id : null;
+}
+ 
+function resolveWeekStart(){
+  const w = qp('week') || qp('week_start');
+  return w ? mondayISO(w) : mondayISO(new Date());
+}
+ 
+/* ========= Fetch rota (published → draft) ========= */
+async function fetchRota(advisorId, weekStartISO){
+  // 1. published
+  let { data, error } = await sb
+    .from('rotas_published')
+    .select('data')
+    .eq('advisor_id', advisorId)
+    .eq('week_start', weekStartISO)
+    .maybeSingle();
+ 
+  if (data && data.data) return data.data;
+ 
+  // 2. fallback to draft rotas
+  let f = await sb
+    .from('rotas')
+    .select('data')
+    .eq('advisor_id', advisorId)
+    .eq('week_start', weekStartISO)
+    .maybeSingle();
+ 
+  return (f.data && f.data.data) ? f.data.data : null;
+}
+ 
+/* ========= Render ========= */
+function processDayValue(dayValue, templates){
+  // Day value is either string template name or {segments:[...]}
+  if (dayValue && typeof dayValue==='object' && Array.isArray(dayValue.segments)) {
+    return dayValue.segments
+      .map(s => ({label:s.code, start:s.start, end:s.end}))
+      .filter(s => s.start && s.end);
+  }
+  if (typeof dayValue==='string') {
+    // If you want to expand templates client-side, uncomment & provide templates map.
+    // For portal we just show label+hours when present in dayValue object.
+    return [{label:dayValue, start:null, end:null}];
+  }
+  return [];
+}
+ 
+function renderWeek(rotaData, weekStartISO){
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+ 
+  // header range
+  document.getElementById('weekRange').textContent = formatRangeLabel(weekStartISO);
+ 
+  // build 7 days Monday→Sunday
+  const monday = new Date(weekStartISO+'T00:00:00');
+ 
+  for (let i=0;i<7;i++){
+    const d = new Date(monday); d.setDate(d.getDate()+i);
+    const dayName = DAYS[i];
+    const dateStr = d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+ 
+    const dayBox = document.createElement('div');
+    dayBox.className = 'day';
+ 
+    const head = document.createElement('div');
+    head.className = 'day-h';
+    head.innerHTML = `<span>${dayName}</span><span class="muted">${dateStr}</span>`;
+    dayBox.appendChild(head);
+ 
+    const dayVal = rotaData[dayName];
+    const segs = processDayValue(dayVal);
+ 
+    if (!segs.length){
+      const off = document.createElement('div');
+      off.className = 'seg';
+      off.style.background = '#f2f4f8';
+      off.innerHTML = `<span class="t">Day Off</span>`;
+      dayBox.appendChild(off);
     } else {
-      right.innerHTML = `<span class="pill muted">Unknown</span>`;
+      segs.forEach(s=>{
+        const div = document.createElement('div');
+        div.className = 'seg';
+        div.style = classForCode(s.label||'');
+        const time = (s.start && s.end) ? `${s.start}–${s.end}` : '';
+        div.innerHTML = `<div>${s.label || ''}</div>${time?`<div class="t">${time}</div>`:''}`;
+        dayBox.appendChild(div);
+      });
     }
  
-    cell.append(left,right); tbody.appendChild(cell);
-  }
- 
-  const status = $("#status");
-  if(hasData){
-    status.innerHTML = `<span class="ok">Loaded from <strong>${src}</strong></span>`;
-    $("#notice").textContent = src.startsWith('rotas_published')
-      ? ""
-      : "No published rota found yet — showing the latest draft. Ask your manager to publish.";
-  } else {
-    status.innerHTML = `<span class="err">No rota found for this week</span>`;
-    $("#notice").textContent = "If this looks wrong, please check your name/advisor_id or speak to your manager.";
+    grid.appendChild(dayBox);
   }
 }
  
-/* ========= NAV ========= */
-function go(deltaDays){
-  const cur = getParam('week') || mondayOf(new Date()).toISOString().slice(0,10);
-  const d = new Date(cur+"T00:00:00");
-  d.setDate(d.getDate()+deltaDays);
-  const m = mondayOf(d).toISOString().slice(0,10);
-  setParam('week', m);
-  load();
+/* ========= Boot ========= */
+let currentMonday = resolveWeekStart();
+let currentAdvisorId = null;
+ 
+async function loadPage(){
+  // normalize to Monday always
+  currentMonday = resolveWeekStart();
+ 
+  const n = document.getElementById('notice');
+  n.innerHTML = '';
+ 
+  if (!currentAdvisorId){
+    currentAdvisorId = await resolveAdvisorId();
+  }
+  if (!currentAdvisorId){
+    n.innerHTML = `<div class="err">Advisor not found. Add <code>?advisor_id=&lt;uuid&gt;</code> or <code>?name=First%20Last</code> to the URL.</div>`;
+    document.getElementById('grid').innerHTML = '';
+    document.getElementById('weekRange').textContent = formatRangeLabel(currentMonday);
+    return;
+  }
+ 
+  const data = await fetchRota(currentAdvisorId, currentMonday);
+  if (!data){
+    n.innerHTML = `<div class="err">No rota found for this week (checked <b>rotas_published</b>, then <b>rotas</b>).</div>`;
+    document.getElementById('grid').innerHTML = '';
+    document.getElementById('weekRange').textContent = formatRangeLabel(currentMonday);
+    return;
+  }
+ 
+  renderWeek(data, currentMonday);
 }
  
-$("#prevBtn").onclick = ()=>go(-7);
-$("#nextBtn").onclick = ()=>go(+7);
-$("#todayBtn").onclick= ()=>{
-  setParam('week', mondayOf(new Date()).toISOString().slice(0,10));
-  load();
+/* ========= Week nav ========= */
+document.getElementById('prev').onclick = async()=>{
+  const d = new Date(currentMonday+'T00:00:00');
+  d.setDate(d.getDate()-7);
+  currentMonday = mondayISO(d);
+  await loadPage();
+};
+document.getElementById('next').onclick = async()=>{
+  const d = new Date(currentMonday+'T00:00:00');
+  d.setDate(d.getDate()+7);
+  currentMonday = mondayISO(d);
+  await loadPage();
+};
+document.getElementById('today').onclick = async()=>{
+  currentMonday = mondayISO(new Date());
+  await loadPage();
 };
  
-/* ========= START ========= */
-load();
-</script>
-</body>
-</html>
+document.addEventListener('DOMContentLoaded', loadPage);
+</scr
