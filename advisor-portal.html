@@ -83,12 +83,20 @@
       .subscribe();
   }
  
+  // UPDATED: uses your GitHub Pages URL as the magic-link redirect
   async function sendMagicLink(){
     const email = $('#email').value.trim();
     if(!email){ alert('Enter your work email'); return; }
-    const { error } = await supabase.auth.signInWithOtp({ email });
+ 
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: 'https://debenhams.github.io/Timeframe-Tool/advisor-portal.html'
+      }
+    });
+ 
     if(error){ alert(error.message); return; }
-    $('#magicInfo').textContent = 'Check your email for the sign-in link.';
+    $('#magicInfo').textContent = 'Check your inbox for the sign-in link (use the newest email).';
   }
  
   async function signOut(){
