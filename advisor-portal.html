@@ -2,175 +2,219 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Advisor Portal – My Rota</title>
+<title>Advisor Portal – Weekly Rota</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
-  :root{--primary:#0d47a1;--bg:#fafafa;--card:#fff;--text:#212121;--muted:#6b7280;--border:#e5e7eb;--accent:#00c853}
+  :root{
+    --primary:#0d47a1; --accent:#00c853; --bg:#f5f7fb; --card:#fff; --text:#212121; --muted:#6b7280; --border:#e5e7eb;
+    --emails:#2ecc71; --mirakl:#ffb300; --social:#5e35b1; --break:#90a4ae; --lunch:#ff8f00; --meeting:#ffd700; --overtime:#e53935;
+    --start:07; --end:20;
+  }
   *{box-sizing:border-box}
   body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;background:var(--bg);color:var(--text)}
-  header{background:var(--primary);color:#fff;padding:18px 20px;font-weight:700}
-  .wrap{max-width:980px;margin:24px auto;padding:0 16px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:16px;margin-bottom:16px}
+  header{background:var(--primary);color:#fff;padding:16px 18px;font-weight:700}
+  .wrap{max-width:1200px;margin:20px auto;padding:0 16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:16px}
   .row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
-  input[type="email"],input[type="date"],input[type="text"]{padding:10px 12px;border:1px solid var(--border);border-radius:8px;min-width:260px}
+  input[type="email"],input[type="date"]{padding:10px 12px;border:1px solid var(--border);border-radius:8px;min-width:260px}
   button{background:var(--accent);color:#fff;border:0;padding:10px 14px;border-radius:8px;cursor:pointer;font-weight:600}
   button.secondary{background:#111827}
+  .pill{display:inline-block;background:#eef2ff;color:#1e3a8a;border:1px solid #c7d2fe;border-radius:999px;padding:4px 10px;font-size:.85rem}
   .muted{color:var(--muted);font-size:.9rem}
-  .pill{display:inline-block;background:#eef2ff;color:#1e3a8a;border:1px solid #c7d2fe;border-radius:999px;padding:4px 10px;font-size:.85rem;margin-right:8px}
-  .spacer{flex:1}
-  .json{white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#0b1020;color:#cde3ff;border-radius:10px;padding:12px;overflow:auto}
-  .hint{font-size:.9rem;padding:8px 12px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px}
-  .error{background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d;border-radius:8px;padding:8px 12px}
+  .error{background:#fee2e2;border:1px solid #fecaca;color:#7f1d1d;border-radius:8px;padding:8px 12px;margin-bottom:10px}
+  .hint{font-size:.9rem;padding:8px 12px;background:#fff8e1;border:1px solid #ffe082;border-radius:8px;margin-top:10px}
+ 
+  /* Calendar */
+  .calendar{display:grid;grid-template-columns:80px repeat(7,1fr);gap:0;border:1px solid var(--border);border-radius:10px;overflow:auto;background:#fff}
+  .time-col{border-right:1px solid var(--border);background:#fbfcff;position:relative}
+  .time-label{position:absolute;left:0;right:0;padding-right:6px;text-align:right;font-size:12px;color:#8a8fa0;transform:translateY(-50%);border-bottom:1px dashed #e6e8f2}
+  .day-head{position:sticky;top:0;background:#f1f5ff;border-left:1px solid var(--border);border-bottom:1px solid var(--border);text-align:center;padding:8px 6px;font-weight:700;z-index:2}
+  .day-cell{position:relative;height:1000px;border-left:1px solid var(--border)}
+  .axis{position:relative;height:1000px}
+  .block{position:absolute;left:6%;width:88%;border-radius:6px;color:#fff;padding:4px 6px;font-size:12px;line-height:1.15;
+         box-shadow:0 1px 4px rgba(0,0,0,.15);display:flex;flex-direction:column;justify-content:center;align-items:center;text-shadow:0 1px 1px rgba(0,0,0,.3)}
+  .code{font-weight:700}
+  .t{font-size:11px;opacity:.95}
+  .off{position:absolute;top:45%;left:0;right:0;text-align:center;color:#b5b8c5;font-weight:600}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  // === Supabase (your project) ===
-  const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
- 
-  // Helpers
-  const $ = s => document.querySelector(s);
-  const fmt = d => d.toISOString().slice(0,10);
-  function mondayOf(date){ const d=new Date(date); const day=d.getDay(); const diff=(day===0?-6:1-day); d.setDate(d.getDate()+diff); d.setHours(0,0,0,0); return d; }
-  function getQuery(){ return Object.fromEntries(new URL(location.href).searchParams.entries()); }
- 
-  async function init(){
-    // Surface any auth error from redirect (e.g., otp_expired)
-    const q = getQuery();
-    if(q.error){ $('#authError').style.display='block'; $('#authError').textContent = `Login error: ${q.error_description||q.error}`; }
- 
-    const { data:{ user } } = await supabase.auth.getUser();
-    if(!user){ $('#loginCard').style.display='block'; return; }
- 
-    $('#loginCard').style.display='none';
-    $('#portalCard').style.display='block';
-    $('#whoami').textContent = user.email || 'Signed in';
- 
-    const { data: prof, error: pErr } = await supabase
-      .from('profiles')
-      .select('advisor_id, role, advisors:advisor_id(name)')
-      .eq('user_id', user.id)
-      .maybeSingle();
- 
-    if(pErr){ $('#authError').style.display='block'; $('#authError').textContent='Profile error: '+pErr.message; return; }
- 
-    if(!prof || !prof.advisor_id){
-      $('#profileWarn').style.display='block';
-      return;
-    }
-    window.PROFILE = prof;
-    $('#advisorName').textContent = prof.advisors?.name ?? '(Advisor)';
- 
-    const monday=mondayOf(new Date());
-    $('#weekStart').value = fmt(monday);
-    await loadWeek();
- 
-    supabase
-      .channel('adv-rotas')
-      .on('postgres_changes',
-          { event:'*', schema:'public', table:'rotas', filter:`advisor_id=eq.${prof.advisor_id}` },
-          () => loadWeek())
-      .subscribe();
-  }
- 
-  // Force redirect to your GitHub Pages URL (prevents any old site)
-  const REDIRECT_URL = 'https://debenhams.github.io/Timeframe-Tool/advisor-portal.html';
- 
-  async function sendMagicLink(){
-    const email = $('#email').value.trim();
-    if(!email){ alert('Enter your work email'); return; }
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: REDIRECT_URL }
-    });
-    if(error){ alert(error.message); return; }
-    $('#magicInfo').textContent = 'Check your inbox for the sign-in link (use the newest email).';
-  }
- 
-  async function signOut(){ await supabase.auth.signOut(); location.href = REDIRECT_URL; }
- 
-  async function loadWeek(){
-    if(!window.PROFILE?.advisor_id) return;
-    const week = $('#weekStart').value;
-    $('#weekLabel').textContent = week;
- 
-    const { data, error } = await supabase
-      .from('rotas')
-      .select('id, data, week_start')
-      .eq('advisor_id', window.PROFILE.advisor_id)
-      .eq('week_start', week)
-      .maybeSingle();
- 
-    const out = $('#rotaOut');
-    if(error){ out.textContent = 'Error: '+error.message; return; }
-    if(!data){ out.textContent = 'No rota for this week yet.'; return; }
-    out.textContent = JSON.stringify(data.data, null, 2);
-  }
- 
-  function shiftWeek(delta){
-    const d = mondayOf(new Date($('#weekStart').value));
-    d.setDate(d.getDate() + 7*delta);
-    $('#weekStart').value = fmt(d);
-    loadWeek();
-  }
- 
-  window.addEventListener('DOMContentLoaded', init);
-</script>
 </head>
 <body>
-<header>Advisor Portal – My Rota</header>
+<header>Advisor Portal – Weekly Rota</header>
 <div class="wrap">
  
   <div id="authError" class="error" style="display:none"></div>
  
   <!-- Login -->
   <div id="loginCard" class="card" style="display:none">
-    <p class="muted">Use your work email. We’ll send a one-time sign-in link.</p>
+    <p class="muted">Use your work email. We’ll send you a one-time sign-in link.</p>
     <div class="row">
       <input id="email" type="email" placeholder="name@company.com" />
       <button onclick="sendMagicLink()">Send magic link</button>
     </div>
-    <p id="magicInfo" class="muted" style="margin-top:8px;"></p>
-    <div class="hint" style="margin-top:10px">
-      If your company email uses Outlook Safe Links and the login fails, request a new link and open the **newest** email.
-    </div>
+    <div class="hint">If Outlook Safe Links breaks the first email, request a new link and open the newest one.</div>
   </div>
  
   <!-- Portal -->
   <div id="portalCard" class="card" style="display:none">
-    <div class="row">
+    <div class="row" style="margin-bottom:10px;">
       <span class="pill" id="whoami">Signed in</span>
       <span class="pill" id="advisorName"></span>
-      <div class="spacer"></div>
+      <div style="flex:1"></div>
       <button class="secondary" onclick="signOut()">Sign out</button>
     </div>
-    <hr/>
  
-    <div class="row" style="margin-bottom:8px;">
-      <label for="weekStart" class="muted">Week start (Monday):</label>
+    <div class="row" style="margin-bottom:10px;">
+      <label class="muted">Week start (Monday):</label>
       <input id="weekStart" type="date" onchange="loadWeek()"/>
       <button onclick="shiftWeek(-1)">◀ Prev Week</button>
       <button onclick="shiftWeek(1)">Next Week ▶</button>
-      <div class="spacer"></div>
+      <div style="flex:1"></div>
       <span class="muted">Selected: <strong id="weekLabel"></strong></span>
     </div>
  
-    <div class="hint" style="margin-bottom:12px;">
-      If you see “not linked”, ask an admin to link your account in <code>profiles</code>.
-    </div>
+    <div id="calendarWrap" class="calendar" aria-live="polite"></div>
  
-    <div class="card" style="background:#0f172a;border-color:#0b1220">
-      <div style="color:#c7d2fe;font-weight:700;margin-bottom:8px;">Rota (read-only JSON for now)</div>
-      <div id="rotaOut" class="json">Loading…</div>
+    <div id="profileWarn" class="hint" style="display:none">
+      Your account isn’t linked to an advisor yet. An admin should set <code>profiles.advisor_id</code>.
     </div>
- 
-    <p id="profileWarn" class="muted" style="display:none">
-      Your account isn’t linked to an advisor yet. An admin should set
-      <code>profiles.advisor_id</code> to your advisor record.
-    </p>
   </div>
- 
 </div>
-</body>
-</html>
+ 
+<script>
+/* ---------- Supabase client (your project) ---------- */
+const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const REDIRECT_URL = 'https://debenhams.github.io/Timeframe-Tool/advisor-portal.html';
+ 
+/* ---------- Helpers ---------- */
+const $ = s => document.querySelector(s);
+const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const START_HOUR = 7, END_HOUR = 20, TOTAL_HOURS = END_HOUR - START_HOUR, HEIGHT = 1000;
+const PX_PER_MIN = (HEIGHT / TOTAL_HOURS) / 60;
+ 
+function mondayOf(date){ const d=new Date(date);const day=d.getDay();const diff=(day===0?-6:1-day);d.setDate(d.getDate()+diff);d.setHours(0,0,0,0);return d; }
+const fmt = d => d.toISOString().slice(0,10);
+const toMin = s => {const [h,m]=s.split(':').map(Number);return h*60+m;}
+function topFor(t){ const mins = toMin(t) - START_HOUR*60; return Math.max(0, mins*PX_PER_MIN); }
+function heightFor(a,b){ return Math.max(10, (toMin(b)-toMin(a))*PX_PER_MIN); }
+function colorFor(code){
+  const c = (code||'').toLowerCase();
+  if(c.includes('email')) return getComputedStyle(document.documentElement).getPropertyValue('--emails')||'#2ecc71';
+  if(c.includes('mirakl')) return getComputedStyle(document.documentElement).getPropertyValue('--mirakl')||'#ffb300';
+  if(c.includes('social')) return getComputedStyle(document.documentElement).getPropertyValue('--social')||'#5e35b1';
+  if(c.includes('break'))  return getComputedStyle(document.documentElement).getPropertyValue('--break')||'#90a4ae';
+  if(c.includes('lunch'))  return getComputedStyle(document.documentElement).getPropertyValue('--lunch')||'#ff8f00';
+  if(c.includes('meeting')||c.includes('coach')) return getComputedStyle(document.documentElement).getPropertyValue('--meeting')||'#ffd700';
+  if(c.includes('overtime')) return getComputedStyle(document.documentElement).getPropertyValue('--overtime')||'#e53935';
+  return '#0ea5e9';
+}
+ 
+/* ---------- Auth / init ---------- */
+async function init(){
+  const q = new URL(location.href).searchParams;
+  if(q.get('error')){ $('#authError').style.display='block'; $('#authError').textContent = 'Login error: '+(q.get('error_description')||q.get('error')); }
+ 
+  const { data:{ user } } = await supabase.auth.getUser();
+  if(!user){ $('#loginCard').style.display='block'; return; }
+ 
+  $('#loginCard').style.display='none'; $('#portalCard').style.display='block';
+  $('#whoami').textContent = user.email || 'Signed in';
+ 
+  const { data: prof, error: pErr } = await supabase
+      .from('profiles')
+      .select('advisor_id, role, advisors:advisor_id(name)')
+      .eq('user_id', user.id)
+      .maybeSingle();
+ 
+  if(pErr){ $('#authError').style.display='block'; $('#authError').textContent='Profile error: '+pErr.message; return; }
+  if(!prof || !prof.advisor_id){ $('#profileWarn').style.display='block'; return; }
+ 
+  window.PROFILE = prof;
+  $('#advisorName').textContent = prof.advisors?.name ?? '(Advisor)';
+ 
+  const monday = mondayOf(new Date());
+  $('#weekStart').value = fmt(monday);
+  await loadWeek();
+ 
+  supabase.channel('adv-rotas')
+    .on('postgres_changes',
+        {event:'*', schema:'public', table:'rotas', filter:`advisor_id=eq.${prof.advisor_id}`},
+        () => loadWeek())
+    .subscribe();
+}
+ 
+async function sendMagicLink(){
+  const email = $('#email').value.trim();
+  if(!email){ alert('Enter your work email'); return; }
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options:{ emailRedirectTo: REDIRECT_URL }
+  });
+  if(error){ alert(error.message); return; }
+  alert('Check your inbox for the sign-in link (use the newest email).');
+}
+ 
+async function signOut(){ await supabase.auth.signOut(); location.href = REDIRECT_URL; }
+ 
+/* ---------- Load / render week ---------- */
+async function loadWeek(){
+  if(!window.PROFILE?.advisor_id) return;
+  const week = $('#weekStart').value;
+  $('#weekLabel').textContent = week;
+ 
+  const { data, error } = await supabase
+    .from('rotas')
+    .select('data, week_start')
+    .eq('advisor_id', window.PROFILE.advisor_id)
+    .eq('week_start', week)
+    .maybeSingle();
+ 
+  renderCalendar(error ? null : (data?.data || {}));
+}
+ 
+function shiftWeek(d){ const m=mondayOf(new Date($('#weekStart').value)); m.setDate(m.getDate()+7*d); $('#weekStart').value=fmt(m); loadWeek(); }
+ 
+function renderCalendar(data){
+  const cal = $('#calendarWrap'); cal.innerHTML='';
+  /* headers */
+  cal.appendChild(headerCell(''));// time column
+  // compute header dates
+  const start = new Date($('#weekStart').value+'T00:00:00');
+  const headers=[];
+  for(let i=0;i<7;i++){ const d=new Date(start); d.setDate(d.getDate()+i);
+    const title = `${d.toLocaleString('en-GB',{month:'long'})}<br><strong>${DAYS[i]}</strong><br>${d.getDate()}`;
+    headers.push(title); cal.appendChild(dayHead(title));
+  }
+  /* time axis */
+  const axis=document.createElement('div'); axis.className='time-col';
+  const axisInner=document.createElement('div'); axisInner.className='axis'; axis.appendChild(axisInner);
+  for(let h=START_HOUR; h<=END_HOUR; h++){
+    const y = topFor(String(h).padStart(2,'0')+':00');
+    const lab=document.createElement('div'); lab.className='time-label'; lab.style.top = y+'px';
+    lab.textContent = String(h).padStart(2,'0')+':00'; axisInner.appendChild(lab);
+  }
+  cal.appendChild(axis);
+ 
+  /* day cells */
+  for(let i=0;i<7;i++){
+    const cell=document.createElement('div'); cell.className='day-cell'; cal.appendChild(cell);
+    const list = Array.isArray(data?.[DAYS[i].slice(0,3)]) ? data[DAYS[i].slice(0,3)]
+               : Array.isArray(data?.[DAYS[i]]) ? data[DAYS[i]] : [];
+    if(!list || list.length===0){ const off=document.createElement('div'); off.className='off'; off.textContent='Roster Day Off'; cell.appendChild(off); continue; }
+    list.forEach(seg=>{
+      if(!seg?.start || !seg?.end) return;
+      const b=document.createElement('div'); b.className='block';
+      b.style.top = topFor(seg.start)+'px';
+      b.style.height = heightFor(seg.start, seg.end)+'px';
+      b.style.background = colorFor(seg.code||seg.activity||'');
+      b.innerHTML = `<div class="code">${(seg.code||seg.activity||'').toString()}</div>
+                     <div class="t">${seg.start} – ${seg.end}</div>`;
+      cell.appendChild(b);
+    });
+  }
+}
+ 
+function headerCell(txt){ const e=document.createElement('div');
