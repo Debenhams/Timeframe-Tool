@@ -1,321 +1,383 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Advisor Portal — Weekly Rota</title>
-<style>
-  :root{
-    --ink:#1f2937; --paper:#ffffff; --wash:#f6f8fb; --line:#e5e9f2; --brand:#0d47a1;
-    --color-email:#2ecc71; --color-mirakl:#b1b51e; --color-social:#5e35b1;
-    --color-overtime:#e53935; --color-meeting:#ffd700; --color-break:#cfd8dc; --color-lunch:#b0bec5;
-    --color-absence:#b0c4de; --color-shrink:#ffd166;
-  }
-  html,body{height:100%}
-  body{margin:0;background:#eef2f6;color:var(--ink);font-family:Inter,Roboto,Segoe UI,system-ui,Arial,Helvetica,sans-serif}
-  .topbar{background:var(--brand);color:#fff;padding:14px 18px;display:flex;align-items:center;gap:14px}
-  .topbar h1{margin:0;font-size:18px;font-weight:800}
-  .wrap{max-width:1100px;margin:18px auto;padding:0 16px;display:flex;flex-direction:column;gap:14px}
-  .panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 20px rgba(12,27,74,.06)}
-  .panel-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line)}
-  .panel-body{padding:12px 14px}
-  .muted{color:#6b7280}
-  .btn{background:#e9eef6;color:#0f172a;border:1px solid var(--line);border-radius:10px;padding:8px 11px;font-weight:700;cursor:pointer}
-  .btn:hover{filter:brightness(.97)}
-  .btn.primary{background:#0d47a1;color:#fff;border-color:#0d47a1}
-  .btn.link{background:transparent;border:0;color:#0d47a1;cursor:pointer}
-  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:10px}
-  .day{border:1px solid var(--line);border-radius:10px;background:#fff;display:flex;flex-direction:column;min-height:140px}
-  .day-h{padding:8px 10px;font-weight:800;border-bottom:1px solid var(--line);background:#f6f8fb;display:flex;justify-content:space-between}
-  .seg{margin:8px 10px;padding:8px;border-radius:8px;font-size:13px;font-weight:700;color:#0b1320;border:1px solid var(--line);background:#f9fbff}
-  .seg .t{font-weight:800}
-  .legend{display:flex;gap:8px;flex-wrap:wrap}
-  .chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 8px;font-size:12px}
-  .sw{width:12px;height:12px;border-radius:3px;border:1px solid var(--line)}
-  .err{padding:10px 12px;border-radius:10px;background:#fde8e8;color:#b42318;border:1px solid #f2b8b5;font-weight:700}
-  .ok{padding:10px 12px;border-radius:10px;background:#e9f9ee;color:#0f5132;border:1px solid #badbcc;font-weight:700}
-  .row{display:flex;gap:8px;align-items:center}
-  input[type=email]{padding:10px 12px;border:1px solid var(--line);border-radius:10px;min-width:280px}
-  .right{margin-left:auto}
-</style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <meta charset="UTF-8" />
+  <title>Advisor Portal – Weekly Rota</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <style>
+    :root{
+      --primary:#0d47a1; --bg:#f5f7fb; --card:#ffffff; --text:#1d2433; --muted:#7b8aa0; --border:#e5e9f2; --accent:#00c853;
+      --emails:#2ecc71; --mirakl:#ffb300; --social:#5e35b1; --overtime:#e53935; --meeting:#ffd700; --break:#90a4ae; --lunch:#ff8f00;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,Segoe UI,Roboto,Inter,Arial,sans-serif}
+    header{background:var(--primary);color:#fff;padding:14px 18px;font-weight:700}
+    .wrap{max-width:1200px;margin:20px auto;padding:0 16px}
+    .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+    .tag{background:#e9f2ff;color:#113a8f;border-radius:999px;padding:6px 10px;font-weight:600}
+    .btn{background:var(--accent);color:#fff;border:0;padding:10px 14px;border-radius:8px;font-weight:700;cursor:pointer}
+    .btn.secondary{background:#e7eefc;color:#113a8f}
+    .btn.ghost{background:#fff;color:#113a8f;border:1px solid var(--border)}
+    input[type="email"],input[type="date"]{border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:260px}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:12px}
+    .notice{background:#fff3cd;border:1px solid #ffe69c;color:#8a6d3b;padding:10px 12px;border-radius:8px;margin:12px 0}
+    /* Calendar */
+    .cal{overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
+    .cal-head{display:grid;grid-template-columns:80px repeat(7,1fr);border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:2}
+    .cal-hcell{padding:10px;border-left:1px solid var(--border);text-align:center;font-weight:700}
+    .cal-hcell small{display:block;color:var(--muted);font-weight:600}
+    .cal-body{display:grid;grid-template-columns:80px repeat(7,1fr);position:relative}
+    .time-col{border-right:1px solid var(--border);background:#fafcff}
+    .trow{height:60px;position:relative;border-bottom:1px dashed #e9edf7;color:#9aa7bd;font-size:12px;text-align:right;padding-right:8px}
+    .day-col{position:relative;border-left:1px solid var(--border);border-bottom:1px dashed #eef2f7;min-height:60px}
+    .slot{position:absolute;left:6%;width:88%;border-radius:8px;color:#fff;padding:6px 8px;box-shadow:0 2px 6px rgba(0,0,0,.12);font-size:12px;font-weight:700;display:flex;flex-direction:column;gap:2px}
+    .slot span{font-size:11px;font-weight:600;opacity:.95}
+    .empty-note{padding:32px;text-align:center;color:var(--muted)}
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .right{display:flex;gap:8px;align-items:center}
+    .pill{padding:6px 8px;border-radius:8px;background:#eef3ff;color:#0d47a1;font-weight:700}
+    .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fff}
+    .dot{width:12px;height:12px;border-radius:50%}
+    @media (max-width:920px){
+      .cal-head,.cal-body{grid-template-columns:50px repeat(7,1fr)}
+      .trow{height:50px}
+    }
+  </style>
 </head>
 <body>
-  <div class="topbar">
-    <h1>Advisor Portal</h1>
-    <div id="weekRange" class="muted right"></div>
-  </div>
-
+  <header>Advisor Portal – Weekly Rota</header>
   <div class="wrap">
-    <!-- Sign-in panel -->
-    <div id="signinPanel" class="panel" style="display:none">
-      <div class="panel-header"><strong>Sign in</strong></div>
-      <div class="panel-body">
-        <div id="signMsg" class="muted" style="margin-bottom:8px">Enter your work email and we’ll email you a secure link.</div>
-        <div class="row" style="flex-wrap:wrap">
-          <input id="emailInput" type="email" placeholder="you@company.com" autocomplete="email"/>
-          <button id="sendLink" class="btn primary">Send magic link</button>
-        </div>
-        <div id="signNotice" style="margin-top:10px"></div>
+    <!-- Sign in panel -->
+    <div id="authBox" class="card" style="display:none">
+      <div class="bar">
+        <input id="emailInput" type="email" placeholder="Enter your work email…" />
+        <button id="sendLinkBtn" class="btn">Send magic link</button>
       </div>
+      <div class="notice">We’ll email you a one-time sign-in link. Check your inbox (and spam).</div>
     </div>
 
-    <!-- Rota panel -->
-    <div id="rotaPanel" class="panel" style="display:none">
-      <div class="panel-header">
-        <div class="row" style="gap:10px">
-          <button class="btn" id="prev">◀ Previous</button>
-          <button class="btn" id="today">This Week</button>
-          <button class="btn" id="next">Next ▶</button>
+    <!-- App panel -->
+    <div id="appBox" class="card" style="display:none">
+      <div class="topbar">
+        <div class="bar">
+          <span id="userEmail" class="tag"></span>
+          <span id="advisorName" class="pill"></span>
         </div>
-        <div class="row" style="gap:10px">
-          <div id="who" class="muted"></div>
-          <button class="btn link" id="signOut">Sign out</button>
+        <div class="right">
+          <input id="weekStart" type="date" />
+          <button id="prevBtn" class="btn secondary">◀ Prev Week</button>
+          <button id="nextBtn" class="btn secondary">Next Week ▶</button>
+          <button id="signOutBtn" class="btn ghost">Sign out</button>
         </div>
       </div>
-      <div class="panel-body">
-        <div class="legend" style="margin-bottom:10px">
-          <span class="chip"><span class="sw" style="background:var(--color-email)"></span>Email</span>
-          <span class="chip"><span class="sw" style="background:var(--color-mirakl)"></span>Mirakl</span>
-          <span class="chip"><span class="sw" style="background:var(--color-social)"></span>Social</span>
-          <span class="chip"><span class="sw" style="background:var(--color-break)"></span>Break</span>
-          <span class="chip"><span class="sw" style="background:var(--color-lunch)"></span>Lunch</span>
-          <span class="chip"><span class="sw" style="background:var(--color-absence)"></span>Absence</span>
-          <span class="chip"><span class="sw" style="background:var(--color-shrink)"></span>Shrinkage</span>
-          <span class="chip"><span class="sw" style="background:var(--color-overtime)"></span>Overtime</span>
-        </div>
-        <div id="notice"></div>
-        <div id="grid" class="grid"></div>
+
+      <div id="calBox" class="cal"></div>
+
+      <div class="legend">
+        <span class="chip"><span class="dot" style="background:var(--emails)"></span> Email</span>
+        <span class="chip"><span class="dot" style="background:var(--mirakl)"></span> Mirakl</span>
+        <span class="chip"><span class="dot" style="background:var(--social)"></span> Social</span>
+        <span class="chip"><span class="dot" style="background:var(--meeting)"></span> Meeting</span>
+        <span class="chip"><span class="dot" style="background:var(--overtime)"></span> Overtime</span>
+        <span class="chip"><span class="dot" style="background:var(--break)"></span> Break</span>
+        <span class="chip"><span class="dot" style="background:var(--lunch)"></span> Lunch</span>
       </div>
+
+      <div id="infoNote" class="notice" style="display:none"></div>
     </div>
   </div>
 
 <script>
-/* ========= Supabase ========= */
-const SUPABASE_URL  = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
-const SUPABASE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+/* =========================
+   Supabase – project config
+   ========================= */
+const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ========= Helpers ========= */
-const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-const pad = n => String(n).padStart(2,'0');
-function startOfWeekMonday(d){
-  const dt = new Date(d);
-  const day = dt.getDay(); // 0..6 Sun..Sat
-  const diff = (day === 0 ? -6 : 1) - day; // move to Monday
-  dt.setDate(dt.getDate()+diff);
-  dt.setHours(0,0,0,0);
-  return dt;
+/* ================
+   DOM references
+   ================ */
+const authBox = document.getElementById("authBox");
+const appBox  = document.getElementById("appBox");
+const emailInput = document.getElementById("emailInput");
+const sendLinkBtn = document.getElementById("sendLinkBtn");
+const userEmailTag = document.getElementById("userEmail");
+const advisorNamePill = document.getElementById("advisorName");
+const weekStartInput = document.getElementById("weekStart");
+const prevBtn = document.getElementById("prevBtn");
+const nextBtn = document.getElementById("nextBtn");
+const signOutBtn = document.getElementById("signOutBtn");
+const calBox = document.getElementById("calBox");
+const infoNote = document.getElementById("infoNote");
+
+/* ================
+   Helpers
+   ================ */
+const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const START_H = 7, END_H = 20;
+
+function toMonday(d){
+  const x = new Date(d);
+  const day = x.getDay(); // 0 Sun .. 6 Sat
+  const diff = (day === 0 ? -6 : 1 - day);
+  x.setDate(x.getDate() + diff);
+  x.setHours(0,0,0,0);
+  return x;
 }
-function mondayISO(any){ return startOfWeekMonday(any).toISOString().slice(0,10); }
-function formatRangeLabel(mondayISOstr){
-  const s = new Date(mondayISOstr+'T00:00:00');
-  const e = new Date(s); e.setDate(e.getDate()+6);
-  const f = d => d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
-  return `${f(s)} – ${f(e)}`;
+function fmtDateISO(d){ return d.toISOString().slice(0,10); }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function hhmmToMinutes(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
+function colorForCode(code){
+  const k = (code||"").toLowerCase();
+  if (k.includes("email")) return "var(--emails)";
+  if (k.includes("mirakl")) return "var(--mirakl)";
+  if (k.includes("social")) return "var(--social)";
+  if (k.includes("meeting")||k.includes("coach")) return "var(--meeting)";
+  if (k.includes("overtime")) return "var(--overtime)";
+  if (k.includes("break")) return "var(--break)";
+  if (k.includes("lunch")) return "var(--lunch)";
+  return "var(--primary)";
 }
-function classForCode(code=''){
-  const k = code.toLowerCase();
-  if(/\blunch\b/.test(k)) return 'background:var(--color-lunch)';
-  if(/\bbreak\b/.test(k)) return 'background:var(--color-break)';
-  if(/\bovertime\b/.test(k)) return 'background:var(--color-overtime);color:#fff';
-  if(/\bmirakl\b/.test(k))  return 'background:var(--color-mirakl);color:#fff';
-  if(/\bsocial\b/.test(k))  return 'background:var(--color-social);color:#fff';
-  if(/\bemail\b/.test(k))   return 'background:var(--color-email);color:#fff';
-  if(['al','sick','rdo','maternity','lts','split shift'].some(w=>k.includes(w))) return 'background:var(--color-absence)';
-  if(['121','atl','coaching','huddle','iti','projects','team meeting','training'].some(w=>k.includes(w))) return 'background:var(--color-shrink)';
-  return 'background:#f9fbff';
-}
-function processDayValue(dayValue){
-  if(dayValue && typeof dayValue==='object' && Array.isArray(dayValue.segments)){
-    return dayValue.segments
-      .map(s => ({label:s.code, start:s.start, end:s.end}))
-      .filter(s => s.label && s.start && s.end);
+
+/* =========================================
+   State
+   ========================================= */
+let sessionUser = null;
+let advisorId = null;
+let advisorName = "";
+let monday = toMonday(new Date());
+let rotaRealtimeChannel = null;
+
+/* =========================================
+   Authentication flow
+   ========================================= */
+async function init(){
+  // Handle OAuth/OTP callbacks automatically
+  await supabase.auth.getSession();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user){
+    authBox.style.display = "";
+    appBox.style.display = "none";
+    return;
   }
-  if(typeof dayValue==='string'){ return [{label:dayValue, start:null, end:null}]; }
-  return [];
+  sessionUser = user;
+  authBox.style.display = "none";
+  appBox.style.display = "";
+
+  userEmailTag.textContent = user.email;
+
+  // Resolve advisor_id (profiles.advisor_id preferred)
+  advisorId = null; advisorName = "";
+  const { data: profile } = await supabase
+    .from("profiles").select("advisor_id, role").eq("user_id", user.id).maybeSingle();
+
+  if (profile && profile.advisor_id){
+    advisorId = profile.advisor_id;
+  } else {
+    // fallback by email in advisors
+    const { data: adv } = await supabase
+      .from("advisors").select("id,name").eq("email", user.email).maybeSingle();
+    if (adv){ advisorId = adv.id; advisorName = adv.name || ""; }
+  }
+
+  // If we still don't know name, fetch by id
+  if (!advisorName && advisorId){
+    const { data: adv2 } = await supabase.from("advisors").select("name").eq("id", advisorId).maybeSingle();
+    advisorName = adv2?.name || "";
+  }
+  advisorNamePill.textContent = advisorName || "Not linked";
+
+  // controls
+  weekStartInput.value = fmtDateISO(monday);
+  prevBtn.onclick = ()=>{
+    monday = addDays(monday,-7);
+    weekStartInput.value = fmtDateISO(monday);
+    loadAndRender();
+    restartRealtime();
+  };
+  nextBtn.onclick = ()=>{
+    monday = addDays(monday,7);
+    weekStartInput.value = fmtDateISO(monday);
+    loadAndRender();
+    restartRealtime();
+  };
+  weekStartInput.onchange = ()=>{
+    monday = toMonday(new Date(weekStartInput.value));
+    loadAndRender();
+    restartRealtime();
+  };
+  signOutBtn.onclick = async ()=>{
+    await supabase.auth.signOut();
+    location.href = location.pathname; // clean url
+  };
+
+  await loadAndRender();
+  await startRealtime();
 }
 
-/* ========= State ========= */
-let currentMonday = mondayISO(new Date());
-let currentAdvisor = null; // { id, name, email }
-
-/* ========= Auth UI ========= */
-const signinPanel = document.getElementById('signinPanel');
-const rotaPanel   = document.getElementById('rotaPanel');
-const signMsg     = document.getElementById('signMsg');
-const signNotice  = document.getElementById('signNotice');
-const emailInput  = document.getElementById('emailInput');
-const sendLinkBtn = document.getElementById('sendLink');
-const signOutBtn  = document.getElementById('signOut');
-
-function setPanels(signedIn){
-  signinPanel.style.display = signedIn ? 'none' : 'block';
-  rotaPanel.style.display   = signedIn ? 'block' : 'none';
-}
-
-/* ========= Auth logic (magic link) ========= */
-async function sendMagicLink(email){
-  signNotice.innerHTML = '';
+sendLinkBtn.onclick = async ()=>{
+  const email = emailInput.value.trim();
+  if (!email) return alert("Please enter your work email.");
+  sendLinkBtn.disabled = true;
   try{
-    const { error } = await sb.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: {
-        emailRedirectTo: window.location.origin + window.location.pathname
-      }
+      options:{ emailRedirectTo: location.origin + location.pathname }
     });
-    if(error) throw error;
-    signNotice.innerHTML = `<div class="ok">Link sent to <b>${email}</b>. Check your inbox and click the link to continue.</div>`;
-  }catch(e){
-    signNotice.innerHTML = `<div class="err">Could not send link: ${e.message}</div>`;
+    if (error) throw error;
+    alert("Magic link sent. Check your inbox.");
+  }catch(e){ alert("Error: "+e.message); }
+  finally{ sendLinkBtn.disabled = false; }
+};
+
+/* =========================================
+   Data load + render
+   ========================================= */
+async function loadAndRender(){
+  calBox.innerHTML = ""; infoNote.style.display="none";
+  if (!advisorId){
+    calBox.innerHTML = `<div class="empty-note">Your account isn’t linked to an advisor yet. Ask planning to link your email to your advisor profile.</div>`;
+    return;
   }
+  const mondayISO = fmtDateISO(monday);
+  const { data, error } = await supabase
+    .from("rotas").select("data").eq("advisor_id", advisorId).eq("week_start", mondayISO).maybeSingle();
+
+  // Build skeleton grid
+  renderSkeleton();
+
+  if (!data || !data.data){
+    infoNote.style.display="";
+    infoNote.textContent = "No rota saved for this week yet. Once planning saves changes you’ll see them here automatically.";
+    return;
+  }
+  drawRota(data.data);
 }
 
-async function getSignedInUser(){
-  const { data: { user }, error } = await sb.auth.getUser();
-  if(error) return null;
-  return user;
-}
+function renderSkeleton(){
+  // Head
+  const head = document.createElement("div");
+  head.className = "cal-head";
+  head.innerHTML = `<div class="cal-hcell"> </div>`;
+  for (let i=0;i<7;i++){
+    const d = addDays(monday,i);
+    head.innerHTML += `<div class="cal-hcell"><small>${d.toLocaleString("en-GB",{month:"long"})}</small>${DAYS[i]}<br><small>${d.getDate()}</small></div>`;
+  }
+  calBox.appendChild(head);
 
-/* ========= Data fetch ========= */
-async function resolveAdvisorByEmail(email){
-  const { data, error } = await sb.from('advisors').select('id,name,email').ilike('email', email).maybeSingle();
-  if (data && data.id) return data;
-  return null;
-}
-async function fetchRota(advisorId, weekStartISO){
-  // Try published first
-  let pub = await sb.from('rotas_published').select('data').eq('advisor_id', advisorId).eq('week_start', weekStartISO).maybeSingle();
-  if (pub.data && pub.data.data) return pub.data.data;
-
-  // Fallback to draft
-  let dr = await sb.from('rotas').select('data').eq('advisor_id', advisorId).eq('week_start', weekStartISO).maybeSingle();
-  if (dr.data && dr.data.data) return dr.data.data;
-
-  return null;
-}
-
-/* ========= Render ========= */
-function renderWeek(rotaData, weekStartISO){
-  const grid = document.getElementById('grid');
-  const who  = document.getElementById('who');
-  const notice = document.getElementById('notice');
-
-  document.getElementById('weekRange').textContent = formatRangeLabel(weekStartISO);
-  grid.innerHTML = '';
-  notice.innerHTML = '';
-  who.textContent = currentAdvisor ? `${currentAdvisor.name || ''} (${currentAdvisor.email || ''})` : '';
-
-  const monday = new Date(weekStartISO+'T00:00:00');
-  for(let i=0;i<7;i++){
-    const d = new Date(monday); d.setDate(d.getDate()+i);
-    const dayName = DAYS[i];
-    const dateStr = d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
-
-    const dayBox = document.createElement('div');
-    dayBox.className = 'day';
-
-    const head = document.createElement('div');
-    head.className = 'day-h';
-    head.innerHTML = `<span>${dayName}</span><span class="muted">${dateStr}</span>`;
-    dayBox.appendChild(head);
-
-    const dayVal = rotaData[dayName];
-    const segs = processDayValue(dayVal);
-
-    if(!segs.length){
-      const off = document.createElement('div');
-      off.className = 'seg';
-      off.style.background = '#f2f4f8';
-      off.innerHTML = `<span class="t">Day Off</span>`;
-      dayBox.appendChild(off);
-    }else{
-      segs.forEach(s=>{
-        const div = document.createElement('div');
-        div.className = 'seg';
-        div.style = classForCode(s.label||'');
-        const time = (s.start && s.end) ? `${s.start}–${s.end}` : '';
-        div.innerHTML = `<div>${s.label || ''}</div>${time?`<div class="t">${time}</div>`:''}`;
-        dayBox.appendChild(div);
-      });
+  // Body grid
+  const body = document.createElement("div");
+  body.className="cal-body";
+  // Time col
+  for (let h=START_H; h<=END_H; h++){
+    const t = document.createElement("div");
+    t.className="trow";
+    t.textContent = String(h).padStart(2,"0")+":00";
+    body.appendChild(t);
+    for(let i=0;i<7;i++){
+      // Add empty day rows; slots are absolutely positioned later
+      if (h===START_H){
+        const dayCol = document.createElement("div");
+        dayCol.className="day-col";
+        dayCol.style.gridColumn = (i+2);
+        dayCol.style.gridRow = `1 / span ${END_H-START_H+1}`;
+      }
     }
-
-    grid.appendChild(dayBox);
   }
+  // Build day columns (one container per day)
+  for (let i=0;i<7;i++){
+    const col = document.createElement("div");
+    col.className="day-col";
+    col.dataset.dayIndex = i;
+    col.style.gridColumn = (i+2);
+    col.style.gridRow = `1 / span ${END_H-START_H+1}`;
+    body.appendChild(col);
+  }
+  // Move time column to left (as grid col 1)
+  const timeCol = document.createElement("div");
+  timeCol.className="time-col";
+  timeCol.style.gridColumn = "1";
+  timeCol.style.gridRow = `1 / span ${END_H-START_H+1}`;
+  timeCol.style.position="relative";
+
+  // Render time ticks (overlap with trows already added for visuals)
+  body.insertBefore(timeCol, body.firstChild);
+
+  calBox.appendChild(body);
 }
 
-/* ========= Page load ========= */
-async function loadRota(){
-  const user = await getSignedInUser();
-  if(!user){
-    setPanels(false);
-    return;
-  }
+function drawRota(json){
+  // json shape expected: { "Monday": { segments:[{start:"07:00", end:"09:15", code:"DEB Email"} , ...] }, ... }
+  const body = calBox.querySelector(".cal-body");
+  const dayCols = [...body.querySelectorAll(".day-col")];
+  const pxPerMin = 60/60; // 60px per hour → 1px per min
 
-  // Resolve advisor by email
-  const email = (user.email || '').trim();
-  const adv = await resolveAdvisorByEmail(email);
-  if(!adv){
-    setPanels(true);
-    signNotice.innerHTML = `<div class="err">No advisor found for <b>${email}</b>. Ask your manager to add/update your email in the system.</div>`;
-    return;
-  }
-  currentAdvisor = adv;
-  setPanels(true); // show rota panel
-
-  const data = await fetchRota(currentAdvisor.id, currentMonday);
-  const notice = document.getElementById('notice');
-  if(!data){
-    notice.innerHTML = `<div class="err">No rota found for this week (checked <b>rotas_published</b> then <b>rotas</b>).</div>`;
-    document.getElementById('grid').innerHTML = '';
-    document.getElementById('weekRange').textContent = formatRangeLabel(currentMonday);
-    return;
-  }
-  renderWeek(data, currentMonday);
+  dayCols.forEach((col, i)=>{
+    const dayName = DAYS[i];
+    const dayData = json[dayName];
+    if (!dayData || !dayData.segments) return;
+    dayData.segments.forEach(seg=>{
+      const startM = Math.max(0, hhmmToMinutes(seg.start||"07:00") - START_H*60);
+      const endM   = Math.min((END_H-START_H)*60, hhmmToMinutes(seg.end||"07:10") - START_H*60);
+      const top = startM * pxPerMin;
+      const height = Math.max(10, (endM - startM) * pxPerMin);
+      const el = document.createElement("div");
+      el.className="slot";
+      el.style.top = `${top}px`;
+      el.style.height = `${height}px`;
+      el.style.background = colorForCode(seg.code||"");
+      el.innerHTML = `
+        <div>${(seg.code||"").toUpperCase()}</div>
+        <span>${(seg.start||"")} – ${(seg.end||"")}</span>
+      `;
+      col.appendChild(el);
+    });
+  });
 }
 
-/* ========= Wire ========= */
-sendLinkBtn.onclick = async()=>{
-  const email = (emailInput.value || '').trim();
-  if(!email){ signNotice.innerHTML = `<div class="err">Enter your email.</div>`; return; }
-  await sendMagicLink(email);
-};
-signOutBtn.onclick = async()=>{
-  await sb.auth.signOut();
-  currentAdvisor = null;
-  document.getElementById('grid').innerHTML = '';
-  document.getElementById('weekRange').textContent = '';
-  signNotice.innerHTML = '';
-  emailInput.value = '';
-  setPanels(false);
-};
+/* =========================================
+   Realtime
+   ========================================= */
+async function startRealtime(){
+  if (!advisorId) return;
+  const mondayISO = fmtDateISO(monday);
 
-document.getElementById('prev').onclick = async()=>{
-  const d = new Date(currentMonday+'T00:00:00'); d.setDate(d.getDate()-7);
-  currentMonday = mondayISO(d);
-  await loadRota();
-};
-document.getElementById('next').onclick = async()=>{
-  const d = new Date(currentMonday+'T00:00:00'); d.setDate(d.getDate()+7);
-  currentMonday = mondayISO(d);
-  await loadRota();
-};
-document.getElementById('today').onclick = async()=>{
-  currentMonday = mondayISO(new Date());
-  await loadRota();
-};
+  // ensure enabled in DB (UI: Enable Realtime on `rotas`)
+  rotaRealtimeChannel = supabase.channel(`rotas_${advisorId}_${mondayISO}`)
+    .on("postgres_changes",
+      { event:"*", schema:"public", table:"rotas", filter:`advisor_id=eq.${advisorId}` },
+      payload=>{
+        // Update only if current week matches
+        const wk = payload.new?.week_start || payload.old?.week_start;
+        if (wk !== mondayISO) return;
+        if (payload.eventType === "DELETE"){
+          calBox.innerHTML = `<div class="empty-note">This week was cleared.</div>`;
+          return;
+        }
+        const data = payload.new?.data;
+        if (data) {
+          // re-render quickly
+          calBox.innerHTML = "";
+          renderSkeleton();
+          drawRota(data);
+          infoNote.style.display="none";
+        }
+      })
+    .subscribe();
+}
 
-/* Handle the magic-link redirect */
-document.addEventListener('DOMContentLoaded', async()=>{
-  // If arriving from email link, let Supabase parse hash and set session
-  const { data, error } = await sb.auth.getSession();
-  // Either way, try to load rota (will show sign-in if not signed)
-  await loadRota();
-  // Always show Monday→Sunday range label even before data
-  document.getElementById('weekRange').textContent = formatRangeLabel(currentMonday);
-  // Show sign-in panel initially if not signed
-  if(!data || !data.session){ setPanels(false); } else { setPanels(true); }
-});
+function restartRealtime(){
+  if (rotaRealtimeChannel) supabase.removeChannel(rotaRealtimeChannel);
+  startRealtime();
+}
+
+/* boot */
+init();
 </script>
 </body>
 </html>
