@@ -23,8 +23,6 @@
     input[type="email"],input[type="date"]{border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:260px}
     .card{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:12px}
     .notice{background:#fff3cd;border:1px solid #ffe69c;color:#8a6d3b;padding:10px 12px;border-radius:8px;margin:12px 0}
-
-    /* Calendar */
     .cal{overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
     .cal-head{display:grid;grid-template-columns:80px repeat(7,1fr);border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:2}
     .cal-hcell{padding:10px;border-left:1px solid var(--border);text-align:center;font-weight:700}
@@ -51,7 +49,6 @@
 <body>
   <header>Advisor Portal – Weekly Rota</header>
   <div class="wrap">
-    <!-- Sign in panel -->
     <div id="authBox" class="card" style="display:none">
       <div class="bar">
         <input id="emailInput" type="email" placeholder="Enter your work email…" />
@@ -60,7 +57,6 @@
       <div class="notice">We’ll email you a one-time sign-in link. Check your inbox (and spam).</div>
     </div>
 
-    <!-- App panel -->
     <div id="appBox" class="card" style="display:none">
       <div class="topbar">
         <div class="bar">
@@ -89,12 +85,10 @@
   </div>
 
 <script>
-/* =========================  Supabase – project config  ========================= */
 const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ================  DOM references  ================ */
 const authBox = document.getElementById("authBox");
 const appBox  = document.getElementById("appBox");
 const emailInput = document.getElementById("emailInput");
@@ -108,13 +102,12 @@ const signOutBtn = document.getElementById("signOutBtn");
 const calBox = document.getElementById("calBox");
 const infoNote = document.getElementById("infoNote");
 
-/* ================  Helpers  ================ */
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const START_H = 7, END_H = 20;
 
 function toMonday(d){
   const x = new Date(d);
-  const day = x.getDay(); // 0 Sun .. 6 Sat
+  const day = x.getDay();
   const diff = (day === 0 ? -6 : 1 - day);
   x.setDate(x.getDate() + diff);
   x.setHours(0,0,0,0);
@@ -135,28 +128,24 @@ function colorForCode(code){
   return "var(--primary)";
 }
 
-/* =========================================  State  ========================================= */
 let sessionUser = null;
 let advisorId = null;
 let advisorName = "";
 let monday = toMonday(new Date());
 let rotaRealtimeChannel = null;
 
-/* ===== Templates → segments (client-side expansion) ===== */
+/* Templates → segments */
 function tplToSegments(t){
   if(!t || !t.start_time || !t.finish_time) return [];
   const mins = s => { const [h,m]=String(s).slice(0,5).split(":").map(Number); return h*60+m; };
   const m2t = m => `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
-
   const s = mins(t.start_time), e = mins(t.finish_time);
   const breaks = [];
   if(t.break1) breaks.push({ at: mins(t.break1), dur: 15, code: "Break" });
   if(t.lunch)  breaks.push({ at: mins(t.lunch),  dur: 30, code: "Lunch" });
   if(t.break2) breaks.push({ at: mins(t.break2), dur: 15, code: "Break" });
-
   const events = [{t:s, type:"start"}, ...breaks.map(b=>({t:b.at, type:"pause", dur:b.dur, code:b.code})), {t:e, type:"end"}]
     .sort((a,b)=>a.t-b.t);
-
   const out=[]; let cur=s;
   for(const ev of events){
     if(ev.t>cur) out.push({ code: t.work_code || "Admin", start: m2t(cur), end: m2t(ev.t) });
@@ -164,11 +153,8 @@ function tplToSegments(t){
   }
   return out;
 }
-
 function normalizeDayValue(dayVal, templatesByName){
-  // Already in segments form
   if(dayVal && typeof dayVal==="object" && Array.isArray(dayVal.segments)) return dayVal;
-  // Template name → expand
   if(typeof dayVal==="string"){
     const tpl = templatesByName[dayVal];
     if(!tpl) return { segments: [] };
@@ -177,7 +163,6 @@ function normalizeDayValue(dayVal, templatesByName){
   return { segments: [] };
 }
 
-/* =========================================  Authentication flow  ========================================= */
 async function init(){
   await supabase.auth.getSession();
   const { data: { user } } = await supabase.auth.getUser();
@@ -191,15 +176,18 @@ async function init(){
   appBox.style.display = "";
   userEmailTag.textContent = user.email;
 
-  // Resolve advisor_id (profiles.advisor_id preferred)
   advisorId = null; advisorName = "";
   const { data: profile } = await supabase
     .from("profiles").select("advisor_id, role").eq("user_id", user.id).maybeSingle();
   if (profile && profile.advisor_id){
     advisorId = profile.advisor_id;
   } else {
+    // ⚠️ case-insensitive email match
     const { data: adv } = await supabase
-      .from("advisors").select("id,name").eq("email", user.email).maybeSingle();
+      .from("advisors")
+      .select("id,name")
+      .ilike("email", user.email)   // <— changed from eq() to ilike()
+      .maybeSingle();
     if (adv){ advisorId = adv.id; advisorName = adv.name || ""; }
   }
   if (!advisorName && advisorId){
@@ -208,29 +196,11 @@ async function init(){
   }
   advisorNamePill.textContent = advisorName || "Not linked";
 
-  // controls
   weekStartInput.value = fmtDateISO(monday);
-  prevBtn.onclick = ()=>{
-    monday = addDays(monday,-7);
-    weekStartInput.value = fmtDateISO(monday);
-    loadAndRender();
-    restartRealtime();
-  };
-  nextBtn.onclick = ()=>{
-    monday = addDays(monday,7);
-    weekStartInput.value = fmtDateISO(monday);
-    loadAndRender();
-    restartRealtime();
-  };
-  weekStartInput.onchange = ()=>{
-    monday = toMonday(new Date(weekStartInput.value));
-    loadAndRender();
-    restartRealtime();
-  };
-  signOutBtn.onclick = async ()=>{
-    await supabase.auth.signOut();
-    location.href = location.pathname;
-  };
+  prevBtn.onclick = ()=>{ monday = addDays(monday,-7); weekStartInput.value = fmtDateISO(monday); loadAndRender(); restartRealtime(); };
+  nextBtn.onclick = ()=>{ monday = addDays(monday,7);  weekStartInput.value = fmtDateISO(monday); loadAndRender(); restartRealtime(); };
+  weekStartInput.onchange = ()=>{ monday = toMonday(new Date(weekStartInput.value)); loadAndRender(); restartRealtime(); };
+  signOutBtn.onclick = async ()=>{ await supabase.auth.signOut(); location.href = location.pathname; };
 
   await loadAndRender();
   await startRealtime();
@@ -251,7 +221,6 @@ sendLinkBtn.onclick = async ()=>{
   finally{ sendLinkBtn.disabled = false; }
 };
 
-/* =========================================  Data load + render  ========================================= */
 async function loadAndRender(){
   calBox.innerHTML = ""; infoNote.style.display="none";
   if (!advisorId){
@@ -260,7 +229,6 @@ async function loadAndRender(){
   }
   const mondayISO = fmtDateISO(monday);
 
-  // 1) Get published rota
   const { data: pub, error: e1 } = await supabase
     .from("rotas_published")
     .select("data")
@@ -268,7 +236,6 @@ async function loadAndRender(){
     .eq("week_start", mondayISO)
     .maybeSingle();
 
-  // Build skeleton grid
   renderSkeleton();
 
   if(e1){
@@ -278,11 +245,10 @@ async function loadAndRender(){
   }
   if (!pub || !pub.data){
     infoNote.style.display="";
-    infoNote.textContent = "No published rota for this week yet.";
+    infoNote.textContent = `No published rota for this week yet. (advisor_id=${advisorId}, week_start=${mondayISO})`;
     return;
   }
 
-  // 2) Load templates (needed when a day value is a template name like 'Early')
   const { data: tplRows, error: e2 } = await supabase
     .from("templates")
     .select("name, work_code, start_time, finish_time, break1, lunch, break2");
@@ -293,14 +259,9 @@ async function loadAndRender(){
     return;
   }
 
-  const TPL = {};
-  (tplRows||[]).forEach(t=>TPL[t.name]=t);
-
-  // 3) Normalise each day to segments and draw
+  const TPL = {}; (tplRows||[]).forEach(t=>TPL[t.name]=t);
   const normalised = {};
-  DAYS.forEach(d=>{
-    normalised[d] = normalizeDayValue(pub.data[d], TPL);
-  });
+  DAYS.forEach(d=>{ normalised[d] = normalizeDayValue(pub.data[d], TPL); });
   drawRota(normalised);
 }
 
@@ -316,7 +277,6 @@ function renderSkeleton(){
 
   const body = document.createElement("div");
   body.className="cal-body";
-
   for (let h=START_H; h<=END_H; h++){
     const t = document.createElement("div");
     t.className="trow";
@@ -331,23 +291,19 @@ function renderSkeleton(){
     col.style.gridRow = `1 / span ${END_H-START_H+1}`;
     body.appendChild(col);
   }
-
   const timeCol = document.createElement("div");
   timeCol.className="time-col";
   timeCol.style.gridColumn = "1";
   timeCol.style.gridRow = `1 / span ${END_H-START_H+1}`;
   timeCol.style.position="relative";
   body.insertBefore(timeCol, body.firstChild);
-
   calBox.appendChild(body);
 }
 
 function drawRota(json){
-  // json shape: { Monday: {segments:[{start,end,code}, ...]}, ... }
   const body = calBox.querySelector(".cal-body");
   const dayCols = [...body.querySelectorAll(".day-col")];
-  const pxPerMin = 60/60; // 60px per hour → 1px per min
-
+  const pxPerMin = 60/60;
   dayCols.forEach((col, i)=>{
     const dayName = DAYS[i];
     const dayData = json[dayName];
@@ -362,16 +318,12 @@ function drawRota(json){
       el.style.top = `${top}px`;
       el.style.height = `${height}px`;
       el.style.background = colorForCode(seg.code||"");
-      el.innerHTML = `
-        <div>${(seg.code||"").toUpperCase()}</div>
-        <span>${(seg.start||"")} – ${(seg.end||"")}</span>
-      `;
+      el.innerHTML = `<div>${(seg.code||"").toUpperCase()}</div><span>${(seg.start||"")} – ${(seg.end||"")}</span>`;
       col.appendChild(el);
     });
   });
 }
 
-/* =========================================  Realtime  ========================================= */
 async function startRealtime(){
   if (!advisorId) return;
   const mondayISO = fmtDateISO(monday);
@@ -385,7 +337,7 @@ async function startRealtime(){
           calBox.innerHTML = `<div class="empty-note">This week has no published rota.</div>`;
           return;
         }
-        loadAndRender(); // refresh view
+        loadAndRender();
       })
     .subscribe();
 }
@@ -394,7 +346,6 @@ function restartRealtime(){
   startRealtime();
 }
 
-/* boot */
 (async function boot(){
   const { data: { user } } = await supabase.auth.getUser();
   if (!user){ authBox.style.display = ""; appBox.style.display = "none"; }
