@@ -1,246 +1,237 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Professional Team Rota System — Master (Calabrio style)</title>
-
-<!-- Supabase -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Professional Team Rota System — Master (Calabrio)</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
-
 <style>
   :root{
-    /* Brand */
-    --brand:#0d47a1; --ink:#0f172a; --muted:#64748b; --accent:#00c853;
+    --brand:#0d47a1; --ink:#0f172a; --muted:#6b7280; --accent:#00c853;
     --bg:#f5f7fb; --card:#ffffff; --line:#e6ebf3;
-
-    /* Timeline */
-    --start:6;   /* first hour label shown */
-    --end:20;    /* last hour label shown */
-    --row-height:34px;
-    --bar-height:14px;
-
-    /* Codes */
+    /* timeline window */
+    --start:6; --end:20;           /* 06:00 → 20:00 */
+    --row-h:34px; --bar-h:14px;    /* compact Calabrio-like */
+    /* colours */
     --email:#2ecc71; --mirakl:#b1b51e; --social:#5e35b1; --meeting:#ffd700;
     --overtime:#e53935; --break:#cfd8dc; --lunch:#b0bec5; --absence:#b0c4de; --shrink:#ffd166;
   }
-
   html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.35 Inter,Segoe UI,Roboto,system-ui,Arial,sans-serif}
-
-  /* Top bar */
-  .topbar{background:var(--brand);color:#fff;display:flex;align-items:center;gap:12px;padding:12px 16px;box-shadow:0 4px 12px rgba(13,71,161,.20)}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.35 Inter,Segoe UI,Roboto,system-ui,Arial}
+  /* top bar */
+  .topbar{background:var(--brand);color:#fff;display:flex;gap:12px;align-items:center;padding:12px 16px;box-shadow:0 4px 14px rgba(13,71,161,.2)}
   .topbar h1{margin:0;font-size:16px;font-weight:800}
-  .topbar .filters{display:flex;gap:8px;flex-wrap:wrap;margin-left:12px}
-  .chip{background:#eaf1ff;color:#113a8f;border-radius:999px;padding:5px 8px;font-weight:700}
-
-  /* Inputs / buttons */
   .in{border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:#fff}
   .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 10px;cursor:pointer}
   .btn.primary{background:var(--accent);color:#fff;border:0}
-  .btn.ghost{background:#fff}
   .btn.icon{padding:6px 8px}
   .btn[disabled]{opacity:.6;cursor:not-allowed}
+  .chip{background:#eaf1ff;color:#113a8f;border-radius:999px;padding:5px 8px;font-weight:700}
+  .sp{flex:1}
 
-  /* Layout */
-  .wrap{max-width:1500px;margin:16px auto;padding:0 14px;display:grid;grid-template-columns:1fr 320px;gap:14px}
+  /* page layout: top controls + schedules row, bottom full-width rota */
+  .page{max-width:1500px;margin:16px auto;padding:0 14px;display:grid;grid-template-columns:1fr 320px;grid-template-areas:"controls schedules" "grid grid";gap:14px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 22px rgba(20,30,70,.06)}
-  .card .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
-  .card .bd{padding:10px 12px}
+  .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .bd{padding:10px 12px}
   .muted{color:var(--muted)}
-  .spacer{flex:1}
 
-  /* Schedules (right) */
+  /* schedules (right) */
+  .schedules{grid-area:schedules}
   .tree-search{display:flex;gap:8px;margin-bottom:8px}
-  .tree{border:1px solid var(--line);border-radius:10px;max-height:68vh;overflow:auto;background:#fff}
+  .tree{border:1px solid var(--line);border-radius:10px;max-height:62vh;overflow:auto;background:#fff}
   .tree details{padding:4px}
   .tree summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:700}
   .tree summary::-webkit-details-marker{display:none}
   .twisty{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--line);border-radius:4px;background:#f0f5ff}
   .node{display:flex;align-items:center;gap:6px;padding:3px 2px}
-  .node-actions button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:2px 6px;cursor:pointer;font-size:11px}
   .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-  .chip.small{padding:3px 6px;font-size:12px}
+  .chip.sm{padding:3px 6px}
 
-  /* Assignment table */
+  /* controls (left top) */
+  .controls{grid-area:controls}
+  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+
+  /* templates + assignment */
+  .key{display:grid;grid-template-columns:18px 110px 1fr;gap:6px;align-items:center}
+  .dot{width:10px;height:10px;border-radius:50%}
   .table-wrap{border:1px solid var(--line);border-radius:12px;overflow:auto}
   table{width:100%;border-collapse:collapse}
   th,td{border:1px solid var(--line);padding:6px;text-align:center}
   thead th{background:#f0f5ff;color:#0d47a1;font-weight:800}
-  td.name{position:sticky;left:0;background:#f7fbff;font-weight:800;text-align:left;min-width:170px}
-  td.name .sub{display:block;font-size:11px;color:var(--muted);font-weight:600}
-  .selector{width:100%;height:28px;border:1px solid var(--line);border-radius:6px;background:#fff;padding:2px 6px}
+  td.name{text-align:left;font-weight:800;min-width:180px;background:#f7fbff;position:sticky;left:0}
 
-  /* Horizontal timeline (Calabrio style) */
-  .timeline{--cols: 14;}
-  .hr-head{height:32px;background:#fbfdff;border-bottom:1px solid var(--line);display:grid;grid-template-columns:170px repeat(var(--cols),1fr)}
+  /* rota grid (bottom, full width) */
+  .gridCard{grid-area:grid}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--line);border-radius:999px;background:#fff}
+
+  /* horizontal timeline */
+  .hr-head{height:30px;background:#fbfdff;border-bottom:1px solid var(--line);display:grid;grid-template-columns:180px repeat(var(--cols),1fr)}
   .hr-head .label{display:flex;align-items:center;justify-content:center;font-weight:800;color:#51607a}
-  .grid{display:grid;grid-template-columns:170px repeat(var(--cols),1fr)}
-  .row{display:contents}
-  .cell{height:var(--row-height);position:relative}
-  .cell.hour{border-left:1px solid var(--line);background:linear-gradient(#fff,#fff)}
-  .row:nth-child(even) .cell.hour{background:linear-gradient(#fbfcff,#fbfcff)}
+  .grid{display:grid;grid-template-columns:180px repeat(var(--cols),1fr)}
+  .rowg{display:contents}
+  .cell{height:var(--row-h);position:relative;border-bottom:1px solid var(--line)}
+  .cell.hour{border-left:1px solid var(--line)}
+  .namecell{display:flex;align-items:center;gap:6px;padding-left:8px;background:#fff;position:sticky;left:0;z-index:1}
 
-  .bar{position:absolute;top:calc((var(--row-height) - var(--bar-height))/2);height:var(--bar-height);left:0;right:0;border-radius:6px;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:space-between;padding:0 6px;font-size:11px;box-shadow:0 1px 2px rgba(0,0,0,.12)}
-  .bar .t{opacity:.9}
+  .bar{position:absolute;top:calc((var(--row-h) - var(--bar-h))/2);height:var(--bar-h);left:0;right:0;border-radius:6px;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:space-between;padding:0 6px;font-size:11px;box-shadow:0 1px 2px rgba(0,0,0,.12);cursor:grab}
+  .bar:active{cursor:grabbing}
+  .handle{position:absolute;top:0;width:6px;height:100%;cursor:ew-resize;opacity:.85}
+  .handle.l{left:-3px} .handle.r{right:-3px}
+
   .b-email{background:var(--email)} .b-mirakl{background:var(--mirakl)}
   .b-social{background:var(--social)} .b-meeting{background:var(--meeting);color:#333}
   .b-overtime{background:var(--overtime)} .b-break{background:var(--break);color:#123}
   .b-lunch{background:var(--lunch);color:#123} .b-absence{background:var(--absence)}
   .b-shrink{background:var(--shrink);color:#123}
 
-  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--line);border-radius:999px;background:#fff}
-  .dot{width:10px;height:10px;border-radius:50%}
-
   .note{background:#fff8d7;border:1px solid #ffe48f;color:#8a6d3b;padding:8px;border-radius:10px}
+  dialog{max-width:720px;width:95%;border:1px solid var(--line);border-radius:12px;padding:12px}
 </style>
 </head>
 <body>
   <div class="topbar">
     <h1>Professional Team Rota System</h1>
-    <div class="filters">
-      <select id="siteFilter" class="in"></select>
-      <select id="leaderFilter" class="in"></select>
-      <select id="viewFilter" class="in"></select>
-      <input type="date" id="weekStart" class="in" />
-      <button class="btn icon" id="prevWeek">◀</button>
-      <button class="btn icon" id="nextWeek">▶</button>
-      <button class="btn" id="btnGenerate">Generate</button>
-      <button class="btn primary" id="btnPublish">Publish</button>
-    </div>
-    <span class="spacer"></span>
+    <select id="siteFilter" class="in"></select>
+    <select id="leaderFilter" class="in"></select>
+    <select id="viewFilter" class="in"></select>
+    <input type="date" id="weekStart" class="in"/>
+    <button class="btn icon" id="prevWeek">◀</button>
+    <button class="btn icon" id="nextWeek">▶</button>
+    <button class="btn" id="btnGenerate">Generate</button>
+    <button class="btn primary" id="btnPublish">Publish</button>
+    <span class="sp"></span>
     <span class="chip" id="rangeLabel"></span>
   </div>
 
-  <div class="wrap">
-    <!-- LEFT -->
-    <div style="display:flex;flex-direction:column;gap:14px">
-      <!-- Horizontal Grid -->
-      <div class="card">
-        <div class="hd">
-          <strong id="teamTitle">Team Week</strong>
-          <div style="display:flex;gap:8px;align-items:center">
-            <button class="btn" id="btnSaveJSON">💾 Save JSON</button>
-            <input type="file" id="file" accept=".json" style="display:none" />
-            <button class="btn" id="btnLoadJSON">📂 Load JSON</button>
-            <button class="btn ghost" id="btnPrint">🖨️ Print</button>
-          </div>
+  <div class="page">
+    <!-- Controls + Templates / Assignment (left) -->
+    <div class="card controls">
+      <div class="hd"><strong>Templates & Master Assignment</strong></div>
+      <div class="bd">
+        <div class="row" style="margin-bottom:8px">
+          <button class="btn" id="btnAddTemplate">➕ Add Template</button>
+          <button class="btn" id="btnLoadDefaults">↺ Load Sample Templates</button>
+          <span class="sp"></span>
+          <button class="btn" id="btnSaveJSON">💾 Save JSON</button>
+          <input type="file" id="file" accept=".json" style="display:none"/>
+          <button class="btn" id="btnLoadJSON">📂 Load JSON</button>
         </div>
-        <div class="bd">
-          <div id="gridHead" class="hr-head"></div>
-          <div id="grid" class="grid"></div>
 
-          <div class="legend">
-            <span class="pill"><span class="dot" style="background:var(--email)"></span> Email</span>
-            <span class="pill"><span class="dot" style="background:var(--mirakl)"></span> Mirakl</span>
-            <span class="pill"><span class="dot" style="background:var(--social)"></span> Social</span>
-            <span class="pill"><span class="dot" style="background:var(--meeting)"></span> Meeting</span>
-            <span class="pill"><span class="dot" style="background:var(--overtime)"></span> Overtime</span>
-            <span class="pill"><span class="dot" style="background:var(--break)"></span> Break</span>
-            <span class="pill"><span class="dot" style="background:var(--lunch)"></span> Lunch</span>
-          </div>
-        </div>
-      </div>
+        <div id="templateEditor" class="note" style="margin-bottom:12px">Loading templates…</div>
 
-      <!-- Settings / Templates / Master Assignment -->
-      <div class="card">
-        <div class="hd"><strong>Settings / Templates & Master Assignment</strong></div>
-        <div class="bd">
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start">
-            <!-- Template editor -->
-            <div>
-              <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-                <button class="btn" id="btnAddTemplate">➕ Add Template</button>
-                <button class="btn" id="btnLoadDefaults">↺ Load Sample Templates</button>
-              </div>
-              <div id="templateEditor" class="note" style="padding:10px">Loading templates…</div>
-            </div>
-
-            <!-- Colour key -->
-            <div>
-              <strong>Colour Key</strong>
-              <div style="display:grid;grid-template-columns:18px 110px 1fr;gap:6px;align-items:center;margin-top:8px">
-                <span class="dot" style="background:var(--email)"></span><span>Email</span><input data-k="--email" class="in" value="#2ecc71">
-                <span class="dot" style="background:var(--mirakl)"></span><span>Mirakl</span><input data-k="--mirakl" class="in" value="#b1b51e">
-                <span class="dot" style="background:var(--social)"></span><span>Social</span><input data-k="--social" class="in" value="#5e35b1">
-                <span class="dot" style="background:var(--meeting)"></span><span>Meeting</span><input data-k="--meeting" class="in" value="#ffd700">
-                <span class="dot" style="background:var(--overtime)"></span><span>Overtime</span><input data-k="--overtime" class="in" value="#e53935">
-                <span class="dot" style="background:var(--break)"></span><span>Break</span><input data-k="--break" class="in" value="#cfd8dc">
-                <span class="dot" style="background:var(--lunch)"></span><span>Lunch</span><input data-k="--lunch" class="in" value="#b0bec5">
-              </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;margin-bottom:8px">
+          <div>
+            <strong>Colour Key</strong>
+            <div class="key" style="margin-top:6px">
+              <span class="dot" style="background:var(--email)"></span><span>Email</span><input class="in" data-k="--email" value="#2ecc71">
+              <span class="dot" style="background:var(--mirakl)"></span><span>Mirakl</span><input class="in" data-k="--mirakl" value="#b1b51e">
+              <span class="dot" style="background:var(--social)"></span><span>Social</span><input class="in" data-k="--social" value="#5e35b1">
+              <span class="dot" style="background:var(--meeting)"></span><span>Meeting</span><input class="in" data-k="--meeting" value="#ffd700">
+              <span class="dot" style="background:var(--overtime)"></span><span>Overtime</span><input class="in" data-k="--overtime" value="#e53935">
+              <span class="dot" style="background:var(--break)"></span><span>Break</span><input class="in" data-k="--break" value="#cfd8dc">
+              <span class="dot" style="background:var(--lunch)"></span><span>Lunch</span><input class="in" data-k="--lunch" value="#b0bec5">
             </div>
           </div>
-
-          <div style="margin-top:14px">
-            <strong>Master Assignment (pick a template per day)</strong>
-            <div class="table-wrap" style="margin-top:8px">
-              <table id="assignTable">
-                <thead>
-                  <tr><th>Advisor</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
-                </thead>
-                <tbody></tbody>
-              </table>
-            </div>
-            <div class="muted" style="margin-top:6px">This table shows advisors from your current **Schedules** selection (or your chosen filters).</div>
-          </div>
+          <div class="note">Pick a template for each advisor/day below. **Generate** writes draft to <code>rotas</code>. **Publish** copies to <code>rotas_published</code> (Advisor Portal).</div>
         </div>
+
+        <div class="table-wrap">
+          <table id="assignTable">
+            <thead>
+              <tr><th>Advisor</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
       </div>
     </div>
 
-    <!-- RIGHT (Schedules tree) -->
-    <div class="card">
+    <!-- Schedules (right) -->
+    <div class="card schedules">
       <div class="hd"><strong>Schedules</strong></div>
       <div class="bd">
         <div class="tree-search">
-          <input id="treeSearch" class="in" placeholder="Search leaders/advisors…" style="flex:1" />
+          <input id="treeSearch" class="in" placeholder="Search leaders/advisors…" style="flex:1"/>
           <button id="btnClearSel" class="btn">Clear</button>
         </div>
         <div class="tree" id="tree"></div>
         <div class="chips" id="activeChips"></div>
-        <div id="panelNote" class="note" style="margin-top:10px">Select a Leader to include their whole team, or tick names individually. “View ▸ Team (Selected)” shows only those rows.</div>
+        <div class="note" style="margin-top:8px">Tick a **Leader** to select the whole team, or tick individuals. “View ▸ Team (Selected)” shows only the checked names.</div>
+      </div>
+    </div>
+
+    <!-- FULL-WIDTH ROTA GRID (bottom) -->
+    <div class="card gridCard">
+      <div class="hd">
+        <strong id="teamTitle">Team Week</strong>
+        <div>
+          <button class="btn" id="btnPrint">🖨️ Print</button>
+        </div>
+      </div>
+      <div class="bd">
+        <div id="gridHead" class="hr-head"></div>
+        <div id="grid" class="grid"></div>
+
+        <div class="legend">
+          <span class="pill"><span class="dot" style="background:var(--email)"></span> Email</span>
+          <span class="pill"><span class="dot" style="background:var(--mirakl)"></span> Mirakl</span>
+          <span class="pill"><span class="dot" style="background:var(--social)"></span> Social</span>
+          <span class="pill"><span class="dot" style="background:var(--meeting)"></span> Meeting</span>
+          <span class="pill"><span class="dot" style="background:var(--overtime)"></span> Overtime</span>
+          <span class="pill"><span class="dot" style="background:var(--break)"></span> Break</span>
+          <span class="pill"><span class="dot" style="background:var(--lunch)"></span> Lunch</span>
+        </div>
       </div>
     </div>
   </div>
 
+  <!-- Click / edit dialog -->
+  <dialog id="editDlg">
+    <div style="font-weight:800;margin-bottom:6px">Edit block</div>
+    <div class="row"><label style="min-width:90px">Code</label>
+      <select id="edCode" class="in" style="flex:1"></select></div>
+    <div class="row"><label style="min-width:90px">Start–End</label>
+      <input id="edStart" class="in" type="time"> <span>–</span> <input id="edEnd" class="in" type="time"></div>
+    <div class="row" style="justify-content:flex-end;margin-top:10px">
+      <button id="edDelete" class="btn">Delete</button>
+      <button onclick="editDlg.close()" class="btn">Cancel</button>
+      <button id="edSave" class="btn primary">Save</button>
+    </div>
+  </dialog>
+
 <script>
-/* =============================
-   SUPABASE CONFIG
-============================= */
-const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
+/* ===== Supabase ===== */
+const SUPABASE_URL="https://oypdnjxhjpgpwmkltzmk.supabase.co";
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* =============================
-   STATE
-============================= */
-const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-let ORG = { sites:{} };                 // sites -> leaders -> advisors
-let ADVISORS = [];                      // flat list
-let ADVISOR_BY_ID = new Map();
-let TEMPLATES = {};                     // { name: {...} }
-let ROTAS = new Map();                  // `${advisorId}|${weekISO}` -> { Monday:{segments:[]}, ... }
-let ASSIGN = new Map();                 // `${advisorId}|${weekISO}` -> { Mon:'Early', ... }
-let SELECTED = new Set();               // advisor names
-let monday = toMonday(new Date());
+/* ===== State ===== */
+const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+let ORG={sites:{}};
+let ADVISORS=[];                    // {id,name,leader_id,email}
+let ADVISOR_BY_ID=new Map();
+let TEMPLATES={};                   // name -> template
+let ROTAS=new Map();                // key "id|weekISO" -> { Monday:{segments:[]}, ... }
+let ASSIGN=new Map();               // key "id|weekISO" -> { Monday:'Early', ... }
+let SELECTED=new Set();             // advisor names checked in tree
+let monday=toMonday(new Date());
 
-/* =============================
-   UTILS
-============================= */
-const $ = s => document.querySelector(s);
-const $$ = s => Array.from(document.querySelectorAll(s));
-const pad = n => String(n).padStart(2,'0');
-const toISO = d => d.toISOString().slice(0,10);
-function toMonday(d){ const x=new Date(d); const w=x.getDay(); const delta=(w===0?-6:1)-w; x.setDate(x.getDate()+delta); x.setHours(0,0,0,0); return x; }
-function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
-function hhmm2min(t){ if(!t) return null; const [h,m] = t.split(':').map(Number); return h*60+m; }
-function min2hhmm(m){ return `${pad(Math.floor(m/60))}:${pad(m%60)}`; }
-function between(n,a,b){ return Math.max(a, Math.min(b, n)); }
-function labelForWeek(m){ const end = addDays(m,6); const fmt = d => d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'}); return `${fmt(m)} – ${fmt(end)} (${toISO(m)})`; }
+/* ===== Utils ===== */
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const pad=n=>String(n).padStart(2,'0');
+const toISO=d=>d.toISOString().slice(0,10);
+function toMonday(d){const x=new Date(d);const w=x.getDay();const delta=(w===0?-6:1)-w;x.setDate(x.getDate()+delta);x.setHours(0,0,0,0);return x;}
+function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+function hhmm2min(t){if(!t)return null;const[a,b]=t.split(':').map(Number);return a*60+b;}
+function min2hhmm(m){return `${pad(Math.floor(m/60))}:${pad(m%60)}`;}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function labelForWeek(m){const e=addDays(m,6);const fmt=d=>d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});return `${fmt(m)} – ${fmt(e)} (${toISO(m)})`;}
+const snap5=m=>Math.round(m/5)*5;
 
-/* =============================
-   LOAD ORG + TEMPLATES
-============================= */
+/* ===== Load org + templates ===== */
 async function loadOrg(){
   const [sitesRes, leadersRes, advisorsRes] = await Promise.all([
     sb.from('sites').select('*').order('name'),
@@ -248,157 +239,129 @@ async function loadOrg(){
     sb.from('advisors').select('*')
   ]);
 
-  ORG = { sites:{} };
-  (sitesRes.data||[]).forEach(s=> ORG.sites[s.name] = { id:s.id, leaders:{} });
+  ORG={sites:{}};
+  (sitesRes.data||[]).forEach(s=> ORG.sites[s.name]={id:s.id, leaders:{}} );
   (leadersRes.data||[]).forEach(l=>{
     for(const site of Object.values(ORG.sites)){
-      if(site.id===l.site_id){ site.leaders[l.name] = { id:l.id, advisors:[] }; break; }
+      if(site.id===l.site_id){ site.leaders[l.name]={id:l.id, advisors:[]}; break; }
     }
   });
 
-  ADVISORS = (advisorsRes.data||[]).map(a=>({id:a.id,name:a.name,leader_id:a.leader_id,email:a.email||''}));
-  ADVISOR_BY_ID = new Map(ADVISORS.map(a=>[a.id,a.name]));
+  ADVISORS=(advisorsRes.data||[]).map(a=>({id:a.id,name:a.name,leader_id:a.leader_id,email:a.email||''}));
+  ADVISOR_BY_ID=new Map(ADVISORS.map(a=>[a.id,a.name]));
   for(const a of ADVISORS){
-    const leaderNode = Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===a.leader_id);
-    if(leaderNode) leaderNode.advisors.push({id:a.id,name:a.name});
+    const leader = Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===a.leader_id);
+    if(leader) leader.advisors.push({id:a.id,name:a.name});
   }
 
-  // Templates
-  const tRes = await sb.from('templates').select('*');
-  TEMPLATES = {};
+  // templates
+  await reloadTemplates();
+}
+async function reloadTemplates(){
+  const tRes=await sb.from('templates').select('*');
+  TEMPLATES={};
   (tRes.data||[]).forEach(t=>{
-    TEMPLATES[t.name] = {
-      name:t.name,
-      work_code:t.work_code || 'Admin',
-      start_time:(t.start_time||'').slice(0,5) || '',
-      finish_time:(t.finish_time||'').slice(0,5) || '',
+    TEMPLATES[t.name]={
+      name:t.name, work_code:t.work_code||'Admin',
+      start_time:(t.start_time||'').slice(0,5)||'',
+      finish_time:(t.finish_time||'').slice(0,5)||'',
       break1:(t.break1||'')?.slice(0,5)||'',
       lunch:(t.lunch||'')?.slice(0,5)||'',
       break2:(t.break2||'')?.slice(0,5)||'',
     };
   });
+  populateTemplateEditor();
 }
 
-/* =============================
-   FILTERS (top bar)
-============================= */
+/* ===== Filters (cascade) ===== */
 function rebuildFilters(){
-  const siteSel = $('#siteFilter');
-  const leaderSel = $('#leaderFilter');
-  const viewSel = $('#viewFilter');
+  const siteSel=$('#siteFilter'), leaderSel=$('#leaderFilter'), viewSel=$('#viewFilter');
 
-  const sites = Object.keys(ORG.sites).sort();
-  siteSel.innerHTML = `<option value="all">All sites</option>` + sites.map(n=>`<option value="${n}">${n}</option>`).join('');
+  const sites=Object.keys(ORG.sites).sort();
+  siteSel.innerHTML=`<option value="all">All sites</option>${sites.map(s=>`<option>${s}</option>`).join('')}`;
 
-  const leaders = Object.entries(ORG.sites)
-    .flatMap(([sn,so])=>Object.entries(so.leaders).map(([ln,lo])=>({name:ln,id:lo.id,site:sn})))
-    .sort((a,b)=>a.name.localeCompare(b.name));
-  leaderSel.innerHTML = `<option value="all">All leaders</option>` +
-    leaders.map(l=>`<option value="${l.id}">${l.name} — ${l.site}</option>`).join('');
+  function rebuildLeaders(){
+    const val=siteSel.value;
+    let leaders=[];
+    if(val==='all'){
+      leaders=Object.entries(ORG.sites).flatMap(([sn,so])=>Object.entries(so.leaders).map(([ln,lo])=>({id:lo.id,name:`${ln} — ${sn}`})));
+    }else{
+      leaders=Object.entries(ORG.sites[val]?.leaders||{}).map(([ln,lo])=>({id:lo.id,name:ln}));
+    }
+    leaders.sort((a,b)=>a.name.localeCompare(b.name));
+    leaderSel.innerHTML=`<option value="all">All leaders</option>${leaders.map(l=>`<option value="${l.id}">${l.name}</option>`).join('')}`;
+  }
+  rebuildLeaders();
+  siteSel.onchange=()=>{ rebuildLeaders(); populateAssignTable(); renderGrid(); rebuildTree(); };
 
-  viewSel.innerHTML = `
-    <option value="TEAM_ALL">Team (All)</option>
-    <option value="TEAM_SELECTED">Team (Selected)</option>
-  `;
-
-  $('#weekStart').value = toISO(monday);
-  $('#rangeLabel').textContent = labelForWeek(monday);
+  viewSel.innerHTML=`<option value="TEAM_ALL">Team (All)</option><option value="TEAM_SELECTED">Team (Selected)</option>`;
 }
 
-/* =============================
-   SCHEDULES TREE (right)
-============================= */
+/* ===== Schedules tree ===== */
 function rebuildTree(){
-  const t = $('#tree');
-  const q = ($('#treeSearch').value||'').trim().toLowerCase();
+  const t=$('#tree'); const q=($('#treeSearch').value||'').toLowerCase().trim();
+  const siteVal=$('#siteFilter').value, leaderVal=$('#leaderFilter').value;
 
-  function advRow(a){
+  function advisorRow(a){
+    const show = (!q || a.name.toLowerCase().includes(q));
+    if(!show) return '';
     const checked = SELECTED.has(a.name) ? 'checked' : '';
-    return `<div class="node">
-      <input type="checkbox" data-adv="${a.id}" data-name="${a.name}" ${checked}/>
-      <span>${a.name}</span>
-      <span class="muted" style="margin-left:auto;font-size:11px">${a.id.slice(0,8)}</span>
-    </div>`;
+    return `<div class="node"><input type="checkbox" data-adv="${a.id}" data-name="${a.name}" ${checked}/> <span>${a.name}</span></div>`;
   }
-
-  function leaderBlock(ln, lo){
-    const team = (lo.advisors||[]).sort((a,b)=>a.name.localeCompare(b.name));
-    const showLeader = !q || ln.toLowerCase().includes(q) || team.some(a=>a.name.toLowerCase().includes(q));
-    if(!showLeader) return '';
-    const allSelected = team.length && team.every(a=>SELECTED.has(a.name));
+  function leaderBlock(ln, lo, siteName){
+    if(siteVal!=='all' && siteName!==siteVal) return '';
+    if(leaderVal!=='all' && lo.id!==leaderVal) return '';
+    const team=(lo.advisors||[]).sort((a,b)=>a.name.localeCompare(b.name));
+    if(q && !ln.toLowerCase().includes(q) && !team.some(a=>a.name.toLowerCase().includes(q))) return '';
+    const allSel = team.length && team.every(a=>SELECTED.has(a.name));
     return `<details open>
       <summary><span class="twisty">−</span>
         <label style="display:flex;gap:6px;align-items:center;margin-left:4px">
-          <input type="checkbox" data-leader="${lo.id}" ${allSelected?'checked':''}/>
-          <strong>${ln}</strong> <span class="muted">(${team.length})</span>
+          <input type="checkbox" data-leader="${lo.id}" ${allSel?'checked':''}/> <strong>${ln}</strong> <span class="muted">(${team.length})</span>
         </label>
       </summary>
-      ${team.map(advRow).join('')}
+      ${team.map(advisorRow).join('')}
     </details>`;
   }
-
-  function siteBlock(sn, so){
-    const leaf = Object.entries(so.leaders).map(([ln,lo])=>leaderBlock(ln,lo)).filter(Boolean).join('');
-    if(!leaf) return '';
-    return `<details open>
-      <summary><span class="twisty">−</span><strong>📁 ${sn}</strong></summary>
-      ${leaf}
-    </details>`;
+  function siteBlock(sn,so){
+    const inner=Object.entries(so.leaders).map(([ln,lo])=>leaderBlock(ln,lo,sn)).filter(Boolean).join('');
+    if(!inner) return '';
+    return `<details open><summary><span class="twisty">−</span><strong>📁 ${sn}</strong></summary>${inner}</details>`;
   }
+  t.innerHTML=Object.entries(ORG.sites).sort((a,b)=>a[0].localeCompare(b[0])).map(([sn,so])=>siteBlock(sn,so)).join('')||'<div class="muted">No data.</div>';
 
-  t.innerHTML = Object.entries(ORG.sites).sort((a,b)=>a[0].localeCompare(b[0])).map(([sn,so])=>siteBlock(sn,so)).join('') || `<div class="muted">No data.</div>`;
-
-  // Toggle icons
-  $$('#tree details').forEach(d=>{
-    const icon = d.querySelector('.twisty');
-    const upd = ()=> icon.textContent = d.open ? '−' : '+';
-    d.addEventListener('toggle',upd); upd();
+  $$('#tree details').forEach(d=>{ const tw=d.querySelector('.twisty'); const up=()=>tw.textContent=d.open?'−':'+'; d.addEventListener('toggle',up); up(); });
+  $$('#tree [data-leader]').forEach(cb=> cb.onchange=()=>{
+    const id=cb.dataset.leader;
+    const leader=Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===id);
+    (leader?.advisors||[]).forEach(a=> cb.checked?SELECTED.add(a.name):SELECTED.delete(a.name));
+    refreshChips(); populateAssignTable(); renderGrid(); rebuildTree();
   });
-
-  // Leader select-all
-  $$('#tree [data-leader]').forEach(cb=>{
-    cb.onchange = ()=>{
-      const id = cb.dataset.leader;
-      const leader = Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===id);
-      (leader?.advisors||[]).forEach(a=> cb.checked ? SELECTED.add(a.name) : SELECTED.delete(a.name));
-      refreshChips();
-      populateAssignTable();
-      renderGrid();
-      rebuildTree(); // refresh checks
-    };
-  });
-
-  // Advisor ticks
-  $$('#tree [data-adv]').forEach(cb=>{
-    cb.onchange = ()=>{ const n=cb.dataset.name; cb.checked?SELECTED.add(n):SELECTED.delete(n); refreshChips(); populateAssignTable(); renderGrid(); };
+  $$('#tree [data-adv]').forEach(cb=> cb.onchange=()=>{
+    cb.checked?SELECTED.add(cb.dataset.name):SELECTED.delete(cb.dataset.name);
+    refreshChips(); populateAssignTable(); renderGrid();
   });
 }
-
 function refreshChips(){
-  const box = $('#activeChips');
-  const items = [...SELECTED].sort();
-  box.innerHTML = items.map(n=>`<span class="chip small">${n} <button data-x="${n}" class="btn icon" title="remove">✕</button></span>`).join('');
-  $$('#activeChips [data-x]').forEach(b=> b.onclick = ()=>{ SELECTED.delete(b.dataset.x); refreshChips(); populateAssignTable(); renderGrid(); rebuildTree(); });
+  const box=$('#activeChips');
+  box.innerHTML=[...SELECTED].sort().map(n=>`<span class="chip sm">${n} <button class="btn icon" data-x="${n}">✕</button></span>`).join('');
+  $$('#activeChips [data-x]').forEach(b=> b.onclick=()=>{ SELECTED.delete(b.dataset.x); refreshChips(); populateAssignTable(); renderGrid(); rebuildTree(); });
 }
 
-/* =============================
-   TEMPLATES EDITOR
-============================= */
-const CODE_GROUPS = {
+/* ===== Templates ===== */
+const GROUPS={
   "Activity":[ "2nd Line","Admin","BH Email","BH Social","BH WhatsApp","DEB Email","DEB Social","DEB WhatsApp","Ebay","KM Email","KM Social","KM WhatsApp","Mirakl","Mixing","PayPlus","PLT Email","PLT Social","PLT WhatsApp","QA","Overtime" ],
   "Absence":[ "AL","Break","Lunch","Sick","Split Shift","RDO","Maternity","LTS" ],
   "Shrinkage":[ "121","ATL","Coaching","Huddle","ITI","Projects","Team Meeting","Training" ]
 };
-function codeSelectGroupedHTML(val=''){
-  return Object.entries(CODE_GROUPS).map(([grp,codes])=>
-    `<optgroup label="${grp}">${codes.map(c=>`<option ${val===c?'selected':''}>${c}</option>`).join('')}</optgroup>`
-  ).join('');
+function codeSelectHTML(val=''){
+  return Object.entries(GROUPS).map(([g,arr])=>`<optgroup label="${g}">${arr.map(c=>`<option ${val===c?'selected':''}>${c}</option>`).join('')}</optgroup>`).join('');
 }
 function templateRow(t){
   return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:#fbfdff" data-name="${t.name}">
     <div style="display:grid;grid-template-columns:130px 1fr 130px 1fr;gap:8px;align-items:center">
       <label>Name</label><input data-f="name" class="in" value="${t.name}">
-      <label>New code</label><select data-f="work_code" class="in">${codeSelectGroupedHTML(t.work_code||'Admin')}</select>
+      <label>New code</label><select data-f="work_code" class="in">${codeSelectHTML(t.work_code||'Admin')}</select>
       <label>Start / Finish</label>
       <div style="display:flex;gap:6px"><input data-f="start_time" class="in" type="time" value="${t.start_time||''}"><input data-f="finish_time" class="in" type="time" value="${t.finish_time||''}"></div>
       <label>Breaks</label>
@@ -412,335 +375,293 @@ function templateRow(t){
 }
 function populateTemplateEditor(){
   const ed=$('#templateEditor'); const list=Object.values(TEMPLATES).sort((a,b)=>a.name.localeCompare(b.name));
-  ed.classList.remove('note'); ed.innerHTML = list.length? list.map(templateRow).join('') : '<div class="muted">No templates. Add or load samples.</div>';
+  ed.classList.remove('note'); ed.innerHTML=list.length?list.map(templateRow).join(''):'<div class="muted">No templates. Add or load samples.</div>';
 
-  // Wire inputs
   $$('#templateEditor [data-f]').forEach(inp=>{
-    inp.addEventListener('change', async()=>{
-      const name = inp.closest('[data-name]').dataset.name;
-      const f = inp.dataset.f;
-      const newVal = inp.value || null;
-      const rec = Object.assign({}, TEMPLATES[name], { [f]: newVal });
-      if(f==='name' && newVal && newVal!==name){
-        // rename = delete old + insert new
-        await sb.from('templates').delete().eq('name', name);
-        const {error} = await sb.from('templates').insert([rec]);
-        if(error) alert('Rename failed: '+error.message);
+    inp.onchange=async()=>{
+      const row=inp.closest('[data-name]'), name=row.dataset.name, f=inp.dataset.f, v=inp.value||null;
+      const next=Object.assign({},TEMPLATES[name],{[f]:v});
+      if(f==='name' && v && v!==name){
+        await sb.from('templates').delete().eq('name',name);
+        const {error}=await sb.from('templates').insert([next]); if(error) alert(error.message);
       }else{
-        const {error} = await sb.from('templates').update(rec).eq('name', name);
-        if(error) alert('Update failed: '+error.message);
+        const {error}=await sb.from('templates').update(next).eq('name',name); if(error) alert(error.message);
       }
       await reloadTemplates();
-    });
+    };
   });
-  // Duplicate / Delete
   $$('#templateEditor [data-act="dup"]').forEach(b=> b.onclick=async()=>{
-    const name = b.closest('[data-name]').dataset.name;
-    const t = Object.assign({}, TEMPLATES[name]);
-    t.name = name + ' Copy';
-    const {error} = await sb.from('templates').insert([t]);
-    if(error) alert('Duplicate failed: '+error.message);
-    else await reloadTemplates();
+    const n=b.closest('[data-name]').dataset.name, t=Object.assign({},TEMPLATES[n]); t.name=n+' Copy';
+    const {error}=await sb.from('templates').insert([t]); if(error) alert(error.message); else await reloadTemplates();
   });
   $$('#templateEditor [data-act="del"]').forEach(b=> b.onclick=async()=>{
-    const name = b.closest('[data-name]').dataset.name;
-    if(!confirm(`Delete template "${name}"?`)) return;
-    const {error} = await sb.from('templates').delete().eq('name', name);
-    if(error) alert('Delete failed: '+error.message);
-    else await reloadTemplates();
+    const n=b.closest('[data-name]').dataset.name; if(!confirm(`Delete "${n}"?`)) return;
+    const {error}=await sb.from('templates').delete().eq('name',n); if(error) alert(error.message); else await reloadTemplates();
   });
 }
-async function reloadTemplates(){
-  const tRes = await sb.from('templates').select('*');
-  TEMPLATES = {}; (tRes.data||[]).forEach(t=> TEMPLATES[t.name] = {
-    name:t.name, work_code:t.work_code||'Admin',
-    start_time:(t.start_time||'').slice(0,5)||'',
-    finish_time:(t.finish_time||'').slice(0,5)||'',
-    break1:(t.break1||'')?.slice(0,5)||'',
-    lunch:(t.lunch||'')?.slice(0,5)||'',
-    break2:(t.break2||'')?.slice(0,5)||'',
-  });
-  populateTemplateEditor();
-}
-$('#btnAddTemplate').onclick = async()=>{
+$('#btnAddTemplate').onclick=async()=>{
   const name='Shift '+(Object.keys(TEMPLATES).length+1);
   const {error}=await sb.from('templates').insert([{name,work_code:'Admin',start_time:'09:00',finish_time:'17:00',break1:null,lunch:'12:30',break2:null}]);
-  if(error) alert('Add failed: '+error.message);
-  else await reloadTemplates();
+  if(error) alert(error.message); else await reloadTemplates();
 };
-$('#btnLoadDefaults').onclick = async()=>{
+$('#btnLoadDefaults').onclick=async()=>{
   const defaults=[
     {name:'Early',  work_code:'DEB Email', start_time:'07:00', finish_time:'16:00', break1:'09:15', lunch:'12:00', break2:'15:15'},
     {name:'Middle', work_code:'Mirakl',    start_time:'11:00', finish_time:'20:00', break1:'11:30', lunch:'15:30', break2:'17:45'},
     {name:'Late',   work_code:'PLT Social',start_time:'12:00', finish_time:'21:00', break1:'13:15', lunch:'17:00', break2:'19:15'},
   ];
-  for(const t of defaults){ await sb.from('templates').upsert(t, { onConflict:'name' }); }
+  for(const t of defaults){ await sb.from('templates').upsert(t,{onConflict:'name'}); }
   await reloadTemplates();
 };
 
-/* =============================
-   ASSIGNMENT TABLE
-============================= */
-function currentAdvisorListForView(){
-  const siteVal = $('#siteFilter').value;
-  const leaderVal = $('#leaderFilter').value;
-  const viewVal = $('#viewFilter').value;
-  let advisors = ADVISORS;
-
+/* ===== Assignment table ===== */
+function advisorsForCurrentView(){
+  const siteVal=$('#siteFilter').value, leaderVal=$('#leaderFilter').value, v=$('#viewFilter').value;
+  let arr=ADVISORS;
   if(siteVal!=='all'){
-    const site = ORG.sites[siteVal];
-    const leaderIds = Object.values(site?.leaders||{}).map(l=>l.id);
-    advisors = advisors.filter(a=> leaderIds.includes(a.leader_id));
+    const leaderIds=Object.values(ORG.sites[siteVal]?.leaders||{}).map(l=>l.id);
+    arr=arr.filter(a=>leaderIds.includes(a.leader_id));
   }
-  if(leaderVal!=='all') advisors = advisors.filter(a=> a.leader_id===leaderVal);
-  advisors.sort((a,b)=>a.name.localeCompare(b.name));
-  if(viewVal==='TEAM_SELECTED') advisors = advisors.filter(a=> SELECTED.has(a.name));
-
-  return advisors;
+  if(leaderVal!=='all') arr=arr.filter(a=>a.leader_id===leaderVal);
+  arr.sort((a,b)=>a.name.localeCompare(b.name));
+  if(v==='TEAM_SELECTED') arr=arr.filter(a=>SELECTED.has(a.name));
+  return arr;
 }
 function populateAssignTable(){
-  const body = $('#assignTable tbody');
-  const advisors = currentAdvisorListForView();
-  if(!advisors.length){
-    body.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:left;padding:10px">Select a Leader or advisors in <strong>Schedules</strong> to populate this table.</td></tr>';
-    return;
-  }
-  const weekISO = toISO(monday);
-  const opts = ['','— None —', ...Object.keys(TEMPLATES).sort()].map(n=> `<option value="${n}">${n||'—'}</option>`).join('');
-  body.innerHTML = advisors.map(a=>{
-    const key=`${a.id}|${weekISO}`; const row = ASSIGN.get(key)||{};
-    return `<tr data-adv="${a.id}">
-      <td class="name"><strong>${a.name}</strong><span class="sub">${a.id.slice(0,8)}</span></td>
-      ${DAYS.map((d,i)=>`<td><select class="selector" data-day="${d}" data-adv="${a.id}">${opts}</select></td>`).join('')}
-    </tr>`;
-  }).join('');
-
-  // Preselect from ASSIGN (if any)
-  advisors.forEach(a=>{
-    const key=`${a.id}|${weekISO}`; const row = ASSIGN.get(key)||{};
-    DAYS.forEach(d=>{
-      const sel = document.querySelector(`select[data-adv="${a.id}"][data-day="${d}"]`);
-      if(sel){ sel.value = row[d] || ''; }
-    });
+  const body=$('#assignTable tbody'); const list=advisorsForCurrentView();
+  if(!list.length){ body.innerHTML='<tr><td colspan="8" class="muted" style="text-align:left;padding:10px">Pick a leader or advisors in **Schedules**.</td></tr>'; return; }
+  const weekISO=toISO(monday);
+  const opts=['','—','...'].slice(0,1).concat(Object.keys(TEMPLATES).sort()).map(n=>`<option value="${n}">${n||'—'}</option>`).join('');
+  body.innerHTML=list.map(a=>`<tr data-adv="${a.id}">
+    <td class="name">${a.name}</td>
+    ${DAYS.map(d=>`<td><select class="in sel" data-adv="${a.id}" data-day="${d}">${opts}</select></td>`).join('')}
+  </tr>`).join('');
+  // preload selections
+  list.forEach(a=>{
+    const key=`${a.id}|${weekISO}`; const row=ASSIGN.get(key)||{};
+    DAYS.forEach(d=>{ const el=document.querySelector(`select[data-adv="${a.id}"][data-day="${d}"]`); if(el) el.value=row[d]||''; });
   });
-
-  // Watch for changes
-  $$('#assignTable select.selector').forEach(sel=>{
-    sel.onchange = ()=>{
-      const adv = sel.dataset.adv; const day = sel.dataset.day; const val = sel.value || '';
-      const key = `${adv}|${toISO(monday)}`;
-      const row = ASSIGN.get(key) || {};
-      row[day] = val;
-      ASSIGN.set(key,row);
-    };
+  $$('#assignTable select.sel').forEach(el=> el.onchange=()=>{
+    const a=el.dataset.adv, d=el.dataset.day, v=el.value||''; const k=`${a}|${toISO(monday)}`;
+    const row=ASSIGN.get(k)||{}; row[d]=v; ASSIGN.set(k,row);
   });
 }
 
-/* Build segments from a template with 15m breaks and 30m lunch */
+/* ===== Segments from template ===== */
 function segmentsFromTemplate(t){
-  if(!t || !t.start_time || !t.finish_time) return [];
-  const B15 = 15, L30 = 30;
-  const out=[];
-  const start = hhmm2min(t.start_time), finish = hhmm2min(t.finish_time);
-  const b1 = t.break1? hhmm2min(t.break1):null;
-  const lu = t.lunch ? hhmm2min(t.lunch):null;
-  const b2 = t.break2? hhmm2min(t.break2):null;
-
-  let cursor=start;
-  function pushBlock(code, s, e){ if(e> s) out.push({ code, start:min2hhmm(s), end:min2hhmm(e) }); }
-
-  if(b1){ pushBlock(t.work_code, cursor, b1); pushBlock('Break', b1, b1+B15); cursor=b1+B15; }
-  if(lu){ pushBlock(t.work_code, cursor, lu); pushBlock('Lunch', lu, lu+L30); cursor=lu+L30; }
-  if(b2){ pushBlock(t.work_code, cursor, b2); pushBlock('Break', b2, b2+B15); cursor=b2+B15; }
-  pushBlock(t.work_code, cursor, finish);
-
-  return out;
-}
-
-/* =============================
-   DATA — LOAD / SAVE ROTAS
-============================= */
-async function loadRotasFor(advisorIds, weekISO){
-  if(!advisorIds.length) return;
-  const { data, error } = await sb
-    .from('rotas')
-    .select('advisor_id, week_start, data')
-    .in('advisor_id', advisorIds)
-    .eq('week_start', weekISO);
-  if(error){ console.warn(error); return; }
-  for(const r of data||[]){
-    ROTAS.set(`${r.advisor_id}|${weekISO}`, r.data || {});
+  if(!t||!t.start_time||!t.finish_time) return [];
+  const out=[], start=hhmm2min(t.start_time), finish=hhmm2min(t.finish_time);
+  const br=(mm,len,code)=>{ out.push({code,start:min2hhmm(mm),end:min2hhmm(mm+len)}); };
+  let cur=start;
+  const push=(code,s,e)=>{ if(e>s) out.push({code,start:min2hhmm(s),end:min2hhmm(e)}); };
+  if(t.break1){ push(t.work_code,cur,hhmm2min(t.break1)); br(hhmm2min(t.break1),15,'Break'); cur=hhmm2min(t.break1)+15; }
+  if(t.lunch){ push(t.work_code,cur,hhmm2min(t.lunch)); br(hhmm2min(t.lunch),30,'Lunch'); cur=hhmm2min(t.lunch)+30; }
+  if(t.break2){ push(t.work_code,cur,hhmm2min(t.break2)); br(hhmm2min(t.break2),15,'Break'); cur=hhmm2min(t.break2)+15; }
+  push(t.work_code,cur,finish);
+  // convert back: merge contiguous same-code blocks
+  const merged=[];
+  for(const seg of out){
+    const last=merged[merged.length-1];
+    if(last && last.code===seg.code && last.end===seg.start){ last.end=seg.end; }
+    else merged.push(seg);
   }
+  return merged;
 }
 
-/* =============================
-   RENDER — GRID
-============================= */
-function codeToClass(code){
+/* ===== Load / save rotas ===== */
+async function loadRotasFor(ids,weekISO){
+  if(!ids.length) return;
+  const {data,error}=await sb.from('rotas').select('advisor_id,week_start,data').in('advisor_id',ids).eq('week_start',weekISO);
+  if(error) return console.warn(error);
+  for(const r of data||[]) ROTAS.set(`${r.advisor_id}|${weekISO}`, r.data||{});
+}
+
+/* ===== Rota grid (render + edit + drag) ===== */
+function codeClass(code){
   const k=(code||'').toLowerCase();
-  if(k.includes('email')) return 'b-email';
-  if(k.includes('mirakl')) return 'b-mirakl';
-  if(k.includes('social')) return 'b-social';
-  if(k.includes('meeting')||k.includes('coach')) return 'b-meeting';
-  if(k.includes('overtime')) return 'b-overtime';
-  if(k.includes('break')) return 'b-break';
-  if(k.includes('lunch')) return 'b-lunch';
-  if(['al','sick','rdo','maternity','lts'].some(w=>k.includes(w))) return 'b-absence';
-  if(['121','atl','huddle','iti','projects','team meeting','training'].some(w=>k.includes(w))) return 'b-shrink';
-  return 'b-email';
+  if(k.includes('email'))return'b-email';
+  if(k.includes('mirakl'))return'b-mirakl';
+  if(k.includes('social'))return'b-social';
+  if(k.includes('meeting')||k.includes('coach'))return'b-meeting';
+  if(k.includes('overtime'))return'b-overtime';
+  if(k.includes('break'))return'b-break';
+  if(k.includes('lunch'))return'b-lunch';
+  if(['al','sick','rdo','maternity','lts'].some(w=>k.includes(w)))return'b-absence';
+  if(['121','atl','huddle','iti','projects','team meeting','training'].some(w=>k.includes(w)))return'b-shrink';
+  return'b-email';
 }
 function renderGrid(){
-  // Hours header
-  const start = +getComputedStyle(document.documentElement).getPropertyValue('--start') || 6;
-  const end   = +getComputedStyle(document.documentElement).getPropertyValue('--end') || 20;
-  const cols  = end-start;
-  $('#gridHead').style.setProperty('--cols', cols);
-  $('#grid').style.setProperty('--cols', cols);
-
-  $('#gridHead').innerHTML =
-    `<div class="label" style="justify-content:flex-start;padding-left:10px">Name</div>` +
-    Array.from({length:cols}, (_,i)=> `<div class="label">${pad(start+i)}:00</div>`).join('');
-
-  // Rows
-  const weekISO = toISO(monday);
-  const advisors = currentAdvisorListForView();
-  const grid = $('#grid');
-  if(!advisors.length){ grid.innerHTML = ''; return; }
-
-  const totalMinutes = (end-start)*60;
-  const rowsHTML = advisors.map(a=>{
-    const key = `${a.id}|${weekISO}`;
-    const json = ROTAS.get(key) || {};
-    // name cell
-    let row = `<div class="row" style="grid-template-columns:170px repeat(${cols},1fr)">
-      <div class="cell name"><strong>${a.name}</strong><span class="sub">${a.id.slice(0,8)}</span></div>
-      ${Array.from({length:cols},()=>`<div class="cell hour"></div>`).join('')}
-      <div class="cell" style="grid-column:2 / ${2+cols}">
-        ${DAYS.map((day,idx)=>{
-          const segs = json[day]?.segments||[];
-          return segs.map(seg=>{
-            const s = between(hhmm2min(seg.start||'07:00') - start*60, 0, totalMinutes);
-            const e = between(hhmm2min(seg.end||'07:10')   - start*60, 0, totalMinutes);
-            const left = (s/totalMinutes)*100;
-            const width= Math.max(1,(e-s)/totalMinutes*100);
-            return `<div class="bar ${codeToClass(seg.code)}" style="top:calc(${idx}*var(--row-height) + (var(--row-height) - var(--bar-height))/2); left:${left}%; width:${width}%">
-              <span>${(seg.code||'').toUpperCase()}</span><span class="t">${seg.start||''} – ${seg.end||''}</span>
-            </div>`;
-          }).join('');
-        }).join('')}
-      </div>
-    </div>`;
-    return row;
+  const start=+getComputedStyle(document.documentElement).getPropertyValue('--start')||6;
+  const end=+getComputedStyle(document.documentElement).getPropertyValue('--end')||20;
+  const cols=end-start, total=(end-start)*60;
+  $('#gridHead').style.setProperty('--cols',cols);
+  $('#grid').style.setProperty('--cols',cols);
+  $('#gridHead').innerHTML=`<div class="label" style="justify-content:flex-start;padding-left:10px">Name</div>`+Array.from({length:cols},(_,i)=>`<div class="label">${pad(start+i)}:00</div>`).join('');
+  const weekISO=toISO(monday), list=advisorsForCurrentView(); const g=$('#grid');
+  if(!list.length){ g.innerHTML=''; return; }
+  g.innerHTML=list.map(a=>{
+    const key=`${a.id}|${weekISO}`; const json=ROTAS.get(key)||{};
+    const bars=DAYS.flatMap((day,di)=>{
+      const segs=json[day]?.segments||[];
+      return segs.map((seg,si)=>{
+        const s=clamp(hhmm2min(seg.start)-start*60,0,total);
+        const e=clamp(hhmm2min(seg.end)-start*60,0,total);
+        const left=(s/total)*100, width=Math.max(1,(e-s)/total*100);
+        return `<div class="bar ${codeClass(seg.code)}" data-adv="${a.id}" data-day="${day}" data-si="${si}"
+                 style="top:calc(${di}*var(--row-h) + (var(--row-h) - var(--bar-h))/2); left:${left}%; width:${width}%">
+                 <span>${(seg.code||'').toUpperCase()}</span><span>${seg.start} – ${seg.end}</span>
+                 <span class="handle l"></span><span class="handle r"></span>
+               </div>`;
+      }).join('');
+    }).join('');
+    return `<div class="rowg"><div class="cell namecell">${a.name}</div>${Array.from({length:cols},()=>`<div class="cell hour"></div>`).join('')}<div class="cell" style="grid-column:2 / ${2+cols}">${bars}</div></div>`;
   }).join('');
-  grid.innerHTML = rowsHTML;
-}
 
-/* =============================
-   GENERATE & PUBLISH
-============================= */
-async function doGenerate(){
-  const advisors = currentAdvisorListForView();
-  if(!advisors.length){ alert('Nothing to generate. Pick advisors/leaders first.'); return; }
-  const weekISO = toISO(monday);
-  const rows = [];
+  // wire editing + drag
+  $$('#grid .bar').forEach(el=>{
+    const adv=el.dataset.adv, day=el.dataset.day, si=+el.dataset.si;
+    el.onclick=e=>{ if(e.target.classList.contains('handle')) return; openEditor(adv,day,si); };
 
-  for(const a of advisors){
-    const key = `${a.id}|${weekISO}`;
-    const pick = ASSIGN.get(key) || {};
-    const data = {};
-    DAYS.forEach(d=>{
-      const tname = pick[d] || '';
-      const t = TEMPLATES[tname];
-      if(t){ data[d] = { segments: segmentsFromTemplate(t) }; }
-    });
-    // Only save if something was selected this week
-    if(Object.keys(data).length){
-      rows.push({ advisor_id:a.id, week_start:weekISO, data });
-      ROTAS.set(key, data);
-    }
-  }
+    // drag to move / resize
+    const key=`${adv}|${weekISO}`; const startH=start; const totalM=(end-start)*60;
+    let mode=null, originX=0, origS=0, origE=0;
 
-  if(!rows.length){ alert('No template selections to save.'); return; }
-  const { error } = await sb.from('rotas').upsert(rows, { onConflict:'advisor_id,week_start' });
-  if(error){ alert('Generate failed: '+error.message); return; }
-  renderGrid();
-  alert('Draft rotas saved.');
-}
-
-async function doPublish(){
-  const advisors = currentAdvisorListForView();
-  if(!advisors.length){ alert('Nothing to publish.'); return; }
-  const weekISO = toISO(monday);
-
-  const rows = advisors.map(a=>{
-    const data = ROTAS.get(`${a.id}|${weekISO}`) || {};
-    return { advisor_id:a.id, week_start:weekISO, data, published_at:new Date().toISOString() };
+    const onDown=e=>{
+      const seg=getSeg(key,day,si); if(!seg) return;
+      mode = e.target.classList.contains('l') ? 'resL' : e.target.classList.contains('r') ? 'resR' : 'move';
+      originX = e.clientX;
+      origS = hhmm2min(seg.start); origE = hhmm2min(seg.end);
+      document.addEventListener('pointermove',onMove); document.addEventListener('pointerup',onUp);
+    };
+    const onMove=e=>{
+      const seg=getSeg(key,day,si); if(!seg) return;
+      const gridRect=$('#grid').getBoundingClientRect();
+      const rel = clamp(e.clientX - originX, -99999, 99999);
+      const minsPerPx = totalM / gridRect.width;
+      const delta = snap5(Math.round(rel * minsPerPx));
+      let s=origS, en=origE;
+      if(mode==='move'){ s=snap5(origS+delta); en=snap5(origE+delta); }
+      if(mode==='resL'){ s=snap5(origS+delta); }
+      if(mode==='resR'){ en=snap5(origE+delta); }
+      s=clamp(s,startH*60,(end*60)-5); en=clamp(en,startH*60+5,end*60);
+      if(en<=s+5) en=s+5;
+      seg.start=min2hhmm(s); seg.end=min2hhmm(en);
+      drawOneBar(el, seg, day);
+    };
+    const onUp=()=>{ document.removeEventListener('pointermove',onMove); document.removeEventListener('pointerup',onUp); saveDraftInstant(key); };
+    el.addEventListener('pointerdown',onDown);
+    el.querySelector('.handle.l').addEventListener('pointerdown',onDown);
+    el.querySelector('.handle.r').addEventListener('pointerdown',onDown);
   });
+}
+function drawOneBar(el, seg, day){
+  const start=+getComputedStyle(document.documentElement).getPropertyValue('--start')||6;
+  const end=+getComputedStyle(document.documentElement).getPropertyValue('--end')||20;
+  const total=(end-start)*60;
+  const s=clamp(hhmm2min(seg.start)-start*60,0,total), e=clamp(hhmm2min(seg.end)-start*60,0,total);
+  const left=(s/total)*100, width=Math.max(1,(e-s)/total*100);
+  el.style.left=`${left}%`; el.style.width=`${width}%`;
+  el.children[0].textContent=(seg.code||'').toUpperCase();
+  el.children[1].textContent=`${seg.start} – ${seg.end}`;
+}
+function getSeg(key,day,si){
+  const json=ROTAS.get(key)||{}; const arr=json[day]?.segments||[]; return arr[si];
+}
+async function saveDraftInstant(key){
+  const [id,week]=key.split('|'); const data=ROTAS.get(key)||{};
+  await sb.from('rotas').upsert([{advisor_id:id,week_start:week,data}],{onConflict:'advisor_id,week_start'});
+}
 
-  const { error } = await sb.from('rotas_published').upsert(rows, { onConflict:'advisor_id,week_start' });
+/* ===== Editor dialog ===== */
+const editDlg=$('#editDlg'), edCode=$('#edCode'), edStart=$('#edStart'), edEnd=$('#edEnd'), edDelete=$('#edDelete'), edSave=$('#edSave');
+edCode.innerHTML = Object.entries(GROUPS).map(([g,arr])=>`<optgroup label="${g}">${arr.map(c=>`<option>${c}</option>`).join('')}</optgroup>`).join('');
+let ctx=null;
+function openEditor(advId, day, si){
+  const key=`${advId}|${toISO(monday)}`; const seg=getSeg(key,day,si); if(!seg) return;
+  ctx={key,day,si};
+  edCode.value=seg.code||'Admin'; edStart.value=seg.start; edEnd.value=seg.end;
+  editDlg.showModal();
+}
+edDelete.onclick=async()=>{
+  if(!ctx) return;
+  const {key,day,si}=ctx; const json=ROTAS.get(key)||{}; const arr=json[day]?.segments||[];
+  arr.splice(si,1); if(arr.length===0) delete json[day];
+  ROTAS.set(key,json); await saveDraftInstant(key); editDlg.close(); renderGrid();
+};
+edSave.onclick=async()=>{
+  if(!ctx) return;
+  const {key,day,si}=ctx; const json=ROTAS.get(key)||{}; const arr=json[day]?.segments||[];
+  const seg=arr[si]; seg.code=edCode.value; seg.start=edStart.value; seg.end=edEnd.value;
+  // keep sorted
+  arr.sort((a,b)=>hhmm2min(a.start)-hhmm2min(b.start));
+  ROTAS.set(key,json); await saveDraftInstant(key); editDlg.close(); renderGrid();
+};
+
+/* ===== Generate & Publish ===== */
+async function doGenerate(){
+  const list=advisorsForCurrentView(); if(!list.length){ alert('Pick advisors first.'); return; }
+  const weekISO=toISO(monday); const rows=[];
+  for(const a of list){
+    const key=`${a.id}|${weekISO}`; const pick=ASSIGN.get(key)||{}; const data={};
+    DAYS.forEach(d=>{ const t=TEMPLATES[pick[d]]; if(t) data[d]={segments:segmentsFromTemplate(t)}; });
+    if(Object.keys(data).length){ rows.push({advisor_id:a.id,week_start:weekISO,data}); ROTAS.set(key,data); }
+  }
+  if(!rows.length){ alert('No selections to generate.'); return; }
+  const {error}=await sb.from('rotas').upsert(rows,{onConflict:'advisor_id,week_start'});
+  if(error){ alert('Generate failed: '+error.message); return; }
+  renderGrid(); alert('Draft rotas saved.');
+}
+async function doPublish(){
+  const list=advisorsForCurrentView(); if(!list.length){ alert('Pick advisors first.'); return; }
+  const weekISO=toISO(monday);
+  const rows=list.map(a=>({advisor_id:a.id,week_start:weekISO,data:ROTAS.get(`${a.id}|${weekISO}`)||{},published_at:new Date().toISOString()}));
+  const {error}=await sb.from('rotas_published').upsert(rows,{onConflict:'advisor_id,week_start'});
   if(error){ alert('Publish failed: '+error.message); return; }
   alert('Published to Advisor Portal.');
 }
 
-/* =============================
-   SAVE/LOAD JSON (optional backup)
-============================= */
-$('#btnLoadJSON').onclick = ()=> $('#file').click();
-$('#file').addEventListener('change', async ev=>{
-  const f = ev.target.files[0]; if(!f) return;
-  const text = await f.text();
-  const data = JSON.parse(text);
-  (data.rotas||[]).forEach(r => ROTAS.set(`${r.advisor_id}|${r.week_start}`, r.data||{}));
+/* ===== JSON backup ===== */
+$('#btnLoadJSON').onclick=()=>$('#file').click();
+$('#file').addEventListener('change',async ev=>{
+  const f=ev.target.files[0]; if(!f) return;
+  const text=await f.text(); const obj=JSON.parse(text);
+  (obj.rotas||[]).forEach(r=> ROTAS.set(`${r.advisor_id}|${r.week_start}`, r.data||{}));
   renderGrid();
 });
-$('#btnSaveJSON').onclick = ()=>{
-  const weekISO = toISO(monday);
-  const rotas = [...ROTAS.entries()].filter(([k])=>k.endsWith('|'+weekISO)).map(([k,v])=>{
-    const advisor_id = k.split('|')[0];
-    return { advisor_id, week_start:weekISO, data:v };
-  });
-  const blob = new Blob([JSON.stringify({rotas},null,2)], {type:'application/json'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `rotas_${weekISO}.json`; a.click();
-  URL.revokeObjectURL(a.href);
+$('#btnSaveJSON').onclick=()=>{
+  const weekISO=toISO(monday);
+  const rotas=[...ROTAS.entries()].filter(([k])=>k.endsWith('|'+weekISO)).map(([k,v])=>({advisor_id:k.split('|')[0],week_start:weekISO,data:v}));
+  const blob=new Blob([JSON.stringify({rotas},null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`rotas_${weekISO}.json`; a.click(); URL.revokeObjectURL(a.href);
 };
 
-/* =============================
-   EVENTS
-============================= */
-$('#prevWeek').onclick = async()=>{ monday = addDays(monday,-7); $('#weekStart').value = toISO(monday); $('#rangeLabel').textContent = labelForWeek(monday); await bootstrapRender(); };
-$('#nextWeek').onclick = async()=>{ monday = addDays(monday, 7); $('#weekStart').value = toISO(monday); $('#rangeLabel').textContent = labelForWeek(monday); await bootstrapRender(); };
-$('#weekStart').onchange = async()=>{ monday = toMonday(new Date($('#weekStart').value)); $('#rangeLabel').textContent = labelForWeek(monday); await bootstrapRender(); };
-$('#siteFilter').onchange = ()=>{ populateAssignTable(); renderGrid(); };
-$('#leaderFilter').onchange = ()=>{ populateAssignTable(); renderGrid(); };
-$('#viewFilter').onchange = ()=>{ populateAssignTable(); renderGrid(); };
-$('#treeSearch').oninput = ()=> rebuildTree();
-$('#btnClearSel').onclick = ()=>{ SELECTED.clear(); refreshChips(); rebuildTree(); populateAssignTable(); renderGrid(); };
-$('#btnPrint').onclick = ()=> window.print();
-$('#btnGenerate').onclick = doGenerate;
-$('#btnPublish').onclick  = doPublish;
+/* ===== Events / boot ===== */
+$('#prevWeek').onclick=async()=>{ monday=addDays(monday,-7); $('#weekStart').value=toISO(monday); $('#rangeLabel').textContent=labelForWeek(monday); await bootRender(); };
+$('#nextWeek').onclick=async()=>{ monday=addDays(monday,7);  $('#weekStart').value=toISO(monday); $('#rangeLabel').textContent=labelForWeek(monday); await bootRender(); };
+$('#weekStart').onchange=async()=>{ monday=toMonday(new Date($('#weekStart').value)); $('#rangeLabel').textContent=labelForWeek(monday); await bootRender(); };
+$('#btnPrint').onclick=()=>window.print();
+$('#btnGenerate').onclick=doGenerate; $('#btnPublish').onclick=doPublish;
 
-/* =============================
-   BOOT
-============================= */
-async function bootstrapRender(){
-  const weekISO = toISO(monday);
-  // Load rotas for advisors in current view (to draw grid)
-  const ids = currentAdvisorListForView().map(a=>a.id);
-  await loadRotasFor(ids, weekISO);
-  populateAssignTable();
-  renderGrid();
+$('#btnClearSel').onclick=()=>{ SELECTED.clear(); refreshChips(); rebuildTree(); populateAssignTable(); renderGrid(); };
+
+document.addEventListener('input',e=>{
+  const k=e.target?.dataset?.k; if(!k) return;
+  document.documentElement.style.setProperty(k, e.target.value);
+});
+
+async function bootRender(){
+  const ids=advisorsForCurrentView().map(a=>a.id); await loadRotasFor(ids,toISO(monday));
+  populateAssignTable(); renderGrid();
 }
-
 async function init(){
   await loadOrg();
   rebuildFilters();
-  rebuildTree();
-  refreshChips();
-  await reloadTemplates();
-  await bootstrapRender();
+  $('#weekStart').value=toISO(monday);
+  $('#rangeLabel').textContent=labelForWeek(monday);
+  rebuildTree(); refreshChips();
+  await bootRender();
 }
 init();
 </script>
 </body>
 </html>
-
