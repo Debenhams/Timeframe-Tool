@@ -3,659 +3,626 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Professional Team Rota System — Master (Calabrio Mode)</title>
+<title>Professional Team Rota System — Master</title>
+<meta name="description" content="Team rota planner with Calabrio-style horizontal grid, templates, and Supabase sync. Version 2025-10-10."/>
+<link rel="preconnect" href="https://cdn.jsdelivr.net"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+
 <style>
-  :root{
-    --brand:#0d47a1; --ink:#0f172a; --muted:#6b7280; --accent:#00c853;
-    --bg:#f5f7fb; --card:#ffffff; --line:#e6ebf3;
-    /* timeline window */
-    --start:6; --end:20;                 /* 06:00 → 20:00 */
-    --row-h:28px; --bar-h:10px;          /* Calabrio-tight */
-    /* palette */
-    --olive:#7e7a2a;                     /* work bar (Calabrio look) */
-    --gap:#dfe5ef;                       /* gaps */
-    --break:#d4dae3; --lunch:#bdeaff;    /* hatched blocks */
-    --email:#2ecc71; --mirakl:#b1b51e; --social:#5e35b1; /* still used in non-Calabrio legend */
-  }
-  html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--ink);font:12px/1.35 Inter,Segoe UI,Roboto,system-ui,Arial}
+:root{
+  /* Brand & surface */
+  --brand:#0d47a1; --accent:#00c853; --ink:#1f2937; --muted:#6b7280;
+  --paper:#ffffff; --wash:#f5f7fb; --line:#e5e9f2;
+  /* Timeline */
+  --start:06; --end:20; --row-h:34px; --name-w:220px; --bar-h:14px;
+  /* Codes */
+  --c-email:#2ecc71; --c-mirakl:#b1b51e; --c-social:#5e35b1;
+  --c-meet:#ffd700; --c-ot:#e53935; --c-break:#cfd8dc; --c-lunch:#b0bec5;
+  --c-abs:#b0c4de; --c-shrink:#ffd166;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:#eef2f6;color:var(--ink);font:13px/1.35 Inter,Segoe UI,Roboto,system-ui,Arial,sans-serif}
 
-  /* top bar */
-  .topbar{background:var(--brand);color:#fff;display:flex;gap:10px;align-items:center;padding:10px 14px;box-shadow:0 4px 14px rgba(13,71,161,.2)}
-  .topbar h1{margin:0;font-size:15px;font-weight:800}
-  .in{border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff}
-  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 9px;cursor:pointer}
-  .btn.primary{background:var(--accent);color:#fff;border:0}
-  .btn.icon{padding:4px 7px}
-  .btn[disabled]{opacity:.6;cursor:not-allowed}
-  .chip{background:#eaf1ff;color:#113a8f;border-radius:999px;padding:4px 7px;font-weight:700}
-  .sp{flex:1}
+/* Topbar */
+.topbar{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--brand);color:#fff;box-shadow:0 2px 10px rgba(13,71,161,.18)}
+.topbar h1{margin:0;font:600 16px/1 Inter,system-ui}
+.badge{background:#113a8f;border:1px solid #1a4fb3;color:#e6efff;border-radius:999px;padding:5px 8px;font-weight:700}
 
-  /* page grid: top controls + schedules (right), bottom rota full width */
-  .page{max-width:1500px;margin:12px auto;padding:0 12px;display:grid;grid-template-columns:1fr 300px;grid-template-areas:"controls schedules" "grid grid";gap:12px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 22px rgba(20,30,70,.06)}
-  .hd{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--line)}
-  .bd{padding:8px 10px}
-  .muted{color:var(--muted)}
+/* Layout */
+.frame{max-width:1500px;margin:14px auto;padding:0 14px;display:grid;grid-template-columns:1fr 320px;gap:14px}
+.controls{grid-column:1/-1;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.controls .grow{flex:1}
+select,input[type="date"],input[type="text"]{border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 10px}
+.btn{border:0;border-radius:9px;padding:8px 12px;font-weight:800;cursor:pointer}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.ghost{background:#eaf2ff;color:#0d47a1;border:1px solid #cfe0ff}
+.btn.warn{background:#ffe8e6;color:#9a1919;border:1px solid #ffb7b0}
+.right{margin-left:auto;display:flex;gap:8px;align-items:center}
 
-  /* schedules (right) */
-  .schedules{grid-area:schedules}
-  .tree-search{display:flex;gap:8px;margin-bottom:6px}
-  .tree{border:1px solid var(--line);border-radius:10px;max-height:60vh;overflow:auto;background:#fff}
-  .tree details{padding:3px}
-  .tree summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:700}
-  .tree summary::-webkit-details-marker{display:none}
-  .twisty{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid var(--line);border-radius:4px;background:#f0f5ff;font-size:10px}
-  .node{display:flex;align-items:center;gap:6px;padding:2px 2px}
-  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
-  .chip.sm{padding:2px 6px}
+/* Panels */
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:12px}
+.panel-h{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-bottom:1px solid var(--line)}
+.panel-h h2{margin:0;font:700 14px/1 Inter}
+.panel-b{padding:10px 12px}
 
-  /* controls (left top) */
-  .controls{grid-area:controls}
-  .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+/* Schedules tree */
+.tree-search{display:flex;gap:8px;margin-bottom:8px}
+.tree{max-height:68vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px;background:#fff}
+.tree details{padding:3px 4px;border-radius:6px}
+.tree summary{list-style:none;cursor:pointer;font-weight:700;display:flex;gap:6px;align-items:center}
+.tree summary::-webkit-details-marker{display:none}
+.twisty{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--line);border-radius:4px;background:#f5f7fb;font-weight:900}
+.node{display:flex;gap:6px;align-items:center;padding:2px 2px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 8px}
 
-  /* templates + assignment */
-  .table-wrap{border:1px solid var(--line);border-radius:12px;overflow:auto}
-  table{width:100%;border-collapse:collapse}
-  th,td{border:1px solid var(--line);padding:6px;text-align:center}
-  thead th{background:#f0f5ff;color:#0d47a1;font-weight:800}
-  td.name{text-align:left;font-weight:800;min-width:160px;background:#f7fbff;position:sticky;left:0}
+/* Templates & Assignment */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.template{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fafcff}
+.template .row{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center;margin:6px 0}
+.template .row .inline{display:flex;gap:8px;flex-wrap:wrap}
+.actions{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
+#assignWrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:900px}
+th,td{border:1px solid var(--line);padding:7px;text-align:center}
+thead th{background:#0d47a1;color:#fff;font-weight:800}
+td.name{position:sticky;left:0;background:#eef4ff;font-weight:800;white-space:nowrap}
 
-  /* rota grid (bottom, full width) */
-  .gridCard{grid-area:grid}
-  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
-  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 6px;border:1px solid var(--line);border-radius:999px;background:#fff}
-  .dot{width:10px;height:10px;border-radius:50%}
+/* Horizontal timeline (Calabrio-style) */
+.timeline{grid-column:1/-1}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.legend .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;border:1px solid rgba(0,0,0,.08)}
+.tl{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.tl-head{display:grid;grid-template-columns:var(--name-w) 1fr;background:#f6f8fb;border-bottom:1px solid var(--line)}
+.tl-hours{display:grid;grid-template-columns:repeat(calc(var(--end)-var(--start)),1fr)}
+.tl-hours div{padding:6px 0;border-left:1px solid var(--line);font-size:12px;color:#68758a;text-align:center}
+.tl-body{display:block}
+.row{display:grid;grid-template-columns:var(--name-w) 1fr}
+.row:nth-child(odd){background:#fbfdff}
+.rname{padding:8px 10px;border-right:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rline{position:relative;height:calc(var(--row-h));border-top:1px solid var(--line)}
+.bar{position:absolute;height:var(--bar-h);top:calc((var(--row-h) - var(--bar-h))/2);border-radius:4px;padding:0 6px;font:800 11px/14px Inter;color:#fff;display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.bar .t{opacity:.95;font-weight:700}
+.c-email{background:var(--c-email)} .c-mirakl{background:var(--c-mirakl)} .c-social{background:var(--c-social)}
+.c-meet{background:var(--c-meet);color:#213} .c-ot{background:var(--c-ot)}
+.c-break{background:var(--c-break);color:#213} .c-lunch{background:var(--c-lunch);color:#213}
+.c-abs{background:var(--c-abs)} .c-shrink{background:var(--c-shrink);color:#213}
 
-  /* horizontal header/grid */
-  .hr-head{height:26px;background:#fbfdff;border-bottom:1px solid var(--line);display:grid;grid-template-columns:180px repeat(var(--cols),1fr)}
-  .hr-head .label{display:flex;align-items:center;justify-content:center;font-weight:800;color:#51607a;font-size:11px}
-  .grid{display:grid;grid-template-columns:180px repeat(var(--cols),1fr)}
-  .rowg{display:contents}
-  .cell{height:var(--row-h);position:relative;border-bottom:1px solid var(--line)}
-  .cell.hour{border-left:1px solid var(--line);background:
-      repeating-linear-gradient(180deg,#0000,#0000 calc(var(--row-h) - 1px), var(--line) calc(var(--row-h) - 1px), var(--line) var(--row-h));}
-  .namecell{display:flex;align-items:center;gap:6px;padding-left:8px;background:#fff;position:sticky;left:0;z-index:1}
+/* Dialogs */
+dialog{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+dialog .row{display:flex;gap:8px;align-items:center;margin:6px 0}
+.btn.small{padding:6px 8px;border-radius:7px}
 
-  /* Calabrio style bars */
-  .work{position:absolute;top:calc((var(--row-h) - var(--bar-h))/2);height:var(--bar-h);border-radius:5px;background:var(--olive);box-shadow:0 1px 2px rgba(0,0,0,.15);cursor:grab}
-  .work:active{cursor:grabbing}
-  .cap{position:absolute;top:-13px;font-size:10px;font-weight:800;color:#2f3b4f}
-  .cap.l{left:-2px} .cap.r{right:-2px}
-  .handle{position:absolute;top:-2px;width:6px;height:calc(var(--bar-h)+4px);cursor:ew-resize}
-  .handle.l{left:-3px} .handle.r{right:-3px}
-  /* hatched breaks/lunch over the work bar */
-  .blk{position:absolute;top:calc((var(--row-h) - var(--bar-h))/2 - 2px);height:calc(var(--bar-h)+4px);border-radius:4px;border:1px solid #c8cfda;background:repeating-linear-gradient(45deg,var(--break),var(--break) 6px,#c7ced9 6px,#c7ced9 12px)}
-  .blk.lunch{background:repeating-linear-gradient(45deg,var(--lunch),var(--lunch) 6px,#91dfff 6px,#91dfff 12px);border-color:#7ed8ff}
-
-  /* dialog */
-  dialog{max-width:720px;width:95%;border:1px solid var(--line);border-radius:12px;padding:12px}
+/* Compact tweak for very wide teams */
+@media (max-width:1200px){
+  :root{ --name-w:180px }
+}
 </style>
 </head>
+
 <body>
   <div class="topbar">
     <h1>Professional Team Rota System</h1>
-    <select id="siteFilter" class="in"></select>
-    <select id="leaderFilter" class="in"></select>
-    <select id="viewFilter" class="in"></select>
-    <input type="date" id="weekStart" class="in"/>
-    <button class="btn icon" id="prevWeek">◀</button>
-    <button class="btn icon" id="nextWeek">▶</button>
-    <button class="btn" id="btnGenerate">Generate</button>
-    <button class="btn primary" id="btnPublish">Publish</button>
-    <span class="sp"></span>
-    <span class="chip" id="rangeLabel"></span>
+    <span class="badge">Master</span>
+    <div class="right">
+      <button class="btn ghost" id="btnAuth">Sign in</button>
+    </div>
   </div>
 
-  <div class="page">
-    <!-- Controls + Templates / Assignment -->
-    <div class="card controls">
-      <div class="hd"><strong>Templates & Master Assignment</strong></div>
-      <div class="bd">
-        <div class="row" style="margin-bottom:6px">
-          <button class="btn" id="btnAddTemplate">➕ Add Template</button>
-          <button class="btn" id="btnLoadDefaults">↺ Load Sample Templates</button>
-          <span class="sp"></span>
-          <button class="btn" id="btnSaveJSON">💾 Save JSON</button>
-          <input type="file" id="file" accept=".json" style="display:none"/>
-          <button class="btn" id="btnLoadJSON">📂 Load JSON</button>
-        </div>
+  <div class="frame">
 
-        <div id="templateEditor" class="muted" style="margin-bottom:10px">Loading templates…</div>
+    <!-- Controls -->
+    <div class="controls">
+      <label>Site</label>
+      <select id="siteSel"></select>
 
-        <div class="table-wrap">
-          <table id="assignTable">
-            <thead>
-              <tr><th>Advisor</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
+      <label>Leader</label>
+      <select id="leaderSel"></select>
 
+      <label>View</label>
+      <select id="viewSel">
+        <option value="TEAM_SELECTED">Team (Selected)</option>
+        <option value="TEAM_ALL">Team (All)</option>
+      </select>
+
+      <label>Week</label>
+      <input type="date" id="weekInput"/>
+
+      <div class="right">
+        <button class="btn ghost" id="prevW">◀</button>
+        <button class="btn ghost" id="todayW">Today</button>
+        <button class="btn ghost" id="nextW">▶</button>
+        <button class="btn primary" id="btnGenerate">Generate</button>
+        <button class="btn primary" id="btnPublish">Publish</button>
       </div>
     </div>
 
-    <!-- Schedules (right) -->
-    <div class="card schedules">
-      <div class="hd"><strong>Schedules</strong></div>
-      <div class="bd">
+    <!-- Left column: Templates + Assign -->
+    <div class="panel">
+      <div class="panel-h">
+        <h2>Templates & Master Assignment</h2>
+        <div class="actions">
+          <button class="btn ghost" id="btnAddTemplate">+ Add Template</button>
+          <button class="btn ghost" id="btnLoadSamples">↺ Load Sample Templates</button>
+          <button class="btn ghost" id="btnSaveLocal">💾 Save JSON</button>
+          <button class="btn ghost" id="btnLoadLocal">📂 Load JSON</button>
+        </div>
+      </div>
+      <div class="panel-b">
+        <div class="grid2">
+          <div>
+            <div id="templWrap"></div>
+          </div>
+          <div>
+            <div id="assignWrap">
+              <table id="assignTbl">
+                <thead>
+                  <tr><th class="name">Advisor</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
+                </thead>
+                <tbody id="assignBody">
+                  <tr><td colspan="8" style="text-align:left;color:var(--muted)">Pick a Leader / advisors on the right to populate this table.</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p style="color:var(--muted);margin:8px 0">Tip: Change a cell to a template to assign a whole day. “Generate” builds the rota grid from these choices. “Publish” writes to <code>rotas</code> and <code>rotas_published</code>.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right column: Schedules pickers -->
+    <div class="panel">
+      <div class="panel-h"><h2>Schedules</h2></div>
+      <div class="panel-b">
         <div class="tree-search">
-          <input id="treeSearch" class="in" placeholder="Search leaders/advisors…" style="flex:1"/>
-          <button id="btnClearSel" class="btn">Clear</button>
+          <input class="grow" id="treeSearch" placeholder="Search leaders/advisors…"/>
+          <button class="btn ghost small" id="btnClearSel">Clear</button>
         </div>
-        <div class="tree" id="tree"></div>
-        <div class="chips" id="activeChips"></div>
-        <div class="muted" style="margin-top:6px">Tick a <strong>Leader</strong> to select the whole team, or tick individuals. “View ▸ Team (Selected)” shows only the checked names.</div>
+        <div id="tree" class="tree"></div>
+        <div id="chips" class="chips"></div>
       </div>
     </div>
 
-    <!-- FULL-WIDTH Calabrio grid (bottom) -->
-    <div class="card gridCard">
-      <div class="hd">
-        <strong id="teamTitle">Team Week</strong>
-        <button class="btn" id="btnPrint">🖨️ Print</button>
-      </div>
-      <div class="bd">
-        <div id="gridHead" class="hr-head"></div>
-        <div id="grid" class="grid"></div>
-
+    <!-- Bottom full-width: Team Week -->
+    <div class="panel timeline">
+      <div class="panel-h">
+        <h2>Team Week</h2>
         <div class="legend">
-          <span class="pill"><span class="dot" style="background:var(--olive)"></span> Work</span>
-          <span class="pill"><span class="dot" style="background:var(--break)"></span> Break</span>
-          <span class="pill"><span class="dot" style="background:var(--lunch)"></span> Lunch</span>
-          <span class="pill"><span class="dot" style="background:#bbb"></span> Gaps</span>
+          <span><i class="dot" style="background:var(--c-email)"></i>Email</span>
+          <span><i class="dot" style="background:var(--c-mirakl)"></i>Mirakl</span>
+          <span><i class="dot" style="background:var(--c-social)"></i>Social</span>
+          <span><i class="dot" style="background:var(--c-meet)"></i>Meeting</span>
+          <span><i class="dot" style="background:var(--c-ot)"></i>Overtime</span>
+          <span><i class="dot" style="background:var(--c-break)"></i>Break</span>
+          <span><i class="dot" style="background:var(--c-lunch)"></i>Lunch</span>
+        </div>
+      </div>
+      <div class="panel-b">
+        <div class="tl">
+          <div class="tl-head">
+            <div style="padding:7px 10px;font-weight:800">Name</div>
+            <div class="tl-hours" id="tlHours"></div>
+          </div>
+          <div class="tl-body" id="tlBody">
+            <!-- rows injected -->
+          </div>
         </div>
       </div>
     </div>
+
   </div>
 
-  <!-- Edit dialog -->
+  <!-- Assign/Edit dialogs -->
   <dialog id="editDlg">
-    <div style="font-weight:800;margin-bottom:6px">Edit block</div>
-    <div style="display:flex;gap:8px;align-items:center;margin:6px 0"><label style="min-width:90px">Code</label>
-      <select id="edCode" class="in" style="flex:1"></select></div>
-    <div style="display:flex;gap:8px;align-items:center;margin:6px 0"><label style="min-width:90px">Start–End</label>
-      <input id="edStart" class="in" type="time"> <span>–</span> <input id="edEnd" class="in" type="time"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
-      <button id="edDelete" class="btn">Delete</button>
-      <button onclick="editDlg.close()" class="btn">Cancel</button>
-      <button id="edSave" class="btn primary">Save</button>
+    <div style="font-weight:800;margin-bottom:6px">Edit Block</div>
+    <div class="row">
+      <label style="min-width:80px">Code</label>
+      <select id="eCode"></select>
+    </div>
+    <div class="row">
+      <label style="min-width:80px">Start–End</label>
+      <input type="time" id="eStart">–<input type="time" id="eEnd">
+    </div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn ghost" onclick="editDlg.close()">Cancel</button>
+      <button class="btn primary" id="eOK">Save</button>
     </div>
   </dialog>
 
 <script>
-/* ===== Supabase ===== */
-const SUPABASE_URL="https://oypdnjxhjpgpwmkltzmk.supabase.co";
-const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
+/* =========================
+   Supabase setup
+   ========================= */
+const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ===== State ===== */
-const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-let ORG={sites:{}};
-let ADVISORS=[];                    // {id,name,leader_id,email}
-let ADVISOR_BY_ID=new Map();
-let TEMPLATES={};                   // name -> template
-let ROTAS=new Map();                // key "id|weekISO" -> { Monday:{segments:[]}, ... }
-let ASSIGN=new Map();               // key "id|weekISO" -> { Monday:'Early', ... }
-let SELECTED=new Set();             // advisor names checked in tree
-let monday=toMonday(new Date());
+/* =========================
+   State
+   ========================= */
+const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+let sites=[], leaders=[], advisors=[];
+let siteById=new Map(), leadersById=new Map(), advisorsById=new Map();
+let selectedLeader = null;
+let selectedNames = new Set();      // selected advisor names (UI chips)
+let templates = {};                 // name -> {work_code,start_time,finish_time,break1,lunch,break2}
+let assigned = new Map();           // key `${advisorId}-${dayIndex}` -> templateName
+let monday = toMonday(new Date());
+let sessionUser = null;
 
-/* ===== Utils ===== */
-const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
-const pad=n=>String(n).padStart(2,'0');
-const toISO=d=>d.toISOString().slice(0,10);
-function toMonday(d){const x=new Date(d);const w=x.getDay();const delta=(w===0?-6:1)-w;x.setDate(x.getDate()+delta);x.setHours(0,0,0,0);return x;}
+/* =========================
+   Helpers
+   ========================= */
+const $=sel=>document.querySelector(sel);
+const $$=sel=>Array.from(document.querySelectorAll(sel));
+const pad=n=>String(n).padStart(2,"0");
+function toMonday(d){const x=new Date(d);const day=x.getDay();x.setHours(0,0,0,0);x.setDate(x.getDate() + (day===0?-6:1-day));return x;}
+function iso(d){return d.toISOString().slice(0,10);}
 function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
-function hhmm2min(t){if(!t)return null;const[a,b]=t.split(':').map(Number);return a*60+b;}
-function min2hhmm(m){return `${pad(Math.floor(m/60))}:${pad(m%60)}`;}
-function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
-function labelForWeek(m){const e=addDays(m,6);const fmt=d=>d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});return `${fmt(m)} – ${fmt(e)} (${toISO(m)})`;}
-const snap5=m=>Math.round(m/5)*5;
+function toMin(t){if(!t)return null;const [h,m]=t.split(":").map(Number);return h*60+m;}
+function m2hhmm(m){return `${pad((m/60|0))}:${pad(m%60)}`;}
+function spanPct(start,end){const S=+getComputedStyle(document.documentElement).getPropertyValue('--start')||6; const E=+getComputedStyle(document.documentElement).getPropertyValue('--end')||20; const total=(E-S)*60; const s=(start-S*60)/total*100; const w=(end-start)/total*100; return {left:Math.max(0,s), width:Math.max(0,Math.min(100-s,w))};}
+function clsFor(code){const k=(code||'').toLowerCase(); if(k.includes('lunch'))return'c-lunch'; if(k.includes('break'))return'c-break'; if(k.includes('overtime'))return'c-ot'; if(k.includes('meeting')||k.includes('coach')||k.includes('121')||k.includes('training')||k.includes('team'))return'c-meet'; if(k.includes('social'))return'c-social'; if(k.includes('mirakl'))return'c-mirakl'; if(k.includes('email'))return'c-email'; if(['al','sick','rdo','maternity','lts'].some(w=>k.includes(w)))return'c-abs'; if(['shrink','project','huddle','atl','iti'].some(w=>k.includes(w)))return'c-shrink'; return'c-email';}
 
-/* ===== Load org + templates ===== */
+/* =========================
+   Auth (for publishing if your RLS needs it)
+   ========================= */
+$('#btnAuth').onclick = async ()=>{
+  const { data:{ user } } = await sb.auth.getUser();
+  if(user){ await sb.auth.signOut(); alert('Signed out'); $('#btnAuth').textContent='Sign in'; return; }
+  const email=prompt('Enter your work email to receive a magic sign-in link'); if(!email) return;
+  const {error}=await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href.split('#')[0] }});
+  if(error) alert(error.message); else alert('Magic link sent. Check your inbox.');
+};
+(async()=>{ const {data:{user}}=await sb.auth.getUser(); sessionUser=user; $('#btnAuth').textContent=user?'Signed in':'Sign in'; })();
+
+/* =========================
+   Load org data
+   ========================= */
 async function loadOrg(){
-  const [sitesRes, leadersRes, advisorsRes] = await Promise.all([
-    sb.from('sites').select('*').order('name'),
-    sb.from('leaders').select('*'),
-    sb.from('advisors').select('*')
+  const [s,l,a] = await Promise.all([
+    sb.from('sites').select('id,name').order('name',{ascending:true}),
+    sb.from('leaders').select('id,name,site_id').order('name',{ascending:true}),
+    sb.from('advisors').select('id,name,email,leader_id').order('name',{ascending:true})
   ]);
+  sites=s.data||[]; leaders=l.data||[]; advisors=a.data||[];
+  siteById=new Map(sites.map(x=>[x.id,x]));
+  leadersById=new Map(leaders.map(x=>[x.id,x]));
+  advisorsById=new Map(advisors.map(x=>[x.id,x]));
 
-  ORG={sites:{}};
-  (sitesRes.data||[]).forEach(s=> ORG.sites[s.name]={id:s.id, leaders:{}} );
-  (leadersRes.data||[]).forEach(l=>{
-    for(const site of Object.values(ORG.sites)){
-      if(site.id===l.site_id){ site.leaders[l.name]={id:l.id, advisors:[]}; break; }
-    }
-  });
-
-  ADVISORS=(advisorsRes.data||[]).map(a=>({id:a.id,name:a.name,leader_id:a.leader_id,email:a.email||''}));
-  ADVISOR_BY_ID=new Map(ADVISORS.map(a=>[a.id,a.name]));
-  for(const a of ADVISORS){
-    const leader = Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===a.leader_id);
-    if(leader) leader.advisors.push({id:a.id,name:a.name});
-  }
-
-  await reloadTemplates();
-}
-async function reloadTemplates(){
-  const tRes=await sb.from('templates').select('*');
-  TEMPLATES={};
-  (tRes.data||[]).forEach(t=>{
-    TEMPLATES[t.name]={
-      name:t.name, work_code:t.work_code||'Admin',
-      start_time:(t.start_time||'').slice(0,5)||'',
-      finish_time:(t.finish_time||'').slice(0,5)||'',
-      break1:(t.break1||'')?.slice(0,5)||'',
-      lunch:(t.lunch||'')?.slice(0,5)||'',
-      break2:(t.break2||'')?.slice(0,5)||'',
-    };
-  });
-  populateTemplateEditor();
+  buildTopFilters(); buildTree(); refreshChips(); rebuildAssignTable();
 }
 
-/* ===== Filters (cascade) ===== */
-function rebuildFilters(){
-  const siteSel=$('#siteFilter'), leaderSel=$('#leaderFilter'), viewSel=$('#viewFilter');
+/* Top filters cascade */
+function buildTopFilters(){
+  const siteSel=$('#siteSel'), leaderSel=$('#leaderSel');
+  siteSel.innerHTML = sites.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  // keep current site if possible
+  if(!siteSel.value && sites[0]) siteSel.value = sites[0].id;
 
-  const sites=Object.keys(ORG.sites).sort();
-  siteSel.innerHTML=`<option value="all">All sites</option>${sites.map(s=>`<option>${s}</option>`).join('')}`;
+  const currentSite = siteSel.value;
+  const siteLeaders = leaders.filter(l=>String(l.site_id)===String(currentSite)).sort((a,b)=>a.name.localeCompare(b.name));
+  leaderSel.innerHTML = siteLeaders.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
+  if(siteLeaders.length) selectedLeader = selectedLeader || siteLeaders[0].id;
 
-  function rebuildLeaders(){
-    const val=siteSel.value;
-    let leaders=[];
-    if(val==='all'){
-      leaders=Object.entries(ORG.sites).flatMap(([sn,so])=>Object.entries(so.leaders).map(([ln,lo])=>({id:lo.id,name:`${ln} — ${sn}`})));
-    }else{
-      leaders=Object.entries(ORG.sites[val]?.leaders||{}).map(([ln,lo])=>({id:lo.id,name:ln}));
-    }
-    leaders.sort((a,b)=>a.name.localeCompare(b.name));
-    leaderSel.innerHTML=`<option value="all">All leaders</option>${leaders.map(l=>`<option value="${l.id}">${l.name}</option>`).join('')}`;
-  }
-  rebuildLeaders();
-  siteSel.onchange=()=>{ rebuildLeaders(); populateAssignTable(); renderGrid(); rebuildTree(); };
+  if(selectedLeader && !siteLeaders.some(x=>x.id===selectedLeader)) selectedLeader = siteLeaders[0]?.id || null;
+  if(selectedLeader) leaderSel.value = selectedLeader;
 
-  viewSel.innerHTML=`<option value="TEAM_ALL">Team (All)</option><option value="TEAM_SELECTED">Team (Selected)</option>`;
+  siteSel.onchange=()=>{ selectedLeader=null; buildTopFilters(); buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline(); };
+  leaderSel.onchange=()=>{ selectedLeader=leaderSel.value; buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline(); };
+
+  $('#viewSel').onchange=()=>renderTimeline();
 }
 
-/* ===== Schedules tree ===== */
-function rebuildTree(){
-  const t=$('#tree'); const q=($('#treeSearch').value||'').toLowerCase().trim();
-  const siteVal=$('#siteFilter').value, leaderVal=$('#leaderFilter').value;
+/* Right panel tree */
+function buildTree(){
+  const t=$('#tree'); const q=$('#treeSearch').value.trim().toLowerCase();
+  const currentSite = $('#siteSel').value;
+  const listLeaders = leaders.filter(l=>String(l.site_id)===String(currentSite)).sort((a,b)=>a.name.localeCompare(b.name));
 
-  function advisorRow(a){
-    const show = (!q || a.name.toLowerCase().includes(q));
-    if(!show) return '';
-    const checked = SELECTED.has(a.name) ? 'checked' : '';
+  function advBlock(a){
+    if(q && !a.name.toLowerCase().includes(q)) return '';
+    const checked = selectedNames.has(a.name)?'checked':'';
     return `<div class="node"><input type="checkbox" data-adv="${a.id}" data-name="${a.name}" ${checked}/> <span>${a.name}</span></div>`;
   }
-  function leaderBlock(ln, lo, siteName){
-    if(siteVal!=='all' && siteName!==siteVal) return '';
-    if(leaderVal!=='all' && lo.id!==leaderVal) return '';
-    const team=(lo.advisors||[]).sort((a,b)=>a.name.localeCompare(b.name));
-    if(q && !ln.toLowerCase().includes(q) && !team.some(a=>a.name.toLowerCase().includes(q))) return '';
-    const allSel = team.length && team.every(a=>SELECTED.has(a.name));
+
+  t.innerHTML = listLeaders.map(ld=>{
+    const team = advisors.filter(a=>String(a.leader_id)===String(ld.id)).sort((a,b)=>a.name.localeCompare(b.name));
+    if(q && !(ld.name.toLowerCase().includes(q) || team.some(a=>a.name.toLowerCase().includes(q)))) return '';
+    const allSel = team.length && team.every(a=>selectedNames.has(a.name));
     return `<details open>
-      <summary><span class="twisty">−</span>
-        <label style="display:flex;gap:6px;align-items:center;margin-left:4px">
-          <input type="checkbox" data-leader="${lo.id}" ${allSel?'checked':''}/> <strong>${ln}</strong> <span class="muted">(${team.length})</span>
-        </label>
-      </summary>
-      ${team.map(advisorRow).join('')}
+      <summary><span class="twisty">${allSel?'−':'+'}</span><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" data-leader="${ld.id}" ${allSel?'checked':''}/> ${ld.name} <span style="color:var(--muted)">(${team.length})</span></label></summary>
+      ${team.map(advBlock).join('')}
     </details>`;
-  }
-  function siteBlock(sn,so){
-    const inner=Object.entries(so.leaders).map(([ln,lo])=>leaderBlock(ln,lo,sn)).filter(Boolean).join('');
-    if(!inner) return '';
-    return `<details open><summary><span class="twisty">−</span><strong>📁 ${sn}</strong></summary>${inner}</details>`;
-  }
-  t.innerHTML=Object.entries(ORG.sites).sort((a,b)=>a[0].localeCompare(b[0])).map(([sn,so])=>siteBlock(sn,so)).join('')||'<div class="muted">No data.</div>';
+  }).join('') || `<div style="color:var(--muted)">No leaders in this site.</div>`;
 
-  $$('#tree details').forEach(d=>{ const tw=d.querySelector('.twisty'); const up=()=>tw.textContent=d.open?'−':'+'; d.addEventListener('toggle',up); up(); });
-  $$('#tree [data-leader]').forEach(cb=> cb.onchange=()=>{
-    const id=cb.dataset.leader;
-    const leader=Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===id);
-    (leader?.advisors||[]).forEach(a=> cb.checked?SELECTED.add(a.name):SELECTED.delete(a.name));
-    refreshChips(); populateAssignTable(); renderGrid(); rebuildTree();
-  });
-  $$('#tree [data-adv]').forEach(cb=> cb.onchange=()=>{
-    cb.checked?SELECTED.add(cb.dataset.name):SELECTED.delete(cb.dataset.name);
-    refreshChips(); populateAssignTable(); renderGrid();
-  });
-}
-function refreshChips(){
-  const box=$('#activeChips');
-  box.innerHTML=[...SELECTED].sort().map(n=>`<span class="chip sm">${n} <button class="btn icon" data-x="${n}">✕</button></span>`).join('');
-  $$('#activeChips [data-x]').forEach(b=> b.onclick=()=>{ SELECTED.delete(b.dataset.x); refreshChips(); populateAssignTable(); renderGrid(); rebuildTree(); });
-}
-
-/* ===== Templates ===== */
-const GROUPS={
-  "Activity":[ "2nd Line","Admin","BH Email","BH Social","BH WhatsApp","DEB Email","DEB Social","DEB WhatsApp","Ebay","KM Email","KM Social","KM WhatsApp","Mirakl","Mixing","PayPlus","PLT Email","PLT Social","PLT WhatsApp","QA","Overtime" ],
-  "Absence":[ "AL","Break","Lunch","Sick","Split Shift","RDO","Maternity","LTS" ],
-  "Shrinkage":[ "121","ATL","Coaching","Huddle","ITI","Projects","Team Meeting","Training" ]
-};
-function codeSelectHTML(val=''){
-  return Object.entries(GROUPS).map(([g,arr])=>`<optgroup label="${g}">${arr.map(c=>`<option ${val===c?'selected':''}>${c}</option>`).join('')}</optgroup>`).join('');
-}
-function templateRow(t){
-  return `<div style="border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:8px;background:#fbfdff" data-name="${t.name}">
-    <div style="display:grid;grid-template-columns:120px 1fr 120px 1fr;gap:6px;align-items:center">
-      <label>Name</label><input data-f="name" class="in" value="${t.name}">
-      <label>New code</label><select data-f="work_code" class="in">${codeSelectHTML(t.work_code||'Admin')}</select>
-      <label>Start / Finish</label>
-      <div style="display:flex;gap:6px"><input data-f="start_time" class="in" type="time" value="${t.start_time||''}"><input data-f="finish_time" class="in" type="time" value="${t.finish_time||''}"></div>
-      <label>Breaks</label>
-      <div style="display:flex;gap:6px"><input data-f="break1" class="in" type="time" value="${t.break1||''}" title="Break 1 (15m)"><input data-f="lunch" class="in" type="time" value="${t.lunch||''}" title="Lunch (30m)"><input data-f="break2" class="in" type="time" value="${t.break2||''}" title="Break 2 (15m)"></div>
-    </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
-      <button class="btn" data-act="dup">Duplicate</button>
-      <button class="btn" data-act="del">Delete</button>
-    </div>
-  </div>`;
-}
-function populateTemplateEditor(){
-  const ed=$('#templateEditor'); const list=Object.values(TEMPLATES).sort((a,b)=>a.name.localeCompare(b.name));
-  ed.innerHTML=list.length?list.map(templateRow).join(''):'<div class="muted">No templates. Add or load samples.</div>';
-
-  $$('#templateEditor [data-f]').forEach(inp=>{
-    inp.onchange=async()=>{
-      const row=inp.closest('[data-name]'), name=row.dataset.name, f=inp.dataset.f, v=inp.value||null;
-      const next=Object.assign({},TEMPLATES[name],{[f]:v});
-      if(f==='name' && v && v!==name){
-        await sb.from('templates').delete().eq('name',name);
-        const {error}=await sb.from('templates').insert([next]); if(error) alert(error.message);
-      }else{
-        const {error}=await sb.from('templates').update(next).eq('name',name); if(error) alert(error.message);
-      }
-      await reloadTemplates();
+  // Events
+  $$('#tree [data-leader]').forEach(cb=>{
+    cb.onchange=()=>{
+      const id=cb.dataset.leader;
+      advisors.filter(a=>String(a.leader_id)===String(id)).forEach(a=>{
+        cb.checked?selectedNames.add(a.name):selectedNames.delete(a.name);
+      });
+      refreshChips(); rebuildAssignTable(); renderTimeline(); buildTree();
     };
   });
-  $$('#templateEditor [data-act="dup"]').forEach(b=> b.onclick=async()=>{
-    const n=b.closest('[data-name]').dataset.name, t=Object.assign({},TEMPLATES[n]); t.name=n+' Copy';
-    const {error}=await sb.from('templates').insert([t]); if(error) alert(error.message); else await reloadTemplates();
+  $$('#tree [data-adv]').forEach(cb=>{
+    cb.onchange=()=>{ const nm=cb.dataset.name; cb.checked?selectedNames.add(nm):selectedNames.delete(nm); refreshChips(); rebuildAssignTable(); renderTimeline(); };
   });
-  $$('#templateEditor [data-act="del"]').forEach(b=> b.onclick=async()=>{
-    const n=b.closest('[data-name]').dataset.name; if(!confirm(`Delete "${n}"?`)) return;
-    const {error}=await sb.from('templates').delete().eq('name',n); if(error) alert(error.message); else await reloadTemplates();
+}
+$('#treeSearch').oninput=()=>buildTree();
+$('#btnClearSel').onclick=()=>{ selectedNames.clear(); buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline(); };
+function refreshChips(){
+  const c=$('#chips');
+  c.innerHTML=[...selectedNames].sort((a,b)=>a.localeCompare(b)).map(n=>`<span class="chip">${n}<button class="btn small ghost" data-x="${n}">×</button></span>`).join('');
+  $$('#chips [data-x]').forEach(b=>b.onclick=()=>{ selectedNames.delete(b.dataset.x); buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline(); });
+}
+
+/* Templates */
+async function loadTemplates(){
+  const {data,error}=await sb.from('templates').select('*');
+  if(error){ console.error(error); return; }
+  templates={}; (data||[]).forEach(t=>templates[t.name]=t);
+  renderTemplates();
+  rebuildAssignTable();
+}
+function codeGroupSelectHTML(val=''){
+  const groups={
+    "Activity":["DEB Email","PLT Social","Mirakl","KM Email","KM Social","2nd Line","Admin","QA","Overtime"],
+    "Absence":["AL","Sick","RDO","Maternity","LTS","Split Shift","Break","Lunch"],
+    "Shrinkage":["121","ATL","Coaching","Huddle","ITI","Projects","Team Meeting","Training"]
+  };
+  return Object.entries(groups).map(([g,c])=>`<optgroup label="${g}">${c.map(x=>`<option ${val===x?'selected':''}>${x}</option>`).join('')}</optgroup>`).join('');
+}
+function renderTemplates(){
+  const w=$('#templWrap');
+  const names=Object.keys(templates).sort();
+  if(!names.length){ w.innerHTML=`<div style="color:var(--muted)">No templates yet. Add one or load samples.</div>`; return; }
+  w.innerHTML = names.map(n=>{
+    const t=templates[n];
+    return `<div class="template" data-name="${n}">
+      <div class="row"><div>Name</div><input data-f="name" value="${t.name}"></div>
+      <div class="row"><div>New code</div><select data-f="work_code">${codeGroupSelectHTML(t.work_code||'DEB Email')}</select></div>
+      <div class="row"><div>Start / Finish</div><div class="inline"><input type="time" data-f="start_time" value="${(t.start_time||'').slice(0,5)}"> <input type="time" data-f="finish_time" value="${(t.finish_time||'').slice(0,5)}"></div></div>
+      <div class="row"><div>Breaks</div><div class="inline">
+        <input type="time" data-f="break1" value="${(t.break1||'').slice(0,5)}" title="Break 1 (15m)">
+        <input type="time" data-f="lunch"  value="${(t.lunch||'').slice(0,5)}"  title="Lunch (30m)">
+        <input type="time" data-f="break2" value="${(t.break2||'').slice(0,5)}" title="Break 2 (15m)">
+      </div></div>
+      <div class="actions"><button class="btn warn small" data-del="${n}">Delete</button></div>
+    </div>`;
+  }).join('');
+
+  // Bind updates
+  $$('#templWrap .template').forEach(box=>{
+    const orig = box.dataset.name;
+    $$('input,select', box).forEach(inp=>{
+      const f=inp.dataset.f; if(!f) return;
+      inp.onchange=async()=>{
+        const row=Object.assign({}, templates[orig]);
+        row[f]=inp.value || null;
+        if(f==='name' && row.name && row.name!==orig){
+          // rename: delete old + insert new
+          await sb.from('templates').delete().eq('name', orig);
+          const {error}=await sb.from('templates').insert([row]);
+          if(error) alert(error.message); else loadTemplates();
+        }else{
+          const {error}=await sb.from('templates').update(row).eq('name', orig);
+          if(error) alert(error.message);
+        }
+      };
+    });
+    box.querySelector('[data-del]').onclick=async()=>{
+      if(!confirm(`Delete template "${orig}"?`)) return;
+      const {error}=await sb.from('templates').delete().eq('name', orig);
+      if(error) alert(error.message); else loadTemplates();
+    };
   });
 }
 $('#btnAddTemplate').onclick=async()=>{
-  const name='Shift '+(Object.keys(TEMPLATES).length+1);
-  const {error}=await sb.from('templates').insert([{name,work_code:'Admin',start_time:'09:00',finish_time:'17:00',break1:null,lunch:'12:30',break2:null}]);
-  if(error) alert(error.message); else await reloadTemplates();
+  const name=prompt('Template name','Early'); if(!name) return;
+  const row={name,work_code:'DEB Email',start_time:'07:00',finish_time:'16:00',break1:'09:15',lunch:'12:00',break2:'15:15'};
+  const {error}=await sb.from('templates').upsert(row,{onConflict:'name'});
+  if(error) alert(error.message); else loadTemplates();
 };
-$('#btnLoadDefaults').onclick=async()=>{
-  const defaults=[
+$('#btnLoadSamples').onclick=async()=>{
+  const sample=[
     {name:'Early',  work_code:'DEB Email', start_time:'07:00', finish_time:'16:00', break1:'09:15', lunch:'12:00', break2:'15:15'},
     {name:'Middle', work_code:'Mirakl',    start_time:'11:00', finish_time:'20:00', break1:'11:30', lunch:'15:30', break2:'17:45'},
     {name:'Late',   work_code:'PLT Social',start_time:'12:00', finish_time:'21:00', break1:'13:15', lunch:'17:00', break2:'19:15'},
   ];
-  for(const t of defaults){ await sb.from('templates').upsert(t,{onConflict:'name'}); }
-  await reloadTemplates();
+  for(const r of sample){ await sb.from('templates').upsert(r,{onConflict:'name'}); }
+  loadTemplates();
 };
 
-/* ===== Assignment table ===== */
-function advisorsForCurrentView(){
-  const siteVal=$('#siteFilter').value, leaderVal=$('#leaderFilter').value, v=$('#viewFilter').value;
-  let arr=ADVISORS;
-  if(siteVal!=='all'){
-    const leaderIds=Object.values(ORG.sites[siteVal]?.leaders||{}).map(l=>l.id);
-    arr=arr.filter(a=>leaderIds.includes(a.leader_id));
-  }
-  if(leaderVal!=='all') arr=arr.filter(a=>a.leader_id===leaderVal);
-  arr.sort((a,b)=>a.name.localeCompare(b.name));
-  if(v==='TEAM_SELECTED') arr=arr.filter(a=>SELECTED.has(a.name));
-  return arr;
-}
-function populateAssignTable(){
-  const body=$('#assignTable tbody'); const list=advisorsForCurrentView();
-  if(!list.length){ body.innerHTML='<tr><td colspan="8" class="muted" style="text-align:left;padding:8px">Pick a leader or advisors in <strong>Schedules</strong>.</td></tr>'; return; }
-  const weekISO=toISO(monday);
-  const opts=[''].concat(Object.keys(TEMPLATES).sort()).map(n=>`<option value="${n}">${n||'—'}</option>`).join('');
-  body.innerHTML=list.map(a=>`<tr data-adv="${a.id}">
-    <td class="name">${a.name}</td>
-    ${DAYS.map(d=>`<td><select class="in sel" data-adv="${a.id}" data-day="${d}">${opts}</select></td>`).join('')}
-  </tr>`).join('');
-  // preload selections
-  list.forEach(a=>{
-    const key=`${a.id}|${weekISO}`; const row=ASSIGN.get(key)||{};
-    DAYS.forEach(d=>{ const el=document.querySelector(\`select[data-adv="${a.id}"][data-day="${d}"]\`); if(el) el.value=row[d]||''; });
-  });
-  $$('#assignTable select.sel').forEach(el=> el.onchange=()=>{
-    const a=el.dataset.adv, d=el.dataset.day, v=el.value||''; const k=`${a}|${toISO(monday)}`;
-    const row=ASSIGN.get(k)||{}; row[d]=v; ASSIGN.set(k,row);
-  });
-}
-
-/* ===== Build segments from template (then compress to Calabrio) ===== */
-function segmentsFromTemplate(t){
-  if(!t||!t.start_time||!t.finish_time) return [];
-  const out=[], start=hhmm2min(t.start_time), finish=hhmm2min(t.finish_time);
-  let cur=start;
-  const push=(code,s,e)=>{ if(e>s) out.push({code,start:min2hhmm(s),end:min2hhmm(e)}); };
-  if(t.break1){ push(t.work_code,cur,hhmm2min(t.break1)); out.push({code:'Break',start:t.break1,end:min2hhmm(hhmm2min(t.break1)+15)}); cur=hhmm2min(t.break1)+15; }
-  if(t.lunch){ push(t.work_code,cur,hhmm2min(t.lunch)); out.push({code:'Lunch',start:t.lunch,end:min2hhmm(hhmm2min(t.lunch)+30)}); cur=hhmm2min(t.lunch)+30; }
-  if(t.break2){ push(t.work_code,cur,hhmm2min(t.break2)); out.push({code:'Break',start:t.break2,end:min2hhmm(hhmm2min(t.break2)+15)}); cur=hhmm2min(t.break2)+15; }
-  push(t.work_code,cur,finish);
-  return out.sort((a,b)=>hhmm2min(a.start)-hhmm2min(b.start));
-}
-/* Calabrio compression: merge all non-break/lunch into one "work" bar, keep break/lunch as hatched overlays */
-function compressCalabrio(daySegs){
-  const isBreak = s=>/break/i.test(s.code);
-  const isLunch = s=>/lunch/i.test(s.code);
-  if(!daySegs||!daySegs.length) return null;
-  const segments = daySegs.slice().sort((a,b)=>hhmm2min(a.start)-hhmm2min(b.start));
-  // determine work span: from first non-break/lunch start to last non-break/lunch end
-  const keep = segments.filter(s=>!isBreak(s)&&!isLunch(s));
-  if(!keep.length) return null;
-  const smin=Math.min(...keep.map(s=>hhmm2min(s.start)));
-  const emin=Math.max(...keep.map(s=>hhmm2min(s.end)));
-  const gaps = segments.filter(s=>isBreak(s)||isLunch(s)).map(s=>({
-    type: isLunch(s)?'lunch':'break',
-    s: hhmm2min(s.start), e: hhmm2min(s.end)
-  }));
-  return {work:[smin,emin], gaps};
-}
-
-/* ===== Load draft rotas ===== */
-async function loadRotasFor(ids,weekISO){
-  if(!ids.length) return;
-  const {data,error}=await sb.from('rotas').select('advisor_id,week_start,data').in('advisor_id',ids).eq('week_start',weekISO);
-  if(error) return console.warn(error);
-  for(const r of data||[]) ROTAS.set(`${r.advisor_id}|${weekISO}`, r.data||{});
-}
-
-/* ===== Rota grid (render + edit + drag) ===== */
-function renderGrid(){
-  const start=+getComputedStyle(document.documentElement).getPropertyValue('--start')||6;
-  const end=+getComputedStyle(document.documentElement).getPropertyValue('--end')||20;
-  const cols=end-start, total=(end-start)*60;
-  $('#gridHead').style.setProperty('--cols',cols);
-  $('#grid').style.setProperty('--cols',cols);
-  $('#gridHead').innerHTML=`<div class="label" style="justify-content:flex-start;padding-left:8px">Name</div>`+Array.from({length:cols},(_,i)=>`<div class="label">${pad(start+i)}:00</div>`).join('');
-  const weekISO=toISO(monday), list=advisorsForCurrentView(); const g=$('#grid');
-  if(!list.length){ g.innerHTML=''; return; }
-
-  g.innerHTML=list.map(a=>{
-    const key=`${a.id}|${weekISO}`; const json=ROTAS.get(key)||{};
-    const bars=DAYS.map((day,di)=>{
-      const c = compressCalabrio((json[day]?.segments)||[]);
-      if(!c) return '';
-      const left=((c.work[0]-start*60)/total)*100;
-      const width=((c.work[1]-c.work[0])/total)*100;
-      const top=`calc(${di}*var(--row-h))`;
-      const leftPx=`${left}%`, widthPx=`${width}%`;
-      const ltxt=min2hhmm(c.work[0]), rtxt=min2hhmm(c.work[1]);
-      const gaps=c.gaps.map(gp=>{
-        const l=((gp.s-start*60)/total)*100, w=((gp.e-gp.s)/total)*100;
-        return `<div class="blk ${gp.type==='lunch'?'lunch':''}" style="left:${l}%;width:${w}%;top:${top}"></div>`;
-      }).join('');
-      return `
-        <div class="work" data-adv="${a.id}" data-day="${day}" style="left:${leftPx};width:${widthPx};top:calc(${di}*var(--row-h) + (var(--row-h) - var(--bar-h))/2)">
-          <span class="handle l"></span><span class="handle r"></span>
-          <span class="cap l">${ltxt}</span><span class="cap r">${rtxt}</span>
-        </div>${gaps}`;
+/* Assignment table */
+function rebuildAssignTable(){
+  const body=$('#assignBody');
+  const names= (selectedNames.size? [...selectedNames] : []).sort((a,b)=>a.localeCompare(b));
+  if(!names.length){ body.innerHTML='<tr><td colspan="8" style="text-align:left;color:var(--muted)">Pick advisors on the right.</td></tr>'; return; }
+  const opts = `<option value="">(none)</option>` + Object.keys(templates).sort().map(n=>`<option>${n}</option>`).join('');
+  body.innerHTML = names.map(n=>{
+    const adv = advisors.find(a=>a.name===n);
+    const tds = DAYS.map((_,di)=>{
+      const key=`${adv.id}-${di}`;
+      const cur=assigned.get(key)||'';
+      return `<td><select data-assign="${adv.id}" data-di="${di}">${opts.replace(`>${cur}<`,` selected>${cur}<`)}</select></td>`;
     }).join('');
-    return `<div class="rowg">
-      <div class="cell namecell">${a.name}</div>
-      ${Array.from({length:cols},()=>`<div class="cell hour"></div>`).join('')}
-      <div class="cell" style="grid-column:2 / ${2+cols}">${bars}</div>
-    </div>`;
+    return `<tr><td class="name">${n}</td>${tds}</tr>`;
   }).join('');
 
-  // drag/resize whole work bar
-  $$('#grid .work').forEach(el=>{
-    const adv=el.dataset.adv, day=el.dataset.day;
-    const key=`${adv}|${weekISO}`;
-    let mode=null, originX=0, origS=0, origE=0;
-
-    const onDown=e=>{
-      const c = compressCalabrio((ROTAS.get(key)?.[day]?.segments)||[]);
-      if(!c) return;
-      mode = e.target.classList.contains('l') ? 'resL' : e.target.classList.contains('r') ? 'resR' : 'move';
-      originX = e.clientX;
-      origS = c.work[0]; origE = c.work[1];
-      document.addEventListener('pointermove',onMove); document.addEventListener('pointerup',onUp);
-    };
-    const onMove=e=>{
-      const gridRect=$('#grid').getBoundingClientRect();
-      const totalM=(end-start)*60;
-      const minsPerPx = totalM / gridRect.width;
-      const delta = snap5(Math.round((e.clientX - originX) * minsPerPx));
-      let s=origS, en=origE;
-      if(mode==='move'){ s=snap5(origS+delta); en=snap5(origE+delta); }
-      if(mode==='resL'){ s=snap5(origS+delta); }
-      if(mode==='resR'){ en=snap5(origE+delta); }
-      s=clamp(s,start*60,(end*60)-5); en=clamp(en,start*60+5,end*60);
-      if(en<=s+5) en=s+5;
-      // rewrite segments: keep break/lunch positions, extend/shift working chunks around them
-      const json=ROTAS.get(key)||{}; const segs=(json[day]?.segments)||[];
-      const br=segs.filter(s=>/break/i.test(s.code)); const lu=segs.filter(s=>/lunch/i.test(s.code));
-      const workOnly = [{start:min2hhmm(s), end:min2hhmm(en), code:'Work'}]; // temporary
-      const rebuilt = [];
-      // weave breaks/lunch back into a single work bar
-      let cur=s;
-      const insertGap=(startMin,len,code)=>{
-        if(startMin>cur) rebuilt.push({code:'Work',start:min2hhmm(cur),end:min2hhmm(startMin)});
-        rebuilt.push({code:code,start:min2hhmm(startMin),end:min2hhmm(startMin+len)});
-        cur=startMin+len;
-      };
-      [...br.map(x=>({t:'Break',s:hhmm2min(x.start),e:hhmm2min(x.end)})),
-       ...lu.map(x=>({t:'Lunch',s:hhmm2min(x.start),e:hhmm2min(x.end)}))]
-       .sort((a,b)=>a.s-b.s)
-       .forEach(g=> insertGap(g.s, g.e-g.s, g.t));
-      if(cur<en) rebuilt.push({code:'Work',start:min2hhmm(cur),end:min2hhmm(en)});
-      json[day]={segments:rebuilt};
-      ROTAS.set(key,json);
-      // redraw one
-      const left=((s-start*60)/totalM)*100, width=((en-s)/totalM)*100;
-      el.style.left=`${left}%`; el.style.width=`${width}%`;
-      el.querySelector('.cap.l').textContent=min2hhmm(s);
-      el.querySelector('.cap.r').textContent=min2hhmm(en);
-    };
-    const onUp=async()=>{ document.removeEventListener('pointermove',onMove); document.removeEventListener('pointerup',onUp); await saveDraftInstant(key); };
-    el.addEventListener('pointerdown',onDown);
-    el.querySelector('.handle.l').addEventListener('pointerdown',onDown);
-    el.querySelector('.handle.r').addEventListener('pointerdown',onDown);
-    // click to open editor on whole bar edges (choose precise times)
-    el.addEventListener('dblclick',()=>openWholeEditor(adv,day));
+  $$('#assignBody select[data-assign]').forEach(sel=>{
+    sel.onchange=()=>{ const k=`${sel.dataset.assign}-${sel.dataset.di}`; if(sel.value) assigned.set(k,sel.value); else assigned.delete(k); };
   });
 }
 
-/* Open editor on the main work bar (we edit first/last working segment) */
-const editDlg=$('#editDlg'), edCode=$('#edCode'), edStart=$('#edStart'), edEnd=$('#edEnd'), edDelete=$('#edDelete'), edSave=$('#edSave');
-edCode.innerHTML = ['Work','Break','Lunch','Admin','Mirakl','DEB Email','PLT Social','Overtime'].map(c=>`<option>${c}</option>`).join('');
-let ctx=null;
-function openWholeEditor(advId, day){
-  const key=`${advId}|${toISO(monday)}`; const json=ROTAS.get(key)||{}; const arr=json[day]?.segments||[];
-  if(!arr.length) return;
-  const first = arr.find(s=>!(/break|lunch/i.test(s.code))) || arr[0];
-  const last  = [...arr].reverse().find(s=>!(/break|lunch/i.test(s.code))) || arr[arr.length-1];
-  ctx={key,day};
-  edCode.value='Work'; edStart.value=first.start; edEnd.value=last.end;
-  editDlg.showModal();
-}
-edDelete.onclick=async()=>{
-  if(!ctx) return;
-  const {key,day}=ctx; const json=ROTAS.get(key)||{};
-  delete json[day]; ROTAS.set(key,json);
-  await saveDraftInstant(key); editDlg.close(); renderGrid();
-};
-edSave.onclick=async()=>{
-  if(!ctx) return;
-  const {key,day}=ctx; const json=ROTAS.get(key)||{};
-  const s=hhmm2min(edStart.value), e=hhmm2min(edEnd.value);
-  json[day]={segments:[{code:'Work',start:edStart.value,end:edEnd.value}]};
-  ROTAS.set(key,json); await saveDraftInstant(key); editDlg.close(); renderGrid();
-};
+/* Generate rota data from assignments into in-memory model -> then render timeline */
+$('#btnGenerate').onclick=()=>{ renderTimeline(true); };
 
-async function saveDraftInstant(key){
-  const [id,week]=key.split('|'); const data=ROTAS.get(key)||{};
-  await sb.from('rotas').upsert([{advisor_id:id,week_start:week,data}],{onConflict:'advisor_id,week_start'});
-}
-
-/* ===== Generate & Publish ===== */
-async function doGenerate(){
-  const list=advisorsForCurrentView(); if(!list.length){ alert('Pick advisors first.'); return; }
-  const weekISO=toISO(monday); const rows=[];
-  for(const a of list){
-    const key=`${a.id}|${weekISO}`; const pick=ASSIGN.get(key)||{}; const data={};
-    DAYS.forEach(d=>{ const t=TEMPLATES[pick[d]]; if(t) data[d]={segments:segmentsFromTemplate(t)}; });
-    if(Object.keys(data).length){ rows.push({advisor_id:a.id,week_start:weekISO,data}); ROTAS.set(key,data); }
+/* Build day segments from a template */
+function segmentsFromTemplate(tmp){
+  // splits: work → (break1?) → work → (lunch?) → work → (break2?) → work
+  const s=toMin(tmp.start_time), e=toMin(tmp.finish_time);
+  const b1=toMin(tmp.break1), l=toMin(tmp.lunch), b2=toMin(tmp.break2);
+  const segs=[];
+  function addWork(a,b){ if(a!=null && b!=null && b>a) segs.push({code:tmp.work_code,start:a,end:b}); }
+  function add(code,at,dur){ if(at!=null){ const d= code==='Lunch'?30:15; segs.push({code, start:at, end:at+(dur||d)}); } }
+  // morning part
+  if(b1){ addWork(s,b1); add('Break',b1,15); addWork(b1+15, (l||b2||e)); }
+  else if(l){ addWork(s,l); add('Lunch',l,30); addWork(l+30,(b2||e)); }
+  else if(b2){ addWork(s,b2); add('Break',b2,15); addWork(b2+15,e); }
+  else { addWork(s,e); }
+  // if both lunch and b2 exist after lunch
+  if(l && b2 && b2>l){ // we already added work up to (b2 or e) above; if b2 present after lunch, split again
+    // remove last work and split
+    const last = segs.pop();
+    if(last && last.code===tmp.work_code){
+      if(last.start< b2) segs.push({code:tmp.work_code,start:last.start,end:b2});
+      segs.push({code:'Break', start:b2, end:b2+15});
+      if(b2+15< last.end) segs.push({code:tmp.work_code,start:b2+15,end:last.end});
+    }else if(last){ segs.push(last); }
   }
-  if(!rows.length){ alert('No selections to generate.'); return; }
-  const {error}=await sb.from('rotas').upsert(rows,{onConflict:'advisor_id,week_start'});
-  if(error){ alert('Generate failed: '+error.message); return; }
-  renderGrid(); alert('Draft rotas saved.');
-}
-async function doPublish(){
-  const list=advisorsForCurrentView(); if(!list.length){ alert('Pick advisors first.'); return; }
-  const weekISO=toISO(monday);
-  const rows=list.map(a=>({advisor_id:a.id,week_start:weekISO,data:ROTAS.get(`${a.id}|${weekISO}`)||{},published_at:new Date().toISOString()}));
-  const {error}=await sb.from('rotas_published').upsert(rows,{onConflict:'advisor_id,week_start'});
-  if(error){ alert('Publish failed: '+error.message); return; }
-  alert('Published to Advisor Portal.');
+  return segs;
 }
 
-/* ===== JSON backup ===== */
-$('#btnLoadJSON').onclick=()=>$('#file').click();
-$('#file').addEventListener('change',async ev=>{
-  const f=ev.target.files[0]; if(!f) return;
-  const text=await f.text(); const obj=JSON.parse(text);
-  (obj.rotas||[]).forEach(r=> ROTAS.set(`${r.advisor_id}|${r.week_start}`, r.data||{}));
-  renderGrid();
-});
-$('#btnSaveJSON').onclick=()=>{
-  const weekISO=toISO(monday);
-  const rotas=[...ROTAS.entries()].filter(([k])=>k.endsWith('|'+weekISO)).map(([k,v])=>({advisor_id:k.split('|')[0],week_start:weekISO,data:v}));
-  const blob=new Blob([JSON.stringify({rotas},null,2)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`rotas_${weekISO}.json`; a.click(); URL.revokeObjectURL(a.href);
+/* Render timeline */
+function renderTimeline(fromAssignments=false){
+  // header hours
+  const H=$('#tlHours'); const S=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--start'))||6; const E=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--end'))||20;
+  H.innerHTML = Array.from({length:E-S},(_,i)=>`<div>${pad(S+i)}:00</div>`).join('');
+
+  const body=$('#tlBody'); body.innerHTML='';
+  const view=$('#viewSel').value;
+  // rows to show = selected OR all in leader
+  const lid= $('#leaderSel').value;
+  const team = advisors.filter(a=>String(a.leader_id)===String(lid)).sort((a,b)=>a.name.localeCompare(b.name));
+  const rows = (view==='TEAM_SELECTED' && selectedNames.size)? team.filter(a=>selectedNames.has(a.name)) : team;
+
+  rows.forEach(adv=>{
+    const tr=document.createElement('div'); tr.className='row';
+    tr.innerHTML = `<div class="rname">${adv.name}</div><div class="rline" data-row="${adv.id}"></div>`;
+    body.appendChild(tr);
+
+    // build segments (from assignments for each day)
+    DAYS.forEach((d,di)=>{
+      const key=`${adv.id}-${di}`, tName=assigned.get(key);
+      if(!tName || !templates[tName]) return;
+      const segs=segmentsFromTemplate(templates[tName]);
+      segs.forEach(seg=>{
+        const start = seg.start + di*1440;      // day offset
+        const end   = seg.end   + di*1440;
+        const p=spanPct(start, end);
+        const el=document.createElement('div');
+        const cls = clsFor(seg.code);
+        el.className=`bar ${cls}`;
+        el.style.left=`${p.left}%`; el.style.width=`${p.width}%`;
+        el.dataset.adv=adv.id; el.dataset.di=di; el.dataset.code=seg.code; el.dataset.start=seg.start; el.dataset.end=seg.end;
+        el.innerHTML = `<span>${(seg.code||'').toUpperCase()}</span><span class="t">${m2hhmm(seg.start)}–${m2hhmm(seg.end)}</span>`;
+        el.onclick=()=>openEdit(el);
+        tr.lastElementChild.appendChild(el);
+      });
+    });
+  });
+
+  if(fromAssignments){ alert('Generated from assignments. Review, tweak blocks (click to edit), then Publish.'); }
+}
+
+/* Edit dialog */
+function codeOptionsHTML(sel=''){
+  const buckets={
+    Activity:["DEB Email","Mirakl","PLT Social","Admin","2nd Line","QA","Overtime"],
+    Absence:["AL","Sick","RDO","Maternity","LTS","Break","Lunch"],
+    Shrinkage:["121","ATL","Coaching","Huddle","ITI","Projects","Team Meeting","Training","Meeting"]
+  };
+  return Object.entries(buckets).map(([g,arr])=>`<optgroup label="${g}">${arr.map(c=>`<option ${c===sel?'selected':''}>${c}</option>`).join('')}</optgroup>`).join('');
+}
+function openEdit(bar){
+  $('#eCode').innerHTML = codeOptionsHTML(bar.dataset.code||'');
+  $('#eStart').value = m2hhmm(+bar.dataset.start);
+  $('#eEnd').value   = m2hhmm(+bar.dataset.end);
+  editDlg.showModal();
+
+  $('#eOK').onclick=()=>{
+    const code=$('#eCode').value;
+    const s=toMin($('#eStart').value), e=toMin($('#eEnd').value);
+    if(!s||!e||e<=s){ alert('Check start/end times'); return; }
+    bar.dataset.code=code; bar.dataset.start=s; bar.dataset.end=e;
+    bar.firstElementChild.textContent=code.toUpperCase();
+    bar.querySelector('.t').textContent=`${m2hhmm(s)}–${m2hhmm(e)}`;
+    const di=+bar.dataset.di; const start= s + di*1440, end = e + di*1440;
+    const p=spanPct(start,end); bar.style.left=`${p.left}%`; bar.style.width=`${p.width}%`;
+    bar.className=`bar ${clsFor(code)}`;
+    editDlg.close();
+  };
+}
+
+/* Save/Load JSON (local only) */
+$('#btnSaveLocal').onclick=()=>{
+  const state = { assigned:[...assigned], selected:[...selectedNames], monday:iso(monday) };
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota_state.json'; a.click();
+};
+$('#btnLoadLocal').onclick=()=>{
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='.json';
+  inp.onchange=()=>{ const f=inp.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{
+      const obj=JSON.parse(rd.result); assigned=new Map(obj.assigned||[]); selectedNames=new Set(obj.selected||[]); monday=new Date(obj.monday||iso(new Date())); refreshChips(); rebuildAssignTable(); renderTimeline();
+  }catch(e){ alert('Invalid file'); } }; rd.readAsText(f); };
+  inp.click();
 };
 
-/* ===== Events / boot ===== */
-$('#prevWeek').onclick=async()=>{ monday=addDays(monday,-7); $('#weekStart').value=toISO(monday); $('#rangeLabel').textContent=labelForWeek(monday); await bootRender(); };
-$('#nextWeek').onclick=async()=>{ monday=addDays(monday,7);  $('#weekStart').value=toISO(monday); $('#rangeLabel').textContent=labelForWeek(monday); await bootRender(); };
-$('#weekStart').onchange=async()=>{ monday=toMonday(new Date($('#weekStart').value)); $('#rangeLabel').textContent=labelForWeek(monday); await bootRender(); };
-$('#btnPrint').onclick=()=>window.print();
-$('#btnGenerate').onclick=doGenerate; $('#btnPublish').onclick=doPublish;
+/* Publish (writes rotas + rotas_published) */
+$('#btnPublish').onclick=async()=>{
+  const lid=$('#leaderSel').value;
+  const team = advisors.filter(a=>String(a.leader_id)===String(lid));
+  const rows = ($('#viewSel').value==='TEAM_SELECTED' && selectedNames.size)? team.filter(a=>selectedNames.has(a.name)) : team;
+  if(!rows.length){ alert('No advisors to publish'); return; }
 
-$('#btnClearSel').onclick=()=>{ SELECTED.clear(); refreshChips(); rebuildTree(); populateAssignTable(); renderGrid(); };
+  const payload=[];
+  rows.forEach(adv=>{
+    const weekData={};
+    DAYS.forEach((_,di)=>{
+      const tName=assigned.get(`${adv.id}-${di}`);
+      if(!tName||!templates[tName]) return;
+      const segs=segmentsFromTemplate(templates[tName]).map(s=>({code:s.code,start:m2hhmm(s.start),end:m2hhmm(s.end)}));
+      weekData[DAYS[di]]={segments:segs};
+    });
+    payload.push({ advisor_id:adv.id, week_start: iso(monday), data: weekData, published_at: new Date().toISOString() });
+  });
 
-async function bootRender(){
-  const ids=advisorsForCurrentView().map(a=>a.id); await loadRotasFor(ids,toISO(monday));
-  populateAssignTable(); renderGrid();
-}
+  if(!payload.length){ alert('Nothing to publish for this week.'); return; }
 
-async function init(){
+  try{
+    // rotas (draft) upsert: delete+insert for simplicity
+    await sb.from('rotas').delete().eq('week_start', iso(monday)).in('advisor_id', payload.map(p=>p.advisor_id));
+    let {error:e1}= await sb.from('rotas').insert(payload.map(({advisor_id,week_start,data})=>({advisor_id,week_start,data})));
+    if(e1) throw e1;
+
+    // published mirror
+    await sb.from('rotas_published').delete().eq('week_start', iso(monday)).in('advisor_id', payload.map(p=>p.advisor_id));
+    let {error:e2}= await sb.from('rotas_published').insert(payload);
+    if(e2) throw e2;
+
+    alert('Published ✓  Advisors can now see their rota.');
+  }catch(err){
+    console.error(err);
+    alert('Publish failed: '+ (err?.message || err));
+  }
+};
+
+/* Week controls */
+$('#weekInput').value = iso(monday);
+$('#prevW').onclick=()=>{ monday=addDays(monday,-7); $('#weekInput').value=iso(monday); renderTimeline(); };
+$('#nextW').onclick=()=>{ monday=addDays(monday,7);  $('#weekInput').value=iso(monday); renderTimeline(); };
+$('#todayW').onclick=()=>{ monday=toMonday(new Date()); $('#weekInput').value=iso(monday); renderTimeline(); };
+$('#weekInput').onchange=()=>{ monday=toMonday(new Date($('#weekInput').value)); renderTimeline(); };
+
+/* Init */
+(async function init(){
   await loadOrg();
-  rebuildFilters();
-  $('#weekStart').value=toISO(monday);
-  $('#rangeLabel').textContent=labelForWeek(monday);
-  rebuildTree(); refreshChips();
-  await bootRender();
-}
-init();
+  await loadTemplates();
+  renderTimeline();
+})();
 </script>
 </body>
 </html>
