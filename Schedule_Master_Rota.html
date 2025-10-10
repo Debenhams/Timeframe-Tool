@@ -3,90 +3,93 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Professional Team Rota System — Master (Calabrio)</title>
+<title>Professional Team Rota System — Master (Calabrio Mode)</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <style>
   :root{
     --brand:#0d47a1; --ink:#0f172a; --muted:#6b7280; --accent:#00c853;
     --bg:#f5f7fb; --card:#ffffff; --line:#e6ebf3;
     /* timeline window */
-    --start:6; --end:20;           /* 06:00 → 20:00 */
-    --row-h:34px; --bar-h:14px;    /* compact Calabrio-like */
-    /* colours */
-    --email:#2ecc71; --mirakl:#b1b51e; --social:#5e35b1; --meeting:#ffd700;
-    --overtime:#e53935; --break:#cfd8dc; --lunch:#b0bec5; --absence:#b0c4de; --shrink:#ffd166;
+    --start:6; --end:20;                 /* 06:00 → 20:00 */
+    --row-h:28px; --bar-h:10px;          /* Calabrio-tight */
+    /* palette */
+    --olive:#7e7a2a;                     /* work bar (Calabrio look) */
+    --gap:#dfe5ef;                       /* gaps */
+    --break:#d4dae3; --lunch:#bdeaff;    /* hatched blocks */
+    --email:#2ecc71; --mirakl:#b1b51e; --social:#5e35b1; /* still used in non-Calabrio legend */
   }
   html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.35 Inter,Segoe UI,Roboto,system-ui,Arial}
+  body{margin:0;background:var(--bg);color:var(--ink);font:12px/1.35 Inter,Segoe UI,Roboto,system-ui,Arial}
+
   /* top bar */
-  .topbar{background:var(--brand);color:#fff;display:flex;gap:12px;align-items:center;padding:12px 16px;box-shadow:0 4px 14px rgba(13,71,161,.2)}
-  .topbar h1{margin:0;font-size:16px;font-weight:800}
-  .in{border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:#fff}
-  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 10px;cursor:pointer}
+  .topbar{background:var(--brand);color:#fff;display:flex;gap:10px;align-items:center;padding:10px 14px;box-shadow:0 4px 14px rgba(13,71,161,.2)}
+  .topbar h1{margin:0;font-size:15px;font-weight:800}
+  .in{border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:#fff}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 9px;cursor:pointer}
   .btn.primary{background:var(--accent);color:#fff;border:0}
-  .btn.icon{padding:6px 8px}
+  .btn.icon{padding:4px 7px}
   .btn[disabled]{opacity:.6;cursor:not-allowed}
-  .chip{background:#eaf1ff;color:#113a8f;border-radius:999px;padding:5px 8px;font-weight:700}
+  .chip{background:#eaf1ff;color:#113a8f;border-radius:999px;padding:4px 7px;font-weight:700}
   .sp{flex:1}
 
-  /* page layout: top controls + schedules row, bottom full-width rota */
-  .page{max-width:1500px;margin:16px auto;padding:0 14px;display:grid;grid-template-columns:1fr 320px;grid-template-areas:"controls schedules" "grid grid";gap:14px}
+  /* page grid: top controls + schedules (right), bottom rota full width */
+  .page{max-width:1500px;margin:12px auto;padding:0 12px;display:grid;grid-template-columns:1fr 300px;grid-template-areas:"controls schedules" "grid grid";gap:12px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 22px rgba(20,30,70,.06)}
-  .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
-  .bd{padding:10px 12px}
+  .hd{display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-bottom:1px solid var(--line)}
+  .bd{padding:8px 10px}
   .muted{color:var(--muted)}
 
   /* schedules (right) */
   .schedules{grid-area:schedules}
-  .tree-search{display:flex;gap:8px;margin-bottom:8px}
-  .tree{border:1px solid var(--line);border-radius:10px;max-height:62vh;overflow:auto;background:#fff}
-  .tree details{padding:4px}
+  .tree-search{display:flex;gap:8px;margin-bottom:6px}
+  .tree{border:1px solid var(--line);border-radius:10px;max-height:60vh;overflow:auto;background:#fff}
+  .tree details{padding:3px}
   .tree summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:700}
   .tree summary::-webkit-details-marker{display:none}
-  .twisty{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--line);border-radius:4px;background:#f0f5ff}
-  .node{display:flex;align-items:center;gap:6px;padding:3px 2px}
-  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-  .chip.sm{padding:3px 6px}
+  .twisty{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid var(--line);border-radius:4px;background:#f0f5ff;font-size:10px}
+  .node{display:flex;align-items:center;gap:6px;padding:2px 2px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .chip.sm{padding:2px 6px}
 
   /* controls (left top) */
   .controls{grid-area:controls}
   .row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 
   /* templates + assignment */
-  .key{display:grid;grid-template-columns:18px 110px 1fr;gap:6px;align-items:center}
-  .dot{width:10px;height:10px;border-radius:50%}
   .table-wrap{border:1px solid var(--line);border-radius:12px;overflow:auto}
   table{width:100%;border-collapse:collapse}
   th,td{border:1px solid var(--line);padding:6px;text-align:center}
   thead th{background:#f0f5ff;color:#0d47a1;font-weight:800}
-  td.name{text-align:left;font-weight:800;min-width:180px;background:#f7fbff;position:sticky;left:0}
+  td.name{text-align:left;font-weight:800;min-width:160px;background:#f7fbff;position:sticky;left:0}
 
   /* rota grid (bottom, full width) */
   .gridCard{grid-area:grid}
-  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--line);border-radius:999px;background:#fff}
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 6px;border:1px solid var(--line);border-radius:999px;background:#fff}
+  .dot{width:10px;height:10px;border-radius:50%}
 
-  /* horizontal timeline */
-  .hr-head{height:30px;background:#fbfdff;border-bottom:1px solid var(--line);display:grid;grid-template-columns:180px repeat(var(--cols),1fr)}
-  .hr-head .label{display:flex;align-items:center;justify-content:center;font-weight:800;color:#51607a}
+  /* horizontal header/grid */
+  .hr-head{height:26px;background:#fbfdff;border-bottom:1px solid var(--line);display:grid;grid-template-columns:180px repeat(var(--cols),1fr)}
+  .hr-head .label{display:flex;align-items:center;justify-content:center;font-weight:800;color:#51607a;font-size:11px}
   .grid{display:grid;grid-template-columns:180px repeat(var(--cols),1fr)}
   .rowg{display:contents}
   .cell{height:var(--row-h);position:relative;border-bottom:1px solid var(--line)}
-  .cell.hour{border-left:1px solid var(--line)}
+  .cell.hour{border-left:1px solid var(--line);background:
+      repeating-linear-gradient(180deg,#0000,#0000 calc(var(--row-h) - 1px), var(--line) calc(var(--row-h) - 1px), var(--line) var(--row-h));}
   .namecell{display:flex;align-items:center;gap:6px;padding-left:8px;background:#fff;position:sticky;left:0;z-index:1}
 
-  .bar{position:absolute;top:calc((var(--row-h) - var(--bar-h))/2);height:var(--bar-h);left:0;right:0;border-radius:6px;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:space-between;padding:0 6px;font-size:11px;box-shadow:0 1px 2px rgba(0,0,0,.12);cursor:grab}
-  .bar:active{cursor:grabbing}
-  .handle{position:absolute;top:0;width:6px;height:100%;cursor:ew-resize;opacity:.85}
+  /* Calabrio style bars */
+  .work{position:absolute;top:calc((var(--row-h) - var(--bar-h))/2);height:var(--bar-h);border-radius:5px;background:var(--olive);box-shadow:0 1px 2px rgba(0,0,0,.15);cursor:grab}
+  .work:active{cursor:grabbing}
+  .cap{position:absolute;top:-13px;font-size:10px;font-weight:800;color:#2f3b4f}
+  .cap.l{left:-2px} .cap.r{right:-2px}
+  .handle{position:absolute;top:-2px;width:6px;height:calc(var(--bar-h)+4px);cursor:ew-resize}
   .handle.l{left:-3px} .handle.r{right:-3px}
+  /* hatched breaks/lunch over the work bar */
+  .blk{position:absolute;top:calc((var(--row-h) - var(--bar-h))/2 - 2px);height:calc(var(--bar-h)+4px);border-radius:4px;border:1px solid #c8cfda;background:repeating-linear-gradient(45deg,var(--break),var(--break) 6px,#c7ced9 6px,#c7ced9 12px)}
+  .blk.lunch{background:repeating-linear-gradient(45deg,var(--lunch),var(--lunch) 6px,#91dfff 6px,#91dfff 12px);border-color:#7ed8ff}
 
-  .b-email{background:var(--email)} .b-mirakl{background:var(--mirakl)}
-  .b-social{background:var(--social)} .b-meeting{background:var(--meeting);color:#333}
-  .b-overtime{background:var(--overtime)} .b-break{background:var(--break);color:#123}
-  .b-lunch{background:var(--lunch);color:#123} .b-absence{background:var(--absence)}
-  .b-shrink{background:var(--shrink);color:#123}
-
-  .note{background:#fff8d7;border:1px solid #ffe48f;color:#8a6d3b;padding:8px;border-radius:10px}
+  /* dialog */
   dialog{max-width:720px;width:95%;border:1px solid var(--line);border-radius:12px;padding:12px}
 </style>
 </head>
@@ -106,11 +109,11 @@
   </div>
 
   <div class="page">
-    <!-- Controls + Templates / Assignment (left) -->
+    <!-- Controls + Templates / Assignment -->
     <div class="card controls">
       <div class="hd"><strong>Templates & Master Assignment</strong></div>
       <div class="bd">
-        <div class="row" style="margin-bottom:8px">
+        <div class="row" style="margin-bottom:6px">
           <button class="btn" id="btnAddTemplate">➕ Add Template</button>
           <button class="btn" id="btnLoadDefaults">↺ Load Sample Templates</button>
           <span class="sp"></span>
@@ -119,23 +122,7 @@
           <button class="btn" id="btnLoadJSON">📂 Load JSON</button>
         </div>
 
-        <div id="templateEditor" class="note" style="margin-bottom:12px">Loading templates…</div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;margin-bottom:8px">
-          <div>
-            <strong>Colour Key</strong>
-            <div class="key" style="margin-top:6px">
-              <span class="dot" style="background:var(--email)"></span><span>Email</span><input class="in" data-k="--email" value="#2ecc71">
-              <span class="dot" style="background:var(--mirakl)"></span><span>Mirakl</span><input class="in" data-k="--mirakl" value="#b1b51e">
-              <span class="dot" style="background:var(--social)"></span><span>Social</span><input class="in" data-k="--social" value="#5e35b1">
-              <span class="dot" style="background:var(--meeting)"></span><span>Meeting</span><input class="in" data-k="--meeting" value="#ffd700">
-              <span class="dot" style="background:var(--overtime)"></span><span>Overtime</span><input class="in" data-k="--overtime" value="#e53935">
-              <span class="dot" style="background:var(--break)"></span><span>Break</span><input class="in" data-k="--break" value="#cfd8dc">
-              <span class="dot" style="background:var(--lunch)"></span><span>Lunch</span><input class="in" data-k="--lunch" value="#b0bec5">
-            </div>
-          </div>
-          <div class="note">Pick a template for each advisor/day below. **Generate** writes draft to <code>rotas</code>. **Publish** copies to <code>rotas_published</code> (Advisor Portal).</div>
-        </div>
+        <div id="templateEditor" class="muted" style="margin-bottom:10px">Loading templates…</div>
 
         <div class="table-wrap">
           <table id="assignTable">
@@ -159,43 +146,38 @@
         </div>
         <div class="tree" id="tree"></div>
         <div class="chips" id="activeChips"></div>
-        <div class="note" style="margin-top:8px">Tick a **Leader** to select the whole team, or tick individuals. “View ▸ Team (Selected)” shows only the checked names.</div>
+        <div class="muted" style="margin-top:6px">Tick a <strong>Leader</strong> to select the whole team, or tick individuals. “View ▸ Team (Selected)” shows only the checked names.</div>
       </div>
     </div>
 
-    <!-- FULL-WIDTH ROTA GRID (bottom) -->
+    <!-- FULL-WIDTH Calabrio grid (bottom) -->
     <div class="card gridCard">
       <div class="hd">
         <strong id="teamTitle">Team Week</strong>
-        <div>
-          <button class="btn" id="btnPrint">🖨️ Print</button>
-        </div>
+        <button class="btn" id="btnPrint">🖨️ Print</button>
       </div>
       <div class="bd">
         <div id="gridHead" class="hr-head"></div>
         <div id="grid" class="grid"></div>
 
         <div class="legend">
-          <span class="pill"><span class="dot" style="background:var(--email)"></span> Email</span>
-          <span class="pill"><span class="dot" style="background:var(--mirakl)"></span> Mirakl</span>
-          <span class="pill"><span class="dot" style="background:var(--social)"></span> Social</span>
-          <span class="pill"><span class="dot" style="background:var(--meeting)"></span> Meeting</span>
-          <span class="pill"><span class="dot" style="background:var(--overtime)"></span> Overtime</span>
+          <span class="pill"><span class="dot" style="background:var(--olive)"></span> Work</span>
           <span class="pill"><span class="dot" style="background:var(--break)"></span> Break</span>
           <span class="pill"><span class="dot" style="background:var(--lunch)"></span> Lunch</span>
+          <span class="pill"><span class="dot" style="background:#bbb"></span> Gaps</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- Click / edit dialog -->
+  <!-- Edit dialog -->
   <dialog id="editDlg">
     <div style="font-weight:800;margin-bottom:6px">Edit block</div>
-    <div class="row"><label style="min-width:90px">Code</label>
+    <div style="display:flex;gap:8px;align-items:center;margin:6px 0"><label style="min-width:90px">Code</label>
       <select id="edCode" class="in" style="flex:1"></select></div>
-    <div class="row"><label style="min-width:90px">Start–End</label>
+    <div style="display:flex;gap:8px;align-items:center;margin:6px 0"><label style="min-width:90px">Start–End</label>
       <input id="edStart" class="in" type="time"> <span>–</span> <input id="edEnd" class="in" type="time"></div>
-    <div class="row" style="justify-content:flex-end;margin-top:10px">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
       <button id="edDelete" class="btn">Delete</button>
       <button onclick="editDlg.close()" class="btn">Cancel</button>
       <button id="edSave" class="btn primary">Save</button>
@@ -254,7 +236,6 @@ async function loadOrg(){
     if(leader) leader.advisors.push({id:a.id,name:a.name});
   }
 
-  // templates
   await reloadTemplates();
 }
 async function reloadTemplates(){
@@ -358,8 +339,8 @@ function codeSelectHTML(val=''){
   return Object.entries(GROUPS).map(([g,arr])=>`<optgroup label="${g}">${arr.map(c=>`<option ${val===c?'selected':''}>${c}</option>`).join('')}</optgroup>`).join('');
 }
 function templateRow(t){
-  return `<div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px;background:#fbfdff" data-name="${t.name}">
-    <div style="display:grid;grid-template-columns:130px 1fr 130px 1fr;gap:8px;align-items:center">
+  return `<div style="border:1px solid var(--line);border-radius:10px;padding:8px;margin-bottom:8px;background:#fbfdff" data-name="${t.name}">
+    <div style="display:grid;grid-template-columns:120px 1fr 120px 1fr;gap:6px;align-items:center">
       <label>Name</label><input data-f="name" class="in" value="${t.name}">
       <label>New code</label><select data-f="work_code" class="in">${codeSelectHTML(t.work_code||'Admin')}</select>
       <label>Start / Finish</label>
@@ -367,7 +348,7 @@ function templateRow(t){
       <label>Breaks</label>
       <div style="display:flex;gap:6px"><input data-f="break1" class="in" type="time" value="${t.break1||''}" title="Break 1 (15m)"><input data-f="lunch" class="in" type="time" value="${t.lunch||''}" title="Lunch (30m)"><input data-f="break2" class="in" type="time" value="${t.break2||''}" title="Break 2 (15m)"></div>
     </div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
       <button class="btn" data-act="dup">Duplicate</button>
       <button class="btn" data-act="del">Delete</button>
     </div>
@@ -375,7 +356,7 @@ function templateRow(t){
 }
 function populateTemplateEditor(){
   const ed=$('#templateEditor'); const list=Object.values(TEMPLATES).sort((a,b)=>a.name.localeCompare(b.name));
-  ed.classList.remove('note'); ed.innerHTML=list.length?list.map(templateRow).join(''):'<div class="muted">No templates. Add or load samples.</div>';
+  ed.innerHTML=list.length?list.map(templateRow).join(''):'<div class="muted">No templates. Add or load samples.</div>';
 
   $$('#templateEditor [data-f]').forEach(inp=>{
     inp.onchange=async()=>{
@@ -429,9 +410,9 @@ function advisorsForCurrentView(){
 }
 function populateAssignTable(){
   const body=$('#assignTable tbody'); const list=advisorsForCurrentView();
-  if(!list.length){ body.innerHTML='<tr><td colspan="8" class="muted" style="text-align:left;padding:10px">Pick a leader or advisors in **Schedules**.</td></tr>'; return; }
+  if(!list.length){ body.innerHTML='<tr><td colspan="8" class="muted" style="text-align:left;padding:8px">Pick a leader or advisors in <strong>Schedules</strong>.</td></tr>'; return; }
   const weekISO=toISO(monday);
-  const opts=['','—','...'].slice(0,1).concat(Object.keys(TEMPLATES).sort()).map(n=>`<option value="${n}">${n||'—'}</option>`).join('');
+  const opts=[''].concat(Object.keys(TEMPLATES).sort()).map(n=>`<option value="${n}">${n||'—'}</option>`).join('');
   body.innerHTML=list.map(a=>`<tr data-adv="${a.id}">
     <td class="name">${a.name}</td>
     ${DAYS.map(d=>`<td><select class="in sel" data-adv="${a.id}" data-day="${d}">${opts}</select></td>`).join('')}
@@ -439,7 +420,7 @@ function populateAssignTable(){
   // preload selections
   list.forEach(a=>{
     const key=`${a.id}|${weekISO}`; const row=ASSIGN.get(key)||{};
-    DAYS.forEach(d=>{ const el=document.querySelector(`select[data-adv="${a.id}"][data-day="${d}"]`); if(el) el.value=row[d]||''; });
+    DAYS.forEach(d=>{ const el=document.querySelector(\`select[data-adv="${a.id}"][data-day="${d}"]\`); if(el) el.value=row[d]||''; });
   });
   $$('#assignTable select.sel').forEach(el=> el.onchange=()=>{
     const a=el.dataset.adv, d=el.dataset.day, v=el.value||''; const k=`${a}|${toISO(monday)}`;
@@ -447,28 +428,37 @@ function populateAssignTable(){
   });
 }
 
-/* ===== Segments from template ===== */
+/* ===== Build segments from template (then compress to Calabrio) ===== */
 function segmentsFromTemplate(t){
   if(!t||!t.start_time||!t.finish_time) return [];
   const out=[], start=hhmm2min(t.start_time), finish=hhmm2min(t.finish_time);
-  const br=(mm,len,code)=>{ out.push({code,start:min2hhmm(mm),end:min2hhmm(mm+len)}); };
   let cur=start;
   const push=(code,s,e)=>{ if(e>s) out.push({code,start:min2hhmm(s),end:min2hhmm(e)}); };
-  if(t.break1){ push(t.work_code,cur,hhmm2min(t.break1)); br(hhmm2min(t.break1),15,'Break'); cur=hhmm2min(t.break1)+15; }
-  if(t.lunch){ push(t.work_code,cur,hhmm2min(t.lunch)); br(hhmm2min(t.lunch),30,'Lunch'); cur=hhmm2min(t.lunch)+30; }
-  if(t.break2){ push(t.work_code,cur,hhmm2min(t.break2)); br(hhmm2min(t.break2),15,'Break'); cur=hhmm2min(t.break2)+15; }
+  if(t.break1){ push(t.work_code,cur,hhmm2min(t.break1)); out.push({code:'Break',start:t.break1,end:min2hhmm(hhmm2min(t.break1)+15)}); cur=hhmm2min(t.break1)+15; }
+  if(t.lunch){ push(t.work_code,cur,hhmm2min(t.lunch)); out.push({code:'Lunch',start:t.lunch,end:min2hhmm(hhmm2min(t.lunch)+30)}); cur=hhmm2min(t.lunch)+30; }
+  if(t.break2){ push(t.work_code,cur,hhmm2min(t.break2)); out.push({code:'Break',start:t.break2,end:min2hhmm(hhmm2min(t.break2)+15)}); cur=hhmm2min(t.break2)+15; }
   push(t.work_code,cur,finish);
-  // convert back: merge contiguous same-code blocks
-  const merged=[];
-  for(const seg of out){
-    const last=merged[merged.length-1];
-    if(last && last.code===seg.code && last.end===seg.start){ last.end=seg.end; }
-    else merged.push(seg);
-  }
-  return merged;
+  return out.sort((a,b)=>hhmm2min(a.start)-hhmm2min(b.start));
+}
+/* Calabrio compression: merge all non-break/lunch into one "work" bar, keep break/lunch as hatched overlays */
+function compressCalabrio(daySegs){
+  const isBreak = s=>/break/i.test(s.code);
+  const isLunch = s=>/lunch/i.test(s.code);
+  if(!daySegs||!daySegs.length) return null;
+  const segments = daySegs.slice().sort((a,b)=>hhmm2min(a.start)-hhmm2min(b.start));
+  // determine work span: from first non-break/lunch start to last non-break/lunch end
+  const keep = segments.filter(s=>!isBreak(s)&&!isLunch(s));
+  if(!keep.length) return null;
+  const smin=Math.min(...keep.map(s=>hhmm2min(s.start)));
+  const emin=Math.max(...keep.map(s=>hhmm2min(s.end)));
+  const gaps = segments.filter(s=>isBreak(s)||isLunch(s)).map(s=>({
+    type: isLunch(s)?'lunch':'break',
+    s: hhmm2min(s.start), e: hhmm2min(s.end)
+  }));
+  return {work:[smin,emin], gaps};
 }
 
-/* ===== Load / save rotas ===== */
+/* ===== Load draft rotas ===== */
 async function loadRotasFor(ids,weekISO){
   if(!ids.length) return;
   const {data,error}=await sb.from('rotas').select('advisor_id,week_start,data').in('advisor_id',ids).eq('week_start',weekISO);
@@ -477,125 +467,133 @@ async function loadRotasFor(ids,weekISO){
 }
 
 /* ===== Rota grid (render + edit + drag) ===== */
-function codeClass(code){
-  const k=(code||'').toLowerCase();
-  if(k.includes('email'))return'b-email';
-  if(k.includes('mirakl'))return'b-mirakl';
-  if(k.includes('social'))return'b-social';
-  if(k.includes('meeting')||k.includes('coach'))return'b-meeting';
-  if(k.includes('overtime'))return'b-overtime';
-  if(k.includes('break'))return'b-break';
-  if(k.includes('lunch'))return'b-lunch';
-  if(['al','sick','rdo','maternity','lts'].some(w=>k.includes(w)))return'b-absence';
-  if(['121','atl','huddle','iti','projects','team meeting','training'].some(w=>k.includes(w)))return'b-shrink';
-  return'b-email';
-}
 function renderGrid(){
   const start=+getComputedStyle(document.documentElement).getPropertyValue('--start')||6;
   const end=+getComputedStyle(document.documentElement).getPropertyValue('--end')||20;
   const cols=end-start, total=(end-start)*60;
   $('#gridHead').style.setProperty('--cols',cols);
   $('#grid').style.setProperty('--cols',cols);
-  $('#gridHead').innerHTML=`<div class="label" style="justify-content:flex-start;padding-left:10px">Name</div>`+Array.from({length:cols},(_,i)=>`<div class="label">${pad(start+i)}:00</div>`).join('');
+  $('#gridHead').innerHTML=`<div class="label" style="justify-content:flex-start;padding-left:8px">Name</div>`+Array.from({length:cols},(_,i)=>`<div class="label">${pad(start+i)}:00</div>`).join('');
   const weekISO=toISO(monday), list=advisorsForCurrentView(); const g=$('#grid');
   if(!list.length){ g.innerHTML=''; return; }
+
   g.innerHTML=list.map(a=>{
     const key=`${a.id}|${weekISO}`; const json=ROTAS.get(key)||{};
-    const bars=DAYS.flatMap((day,di)=>{
-      const segs=json[day]?.segments||[];
-      return segs.map((seg,si)=>{
-        const s=clamp(hhmm2min(seg.start)-start*60,0,total);
-        const e=clamp(hhmm2min(seg.end)-start*60,0,total);
-        const left=(s/total)*100, width=Math.max(1,(e-s)/total*100);
-        return `<div class="bar ${codeClass(seg.code)}" data-adv="${a.id}" data-day="${day}" data-si="${si}"
-                 style="top:calc(${di}*var(--row-h) + (var(--row-h) - var(--bar-h))/2); left:${left}%; width:${width}%">
-                 <span>${(seg.code||'').toUpperCase()}</span><span>${seg.start} – ${seg.end}</span>
-                 <span class="handle l"></span><span class="handle r"></span>
-               </div>`;
+    const bars=DAYS.map((day,di)=>{
+      const c = compressCalabrio((json[day]?.segments)||[]);
+      if(!c) return '';
+      const left=((c.work[0]-start*60)/total)*100;
+      const width=((c.work[1]-c.work[0])/total)*100;
+      const top=`calc(${di}*var(--row-h))`;
+      const leftPx=`${left}%`, widthPx=`${width}%`;
+      const ltxt=min2hhmm(c.work[0]), rtxt=min2hhmm(c.work[1]);
+      const gaps=c.gaps.map(gp=>{
+        const l=((gp.s-start*60)/total)*100, w=((gp.e-gp.s)/total)*100;
+        return `<div class="blk ${gp.type==='lunch'?'lunch':''}" style="left:${l}%;width:${w}%;top:${top}"></div>`;
       }).join('');
+      return `
+        <div class="work" data-adv="${a.id}" data-day="${day}" style="left:${leftPx};width:${widthPx};top:calc(${di}*var(--row-h) + (var(--row-h) - var(--bar-h))/2)">
+          <span class="handle l"></span><span class="handle r"></span>
+          <span class="cap l">${ltxt}</span><span class="cap r">${rtxt}</span>
+        </div>${gaps}`;
     }).join('');
-    return `<div class="rowg"><div class="cell namecell">${a.name}</div>${Array.from({length:cols},()=>`<div class="cell hour"></div>`).join('')}<div class="cell" style="grid-column:2 / ${2+cols}">${bars}</div></div>`;
+    return `<div class="rowg">
+      <div class="cell namecell">${a.name}</div>
+      ${Array.from({length:cols},()=>`<div class="cell hour"></div>`).join('')}
+      <div class="cell" style="grid-column:2 / ${2+cols}">${bars}</div>
+    </div>`;
   }).join('');
 
-  // wire editing + drag
-  $$('#grid .bar').forEach(el=>{
-    const adv=el.dataset.adv, day=el.dataset.day, si=+el.dataset.si;
-    el.onclick=e=>{ if(e.target.classList.contains('handle')) return; openEditor(adv,day,si); };
-
-    // drag to move / resize
-    const key=`${adv}|${weekISO}`; const startH=start; const totalM=(end-start)*60;
+  // drag/resize whole work bar
+  $$('#grid .work').forEach(el=>{
+    const adv=el.dataset.adv, day=el.dataset.day;
+    const key=`${adv}|${weekISO}`;
     let mode=null, originX=0, origS=0, origE=0;
 
     const onDown=e=>{
-      const seg=getSeg(key,day,si); if(!seg) return;
+      const c = compressCalabrio((ROTAS.get(key)?.[day]?.segments)||[]);
+      if(!c) return;
       mode = e.target.classList.contains('l') ? 'resL' : e.target.classList.contains('r') ? 'resR' : 'move';
       originX = e.clientX;
-      origS = hhmm2min(seg.start); origE = hhmm2min(seg.end);
+      origS = c.work[0]; origE = c.work[1];
       document.addEventListener('pointermove',onMove); document.addEventListener('pointerup',onUp);
     };
     const onMove=e=>{
-      const seg=getSeg(key,day,si); if(!seg) return;
       const gridRect=$('#grid').getBoundingClientRect();
-      const rel = clamp(e.clientX - originX, -99999, 99999);
+      const totalM=(end-start)*60;
       const minsPerPx = totalM / gridRect.width;
-      const delta = snap5(Math.round(rel * minsPerPx));
+      const delta = snap5(Math.round((e.clientX - originX) * minsPerPx));
       let s=origS, en=origE;
       if(mode==='move'){ s=snap5(origS+delta); en=snap5(origE+delta); }
       if(mode==='resL'){ s=snap5(origS+delta); }
       if(mode==='resR'){ en=snap5(origE+delta); }
-      s=clamp(s,startH*60,(end*60)-5); en=clamp(en,startH*60+5,end*60);
+      s=clamp(s,start*60,(end*60)-5); en=clamp(en,start*60+5,end*60);
       if(en<=s+5) en=s+5;
-      seg.start=min2hhmm(s); seg.end=min2hhmm(en);
-      drawOneBar(el, seg, day);
+      // rewrite segments: keep break/lunch positions, extend/shift working chunks around them
+      const json=ROTAS.get(key)||{}; const segs=(json[day]?.segments)||[];
+      const br=segs.filter(s=>/break/i.test(s.code)); const lu=segs.filter(s=>/lunch/i.test(s.code));
+      const workOnly = [{start:min2hhmm(s), end:min2hhmm(en), code:'Work'}]; // temporary
+      const rebuilt = [];
+      // weave breaks/lunch back into a single work bar
+      let cur=s;
+      const insertGap=(startMin,len,code)=>{
+        if(startMin>cur) rebuilt.push({code:'Work',start:min2hhmm(cur),end:min2hhmm(startMin)});
+        rebuilt.push({code:code,start:min2hhmm(startMin),end:min2hhmm(startMin+len)});
+        cur=startMin+len;
+      };
+      [...br.map(x=>({t:'Break',s:hhmm2min(x.start),e:hhmm2min(x.end)})),
+       ...lu.map(x=>({t:'Lunch',s:hhmm2min(x.start),e:hhmm2min(x.end)}))]
+       .sort((a,b)=>a.s-b.s)
+       .forEach(g=> insertGap(g.s, g.e-g.s, g.t));
+      if(cur<en) rebuilt.push({code:'Work',start:min2hhmm(cur),end:min2hhmm(en)});
+      json[day]={segments:rebuilt};
+      ROTAS.set(key,json);
+      // redraw one
+      const left=((s-start*60)/totalM)*100, width=((en-s)/totalM)*100;
+      el.style.left=`${left}%`; el.style.width=`${width}%`;
+      el.querySelector('.cap.l').textContent=min2hhmm(s);
+      el.querySelector('.cap.r').textContent=min2hhmm(en);
     };
-    const onUp=()=>{ document.removeEventListener('pointermove',onMove); document.removeEventListener('pointerup',onUp); saveDraftInstant(key); };
+    const onUp=async()=>{ document.removeEventListener('pointermove',onMove); document.removeEventListener('pointerup',onUp); await saveDraftInstant(key); };
     el.addEventListener('pointerdown',onDown);
     el.querySelector('.handle.l').addEventListener('pointerdown',onDown);
     el.querySelector('.handle.r').addEventListener('pointerdown',onDown);
+    // click to open editor on whole bar edges (choose precise times)
+    el.addEventListener('dblclick',()=>openWholeEditor(adv,day));
   });
 }
-function drawOneBar(el, seg, day){
-  const start=+getComputedStyle(document.documentElement).getPropertyValue('--start')||6;
-  const end=+getComputedStyle(document.documentElement).getPropertyValue('--end')||20;
-  const total=(end-start)*60;
-  const s=clamp(hhmm2min(seg.start)-start*60,0,total), e=clamp(hhmm2min(seg.end)-start*60,0,total);
-  const left=(s/total)*100, width=Math.max(1,(e-s)/total*100);
-  el.style.left=`${left}%`; el.style.width=`${width}%`;
-  el.children[0].textContent=(seg.code||'').toUpperCase();
-  el.children[1].textContent=`${seg.start} – ${seg.end}`;
-}
-function getSeg(key,day,si){
-  const json=ROTAS.get(key)||{}; const arr=json[day]?.segments||[]; return arr[si];
-}
-async function saveDraftInstant(key){
-  const [id,week]=key.split('|'); const data=ROTAS.get(key)||{};
-  await sb.from('rotas').upsert([{advisor_id:id,week_start:week,data}],{onConflict:'advisor_id,week_start'});
-}
 
-/* ===== Editor dialog ===== */
+/* Open editor on the main work bar (we edit first/last working segment) */
 const editDlg=$('#editDlg'), edCode=$('#edCode'), edStart=$('#edStart'), edEnd=$('#edEnd'), edDelete=$('#edDelete'), edSave=$('#edSave');
-edCode.innerHTML = Object.entries(GROUPS).map(([g,arr])=>`<optgroup label="${g}">${arr.map(c=>`<option>${c}</option>`).join('')}</optgroup>`).join('');
+edCode.innerHTML = ['Work','Break','Lunch','Admin','Mirakl','DEB Email','PLT Social','Overtime'].map(c=>`<option>${c}</option>`).join('');
 let ctx=null;
-function openEditor(advId, day, si){
-  const key=`${advId}|${toISO(monday)}`; const seg=getSeg(key,day,si); if(!seg) return;
-  ctx={key,day,si};
-  edCode.value=seg.code||'Admin'; edStart.value=seg.start; edEnd.value=seg.end;
+function openWholeEditor(advId, day){
+  const key=`${advId}|${toISO(monday)}`; const json=ROTAS.get(key)||{}; const arr=json[day]?.segments||[];
+  if(!arr.length) return;
+  const first = arr.find(s=>!(/break|lunch/i.test(s.code))) || arr[0];
+  const last  = [...arr].reverse().find(s=>!(/break|lunch/i.test(s.code))) || arr[arr.length-1];
+  ctx={key,day};
+  edCode.value='Work'; edStart.value=first.start; edEnd.value=last.end;
   editDlg.showModal();
 }
 edDelete.onclick=async()=>{
   if(!ctx) return;
-  const {key,day,si}=ctx; const json=ROTAS.get(key)||{}; const arr=json[day]?.segments||[];
-  arr.splice(si,1); if(arr.length===0) delete json[day];
-  ROTAS.set(key,json); await saveDraftInstant(key); editDlg.close(); renderGrid();
+  const {key,day}=ctx; const json=ROTAS.get(key)||{};
+  delete json[day]; ROTAS.set(key,json);
+  await saveDraftInstant(key); editDlg.close(); renderGrid();
 };
 edSave.onclick=async()=>{
   if(!ctx) return;
-  const {key,day,si}=ctx; const json=ROTAS.get(key)||{}; const arr=json[day]?.segments||[];
-  const seg=arr[si]; seg.code=edCode.value; seg.start=edStart.value; seg.end=edEnd.value;
-  // keep sorted
-  arr.sort((a,b)=>hhmm2min(a.start)-hhmm2min(b.start));
+  const {key,day}=ctx; const json=ROTAS.get(key)||{};
+  const s=hhmm2min(edStart.value), e=hhmm2min(edEnd.value);
+  json[day]={segments:[{code:'Work',start:edStart.value,end:edEnd.value}]};
   ROTAS.set(key,json); await saveDraftInstant(key); editDlg.close(); renderGrid();
 };
+
+async function saveDraftInstant(key){
+  const [id,week]=key.split('|'); const data=ROTAS.get(key)||{};
+  await sb.from('rotas').upsert([{advisor_id:id,week_start:week,data}],{onConflict:'advisor_id,week_start'});
+}
 
 /* ===== Generate & Publish ===== */
 async function doGenerate(){
@@ -644,15 +642,11 @@ $('#btnGenerate').onclick=doGenerate; $('#btnPublish').onclick=doPublish;
 
 $('#btnClearSel').onclick=()=>{ SELECTED.clear(); refreshChips(); rebuildTree(); populateAssignTable(); renderGrid(); };
 
-document.addEventListener('input',e=>{
-  const k=e.target?.dataset?.k; if(!k) return;
-  document.documentElement.style.setProperty(k, e.target.value);
-});
-
 async function bootRender(){
   const ids=advisorsForCurrentView().map(a=>a.id); await loadRotasFor(ids,toISO(monday));
   populateAssignTable(); renderGrid();
 }
+
 async function init(){
   await loadOrg();
   rebuildFilters();
