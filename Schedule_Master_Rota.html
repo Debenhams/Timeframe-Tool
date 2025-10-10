@@ -3,594 +3,569 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Professional Team Rota System — Horizontal (Compact)</title>
+<title>Professional Team Rota System — Master (Calabrio style)</title>
 
-<!-- Supabase client -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Supabase -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 
 <style>
   :root{
     /* Brand */
-    --brand:#0d47a1; --accent:#00c853;
-    --ink:#0f172a; --muted:#6b7280; --paper:#fff; --wash:#f5f7fb; --line:#e5e9f2;
+    --brand:#0d47a1; --ink:#0f172a; --muted:#64748b; --accent:#00c853;
+    --bg:#f5f7fb; --card:#ffffff; --line:#e6ebf3;
 
-    /* Horizontal timeline (Calabrio style) */
-    --name-col:150px;               /* fixed left column */
-    --start-min:360;                /* 06:00 -> 360 minutes */
-    --end-min:1200;                 /* 20:00 -> 1200 minutes */
-    --slot-min:15;                  /* grid step in minutes */
-    --row-h:34px;                   /* compact row height */
-    --bar-h:14px;                   /* segment thickness */
-    --grid-font:12px;
+    /* Timeline */
+    --start:6;   /* 06:00 */
+    --end:20;   /* 20:00 */
+    --row-height:34px;
+    --bar-height:14px;
 
     /* Codes */
-    --c-email:#2ecc71;
-    --c-mirakl:#b1b51e;
-    --c-social:#5e35b1;
-    --c-meeting:#ffd700;
-    --c-overtime:#e53935;
-    --c-break:#cfd8dc;
-    --c-lunch:#b0bec5;
-    --c-absence:#b0c4de;
-    --c-shrink:#ffd166;
+    --email:#2ecc71; --mirakl:#b1b51e; --social:#5e35b1; --meeting:#ffd700;
+    --overtime:#e53935; --break:#cfd8dc; --lunch:#b0bec5; --absence:#b0c4de; --shrink:#ffd166;
   }
 
   html,body{height:100%}
-  body{margin:0;background:#eef2f7;color:var(--ink);font:14px/1.35 Inter,Roboto,Segoe UI,system-ui,Arial,sans-serif}
+  body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.35 Inter,Segoe UI,Roboto,system-ui,Arial,sans-serif}
 
   /* Top bar */
-  .topbar{background:var(--brand);color:#fff;display:flex;align-items:center;gap:10px;padding:12px 16px;box-shadow:0 2px 12px rgba(13,71,161,.18)}
+  .topbar{background:var(--brand);color:#fff;display:flex;align-items:center;gap:12px;padding:12px 16px;box-shadow:0 4px 12px rgba(13,71,161,.20)}
   .topbar h1{margin:0;font-size:16px;font-weight:800}
-  .btn{border:0;border-radius:9px;padding:7px 10px;font-weight:700;cursor:pointer}
-  .btn.ghost{background:#e9eef9;color:#0f172a}
-  .btn.action{background:var(--accent);color:#fff}
-  .seg{display:inline-flex;border:1px solid #cfd7ee;border-radius:9px;overflow:hidden}
-  .seg button{border:0;padding:7px 10px;background:#fff;cursor:pointer}
-  .seg button.active{background:#1e5fe0;color:#fff}
+  .topbar .filters{display:flex;gap:8px;flex-wrap:wrap;margin-left:12px}
+  .chip{background:#eaf1ff;color:#113a8f;border-radius:999px;padding:5px 8px;font-weight:700}
+
+  /* Inputs / buttons */
+  .in{border:1px solid var(--line);border-radius:8px;padding:7px 9px;background:#fff}
+  .btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 10px;cursor:pointer}
+  .btn.primary{background:var(--accent);color:#fff;border:0}
+  .btn.ghost{background:#fff}
+  .btn.icon{padding:6px 8px}
+  .btn[disabled]{opacity:.6;cursor:not-allowed}
 
   /* Layout */
-  .wrap{max-width:1400px;margin:14px auto;padding:0 14px;display:grid;grid-template-columns:1fr 340px;gap:14px}
-  .card{background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 24px rgba(10,30,60,.06)}
-  .card-h{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
-  .card-b{padding:12px}
+  .wrap{max-width:1500px;margin:16px auto;padding:0 14px;display:grid;grid-template-columns:1fr 320px;gap:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 22px rgba(20,30,70,.06)}
+  .card .hd{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .card .bd{padding:10px 12px}
   .muted{color:var(--muted)}
-  .input,select,input[type=date]{border:1px solid var(--line);border-radius:9px;background:#fff;padding:7px 10px}
+  .spacer{flex:1}
 
-  /* ===== HORIZONTAL SCHEDULE (Calabrio-like) ===== */
-  .h-shell{--cols: calc((var(--end-min) - var(--start-min)) / var(--slot-min));}
-  .h-head,.h-row{
-    display:grid;
-    grid-template-columns: var(--name-col) repeat(var(--cols), 1fr);
-    column-gap:0; align-items:center;
-  }
-  .h-head{position:sticky;top:0;background:#f7f9ff;border-bottom:1px solid var(--line);z-index:5}
-  .h-head div{font-size:12px;text-align:center;padding:6px 0;color:var(--muted)}
-  .h-name{position:sticky;left:0;background:#f2f6ff;border-right:1px solid var(--line);z-index:4;font-weight:800;padding:0 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .h-gridcell{height:var(--row-h);border-bottom:1px solid #e9eef6;border-right:1px solid #f2f4fb}
-  .h-gridcell.is-hour{background:linear-gradient(#0000,#0000)}
-  .h-row:nth-child(odd) .h-gridcell{background:#fafcff}
-  .h-row:hover .h-gridcell{background:#f5f8ff}
-
-  /* segment bars placed inside the row grid (grid overlay) */
-  .h-row{position:relative}
-  .segbar{
-    position:absolute; height:var(--bar-h); top:calc((var(--row-h) - var(--bar-h))/2);
-    border-radius:7px; color:#fff; font-size:11px; font-weight:800; padding:0 6px;
-    display:flex; align-items:center; gap:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-    box-shadow:0 1px 3px rgba(0,0,0,.12)
-  }
-  .segbar .t{opacity:.95;font-size:10px;font-weight:700}
-
-  /* color classes */
-  .c-email{background:var(--c-email)} .c-mirakl{background:var(--c-mirakl)} .c-social{background:var(--c-social)}
-  .c-meeting{background:var(--c-meeting);color:#222}
-  .c-overtime{background:var(--c-overtime)}
-  .c-break{background:var(--c-break);color:#213}
-  .c-lunch{background:var(--c-lunch);color:#213}
-  .c-absence{background:var(--c-absence)}
-  .c-shrink{background:var(--c-shrink);color:#213}
-
-  /* Settings / templates */
-  .tpl-row{display:grid;grid-template-columns:130px 1fr 150px 1fr;gap:8px 10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fafcff;margin-bottom:8px}
-  .tpl-row .full{grid-column:1/-1}
-  .danger{background:#ffe3e3;color:#b42318;border:1px solid #f2b8b5;border-radius:8px;padding:6px 10px;cursor:pointer}
-
-  /* Assign table (weekly selectors) */
-  .tbl-wrap{overflow:auto}
-  table{border-collapse:collapse;width:100%;min-width:860px}
-  th,td{border:1px solid var(--line);padding:6px;text-align:center;font-size:13px}
-  thead th{background:#0d47a1;color:#fff}
-  td.name{position:sticky;left:0;background:#eef4ff;font-weight:800;text-align:left}
-
-  /* Sidebar tree */
-  .tree{max-height:68vh;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:6px;background:#fff}
-  .tree details{padding:2px 2px}
-  .tree summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:800}
+  /* Schedules (right) */
+  .tree-search{display:flex;gap:8px;margin-bottom:8px}
+  .tree{border:1px solid var(--line);border-radius:10px;max-height:68vh;overflow:auto;background:#fff}
+  .tree details{padding:4px}
+  .tree summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:6px;font-weight:700}
   .tree summary::-webkit-details-marker{display:none}
-  .node{display:flex;gap:6px;align-items:center;padding:2px}
-  .chip{display:inline-flex;gap:6px;align-items:center;padding:2px 8px;border-radius:999px;background:#eef2ff;border:1px solid #d7defe;font-size:12px}
+  .twisty{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:1px solid var(--line);border-radius:4px;background:#f0f5ff}
+  .node{display:flex;align-items:center;gap:6px;padding:3px 2px}
+  .node-actions button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:2px 6px;cursor:pointer;font-size:11px}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .chip.small{padding:3px 6px;font-size:12px}
 
-  /* compact toggle (no extra CSS needed; already compact) */
+  /* Assignment table (horizontal team grid header) */
+  .table-wrap{border:1px solid var(--line);border-radius:12px;overflow:auto}
+  table{width:100%;border-collapse:collapse}
+  th,td{border:1px solid var(--line);padding:6px;text-align:center}
+  thead th{background:#f0f5ff;color:#0d47a1;font-weight:800}
+  td.name{position:sticky;left:0;background:#f7fbff;font-weight:800;text-align:left;min-width:150px}
+  td.name .sub{display:block;font-size:11px;color:var(--muted);font-weight:600}
+  .selector{width:100%;height:28px;border:1px solid var(--line);border-radius:6px;background:#fff;padding:2px 6px}
+
+  /* Compact horizontal timeline (Calabrio style) */
+  .timeline{--cols: 15; /* 06:00..20:00 -> 14 columns of hours + first column for 06:00 label */ }
+  .timeline .grid{display:grid;grid-template-columns:150px repeat(calc(var(--cols)),1fr)}
+  .hr-head{height:32px;background:#fbfdff;border-bottom:1px solid var(--line);display:grid;grid-template-columns:150px repeat(calc(var(--cols)),1fr)}
+  .hr-head .label{display:flex;align-items:center;justify-content:center;font-weight:800;color:#51607a}
+  .row{display:contents}
+  .cell{height:var(--row-height);position:relative;background:
+    repeating-linear-gradient(90deg,#0000 0 1px,#0000 1px, #0000 calc(100%/1 - 1px)),
+    linear-gradient(#fff,#fff)}
+  .cell.hour{border-left:1px solid var(--line)}
+  .row:nth-child(even) .cell{background:
+    repeating-linear-gradient(90deg,#0000 0 1px,#0000 1px, #0000 calc(100%/1 - 1px)),
+    linear-gradient(#fbfcff,#fbfcff)}
+
+  .bar{position:absolute;top:calc((var(--row-height) - var(--bar-height))/2);height:var(--bar-height);left:0;right:0;border-radius:6px;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:space-between;padding:0 6px;font-size:11px;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+  .bar .t{opacity:.9}
+  .b-email{background:var(--email)} .b-mirakl{background:var(--mirakl)}
+  .b-social{background:var(--social)} .b-meeting{background:var(--meeting);color:#333}
+  .b-overtime{background:var(--overtime)} .b-break{background:var(--break);color:#123}
+  .b-lunch{background:var(--lunch);color:#123} .b-absence{background:var(--absence)}
+  .b-shrink{background:var(--shrink);color:#123}
+
+  .legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--line);border-radius:999px;background:#fff}
+  .dot{width:10px;height:10px;border-radius:50%}
+
+  /* Small utilities */
+  .row-empty{color:var(--muted);font-style:italic}
+  .note{background:#fff8d7;border:1px solid #ffe48f;color:#8a6d3b;padding:8px;border-radius:10px}
+  .danger{background:#ffe7e7;border:1px solid #ffb0b0;color:#902d2d}
+  .ok{background:#e7f6ec;border:1px solid #b4e2c5;color:#155c2d}
 </style>
 </head>
 <body>
   <div class="topbar">
     <h1>Professional Team Rota System</h1>
-    <div class="seg" style="margin-left:auto">
-      <button id="modeDay" class="active">Day</button>
-      <button id="modeWeek">Week</button>
+    <div class="filters">
+      <select id="siteFilter" class="in"></select>
+      <select id="leaderFilter" class="in"></select>
+      <select id="viewFilter" class="in"></select>
+      <input type="date" id="weekStart" class="in" />
+      <button class="btn icon" id="prevWeek">◀</button>
+      <button class="btn icon" id="nextWeek">▶</button>
+      <button class="btn" id="btnGenerate">Generate</button>
+      <button class="btn primary" id="btnPublish">Publish</button>
     </div>
-    <button id="btnPrint" class="btn ghost">🖨️ Print</button>
+    <span class="spacer"></span>
+    <span class="chip" id="rangeLabel"></span>
   </div>
 
   <div class="wrap">
-    <!-- MAIN COLUMN -->
-    <div style="display:flex;flex-direction:column;gap:14px">
-
-      <!-- Controls -->
-      <div class="card">
-        <div class="card-b" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
-          <label>Week start</label>
-          <input type="date" id="weekStart" class="input"/>
-
-          <label>Day</label>
-          <select id="daySelect" class="input">
-            <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
-            <option>Thursday</option><option>Friday</option><option>Saturday</option><option>Sunday</option>
-          </select>
-
-          <label>View</label>
-          <select id="advisorSelect" class="input"></select>
-
-          <button id="btnGenerate" class="btn action">Generate</button>
-          <button id="btnPublish" class="btn ghost">Publish selected</button>
-
-          <span id="rangeLabel" class="muted" style="margin-left:auto"></span>
+    <!-- LEFT: Team grid + legend -->
+    <div class="card" id="teamCard">
+      <div class="hd">
+        <strong id="teamTitle">Team Week</strong>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn" id="btnSaveJSON">💾 Save JSON</button>
+          <input type="file" id="file" accept=".json" style="display:none" />
+          <button class="btn" id="btnLoadJSON">📂 Load JSON</button>
+          <button class="btn ghost" id="btnPrint">🖨️ Print</button>
         </div>
       </div>
+      <div class="bd">
+        <!-- Compact horizontal grid -->
+        <div id="hGrid"></div>
 
-      <!-- Horizontal DAY view -->
-      <div class="card h-shell" id="hCard" style="display:none">
-        <div class="card-b" style="padding-top:6px">
-          <div class="h-head" id="hHead"></div>
-          <div id="hBody"></div>
-        </div>
-      </div>
-
-      <!-- Weekly assignment table -->
-      <div class="card" id="assignCard">
-        <div class="card-h"><strong>Master Assignment (Team)</strong></div>
-        <div class="card-b">
-          <div class="tbl-wrap">
-            <table id="assignTable">
-              <thead>
-                <tr><th rowspan="2">Advisor</th><th colspan="7">Select Shift Template (per day)</th></tr>
-                <tr id="dateHeaders"></tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-          <div class="muted" style="margin-top:6px">Tip: pick a Team Leader or individual advisors from the sidebar to populate this table.</div>
-        </div>
-      </div>
-
-      <!-- Templates -->
-      <div class="card">
-        <div class="card-h"><strong>Settings / Templates</strong>
-          <div style="display:flex;gap:8px">
-            <button id="btnAddTemplate" class="btn ghost">+ Add Template</button>
-            <button id="btnDefaults" class="btn ghost">↺ Load Sample Templates</button>
-          </div>
-        </div>
-        <div class="card-b">
-          <div id="tplEditor"></div>
+        <div class="legend">
+          <span class="pill"><span class="dot" style="background:var(--email)"></span> Email</span>
+          <span class="pill"><span class="dot" style="background:var(--mirakl)"></span> Mirakl</span>
+          <span class="pill"><span class="dot" style="background:var(--social)"></span> Social</span>
+          <span class="pill"><span class="dot" style="background:var(--meeting)"></span> Meeting</span>
+          <span class="pill"><span class="dot" style="background:var(--overtime)"></span> Overtime</span>
+          <span class="pill"><span class="dot" style="background:var(--break)"></span> Break</span>
+          <span class="pill"><span class="dot" style="background:var(--lunch)"></span> Lunch</span>
         </div>
       </div>
     </div>
 
-    <!-- SIDEBAR -->
+    <!-- RIGHT: Schedules tree -->
     <div class="card">
-      <div class="card-h"><strong>Schedules</strong></div>
-      <div class="card-b">
-        <div style="display:flex;gap:8px;margin-bottom:8px">
-          <input id="treeSearch" class="input" placeholder="Search sites/leaders/advisors…" style="flex:1">
-          <button id="btnClearSel" class="btn ghost">Clear</button>
+      <div class="hd"><strong>Schedules</strong></div>
+      <div class="bd">
+        <div class="tree-search">
+          <input id="treeSearch" class="in" placeholder="Search leaders/advisors…" style="flex:1" />
+          <button id="btnClearSel" class="btn">Clear</button>
         </div>
-        <div id="tree" class="tree"></div>
-        <div id="activeChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
+        <div class="tree" id="tree"></div>
+        <div class="chips" id="activeChips"></div>
+        <div id="panelNote" class="note" style="margin-top:10px">Tip: select a Leader to include their whole team, or tick names individually. “View ▸ Team (Selected)” shows only those rows.</div>
       </div>
     </div>
   </div>
 <script>
-/* ========= Supabase config ========= */
+/* =============================
+   SUPABASE CONFIG
+============================= */
 const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ========= State ========= */
+/* =============================
+   STATE
+============================= */
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-let ORG = { sites:{} };
-let ADVISORS = [];                    // [{id,name,leader_id,email}]
-let ADVISOR_BY_NAME = new Map();      // name -> id
-let ADVISOR_BY_ID = new Map();        // id -> name
-let selectedNames = new Set();        // names selected in sidebar
-let TEMPLATES = {};                   // name -> template row
+let ORG = { sites:{} };                 // sites -> leaders -> advisors
+let ADVISORS = [];                      // flat list
+let ADVISOR_BY_ID = new Map();
+let TEMPLATES = {};                     // { name: {start_time, finish_time, ...} }
+let ROTAS = new Map();                  // key: `${advisorId}|${weekISO}` -> { Monday:{segments:[]}, ... }
+let SELECTED = new Set();               // set of advisor names (for "Team (Selected)")
+let monday = toMonday(new Date());
 
-/* ========= Helpers ========= */
-const $ = (s)=>document.querySelector(s);
-const $$ = (s)=>Array.from(document.querySelectorAll(s));
-const pad = (n)=>String(n).padStart(2,'0');
-const toMin = (t)=>{ if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; };
-const fromMin = (m)=> `${pad(Math.floor(m/60))}:${pad(m%60)}`;
-function mondayOf(d){ const x=new Date(d); const wd=x.getDay(); const diff=(wd===0?-6:1)-wd; x.setDate(x.getDate()+diff); x.setHours(0,0,0,0); return x; }
-function fmtISO(d){ return d.toISOString().slice(0,10); }
+/* =============================
+   UTILS
+============================= */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const pad = n => String(n).padStart(2,'0');
+const toISO = d => d.toISOString().slice(0,10);
+function toMonday(d){
+  const x=new Date(d); const w=x.getDay(); const delta=(w===0?-6:1)-w; x.setDate(x.getDate()+delta); x.setHours(0,0,0,0); return x;
+}
 function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function hhmm2min(t){ if(!t) return null; const [h,m] = t.split(':').map(Number); return h*60+m; }
+function min2hhmm(m){ return `${pad(Math.floor(m/60))}:${pad(m%60)}`; }
+function between(n,a,b){ return Math.max(a, Math.min(b, n)); }
+function dayKey(d){ return DAYS[d]; }
 
-const START = +getComputedStyle(document.documentElement).getPropertyValue('--start-min');  // minutes
-const END   = +getComputedStyle(document.documentElement).getPropertyValue('--end-min');
-const SLOT  = +getComputedStyle(document.documentElement).getPropertyValue('--slot-min');
-const COLS  = Math.round((END-START)/SLOT);
-
-/* ========= Code → class + label ========= */
-function classFor(code){
-  const k = (code||'').toLowerCase();
-  if (k.includes('lunch')) return 'c-lunch';
-  if (k.includes('break')) return 'c-break';
-  if (k.includes('overtime')) return 'c-overtime';
-  if (k.includes('meeting')||k.includes('team')) return 'c-meeting';
-  if (k.includes('mirakl')) return 'c-mirakl';
-  if (k.includes('social')||k.includes('plt')) return 'c-social';
-  if (k.includes('email')||k.includes('deb')) return 'c-email';
-  if (['al','sick','rdo','maternity','lts'].some(w=>k.includes(w))) return 'c-absence';
-  if (['121','atl','coaching','huddle','iti','project','training'].some(w=>k.includes(w))) return 'c-shrink';
-  return 'c-email';
-}
-
-/* ========= Templates UI ========= */
-function tplRow(t){
-  return `<div class="tpl-row" data-name="${t.name}">
-    <label>Name</label><input data-f="name" value="${t.name}">
-    <label>Code</label>
-      <select data-f="work_code">
-        ${['DEB Email','Mirakl','PLT Social','Meeting','Overtime','Break','Lunch'].map(c=>`<option ${t.work_code===c?'selected':''}>${c}</option>`).join('')}
-      </select>
-    <label>Start–Finish</label>
-      <div style="display:flex;gap:6px"><input data-f="start_time" type="time" value="${t.start_time||''}"><input data-f="finish_time" type="time" value="${t.finish_time||''}"></div>
-    <label>Breaks</label>
-      <div style="display:flex;gap:6px"><input data-f="break1" type="time" value="${t.break1||''}"><input data-f="lunch" type="time" value="${t.lunch||''}"><input data-f="break2" type="time" value="${t.break2||''}"></div>
-    <div class="full" style="display:flex;justify-content:flex-end"><button class="danger" data-del>Delete</button></div>
-  </div>`;
-}
-async function loadTemplates(){
-  const { data } = await sb.from('templates').select('*').order('name');
-  TEMPLATES = {};
-  (data||[]).forEach(t=> TEMPLATES[t.name] = t);
-  renderTplEditor();
-}
-function renderTplEditor(){
-  const ed = $('#tplEditor');
-  const arr = Object.values(TEMPLATES).sort((a,b)=>a.name.localeCompare(b.name));
-  ed.innerHTML = arr.length ? arr.map(tplRow).join('') : '<div class="muted">No templates yet.</div>';
-  // wire edits
-  $$('#tplEditor .tpl-row').forEach(row=>{
-    const orig = row.dataset.name;
-    row.querySelectorAll('[data-f]').forEach(inp=>{
-      inp.addEventListener('change', async ()=>{
-        let patch = Object.assign({}, TEMPLATES[orig]);
-        patch[inp.dataset.f] = inp.value || null;
-        if(inp.dataset.f==='name'){
-          // rename
-          await sb.from('templates').delete().eq('name', orig);
-          await sb.from('templates').insert([{
-            name:patch.name, work_code:patch.work_code, start_time:patch.start_time, finish_time:patch.finish_time,
-            break1:patch.break1, lunch:patch.lunch, break2:patch.break2
-          }]);
-        }else{
-          await sb.from('templates').update({
-            work_code:patch.work_code, start_time:patch.start_time, finish_time:patch.finish_time,
-            break1:patch.break1, lunch:patch.lunch, break2:patch.break2
-          }).eq('name', orig);
-        }
-        loadTemplates();
-      });
-    });
-    row.querySelector('[data-del]').onclick = async()=>{
-      if(!confirm(`Delete template "${orig}"?`)) return;
-      await sb.from('templates').delete().eq('name', orig);
-      loadTemplates();
-    };
-  });
-}
-$('#btnAddTemplate').onclick = async()=>{
-  const n = 'Shift ' + (Object.keys(TEMPLATES).length+1);
-  await sb.from('templates').insert([{name:n,work_code:'DEB Email',start_time:'07:00',finish_time:'16:00',break1:'09:15',lunch:'12:00',break2:'15:15'}]);
-  loadTemplates();
-};
-$('#btnDefaults').onclick = async()=>{
-  const defs = [
-    {name:'Early',  work_code:'DEB Email', start_time:'07:00', finish_time:'16:00', break1:'09:15', lunch:'12:00', break2:'15:15'},
-    {name:'Middle', work_code:'Mirakl',    start_time:'11:00', finish_time:'20:00', break1:'11:30', lunch:'15:30', break2:'17:45'},
-    {name:'Late',   work_code:'PLT Social',start_time:'12:00', finish_time:'21:00', break1:'13:15', lunch:'17:00', break2:'19:15'},
-  ];
-  for(const t of defs) await sb.from('templates').upsert(t, {onConflict:'name'});
-  loadTemplates();
-};
-
-/* ========= Org (sites/leaders/advisors) ========= */
+/* =============================
+   LOAD ORG + TEMPLATES
+============================= */
 async function loadOrg(){
-  const [sites, leaders, advisors] = await Promise.all([
+  const [sitesRes, leadersRes, advisorsRes] = await Promise.all([
     sb.from('sites').select('*').order('name'),
     sb.from('leaders').select('*'),
     sb.from('advisors').select('*')
   ]);
 
   ORG = { sites:{} };
-  (sites.data||[]).forEach(s=> ORG.sites[s.name] = {id:s.id, leaders:{}});
-  (leaders.data||[]).forEach(l=>{
-    const site = Object.values(ORG.sites).find(s=>s.id===l.site_id);
-    if(site) site.leaders[l.name] = {id:l.id, advisors:[]};
-  });
-  ADVISORS = (advisors.data||[]);
-  ADVISORS.forEach(a=>{
-    const leader = Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===a.leader_id);
-    if(leader) leader.advisors.push({id:a.id,name:a.name,email:a.email||''});
-  });
-
-  ADVISOR_BY_NAME = new Map(ADVISORS.map(a=>[a.name,a.id]));
-  ADVISOR_BY_ID   = new Map(ADVISORS.map(a=>[a.id,a.name]));
-}
-
-/* ========= Sidebar tree ========= */
-function renderTree(){
-  const q = $('#treeSearch').value.trim().toLowerCase();
-  const t = $('#tree');
-  const blocks = Object.entries(ORG.sites).sort((a,b)=>a[0].localeCompare(b[0])).map(([sn,so])=>{
-    const leaders = Object.entries(so.leaders).sort((a,b)=>a[0].localeCompare(b[0])).map(([ln,lo])=>{
-      const advs = (lo.advisors||[]).filter(a=>!q || a.name.toLowerCase().includes(q) || ln.toLowerCase().includes(q) || sn.toLowerCase().includes(q))
-        .sort((a,b)=>a.name.localeCompare(b.name))
-        .map(a=>`<div class="node"><input type="checkbox" data-adv="${a.name}" ${selectedNames.has(a.name)?'checked':''}>${a.name}</div>`).join('');
-      if(!advs && q) return '';
-      return `<details open><summary>👤 ${ln}</summary>${advs}</details>`;
-    }).join('');
-    if(!leaders) return '';
-    return `<details open><summary>📁 ${sn}</summary>${leaders}</details>`;
-  }).join('');
-  t.innerHTML = blocks || '<div class="muted">No sites/leaders/advisors yet.</div>';
-
-  $$('#tree [data-adv]').forEach(cb=>{
-    cb.onchange = ()=>{ const n=cb.dataset.adv; cb.checked?selectedNames.add(n):selectedNames.delete(n); refreshChips(); populateAssignTable(); renderDayGrid(); };
-  });
-}
-function refreshChips(){
-  const box = $('#activeChips'); box.innerHTML='';
-  [...selectedNames].sort((a,b)=>a.localeCompare(b)).forEach(n=>{
-    const chip = document.createElement('span'); chip.className='chip'; chip.textContent=n;
-    chip.onclick=()=>{ selectedNames.delete(n); renderTree(); refreshChips(); populateAssignTable(); renderDayGrid(); };
-    box.appendChild(chip);
-  });
-}
-$('#treeSearch').addEventListener('input', renderTree);
-$('#btnClearSel').onclick = ()=>{ selectedNames.clear(); renderTree(); refreshChips(); populateAssignTable(); renderDayGrid(); };
-
-/* ========= Advisor dropdown (quick jump) ========= */
-function rebuildAdvisorDropdown(){
-  const sel = $('#advisorSelect');
-  const all = ADVISORS.slice().sort((a,b)=>a.name.localeCompare(b.name));
-  sel.innerHTML = `<option value="__TEAM_SELECTED__">Team (Selected)</option>
-                   <option value="__TEAM_ALL__">Team (All)</option>
-                   <optgroup label="Advisors">
-                     ${all.map(a=>`<option value="${a.id}">${a.name}</option>`).join('')}
-                   </optgroup>`;
-}
-
-/* ========= Assignment (weekly) ========= */
-function populateAssignTable(){
-  const head = $('#dateHeaders'), body = $('#assignTable tbody');
-  head.innerHTML = DAYS.map(d=>`<th>${d.slice(0,3)}</th>`).join('');
-  const names = [...selectedNames].sort((a,b)=>a.localeCompare(b));
-  if(names.length===0){
-    body.innerHTML = `<tr><td colspan="8" class="muted" style="text-align:left;padding:8px">Select advisors in the sidebar to populate this table.</td></tr>`;
-    return;
-  }
-  const opts = Object.keys(TEMPLATES).sort().map(n=>`<option value="${n}">${n}</option>`).join('');
-  body.innerHTML = '';
-  names.forEach(n=>{
-    const tr=document.createElement('tr');
-    const tdN=document.createElement('td'); tdN.className='name'; tdN.textContent=n; tr.appendChild(tdN);
-    DAYS.forEach(day=>{
-      const td=document.createElement('td');
-      const sel=document.createElement('select');
-      sel.innerHTML = `<option value="">—</option>${opts}`;
-      sel.dataset.name=n; sel.dataset.day=day;
-      sel.onchange = ()=> saveDraftCell(sel);
-      td.appendChild(sel); tr.appendChild(td);
-    });
-    body.appendChild(tr);
-  });
-}
-async function saveDraftCell(sel){
-  const name=sel.dataset.name, day=sel.dataset.day, tpl=sel.value||null;
-  const aid = ADVISOR_BY_NAME.get(name); if(!aid) return;
-  const ws = $('#weekStart').value;
-  // store simple draft mapping in 'rotas' table under data.{Day} = template-name (string)
-  const { data: existing } = await sb.from('rotas').select('id,data').eq('advisor_id',aid).eq('week_start',ws).maybeSingle();
-  let dataObj = existing?.data || {};
-  dataObj[day] = tpl;
-  if(existing){
-    await sb.from('rotas').update({data:dataObj}).eq('id', existing.id);
-  }else{
-    await sb.from('rotas').insert([{advisor_id:aid,week_start:ws,data:dataObj}]);
-  }
-}
-</script>
-<script>
-/* ========= Build segments from a template name ========= */
-function segmentsFromTemplate(tname){
-  const t = TEMPLATES[tname]; if(!t) return [];
-  const segs=[];
-  const s = toMin(t.start_time), e = toMin(t.finish_time);
-  if(s!=null && e!=null && e>s){
-    segs.push({code:t.work_code||'Work', start:fromMin(s), end:fromMin(e)});
-  }
-  // Insert breaks/lunch as separate color bars overlayed next line (we’ll stack vertically if present)
-  [['break1','Break'],['lunch','Lunch'],['break2','Break']].forEach(([k,label])=>{
-    const m = toMin(t[k]); if(m!=null) segs.push({code:label, start:fromMin(m), end:fromMin(m+ (label==='Lunch'?30:15))});
-  });
-  return segs;
-}
-/* Published JSON shape producer for a whole week */
-function weekJsonFromDraft(draft){
-  // draft = { Monday:"Early", ... }  ->  { Monday:{segments:[...]}, ... }
-  const out={};
-  DAYS.forEach(d=>{
-    const tpl = draft?.[d]||null;
-    if(!tpl) return;
-    out[d] = { segments: segmentsFromTemplate(tpl) };
-  });
-  return out;
-}
-
-/* ========= Horizontal DAY view renderer ========= */
-function renderDayGrid(){
-  const card = $('#hCard');
-  const day = $('#daySelect').value;
-  const ws = $('#weekStart').value;
-  const names = [...selectedNames].sort((a,b)=>a.localeCompare(b));
-  if(names.length===0){ card.style.display='none'; return; }
-  card.style.display='';
-
-  // Build sticky hour header
-  const head = $('#hHead');
-  head.innerHTML = ''; head.style.gridTemplateColumns = `var(--name-col) repeat(${COLS}, 1fr)`;
-  head.insertAdjacentHTML('beforeend', `<div class="h-name" style="text-align:left;padding:4px 10px;font-weight:800">Advisor</div>`);
-  for(let m=START; m<=END; m+=60){
-    const colStart = Math.round((m-START)/SLOT)+1;              // in the repeat() area
-    const span = 60/SLOT;
-    const lab = `${pad(Math.floor(m/60))}:00`;
-    const cell = document.createElement('div');
-    cell.style.gridColumn = `${colStart+1} / span ${span}`;
-    cell.textContent = lab;
-    head.appendChild(cell);
-  }
-
-  // Body rows
-  const body = $('#hBody'); body.innerHTML='';
-
-  const buildRow = (name, segs)=>{
-    const row = document.createElement('div');
-    row.className = 'h-row';
-    row.style.gridTemplateColumns = `var(--name-col) repeat(${COLS}, 1fr)`;
-
-    // name col
-    const nameCell = document.createElement('div');
-    nameCell.className = 'h-name';
-    nameCell.style.height = 'var(--row-h)';
-    nameCell.textContent = name;
-    row.appendChild(nameCell);
-
-    // empty grid cells (for subtle lines)
-    for(let i=0;i<COLS;i++){
-      const c = document.createElement('div');
-      c.className = 'h-gridcell';
-      row.appendChild(c);
+  (sitesRes.data||[]).forEach(s=> ORG.sites[s.name] = { id:s.id, leaders:{} });
+  (leadersRes.data||[]).forEach(l=>{
+    for(const site of Object.values(ORG.sites)){
+      if(site.id===l.site_id){ site.leaders[l.name] = { id:l.id, advisors:[] }; break; }
     }
+  });
+  ADVISORS = (advisorsRes.data||[]).map(a=>({id:a.id,name:a.name,leader_id:a.leader_id,email:a.email||''}));
+  ADVISOR_BY_ID = new Map(ADVISORS.map(a=>[a.id,a.name]));
+  for(const a of ADVISORS){
+    const leaderNode = Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===a.leader_id);
+    if(leaderNode) leaderNode.advisors.push({id:a.id,name:a.name});
+  }
 
-    // overlay segments as absolute bars (compute left/width via percentage across the repeat() area)
-    const total = (END-START); // minutes
-    segs.forEach(s=>{
-      const a = toMin(s.start), b = toMin(s.end);
-      if(a==null||b==null||b<=a) return;
-      const leftPct = ((a-START)/total)*100;
-      const widthPct = ((b-a)/total)*100;
-      const bar = document.createElement('div');
-      bar.className = `segbar ${classFor(s.code)}`;
-      bar.style.left = `calc(var(--name-col) + ${leftPct}%)`;
-      bar.style.width = `calc(${widthPct}% - 6px)`;
-      bar.innerHTML = `${(s.code||'').toUpperCase()} <span class="t">${s.start}–${s.end}</span>`;
-      row.appendChild(bar);
-    });
-
-    return row;
-  };
-
-  body.appendChild(document.createElement('div')); // nothing (the header already exists)
-
-  // fetch drafts (rotas) and show day from chosen week
-  const ids = names.map(n=>ADVISOR_BY_NAME.get(n)).filter(Boolean);
-  if(ids.length===0){ return; }
-
-  sb.from('rotas').select('advisor_id,data').in('advisor_id',ids).eq('week_start',ws).then(({data})=>{
-    names.forEach(n=>{
-      const id = ADVISOR_BY_NAME.get(n);
-      const draft = (data||[]).find(r=>r.advisor_id===id)?.data || {};
-      const tplName = draft?.[day] || null;
-      const segs = tplName ? segmentsFromTemplate(tplName) : [];
-      body.appendChild(buildRow(n, segs));
-    });
+  // Templates
+  const tRes = await sb.from('templates').select('*');
+  TEMPLATES = {};
+  (tRes.data||[]).forEach(t=>{
+    TEMPLATES[t.name] = {
+      name:t.name,
+      work_code:t.work_code || 'Admin',
+      start_time:(t.start_time||'').slice(0,5) || '',
+      finish_time:(t.finish_time||'').slice(0,5) || '',
+      break1:(t.break1||'')?.slice(0,5)||'',
+      lunch:(t.lunch||'')?.slice(0,5)||'',
+      break2:(t.break2||'')?.slice(0,5)||'',
+    };
   });
 }
 
-/* ========= Publish selected ========= */
-async function publishSelected(){
-  const ws = $('#weekStart').value;
-  const names = [...selectedNames];
-  if(names.length===0) return alert('Select advisors in the sidebar first.');
-  if(!confirm(`Publish ${names.length} advisor rota(s) for week starting ${ws}?`)) return;
+/* =============================
+   FILTERS (top bar)
+============================= */
+function rebuildFilters(){
+  const siteSel = $('#siteFilter');
+  const leaderSel = $('#leaderFilter');
+  const viewSel = $('#viewFilter');
 
-  // Load drafts
-  const ids = names.map(n=>ADVISOR_BY_NAME.get(n)).filter(Boolean);
-  const { data: drafts } = await sb.from('rotas').select('advisor_id,data').in('advisor_id',ids).eq('week_start',ws);
+  // Sites
+  const sites = Object.keys(ORG.sites).sort();
+  siteSel.innerHTML = `<option value="all">All sites</option>` + sites.map(n=>`<option value="${n}">${n}</option>`).join('');
 
-  // Upsert published snapshots
-  const rows = (drafts||[]).map(r=>({
-    advisor_id: r.advisor_id,
-    week_start: ws,
-    data: weekJsonFromDraft(r.data),
-    published_at: new Date().toISOString()
-  }));
-  if(rows.length===0) return alert('Nothing to publish for the selected advisors.');
-  const { error } = await sb.from('rotas_published').upsert(rows, { onConflict:['advisor_id','week_start'] });
-  if(error){ alert('Publish failed: '+error.message); return; }
-  alert('Published ✔');
+  // Leaders (all across sites)
+  const leaders = Object.entries(ORG.sites)
+    .flatMap(([sn,so])=>Object.entries(so.leaders).map(([ln,lo])=>({name:ln,id:lo.id,site:sn})))
+    .sort((a,b)=>a.name.localeCompare(b.name));
+
+  leaderSel.innerHTML = `<option value="all">All leaders</option>` +
+    leaders.map(l=>`<option value="${l.id}">${l.name} — ${l.site}</option>`).join('');
+
+  // View
+  viewSel.innerHTML = `
+    <option value="TEAM_ALL">Team (All)</option>
+    <option value="TEAM_SELECTED">Team (Selected)</option>
+  `;
+
+  // default labels / values
+  $('#weekStart').value = toISO(monday);
+  $('#rangeLabel').textContent = labelForWeek(monday);
 }
-
-/* ========= Controls + wiring ========= */
-$('#btnPrint').onclick = ()=> window.print();
-$('#btnGenerate').onclick = ()=>{ populateAssignTable(); renderDayGrid(); };
-$('#btnPublish').onclick = publishSelected;
-
-$('#modeDay').onclick = ()=>{
-  $('#modeDay').classList.add('active'); $('#modeWeek').classList.remove('active');
-  $('#hCard').style.display=''; $('#assignCard').style.display='none';
-  renderDayGrid();
-};
-$('#modeWeek').onclick = ()=>{
-  $('#modeWeek').classList.add('active'); $('#modeDay').classList.remove('active');
-  $('#assignCard').style.display=''; $('#hCard').style.display='none';
-};
-
-$('#daySelect').onchange = renderDayGrid;
-$('#weekStart').onchange = ()=>{ updateRangeLabel(); renderDayGrid(); };
-
-function updateRangeLabel(){
-  const m = new Date($('#weekStart').value);
+function labelForWeek(m){
   const end = addDays(m,6);
-  $('#rangeLabel').textContent = `${m.toLocaleDateString('en-GB',{day:'2-digit',month:'short'})} – ${end.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}`;
+  const fmt = d => d.toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
+  return `${fmt(m)} – ${fmt(end)} (${toISO(m)})`;
 }
 
-/* ========= Init ========= */
-(async function init(){
-  // default week start = current Monday
-  const m = mondayOf(new Date());
-  $('#weekStart').value = fmtISO(m);
-  updateRangeLabel();
+/* =============================
+   SCHEDULES TREE (right)
+============================= */
+function rebuildTree(){
+  const t = $('#tree');
+  const q = ($('#treeSearch').value||'').trim().toLowerCase();
 
-  await Promise.all([loadOrg(), loadTemplates()]);
-  renderTree(); refreshChips();
-  rebuildAdvisorDropdown();
-  populateAssignTable();
-  renderDayGrid();
-})();
+  function advRow(a){
+    const checked = SELECTED.has(a.name) ? 'checked' : '';
+    return `<div class="node">
+      <input type="checkbox" data-adv="${a.id}" data-name="${a.name}" ${checked}/>
+      <span>${a.name}</span>
+      <span class="muted" style="margin-left:auto;font-size:11px">${a.id.slice(0,8)}</span>
+    </div>`;
+  }
+
+  function leaderBlock(ln, lo){
+    const team = (lo.advisors||[]).sort((a,b)=>a.name.localeCompare(b.name));
+    const showLeader = !q || ln.toLowerCase().includes(q) || team.some(a=>a.name.toLowerCase().includes(q));
+    if(!showLeader) return '';
+    const allSelected = team.length && team.every(a=>SELECTED.has(a.name));
+    return `<details open>
+      <summary><span class="twisty">−</span>
+        <label style="display:flex;gap:6px;align-items:center;margin-left:4px">
+          <input type="checkbox" data-leader="${lo.id}" ${allSelected?'checked':''}/>
+          <strong>${ln}</strong> <span class="muted">(${team.length})</span>
+        </label>
+      </summary>
+      ${team.map(advRow).join('')}
+    </details>`;
+  }
+
+  function siteBlock(sn, so){
+    const leaf = Object.entries(so.leaders).map(([ln,lo])=>leaderBlock(ln,lo)).filter(Boolean).join('');
+    if(!leaf) return '';
+    return `<details open>
+      <summary><span class="twisty">−</span><strong>📁 ${sn}</strong></summary>
+      ${leaf}
+    </details>`;
+  }
+
+  t.innerHTML = Object.entries(ORG.sites).sort((a,b)=>a[0].localeCompare(b[0])).map(([sn,so])=>siteBlock(sn,so)).join('') || `<div class="muted">No data.</div>`;
+
+  // Toggle icons
+  $$('#tree details').forEach(d=>{
+    const icon = d.querySelector('.twisty');
+    const upd = ()=> icon.textContent = d.open ? '−' : '+';
+    d.addEventListener('toggle',upd); upd();
+  });
+
+  // Leader select-all
+  $$('#tree [data-leader]').forEach(cb=>{
+    cb.onchange = ()=>{
+      const id = cb.dataset.leader;
+      const leader = Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===id);
+      (leader?.advisors||[]).forEach(a=> cb.checked ? SELECTED.add(a.name) : SELECTED.delete(a.name));
+      refreshChips();
+      renderGrid();
+      rebuildTree(); // refresh check states
+    };
+  });
+
+  // Advisor ticks
+  $$('#tree [data-adv]').forEach(cb=>{
+    cb.onchange = ()=>{ const n=cb.dataset.name; cb.checked?SELECTED.add(n):SELECTED.delete(n); refreshChips(); renderGrid(); };
+  });
+}
+
+function refreshChips(){
+  const box = $('#activeChips');
+  const items = [...SELECTED].sort();
+  box.innerHTML = items.map(n=>`<span class="chip small">${n} <button data-x="${n}" class="btn icon" title="remove">✕</button></span>`).join('');
+  $$('#activeChips [data-x]').forEach(b=> b.onclick = ()=>{ SELECTED.delete(b.dataset.x); refreshChips(); renderGrid(); rebuildTree(); });
+}
+
+/* =============================
+   DATA — GET ROTAS (DRAFT) + PUBLISHED SNAPSHOT
+============================= */
+async function loadRotasFor(advisorIds, weekISO){
+  if(!advisorIds.length) return;
+  const { data, error } = await sb
+    .from('rotas')
+    .select('advisor_id, week_start, data')
+    .in('advisor_id', advisorIds)
+    .eq('week_start', weekISO);
+  if(error){ console.warn(error); return; }
+  for(const r of data||[]){
+    ROTAS.set(`${r.advisor_id}|${weekISO}`, r.data || {});
+  }
+}
+/* =============================
+   RENDER — CALABRIO STYLE GRID
+============================= */
+function codeToClass(code){
+  const k=(code||'').toLowerCase();
+  if(k.includes('email')) return 'b-email';
+  if(k.includes('mirakl')) return 'b-mirakl';
+  if(k.includes('social')) return 'b-social';
+  if(k.includes('meeting')||k.includes('coach')) return 'b-meeting';
+  if(k.includes('overtime')) return 'b-overtime';
+  if(k.includes('break')) return 'b-break';
+  if(k.includes('lunch')) return 'b-lunch';
+  if(['al','sick','rdo','maternity','lts'].some(w=>k.includes(w))) return 'b-absence';
+  if(['121','atl','huddle','iti','projects','team meeting','training'].some(w=>k.includes(w))) return 'b-shrink';
+  return 'b-email';
+}
+
+function renderGrid(){
+  const weekISO = toISO(monday);
+  const siteVal = $('#siteFilter').value;
+  const leaderVal = $('#leaderFilter').value;
+  const viewVal = $('#viewFilter').value;
+
+  // Who to show?
+  let advisors = ADVISORS;
+  if(siteVal!=='all'){
+    const site = ORG.sites[siteVal];
+    const leaderIds = Object.values(site?.leaders||{}).map(l=>l.id);
+    advisors = advisors.filter(a=> leaderIds.includes(a.leader_id));
+  }
+  if(leaderVal!=='all'){
+    advisors = advisors.filter(a=> a.leader_id===leaderVal);
+  }
+  advisors = advisors.sort((a,b)=>a.name.localeCompare(b.name));
+
+  if(viewVal==='TEAM_SELECTED'){
+    const wanted = new Set(SELECTED);
+    advisors = advisors.filter(a=> wanted.has(a.name));
+  }
+
+  // Build hourly head 06..20 (labels at each full hour)
+  const start = +getComputedStyle(document.documentElement).getPropertyValue('--start') || 6;
+  const end   = +getComputedStyle(document.documentElement).getPropertyValue('--end') || 20;
+  const cols = end-start;
+  const h = $('#hGrid');
+  h.innerHTML = `
+    <div class="hr-head" style="--cols:${cols}">
+      <div class="label" style="justify-content:flex-start;padding-left:10px">Name</div>
+      ${Array.from({length:cols+1}, (_,i)=> `<div class="label">${pad(start+i)}:00</div>`).join('')}
+    </div>
+    <div class="timeline">
+      <div class="grid" style="--cols:${cols}">
+        ${advisors.map(a=> renderRow(a, weekISO, start, end)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function renderRow(a, weekISO, startHour, endHour){
+  const key = `${a.id}|${weekISO}`;
+  const json = ROTAS.get(key) || {};
+  const minutesPerHour = 60;
+  const totalMinutes = (endHour-startHour)*minutesPerHour;
+
+  // Build 1 name cell + N hour cells as grid
+  const nameHTML = `<div class="cell name" style="grid-column:1/2"><strong>${a.name}</strong><span class="sub">${a.id.slice(0,8)}</span></div>`;
+  const hoursHTML = Array.from({length:(endHour-startHour)+1}, ()=> `<div class="cell hour"></div>`).join('');
+
+  // Bars (segments) – we place them within a single overlay cell spanning the hour range
+  const overlay = `<div class="cell" style="grid-column:2 / ${2+(endHour-startHour)+1}">
+    ${DAYS.map((day,idx)=> {
+      const d = json[day]?.segments || [];
+      if(!d.length) return '';
+      return d.map(seg=>{
+        const s = between(hhmm2min(seg.start||'07:00') - startHour*60, 0, totalMinutes);
+        const e = between(hhmm2min(seg.end||'07:10')   - startHour*60, 0, totalMinutes);
+        const left = (s/totalMinutes)*100;
+        const width = Math.max(1, (e-s)/totalMinutes*100);
+        return `<div class="bar ${codeToClass(seg.code)}" style="top:calc(${idx}*var(--row-height) + (var(--row-height) - var(--bar-height))/2); left:${left}%; width:${width}%">
+          <span>${(seg.code||'').toUpperCase()}</span><span class="t">${(seg.start||'')} – ${(seg.end||'')}</span>
+        </div>`;
+      }).join('');
+    }).join('')}
+  </div>`;
+
+  // One "row" is 1 name cell + all hourly cells + overlay bars
+  const hourlyCells = Array.from({length:(endHour-startHour)+1}, ()=> `<div class="cell hour"></div>`).join('');
+  return `
+    <div class="row" style="grid-template-columns:150px repeat(${(endHour-startHour)+1},1fr)">
+      ${nameHTML}
+      ${hourlyCells}
+      ${overlay}
+    </div>
+  `;
+}
+
+/* =============================
+   PUBLISH — from rotas → rotas_published
+   (keeps just the selected / filtered advisors for this week)
+============================= */
+async function publishCurrent(){
+  const weekISO = toISO(monday);
+  const siteVal = $('#siteFilter').value;
+  const leaderVal = $('#leaderFilter').value;
+  const viewVal = $('#viewFilter').value;
+
+  let advisors = ADVISORS;
+  if(siteVal!=='all'){
+    const site = ORG.sites[siteVal];
+    const leaderIds = Object.values(site?.leaders||{}).map(l=>l.id);
+    advisors = advisors.filter(a=> leaderIds.includes(a.leader_id));
+  }
+  if(leaderVal!=='all'){
+    advisors = advisors.filter(a=> a.leader_id===leaderVal);
+  }
+  if(viewVal==='TEAM_SELECTED'){
+    const wanted = new Set(SELECTED);
+    advisors = advisors.filter(a=> wanted.has(a.name));
+  }
+
+  if(!advisors.length){ alert('Nothing to publish (no advisors in view).'); return; }
+
+  const rows = advisors.map(a=>{
+    const data = ROTAS.get(`${a.id}|${weekISO}`) || {};
+    return { advisor_id:a.id, week_start:weekISO, data, published_at: new Date().toISOString() };
+  });
+
+  // Upsert by (advisor_id, week_start)
+  const { error } = await sb.from('rotas_published').upsert(rows, { onConflict:'advisor_id,week_start' });
+  if(error){ alert('Publish failed: '+error.message); return; }
+  alert('Published to Advisor Portal (rotas_published).');
+}
+
+/* =============================
+   EVENTS
+============================= */
+$('#prevWeek').onclick = ()=>{ monday = addDays(monday,-7); $('#weekStart').value = toISO(monday); $('#rangeLabel').textContent = labelForWeek(monday); bootstrapRender(); };
+$('#nextWeek').onclick = ()=>{ monday = addDays(monday, 7); $('#weekStart').value = toISO(monday); $('#rangeLabel').textContent = labelForWeek(monday); bootstrapRender(); };
+$('#weekStart').onchange = ()=>{ monday = toMonday(new Date($('#weekStart').value)); $('#rangeLabel').textContent = labelForWeek(monday); bootstrapRender(); };
+$('#siteFilter').onchange = ()=>{ renderGrid(); };
+$('#leaderFilter').onchange = ()=>{ renderGrid(); };
+$('#viewFilter').onchange = ()=>{ renderGrid(); };
+$('#treeSearch').oninput = ()=> rebuildTree();
+$('#btnClearSel').onclick = ()=>{ SELECTED.clear(); refreshChips(); rebuildTree(); renderGrid(); };
+$('#btnGenerate').onclick = ()=> alert('Generate: (hook up your generator here — this UI keeps the grid compact)');
+$('#btnPublish').onclick = publishCurrent;
+$('#btnPrint').onclick = ()=> window.print();
+$('#btnLoadJSON').onclick = ()=> $('#file').click();
+$('#file').addEventListener('change', async ev=>{
+  const f = ev.target.files[0]; if(!f) return;
+  const text = await f.text();
+  const data = JSON.parse(text);
+  // expecting shape: { rotas: [ {advisor_id, week_start, data}, ... ] }
+  (data.rotas||[]).forEach(r => ROTAS.set(`${r.advisor_id}|${r.week_start}`, r.data||{}));
+  renderGrid();
+});
+$('#btnSaveJSON').onclick = ()=>{
+  const weekISO = toISO(monday);
+  const rotas = [...ROTAS.entries()].filter(([k])=>k.endsWith('|'+weekISO)).map(([k,v])=>{
+    const advisor_id = k.split('|')[0];
+    return { advisor_id, week_start:weekISO, data:v };
+  });
+  const blob = new Blob([JSON.stringify({rotas},null,2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `rotas_${weekISO}.json`; a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+/* =============================
+   BOOT
+============================= */
+async function bootstrapRender(){
+  const weekISO = toISO(monday);
+
+  // Which advisors to load rotas for? (match the current filter to avoid extra traffic)
+  let advisors = ADVISORS;
+  const siteVal = $('#siteFilter').value;
+  const leaderVal = $('#leaderFilter').value;
+  const viewVal = $('#viewFilter').value;
+
+  if(siteVal!=='all'){
+    const site = ORG.sites[siteVal];
+    const leaderIds = Object.values(site?.leaders||{}).map(l=>l.id);
+    advisors = advisors.filter(a=> leaderIds.includes(a.leader_id));
+  }
+  if(leaderVal!=='all') advisors = advisors.filter(a=> a.leader_id===leaderVal);
+  if(viewVal==='TEAM_SELECTED') advisors = advisors.filter(a=> SELECTED.has(a.name));
+
+  const ids = advisors.map(a=>a.id);
+  await loadRotasFor(ids, weekISO);
+  renderGrid();
+}
+
+async function init(){
+  await loadOrg();
+  rebuildFilters();
+  rebuildTree();
+  refreshChips();
+  await bootstrapRender();
+}
+init();
 </script>
 </body>
 </html>
+
