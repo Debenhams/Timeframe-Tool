@@ -4,30 +4,31 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Professional Team Rota System — Master</title>
-<meta name="description" content="Team rota planner with Calabrio-style horizontal grid, templates, and Supabase sync. Version 2025-10-10."/>
 <link rel="preconnect" href="https://cdn.jsdelivr.net"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 
 <style>
 :root{
-  /* Brand & surface */
-  --brand:#0d47a1; --accent:#00c853; --ink:#1f2937; --muted:#6b7280;
-  --paper:#ffffff; --wash:#f5f7fb; --line:#e5e9f2;
-  /* Timeline */
-  --start:06; --end:20; --row-h:34px; --name-w:220px; --bar-h:14px;
-  /* Codes */
-  --c-email:#2ecc71; --c-mirakl:#b1b51e; --c-social:#5e35b1;
-  --c-meet:#ffd700; --c-ot:#e53935; --c-break:#cfd8dc; --c-lunch:#b0bec5;
-  --c-abs:#b0c4de; --c-shrink:#ffd166;
+  /* Look & feel */
+  --brand:#0d47a1; --accent:#00c853; --ink:#111827; --muted:#6b7280;
+  --paper:#ffffff; --wash:#f6f9ff; --line:#e6ebf4;
+
+  /* Timeline (Calabrio-ish) */
+  --start:06;        /* first hour label */
+  --end:20;          /* last hour label (exclusive) */
+  --row-h:38px;      /* row height (tight but readable) */
+  --bar-h:16px;      /* block height */
+  --name-w:260px;    /* sticky name column width */
 }
+
 *{box-sizing:border-box}
 html,body{height:100%}
 body{margin:0;background:#eef2f6;color:var(--ink);font:13px/1.35 Inter,Segoe UI,Roboto,system-ui,Arial,sans-serif}
 
 /* Topbar */
 .topbar{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--brand);color:#fff;box-shadow:0 2px 10px rgba(13,71,161,.18)}
-.topbar h1{margin:0;font:600 16px/1 Inter,system-ui}
-.badge{background:#113a8f;border:1px solid #1a4fb3;color:#e6efff;border-radius:999px;padding:5px 8px;font-weight:700}
+.topbar h1{margin:0;font:700 16px/1 Inter,system-ui}
+.badge{background:#113a8f;border:1px solid #1a4fb3;color:#e6efff;border-radius:999px;padding:4px 8px;font-weight:700}
 
 /* Layout */
 .frame{max-width:1500px;margin:14px auto;padding:0 14px;display:grid;grid-template-columns:1fr 320px;gap:14px}
@@ -37,7 +38,6 @@ select,input[type="date"],input[type="text"]{border:1px solid var(--line);backgr
 .btn{border:0;border-radius:9px;padding:8px 12px;font-weight:800;cursor:pointer}
 .btn.primary{background:var(--accent);color:#fff}
 .btn.ghost{background:#eaf2ff;color:#0d47a1;border:1px solid #cfe0ff}
-.btn.warn{background:#ffe8e6;color:#9a1919;border:1px solid #ffb7b0}
 .right{margin-left:auto;display:flex;gap:8px;align-items:center}
 
 /* Panels */
@@ -69,7 +69,7 @@ th,td{border:1px solid var(--line);padding:7px;text-align:center}
 thead th{background:#0d47a1;color:#fff;font-weight:800}
 td.name{position:sticky;left:0;background:#eef4ff;font-weight:800;white-space:nowrap}
 
-/* Horizontal timeline (Calabrio-style) */
+/* Horizontal timeline */
 .timeline{grid-column:1/-1}
 .legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 .legend .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;border:1px solid rgba(0,0,0,.08)}
@@ -81,23 +81,28 @@ td.name{position:sticky;left:0;background:#eef4ff;font-weight:800;white-space:no
 .row{display:grid;grid-template-columns:var(--name-w) 1fr}
 .row:nth-child(odd){background:#fbfdff}
 .rname{padding:8px 10px;border-right:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rline{position:relative;height:calc(var(--row-h));border-top:1px solid var(--line)}
-.bar{position:absolute;height:var(--bar-h);top:calc((var(--row-h) - var(--bar-h))/2);border-radius:4px;padding:0 6px;font:800 11px/14px Inter;color:#fff;display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.rline{position:relative;height:var(--row-h);border-top:1px solid var(--line)}
+.bar{position:absolute;height:var(--bar-h);top:calc((var(--row-h) - var(--bar-h))/2);border-radius:4px;padding:0 6px;font:800 11px/16px Inter;color:#fff;display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(0,0,0,.12)}
 .bar .t{opacity:.95;font-weight:700}
-.c-email{background:var(--c-email)} .c-mirakl{background:var(--c-mirakl)} .c-social{background:var(--c-social)}
-.c-meet{background:var(--c-meet);color:#213} .c-ot{background:var(--c-ot)}
-.c-break{background:var(--c-break);color:#213} .c-lunch{background:var(--c-lunch);color:#213}
-.c-abs{background:var(--c-abs)} .c-shrink{background:var(--c-shrink);color:#213}
+
+/* Code colours */
+.c-email{background:#2ecc71}
+.c-mirakl{background:#b1b51e}
+.c-social{background:#5e35b1}
+.c-meet{background:#ffd700;color:#213}
+.c-ot{background:#e53935}
+.c-break{background:#cfd8dc;color:#213}
+.c-lunch{background:#b0bec5;color:#213}
+.c-abs{background:#b0c4de}
+.c-shrink{background:#ffd166;color:#213}
 
 /* Dialogs */
 dialog{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
 dialog .row{display:flex;gap:8px;align-items:center;margin:6px 0}
 .btn.small{padding:6px 8px;border-radius:7px}
 
-/* Compact tweak for very wide teams */
-@media (max-width:1200px){
-  :root{ --name-w:180px }
-}
+/* Responsive tweak */
+@media (max-width:1200px){ :root{ --name-w:200px } }
 </style>
 </head>
 
@@ -122,8 +127,8 @@ dialog .row{display:flex;gap:8px;align-items:center;margin:6px 0}
 
       <label>View</label>
       <select id="viewSel">
-        <option value="TEAM_SELECTED">Team (Selected)</option>
         <option value="TEAM_ALL">Team (All)</option>
+        <option value="TEAM_SELECTED">Team (Selected)</option>
       </select>
 
       <label>Week</label>
@@ -138,7 +143,7 @@ dialog .row{display:flex;gap:8px;align-items:center;margin:6px 0}
       </div>
     </div>
 
-    <!-- Left column: Templates + Assign -->
+    <!-- Left column: Templates + Assignment -->
     <div class="panel">
       <div class="panel-h">
         <h2>Templates & Master Assignment</h2>
@@ -165,7 +170,7 @@ dialog .row{display:flex;gap:8px;align-items:center;margin:6px 0}
                 </tbody>
               </table>
             </div>
-            <p style="color:var(--muted);margin:8px 0">Tip: Change a cell to a template to assign a whole day. “Generate” builds the rota grid from these choices. “Publish” writes to <code>rotas</code> and <code>rotas_published</code>.</p>
+            <p style="color:var(--muted);margin:8px 0">Tip: set the week (Monday), choose a Leader, assign templates per day, **Generate**, tweak blocks (click to edit), then **Publish**.</p>
           </div>
         </div>
       </div>
@@ -189,13 +194,13 @@ dialog .row{display:flex;gap:8px;align-items:center;margin:6px 0}
       <div class="panel-h">
         <h2>Team Week</h2>
         <div class="legend">
-          <span><i class="dot" style="background:var(--c-email)"></i>Email</span>
-          <span><i class="dot" style="background:var(--c-mirakl)"></i>Mirakl</span>
-          <span><i class="dot" style="background:var(--c-social)"></i>Social</span>
-          <span><i class="dot" style="background:var(--c-meet)"></i>Meeting</span>
-          <span><i class="dot" style="background:var(--c-ot)"></i>Overtime</span>
-          <span><i class="dot" style="background:var(--c-break)"></i>Break</span>
-          <span><i class="dot" style="background:var(--c-lunch)"></i>Lunch</span>
+          <span><i class="dot" style="background:#2ecc71"></i>Email</span>
+          <span><i class="dot" style="background:#b1b51e"></i>Mirakl</span>
+          <span><i class="dot" style="background:#5e35b1"></i>Social</span>
+          <span><i class="dot" style="background:#ffd700"></i>Meeting</span>
+          <span><i class="dot" style="background:#e53935"></i>Overtime</span>
+          <span><i class="dot" style="background:#cfd8dc"></i>Break</span>
+          <span><i class="dot" style="background:#b0bec5"></i>Lunch</span>
         </div>
       </div>
       <div class="panel-b">
@@ -204,26 +209,18 @@ dialog .row{display:flex;gap:8px;align-items:center;margin:6px 0}
             <div style="padding:7px 10px;font-weight:800">Name</div>
             <div class="tl-hours" id="tlHours"></div>
           </div>
-          <div class="tl-body" id="tlBody">
-            <!-- rows injected -->
-          </div>
+          <div class="tl-body" id="tlBody"></div>
         </div>
       </div>
     </div>
 
   </div>
 
-  <!-- Assign/Edit dialogs -->
+  <!-- Edit dialog -->
   <dialog id="editDlg">
     <div style="font-weight:800;margin-bottom:6px">Edit Block</div>
-    <div class="row">
-      <label style="min-width:80px">Code</label>
-      <select id="eCode"></select>
-    </div>
-    <div class="row">
-      <label style="min-width:80px">Start–End</label>
-      <input type="time" id="eStart">–<input type="time" id="eEnd">
-    </div>
+    <div class="row"><label style="min-width:80px">Code</label><select id="eCode"></select></div>
+    <div class="row"><label style="min-width:80px">Start–End</label><input type="time" id="eStart">–<input type="time" id="eEnd"></div>
     <div class="row" style="justify-content:flex-end">
       <button class="btn ghost" onclick="editDlg.close()">Cancel</button>
       <button class="btn primary" id="eOK">Save</button>
@@ -231,113 +228,119 @@ dialog .row{display:flex;gap:8px;align-items:center;margin:6px 0}
   </dialog>
 
 <script>
-/* =========================
-   Supabase setup
-   ========================= */
-const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+/* ========= Supabase ========= */
+const SUPABASE_URL="https://oypdnjxhjpgpwmkltzmk.supabase.co";
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 
-/* =========================
-   State
-   ========================= */
-const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-let sites=[], leaders=[], advisors=[];
-let siteById=new Map(), leadersById=new Map(), advisorsById=new Map();
-let selectedLeader = null;
-let selectedNames = new Set();      // selected advisor names (UI chips)
-let templates = {};                 // name -> {work_code,start_time,finish_time,break1,lunch,break2}
-let assigned = new Map();           // key `${advisorId}-${dayIndex}` -> templateName
+/* ========= State ========= */
+const DAYS=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+let sites=[],leaders=[],advisors=[];
+let selectedLeader=null;
+let selectedNames=new Set();
+let templates={};
+let assigned=new Map(); // key `${advisorId}-${dayIndex}` -> templateName
 let monday = toMonday(new Date());
-let sessionUser = null;
+let sessionUser=null;
 
-/* =========================
-   Helpers
-   ========================= */
-const $=sel=>document.querySelector(sel);
-const $$=sel=>Array.from(document.querySelectorAll(sel));
+/* ========= Helpers ========= */
+const $=s=>document.querySelector(s);
+const $$=s=>Array.from(document.querySelectorAll(s));
 const pad=n=>String(n).padStart(2,"0");
-function toMonday(d){const x=new Date(d);const day=x.getDay();x.setHours(0,0,0,0);x.setDate(x.getDate() + (day===0?-6:1-day));return x;}
-function iso(d){return d.toISOString().slice(0,10);}
-function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
-function toMin(t){if(!t)return null;const [h,m]=t.split(":").map(Number);return h*60+m;}
+function isoLocal(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+function toMonday(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate()); const day=x.getDay(); x.setDate(x.getDate() + (day===0?-6:1-day)); x.setHours(0,0,0,0); return x;}
+function addDays(d,n){const x=new Date(d); x.setDate(x.getDate()+n); return x;}
+function toMin(t){if(!t)return null; const [h,m]=t.split(":").map(Number); return h*60+m;}
 function m2hhmm(m){return `${pad((m/60|0))}:${pad(m%60)}`;}
-function spanPct(start,end){const S=+getComputedStyle(document.documentElement).getPropertyValue('--start')||6; const E=+getComputedStyle(document.documentElement).getPropertyValue('--end')||20; const total=(E-S)*60; const s=(start-S*60)/total*100; const w=(end-start)/total*100; return {left:Math.max(0,s), width:Math.max(0,Math.min(100-s,w))};}
-function clsFor(code){const k=(code||'').toLowerCase(); if(k.includes('lunch'))return'c-lunch'; if(k.includes('break'))return'c-break'; if(k.includes('overtime'))return'c-ot'; if(k.includes('meeting')||k.includes('coach')||k.includes('121')||k.includes('training')||k.includes('team'))return'c-meet'; if(k.includes('social'))return'c-social'; if(k.includes('mirakl'))return'c-mirakl'; if(k.includes('email'))return'c-email'; if(['al','sick','rdo','maternity','lts'].some(w=>k.includes(w)))return'c-abs'; if(['shrink','project','huddle','atl','iti'].some(w=>k.includes(w)))return'c-shrink'; return'c-email';}
+function clsFor(code){const k=(code||"").toLowerCase(); if(k.includes("lunch"))return"c-lunch"; if(k.includes("break"))return"c-break"; if(k.includes("overtime"))return"c-ot"; if(k.includes("meeting")||k.includes("coach")||k.includes("121")||k.includes("training")||k.includes("team"))return"c-meet"; if(k.includes("social"))return"c-social"; if(k.includes("mirakl"))return"c-mirakl"; if(k.includes("email"))return"c-email"; if(["al","sick","rdo","maternity","lts"].some(w=>k.includes(w)))return"c-abs"; if(["shrink","project","huddle","atl","iti"].some(w=>k.includes(w)))return"c-shrink"; return"c-email";}
+function spanPct(start,end){const S=+getComputedStyle(document.documentElement).getPropertyValue("--start")||6; const E=+getComputedStyle(document.documentElement).getPropertyValue("--end")||20; const total=(E-S)*60; const s=(start-S*60)/total*100; const w=(end-start)/total*100; return {left:Math.max(0,s),width:Math.max(0,Math.min(100-s,w))};}
 
-/* =========================
-   Auth (for publishing if your RLS needs it)
-   ========================= */
-$('#btnAuth').onclick = async ()=>{
-  const { data:{ user } } = await sb.auth.getUser();
-  if(user){ await sb.auth.signOut(); alert('Signed out'); $('#btnAuth').textContent='Sign in'; return; }
+/* ========= Auth (optional for Publish) ========= */
+$('#btnAuth').onclick=async()=>{
+  const {data:{user}}=await sb.auth.getUser();
+  if(user){ await sb.auth.signOut(); $('#btnAuth').textContent='Sign in'; alert('Signed out'); return; }
   const email=prompt('Enter your work email to receive a magic sign-in link'); if(!email) return;
   const {error}=await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href.split('#')[0] }});
   if(error) alert(error.message); else alert('Magic link sent. Check your inbox.');
 };
 (async()=>{ const {data:{user}}=await sb.auth.getUser(); sessionUser=user; $('#btnAuth').textContent=user?'Signed in':'Sign in'; })();
 
-/* =========================
-   Load org data
-   ========================= */
+/* ========= Load org data ========= */
 async function loadOrg(){
-  const [s,l,a] = await Promise.all([
-    sb.from('sites').select('id,name').order('name',{ascending:true}),
-    sb.from('leaders').select('id,name,site_id').order('name',{ascending:true}),
-    sb.from('advisors').select('id,name,email,leader_id').order('name',{ascending:true})
+  const [s,l,a]=await Promise.all([
+    sb.from('sites').select('id,name').order('name'),
+    sb.from('leaders').select('id,name,site_id').order('name'),
+    sb.from('advisors').select('id,name,email,leader_id').order('name')
   ]);
   sites=s.data||[]; leaders=l.data||[]; advisors=a.data||[];
-  siteById=new Map(sites.map(x=>[x.id,x]));
-  leadersById=new Map(leaders.map(x=>[x.id,x]));
-  advisorsById=new Map(advisors.map(x=>[x.id,x]));
-
-  buildTopFilters(); buildTree(); refreshChips(); rebuildAssignTable();
+  buildTopFilters(true);
+  buildTree();
+  refreshChips();
+  rebuildAssignTable();
 }
 
-/* Top filters cascade */
-function buildTopFilters(){
+/* ========= Top filters (cascade) ========= */
+function buildTopFilters(first=false){
   const siteSel=$('#siteSel'), leaderSel=$('#leaderSel');
+
+  // Sites
   siteSel.innerHTML = sites.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
-  // keep current site if possible
-  if(!siteSel.value && sites[0]) siteSel.value = sites[0].id;
-
-  const currentSite = siteSel.value;
-  const siteLeaders = leaders.filter(l=>String(l.site_id)===String(currentSite)).sort((a,b)=>a.name.localeCompare(b.name));
-  leaderSel.innerHTML = siteLeaders.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
-  if(siteLeaders.length) selectedLeader = selectedLeader || siteLeaders[0].id;
-
-  if(selectedLeader && !siteLeaders.some(x=>x.id===selectedLeader)) selectedLeader = siteLeaders[0]?.id || null;
+  if(first && sites.length){
+    // Prefer Debenhams if it exists
+    const deb = sites.find(s=>/debenhams/i.test(s.name));
+    siteSel.value = deb? deb.id : sites[0].id;
+  }
+  // Leaders filtered by site
+  const ls = leaders.filter(l=>String(l.site_id)===String(siteSel.value)).sort((a,b)=>a.name.localeCompare(b.name));
+  leaderSel.innerHTML = ls.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
+  if(!selectedLeader || !ls.some(x=>x.id===selectedLeader)) selectedLeader = ls[0]?.id || null;
   if(selectedLeader) leaderSel.value = selectedLeader;
 
-  siteSel.onchange=()=>{ selectedLeader=null; buildTopFilters(); buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline(); };
-  leaderSel.onchange=()=>{ selectedLeader=leaderSel.value; buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline(); };
+  siteSel.onchange=()=>{
+    // When site changes, clear selection & pick first leader in that site
+    selectedNames.clear();
+    const nextLeaders = leaders.filter(l=>String(l.site_id)===String(siteSel.value)).sort((a,b)=>a.name.localeCompare(b.name));
+    selectedLeader = nextLeaders[0]?.id || null;
+    buildTopFilters(); buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline();
+  };
+  leaderSel.onchange=()=>{
+    selectedLeader=leaderSel.value;
+    selectedNames.clear(); // avoid sticking to a previous leader's picks
+    buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline();
+  };
 
-  $('#viewSel').onchange=()=>renderTimeline();
+  // Hours header
+  const H=$('#tlHours'); const S=+getComputedStyle(document.documentElement).getPropertyValue('--start')||6; const E=+getComputedStyle(document.documentElement).getPropertyValue('--end')||20;
+  H.innerHTML = Array.from({length:E-S},(_,i)=>`<div>${pad(S+i)}:00</div>`).join('');
 }
 
-/* Right panel tree */
+/* ========= Right-side “Schedules” tree ========= */
 function buildTree(){
   const t=$('#tree'); const q=$('#treeSearch').value.trim().toLowerCase();
-  const currentSite = $('#siteSel').value;
-  const listLeaders = leaders.filter(l=>String(l.site_id)===String(currentSite)).sort((a,b)=>a.name.localeCompare(b.name));
+  const siteId=$('#siteSel').value;
+  const listLeaders=leaders.filter(l=>String(l.site_id)===String(siteId)).sort((a,b)=>a.name.localeCompare(b.name));
 
-  function advBlock(a){
+  function advRow(a){
     if(q && !a.name.toLowerCase().includes(q)) return '';
-    const checked = selectedNames.has(a.name)?'checked':'';
+    const checked= selectedNames.has(a.name)?'checked':'';
     return `<div class="node"><input type="checkbox" data-adv="${a.id}" data-name="${a.name}" ${checked}/> <span>${a.name}</span></div>`;
   }
 
   t.innerHTML = listLeaders.map(ld=>{
-    const team = advisors.filter(a=>String(a.leader_id)===String(ld.id)).sort((a,b)=>a.name.localeCompare(b.name));
+    const team=advisors.filter(a=>String(a.leader_id)===String(ld.id)).sort((a,b)=>a.name.localeCompare(b.name));
     if(q && !(ld.name.toLowerCase().includes(q) || team.some(a=>a.name.toLowerCase().includes(q)))) return '';
-    const allSel = team.length && team.every(a=>selectedNames.has(a.name));
+    const allChecked = team.length && team.every(a=>selectedNames.has(a.name));
     return `<details open>
-      <summary><span class="twisty">${allSel?'−':'+'}</span><label style="display:flex;align-items:center;gap:6px"><input type="checkbox" data-leader="${ld.id}" ${allSel?'checked':''}/> ${ld.name} <span style="color:var(--muted)">(${team.length})</span></label></summary>
-      ${team.map(advBlock).join('')}
+      <summary><span class="twisty">${allChecked?'−':'+'}</span>
+        <label style="display:flex;align-items:center;gap:6px">
+          <input type="checkbox" data-leader="${ld.id}" ${allChecked?'checked':''}/> ${ld.name}
+          <span style="color:var(--muted)">(${team.length})</span>
+        </label>
+      </summary>
+      ${team.map(advRow).join('')}
     </details>`;
   }).join('') || `<div style="color:var(--muted)">No leaders in this site.</div>`;
 
-  // Events
   $$('#tree [data-leader]').forEach(cb=>{
     cb.onchange=()=>{
       const id=cb.dataset.leader;
@@ -352,26 +355,26 @@ function buildTree(){
   });
 }
 $('#treeSearch').oninput=()=>buildTree();
-$('#btnClearSel').onclick=()=>{ selectedNames.clear(); buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline(); };
+$('#btnClearSel').onclick=()=>{ selectedNames.clear(); refreshChips(); buildTree(); rebuildAssignTable(); renderTimeline(); };
+
 function refreshChips(){
   const c=$('#chips');
   c.innerHTML=[...selectedNames].sort((a,b)=>a.localeCompare(b)).map(n=>`<span class="chip">${n}<button class="btn small ghost" data-x="${n}">×</button></span>`).join('');
   $$('#chips [data-x]').forEach(b=>b.onclick=()=>{ selectedNames.delete(b.dataset.x); buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline(); });
 }
 
-/* Templates */
+/* ========= Templates ========= */
 async function loadTemplates(){
   const {data,error}=await sb.from('templates').select('*');
   if(error){ console.error(error); return; }
   templates={}; (data||[]).forEach(t=>templates[t.name]=t);
-  renderTemplates();
-  rebuildAssignTable();
+  renderTemplates(); rebuildAssignTable();
 }
 function codeGroupSelectHTML(val=''){
   const groups={
     "Activity":["DEB Email","PLT Social","Mirakl","KM Email","KM Social","2nd Line","Admin","QA","Overtime"],
     "Absence":["AL","Sick","RDO","Maternity","LTS","Split Shift","Break","Lunch"],
-    "Shrinkage":["121","ATL","Coaching","Huddle","ITI","Projects","Team Meeting","Training"]
+    "Shrinkage":["121","ATL","Coaching","Huddle","ITI","Projects","Team Meeting","Training","Meeting"]
   };
   return Object.entries(groups).map(([g,c])=>`<optgroup label="${g}">${c.map(x=>`<option ${val===x?'selected':''}>${x}</option>`).join('')}</optgroup>`).join('');
 }
@@ -390,20 +393,29 @@ function renderTemplates(){
         <input type="time" data-f="lunch"  value="${(t.lunch||'').slice(0,5)}"  title="Lunch (30m)">
         <input type="time" data-f="break2" value="${(t.break2||'').slice(0,5)}" title="Break 2 (15m)">
       </div></div>
-      <div class="actions"><button class="btn warn small" data-del="${n}">Delete</button></div>
+      <div class="actions"><button class="btn small ghost" data-dup="${n}">Duplicate</button><button class="btn small" style="background:#ffe8e6;color:#9a1919;border:1px solid #ffb7b0" data-del="${n}">Delete</button></div>
     </div>`;
   }).join('');
 
-  // Bind updates
+  // Bind
   $$('#templWrap .template').forEach(box=>{
-    const orig = box.dataset.name;
-    $$('input,select', box).forEach(inp=>{
+    const orig=box.dataset.name;
+    box.querySelector('[data-dup]').onclick=async()=>{
+      const nn=prompt('Duplicate as…', orig+' Copy'); if(!nn) return;
+      const src=templates[orig]; const row=Object.assign({},src,{name:nn});
+      const {error}=await sb.from('templates').upsert(row,{onConflict:'name'});
+      if(error) alert(error.message); else loadTemplates();
+    };
+    box.querySelector('[data-del]').onclick=async()=>{
+      if(!confirm(`Delete template "${orig}"?`)) return;
+      const {error}=await sb.from('templates').delete().eq('name',orig);
+      if(error) alert(error.message); else loadTemplates();
+    };
+    $$('input,select',box).forEach(inp=>{
       const f=inp.dataset.f; if(!f) return;
       inp.onchange=async()=>{
-        const row=Object.assign({}, templates[orig]);
-        row[f]=inp.value || null;
+        const row=Object.assign({}, templates[orig]); row[f]=inp.value||null;
         if(f==='name' && row.name && row.name!==orig){
-          // rename: delete old + insert new
           await sb.from('templates').delete().eq('name', orig);
           const {error}=await sb.from('templates').insert([row]);
           if(error) alert(error.message); else loadTemplates();
@@ -413,11 +425,6 @@ function renderTemplates(){
         }
       };
     });
-    box.querySelector('[data-del]').onclick=async()=>{
-      if(!confirm(`Delete template "${orig}"?`)) return;
-      const {error}=await sb.from('templates').delete().eq('name', orig);
-      if(error) alert(error.message); else loadTemplates();
-    };
   });
 }
 $('#btnAddTemplate').onclick=async()=>{
@@ -436,20 +443,22 @@ $('#btnLoadSamples').onclick=async()=>{
   loadTemplates();
 };
 
-/* Assignment table */
+/* ========= Assignment table ========= */
 function rebuildAssignTable(){
   const body=$('#assignBody');
-  const names= (selectedNames.size? [...selectedNames] : []).sort((a,b)=>a.localeCompare(b));
-  if(!names.length){ body.innerHTML='<tr><td colspan="8" style="text-align:left;color:var(--muted)">Pick advisors on the right.</td></tr>'; return; }
+  const lid=$('#leaderSel').value;
+  const team=advisors.filter(a=>String(a.leader_id)===String(lid)).sort((a,b)=>a.name.localeCompare(b.name));
+  const rows = ($('#viewSel').value==='TEAM_SELECTED' && selectedNames.size)? team.filter(a=>selectedNames.has(a.name)) : team;
+
+  if(!rows.length){ body.innerHTML='<tr><td colspan="8" style="text-align:left;color:var(--muted)">Pick advisors on the right.</td></tr>'; return; }
+
   const opts = `<option value="">(none)</option>` + Object.keys(templates).sort().map(n=>`<option>${n}</option>`).join('');
-  body.innerHTML = names.map(n=>{
-    const adv = advisors.find(a=>a.name===n);
+  body.innerHTML = rows.map(adv=>{
     const tds = DAYS.map((_,di)=>{
-      const key=`${adv.id}-${di}`;
-      const cur=assigned.get(key)||'';
+      const key=`${adv.id}-${di}`; const cur=assigned.get(key)||'';
       return `<td><select data-assign="${adv.id}" data-di="${di}">${opts.replace(`>${cur}<`,` selected>${cur}<`)}</select></td>`;
     }).join('');
-    return `<tr><td class="name">${n}</td>${tds}</tr>`;
+    return `<tr><td class="name">${adv.name}</td>${tds}</tr>`;
   }).join('');
 
   $$('#assignBody select[data-assign]').forEach(sel=>{
@@ -457,75 +466,59 @@ function rebuildAssignTable(){
   });
 }
 
-/* Generate rota data from assignments into in-memory model -> then render timeline */
-$('#btnGenerate').onclick=()=>{ renderTimeline(true); };
+/* ========= Generate & Render ========= */
+$('#btnGenerate').onclick=()=>renderTimeline(true);
 
-/* Build day segments from a template */
 function segmentsFromTemplate(tmp){
-  // splits: work → (break1?) → work → (lunch?) → work → (break2?) → work
   const s=toMin(tmp.start_time), e=toMin(tmp.finish_time);
   const b1=toMin(tmp.break1), l=toMin(tmp.lunch), b2=toMin(tmp.break2);
   const segs=[];
   function addWork(a,b){ if(a!=null && b!=null && b>a) segs.push({code:tmp.work_code,start:a,end:b}); }
   function add(code,at,dur){ if(at!=null){ const d= code==='Lunch'?30:15; segs.push({code, start:at, end:at+(dur||d)}); } }
-  // morning part
-  if(b1){ addWork(s,b1); add('Break',b1,15); addWork(b1+15, (l||b2||e)); }
+
+  if(b1){ addWork(s,b1); add('Break',b1,15); addWork(b1+15,(l||b2||e)); }
   else if(l){ addWork(s,l); add('Lunch',l,30); addWork(l+30,(b2||e)); }
   else if(b2){ addWork(s,b2); add('Break',b2,15); addWork(b2+15,e); }
   else { addWork(s,e); }
-  // if both lunch and b2 exist after lunch
-  if(l && b2 && b2>l){ // we already added work up to (b2 or e) above; if b2 present after lunch, split again
-    // remove last work and split
-    const last = segs.pop();
+
+  if(l && b2 && b2>l){
+    const last=segs.pop();
     if(last && last.code===tmp.work_code){
-      if(last.start< b2) segs.push({code:tmp.work_code,start:last.start,end:b2});
-      segs.push({code:'Break', start:b2, end:b2+15});
-      if(b2+15< last.end) segs.push({code:tmp.work_code,start:b2+15,end:last.end});
-    }else if(last){ segs.push(last); }
+      if(last.start<b2) segs.push({code:tmp.work_code,start:last.start,end:b2});
+      segs.push({code:'Break',start:b2,end:b2+15});
+      if(b2+15<last.end) segs.push({code:tmp.work_code,start:b2+15,end:last.end});
+    } else if(last){ segs.push(last); }
   }
   return segs;
 }
 
-/* Render timeline */
 function renderTimeline(fromAssignments=false){
-  // header hours
-  const H=$('#tlHours'); const S=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--start'))||6; const E=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--end'))||20;
-  H.innerHTML = Array.from({length:E-S},(_,i)=>`<div>${pad(S+i)}:00</div>`).join('');
-
   const body=$('#tlBody'); body.innerHTML='';
-  const view=$('#viewSel').value;
-  // rows to show = selected OR all in leader
-  const lid= $('#leaderSel').value;
-  const team = advisors.filter(a=>String(a.leader_id)===String(lid)).sort((a,b)=>a.name.localeCompare(b.name));
-  const rows = (view==='TEAM_SELECTED' && selectedNames.size)? team.filter(a=>selectedNames.has(a.name)) : team;
+  const lid=$('#leaderSel').value;
+  const team=advisors.filter(a=>String(a.leader_id)===String(lid)).sort((a,b)=>a.name.localeCompare(b.name));
+  const rows = ($('#viewSel').value==='TEAM_SELECTED' && selectedNames.size)? team.filter(a=>selectedNames.has(a.name)) : team;
 
   rows.forEach(adv=>{
-    const tr=document.createElement('div'); tr.className='row';
-    tr.innerHTML = `<div class="rname">${adv.name}</div><div class="rline" data-row="${adv.id}"></div>`;
-    body.appendChild(tr);
-
-    // build segments (from assignments for each day)
-    DAYS.forEach((d,di)=>{
-      const key=`${adv.id}-${di}`, tName=assigned.get(key);
-      if(!tName || !templates[tName]) return;
+    const r=document.createElement('div'); r.className='row';
+    r.innerHTML=`<div class="rname">${adv.name}</div><div class="rline" data-row="${adv.id}"></div>`;
+    body.appendChild(r);
+    DAYS.forEach((_,di)=>{
+      const tName=assigned.get(`${adv.id}-${di}`); if(!tName||!templates[tName]) return;
       const segs=segmentsFromTemplate(templates[tName]);
       segs.forEach(seg=>{
-        const start = seg.start + di*1440;      // day offset
-        const end   = seg.end   + di*1440;
-        const p=spanPct(start, end);
-        const el=document.createElement('div');
-        const cls = clsFor(seg.code);
-        el.className=`bar ${cls}`;
+        const start = seg.start + di*1440, end = seg.end + di*1440;
+        const p=spanPct(start,end);
+        const el=document.createElement('div'); el.className=`bar ${clsFor(seg.code)}`;
         el.style.left=`${p.left}%`; el.style.width=`${p.width}%`;
         el.dataset.adv=adv.id; el.dataset.di=di; el.dataset.code=seg.code; el.dataset.start=seg.start; el.dataset.end=seg.end;
-        el.innerHTML = `<span>${(seg.code||'').toUpperCase()}</span><span class="t">${m2hhmm(seg.start)}–${m2hhmm(seg.end)}</span>`;
+        el.innerHTML=`<span>${seg.code.toUpperCase()}</span><span class="t">${m2hhmm(seg.start)}–${m2hhmm(seg.end)}</span>`;
         el.onclick=()=>openEdit(el);
-        tr.lastElementChild.appendChild(el);
+        r.lastElementChild.appendChild(el);
       });
     });
   });
 
-  if(fromAssignments){ alert('Generated from assignments. Review, tweak blocks (click to edit), then Publish.'); }
+  if(fromAssignments) alert('Generated from assignments. Click blocks to tweak, then Publish.');
 }
 
 /* Edit dialog */
@@ -538,45 +531,43 @@ function codeOptionsHTML(sel=''){
   return Object.entries(buckets).map(([g,arr])=>`<optgroup label="${g}">${arr.map(c=>`<option ${c===sel?'selected':''}>${c}</option>`).join('')}</optgroup>`).join('');
 }
 function openEdit(bar){
-  $('#eCode').innerHTML = codeOptionsHTML(bar.dataset.code||'');
-  $('#eStart').value = m2hhmm(+bar.dataset.start);
-  $('#eEnd').value   = m2hhmm(+bar.dataset.end);
+  $('#eCode').innerHTML=codeOptionsHTML(bar.dataset.code||'');
+  $('#eStart').value=m2hhmm(+bar.dataset.start);
+  $('#eEnd').value=m2hhmm(+bar.dataset.end);
   editDlg.showModal();
-
   $('#eOK').onclick=()=>{
     const code=$('#eCode').value;
     const s=toMin($('#eStart').value), e=toMin($('#eEnd').value);
-    if(!s||!e||e<=s){ alert('Check start/end times'); return; }
+    if(!s||!e||e<=s){ alert('Check start/end times.'); return; }
     bar.dataset.code=code; bar.dataset.start=s; bar.dataset.end=e;
     bar.firstElementChild.textContent=code.toUpperCase();
     bar.querySelector('.t').textContent=`${m2hhmm(s)}–${m2hhmm(e)}`;
-    const di=+bar.dataset.di; const start= s + di*1440, end = e + di*1440;
-    const p=spanPct(start,end); bar.style.left=`${p.left}%`; bar.style.width=`${p.width}%`;
-    bar.className=`bar ${clsFor(code)}`;
+    const di=+bar.dataset.di; const p=spanPct(s+di*1440,e+di*1440);
+    bar.style.left=`${p.left}%`; bar.style.width=`${p.width}%`; bar.className=`bar ${clsFor(code)}`;
     editDlg.close();
   };
 }
 
-/* Save/Load JSON (local only) */
+/* Save/Load JSON (local) */
 $('#btnSaveLocal').onclick=()=>{
-  const state = { assigned:[...assigned], selected:[...selectedNames], monday:iso(monday) };
+  const state={assigned:[...assigned],selected:[...selectedNames],monday:isoLocal(monday)};
   const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota_state.json'; a.click();
 };
 $('#btnLoadLocal').onclick=()=>{
   const inp=document.createElement('input'); inp.type='file'; inp.accept='.json';
   inp.onchange=()=>{ const f=inp.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{
-      const obj=JSON.parse(rd.result); assigned=new Map(obj.assigned||[]); selectedNames=new Set(obj.selected||[]); monday=new Date(obj.monday||iso(new Date())); refreshChips(); rebuildAssignTable(); renderTimeline();
+      const obj=JSON.parse(rd.result); assigned=new Map(obj.assigned||[]); selectedNames=new Set(obj.selected||[]); monday=toMonday(new Date(obj.monday)); $('#weekInput').value=isoLocal(monday); refreshChips(); buildTree(); rebuildAssignTable(); renderTimeline();
   }catch(e){ alert('Invalid file'); } }; rd.readAsText(f); };
   inp.click();
 };
 
-/* Publish (writes rotas + rotas_published) */
+/* Publish (rotas + rotas_published) */
 $('#btnPublish').onclick=async()=>{
   const lid=$('#leaderSel').value;
-  const team = advisors.filter(a=>String(a.leader_id)===String(lid));
+  const team=advisors.filter(a=>String(a.leader_id)===String(lid));
   const rows = ($('#viewSel').value==='TEAM_SELECTED' && selectedNames.size)? team.filter(a=>selectedNames.has(a.name)) : team;
-  if(!rows.length){ alert('No advisors to publish'); return; }
+  if(!rows.length){ alert('No advisors to publish.'); return; }
 
   const payload=[];
   rows.forEach(adv=>{
@@ -587,37 +578,35 @@ $('#btnPublish').onclick=async()=>{
       const segs=segmentsFromTemplate(templates[tName]).map(s=>({code:s.code,start:m2hhmm(s.start),end:m2hhmm(s.end)}));
       weekData[DAYS[di]]={segments:segs};
     });
-    payload.push({ advisor_id:adv.id, week_start: iso(monday), data: weekData, published_at: new Date().toISOString() });
+    payload.push({ advisor_id:adv.id, week_start: isoLocal(monday), data: weekData, published_at: new Date().toISOString() });
   });
 
   if(!payload.length){ alert('Nothing to publish for this week.'); return; }
 
   try{
-    // rotas (draft) upsert: delete+insert for simplicity
-    await sb.from('rotas').delete().eq('week_start', iso(monday)).in('advisor_id', payload.map(p=>p.advisor_id));
-    let {error:e1}= await sb.from('rotas').insert(payload.map(({advisor_id,week_start,data})=>({advisor_id,week_start,data})));
+    await sb.from('rotas').delete().eq('week_start', isoLocal(monday)).in('advisor_id', payload.map(p=>p.advisor_id));
+    let {error:e1}=await sb.from('rotas').insert(payload.map(({advisor_id,week_start,data})=>({advisor_id,week_start,data})));
     if(e1) throw e1;
 
-    // published mirror
-    await sb.from('rotas_published').delete().eq('week_start', iso(monday)).in('advisor_id', payload.map(p=>p.advisor_id));
-    let {error:e2}= await sb.from('rotas_published').insert(payload);
+    await sb.from('rotas_published').delete().eq('week_start', isoLocal(monday)).in('advisor_id', payload.map(p=>p.advisor_id));
+    let {error:e2}=await sb.from('rotas_published').insert(payload);
     if(e2) throw e2;
 
-    alert('Published ✓  Advisors can now see their rota.');
+    alert('Published ✓ Advisors will see this instantly.');
   }catch(err){
     console.error(err);
-    alert('Publish failed: '+ (err?.message || err));
+    alert('Publish failed: '+(err?.message||err));
   }
 };
 
-/* Week controls */
-$('#weekInput').value = iso(monday);
-$('#prevW').onclick=()=>{ monday=addDays(monday,-7); $('#weekInput').value=iso(monday); renderTimeline(); };
-$('#nextW').onclick=()=>{ monday=addDays(monday,7);  $('#weekInput').value=iso(monday); renderTimeline(); };
-$('#todayW').onclick=()=>{ monday=toMonday(new Date()); $('#weekInput').value=iso(monday); renderTimeline(); };
-$('#weekInput').onchange=()=>{ monday=toMonday(new Date($('#weekInput').value)); renderTimeline(); };
+/* ========= Week controls (LOCAL date handling to avoid 05/10 issue) ========= */
+$('#weekInput').value = isoLocal(monday);
+$('#prevW').onclick=()=>{ monday=addDays(monday,-7); $('#weekInput').value=isoLocal(monday); renderTimeline(); };
+$('#nextW').onclick=()=>{ monday=addDays(monday,7);  $('#weekInput').value=isoLocal(monday); renderTimeline(); };
+$('#todayW').onclick=()=>{ monday=toMonday(new Date()); $('#weekInput').value=isoLocal(monday); renderTimeline(); };
+$('#weekInput').onchange=()=>{ const d=new Date($('#weekInput').value+'T00:00'); monday=toMonday(d); $('#weekInput').value=isoLocal(monday); renderTimeline(); };
 
-/* Init */
+/* ========= Init ========= */
 (async function init(){
   await loadOrg();
   await loadTemplates();
