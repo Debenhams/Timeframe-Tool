@@ -49,6 +49,7 @@
 <body>
   <header>Advisor Portal – Weekly Rota</header>
   <div class="wrap">
+    <!-- Sign in -->
     <div id="authBox" class="card" style="display:none">
       <div class="bar">
         <input id="emailInput" type="email" placeholder="Enter your work email…" />
@@ -57,6 +58,7 @@
       <div class="notice">We’ll email you a one-time sign-in link. Check your inbox (and spam).</div>
     </div>
 
+    <!-- App -->
     <div id="appBox" class="card" style="display:none">
       <div class="topbar">
         <div class="bar">
@@ -105,16 +107,21 @@ const infoNote = document.getElementById("infoNote");
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 const START_H = 7, END_H = 20;
 
+/* ----- DATE HELPERS (LOCAL, no UTC shift) ----- */
 function toMonday(d){
-  const x = new Date(d);
-  const day = x.getDay();
-  const diff = (day === 0 ? -6 : 1 - day);
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0); // local midnight
+  const dow = x.getDay(); // 0..6 (Sun..Sat)
+  const diff = (dow === 0 ? -6 : 1 - dow);
   x.setDate(x.getDate() + diff);
-  x.setHours(0,0,0,0);
   return x;
 }
-function fmtDateISO(d){ return d.toISOString().slice(0,10); }
-function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function fmtDateLocal(d){
+  const y = d.getFullYear();
+  const m = String(d.getMonth()+1).padStart(2,'0');
+  const day = String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${day}`;
+}
+function addDays(d,n){ const x=new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate()+n); return x; }
 function hhmmToMinutes(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
 function colorForCode(code){
   const k = (code||"").toLowerCase();
@@ -134,7 +141,7 @@ let advisorName = "";
 let monday = toMonday(new Date());
 let rotaRealtimeChannel = null;
 
-/* Templates → segments */
+/* ---- Templates → segments ---- */
 function tplToSegments(t){
   if(!t || !t.start_time || !t.finish_time) return [];
   const mins = s => { const [h,m]=String(s).slice(0,5).split(":").map(Number); return h*60+m; };
@@ -182,11 +189,10 @@ async function init(){
   if (profile && profile.advisor_id){
     advisorId = profile.advisor_id;
   } else {
-    // ⚠️ case-insensitive email match
     const { data: adv } = await supabase
       .from("advisors")
       .select("id,name")
-      .ilike("email", user.email)   // <— changed from eq() to ilike()
+      .ilike("email", user.email)   // case-insensitive email match
       .maybeSingle();
     if (adv){ advisorId = adv.id; advisorName = adv.name || ""; }
   }
@@ -196,10 +202,16 @@ async function init(){
   }
   advisorNamePill.textContent = advisorName || "Not linked";
 
-  weekStartInput.value = fmtDateISO(monday);
-  prevBtn.onclick = ()=>{ monday = addDays(monday,-7); weekStartInput.value = fmtDateISO(monday); loadAndRender(); restartRealtime(); };
-  nextBtn.onclick = ()=>{ monday = addDays(monday,7);  weekStartInput.value = fmtDateISO(monday); loadAndRender(); restartRealtime(); };
-  weekStartInput.onchange = ()=>{ monday = toMonday(new Date(weekStartInput.value)); loadAndRender(); restartRealtime(); };
+  weekStartInput.value = fmtDateLocal(monday);
+  prevBtn.onclick = ()=>{ monday = addDays(monday,-7); weekStartInput.value = fmtDateLocal(monday); loadAndRender(); restartRealtime(); };
+  nextBtn.onclick = ()=>{ monday = addDays(monday,7);  weekStartInput.value = fmtDateLocal(monday); loadAndRender(); restartRealtime(); };
+  weekStartInput.onchange = ()=>{
+    // parse at LOCAL midnight to avoid UTC shift
+    const parts = weekStartInput.value.split("-");
+    const d = new Date(Number(parts[0]), Number(parts[1])-1, Number(parts[2]), 0, 0, 0, 0);
+    monday = toMonday(d);
+    loadAndRender(); restartRealtime();
+  };
   signOutBtn.onclick = async ()=>{ await supabase.auth.signOut(); location.href = location.pathname; };
 
   await loadAndRender();
@@ -227,7 +239,7 @@ async function loadAndRender(){
     calBox.innerHTML = `<div class="empty-note">Your account isn’t linked to an advisor yet. Ask planning to link your email to your advisor profile.</div>`;
     return;
   }
-  const mondayISO = fmtDateISO(monday);
+  const mondayISO = fmtDateLocal(monday);
 
   const { data: pub, error: e1 } = await supabase
     .from("rotas_published")
@@ -326,7 +338,7 @@ function drawRota(json){
 
 async function startRealtime(){
   if (!advisorId) return;
-  const mondayISO = fmtDateISO(monday);
+  const mondayISO = fmtDateLocal(monday);
   rotaRealtimeChannel = supabase.channel(`rotas_pub_${advisorId}_${mondayISO}`)
     .on("postgres_changes",
       { event:"*", schema:"public", table:"rotas_published", filter:`advisor_id=eq.${advisorId}` },
