@@ -9,16 +9,15 @@
 
 <style>
 :root{
-  /* Look & feel */
   --brand:#0d47a1; --accent:#00c853; --ink:#111827; --muted:#6b7280;
   --paper:#ffffff; --wash:#f6f9ff; --line:#e6ebf4;
 
-  /* Timeline (Calabrio-ish) */
-  --start:06;        /* first hour label */
-  --end:20;          /* last hour label (exclusive) */
-  --row-h:38px;      /* row height (tight but readable) */
-  --bar-h:16px;      /* block height */
-  --name-w:260px;    /* sticky name column width */
+  /* timeline window (Calabrio-style) */
+  --start:06;
+  --end:20;
+  --row-h:36px;
+  --bar-h:14px;
+  --name-w:260px;
 }
 
 *{box-sizing:border-box}
@@ -27,11 +26,12 @@ body{margin:0;background:#eef2f6;color:var(--ink);font:13px/1.35 Inter,Segoe UI,
 
 /* Topbar */
 .topbar{position:sticky;top:0;z-index:5;display:flex;gap:10px;align-items:center;padding:10px 14px;background:var(--brand);color:#fff;box-shadow:0 2px 10px rgba(13,71,161,.18)}
-.topbar h1{margin:0;font:700 16px/1 Inter,system-ui}
+.topbar h1{margin:0;font:700 16px/1 Inter}
 .badge{background:#113a8f;border:1px solid #1a4fb3;color:#e6efff;border-radius:999px;padding:4px 8px;font-weight:700}
 
-/* Layout */
 .frame{max-width:1500px;margin:14px auto;padding:0 14px;display:grid;grid-template-columns:1fr 320px;gap:14px}
+
+/* Controls */
 .controls{grid-column:1/-1;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .controls .grow{flex:1}
 select,input[type="date"],input[type="text"]{border:1px solid var(--line);background:#fff;border-radius:9px;padding:8px 10px}
@@ -57,9 +57,8 @@ select,input[type="date"],input[type="text"]{border:1px solid var(--line);backgr
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 8px}
 
-/* Templates & Assignment */
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.template{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fafcff}
+/* Templates & Assignment (vertical, templates on top) */
+.template{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fafcff;margin-bottom:10px}
 .template .row{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center;margin:6px 0}
 .template .row .inline{display:flex;gap:8px;flex-wrap:wrap}
 .actions{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
@@ -69,7 +68,7 @@ th,td{border:1px solid var(--line);padding:7px;text-align:center}
 thead th{background:#0d47a1;color:#fff;font-weight:800}
 td.name{position:sticky;left:0;background:#eef4ff;font-weight:800;white-space:nowrap}
 
-/* Horizontal timeline */
+/* Timeline */
 .timeline{grid-column:1/-1}
 .legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
 .legend .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;border:1px solid rgba(0,0,0,.08)}
@@ -80,28 +79,30 @@ td.name{position:sticky;left:0;background:#eef4ff;font-weight:800;white-space:no
 .tl-body{display:block}
 .row{display:grid;grid-template-columns:var(--name-w) 1fr}
 .row:nth-child(odd){background:#fbfdff}
-.rname{padding:8px 10px;border-right:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rname{padding:8px 10px;border-right:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:8px}
+.badge-sm{font-weight:800;font-size:11px;background:#eef2ff;border:1px solid #cfe0ff;color:#0d47a1;border-radius:5px;padding:2px 6px}
 .rline{position:relative;height:var(--row-h);border-top:1px solid var(--line)}
-.bar{position:absolute;height:var(--bar-h);top:calc((var(--row-h) - var(--bar-h))/2);border-radius:4px;padding:0 6px;font:800 11px/16px Inter;color:#fff;display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 2px rgba(0,0,0,.12)}
-.bar .t{opacity:.95;font-weight:700}
+.bar{position:absolute;height:var(--bar-h);top:calc((var(--row-h) - var(--bar-h))/2);border-radius:2px;padding:0 2px;box-shadow:0 1px 2px rgba(0,0,0,.10)}
+/* No text in bars – info via tooltip */
 
 /* Code colours */
-.c-email{background:#2ecc71}
-.c-mirakl{background:#b1b51e}
-.c-social{background:#5e35b1}
-.c-meet{background:#ffd700;color:#213}
-.c-ot{background:#e53935}
-.c-break{background:#cfd8dc;color:#213}
-.c-lunch{background:#b0bec5;color:#213}
+.c-email{background:#7f8b2b}
+.c-mirakl{background:#7f8b2b}
+.c-social{background:#35508e}
+.c-meet{background:#ffd700}
+.c-ot{background:#cc351f}
+.c-break{background:#d9dce3}
+.c-lunch{background:#96e8ee}
 .c-abs{background:#b0c4de}
-.c-shrink{background:#ffd166;color:#213}
+.c-shrink{background:#ffd166}
 
-/* Dialogs */
-dialog{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-dialog .row{display:flex;gap:8px;align-items:center;margin:6px 0}
-.btn.small{padding:6px 8px;border-radius:7px}
+/* Now-line */
+.nowline{position:absolute;top:0;bottom:0;width:2px;background:#1c64f2;opacity:.7}
 
-/* Responsive tweak */
+/* Tooltip */
+.tooltip{position:fixed;pointer-events:none;z-index:50;padding:6px 8px;background:#111827;color:#fff;border-radius:6px;font-weight:700;font-size:12px;transform:translate(-50%,-120%);white-space:nowrap}
+.hidden{display:none}
+
 @media (max-width:1200px){ :root{ --name-w:200px } }
 </style>
 </head>
@@ -143,46 +144,40 @@ dialog .row{display:flex;gap:8px;align-items:center;margin:6px 0}
       </div>
     </div>
 
-    <!-- Left column: Templates + Assignment -->
+    <!-- Left: Templates + Assignment (vertical) -->
     <div class="panel">
       <div class="panel-h">
         <h2>Templates & Master Assignment</h2>
         <div class="actions">
           <button class="btn ghost" id="btnAddTemplate">+ Add Template</button>
           <button class="btn ghost" id="btnLoadSamples">↺ Load Sample Templates</button>
-          <button class="btn ghost" id="btnSaveLocal">💾 Save JSON</button>
-          <button class="btn ghost" id="btnLoadLocal">📂 Load JSON</button>
         </div>
       </div>
       <div class="panel-b">
-        <div class="grid2">
-          <div>
-            <div id="templWrap"></div>
-          </div>
-          <div>
-            <div id="assignWrap">
-              <table id="assignTbl">
-                <thead>
-                  <tr><th class="name">Advisor</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
-                </thead>
-                <tbody id="assignBody">
-                  <tr><td colspan="8" style="text-align:left;color:var(--muted)">Pick a Leader / advisors on the right to populate this table.</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <p style="color:var(--muted);margin:8px 0">Tip: set the week (Monday), choose a Leader, assign templates per day, **Generate**, tweak blocks (click to edit), then **Publish**.</p>
-          </div>
+        <!-- Templates -->
+        <div id="templWrap"></div>
+
+        <!-- Assignment -->
+        <div id="assignWrap" style="margin-top:10px">
+          <table id="assignTbl">
+            <thead>
+              <tr><th class="name">Advisor</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
+            </thead>
+            <tbody id="assignBody">
+              <tr><td colspan="8" style="text-align:left;color:var(--muted)">Pick a Leader / advisors on the right to populate this table.</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
 
-    <!-- Right column: Schedules pickers -->
+    <!-- Right: Schedules pickers -->
     <div class="panel">
       <div class="panel-h"><h2>Schedules</h2></div>
       <div class="panel-b">
         <div class="tree-search">
           <input class="grow" id="treeSearch" placeholder="Search leaders/advisors…"/>
-          <button class="btn ghost small" id="btnClearSel">Clear</button>
+          <button class="btn ghost" id="btnClearSel">Clear</button>
         </div>
         <div id="tree" class="tree"></div>
         <div id="chips" class="chips"></div>
@@ -194,13 +189,10 @@ dialog .row{display:flex;gap:8px;align-items:center;margin:6px 0}
       <div class="panel-h">
         <h2>Team Week</h2>
         <div class="legend">
-          <span><i class="dot" style="background:#2ecc71"></i>Email</span>
-          <span><i class="dot" style="background:#b1b51e"></i>Mirakl</span>
-          <span><i class="dot" style="background:#5e35b1"></i>Social</span>
+          <span><i class="dot" style="background:#7f8b2b"></i>Work</span>
+          <span><i class="dot" style="background:#96e8ee"></i>Lunch</span>
+          <span><i class="dot" style="background:#d9dce3"></i>Break</span>
           <span><i class="dot" style="background:#ffd700"></i>Meeting</span>
-          <span><i class="dot" style="background:#e53935"></i>Overtime</span>
-          <span><i class="dot" style="background:#cfd8dc"></i>Break</span>
-          <span><i class="dot" style="background:#b0bec5"></i>Lunch</span>
         </div>
       </div>
       <div class="panel-b">
@@ -216,16 +208,8 @@ dialog .row{display:flex;gap:8px;align-items:center;margin:6px 0}
 
   </div>
 
-  <!-- Edit dialog -->
-  <dialog id="editDlg">
-    <div style="font-weight:800;margin-bottom:6px">Edit Block</div>
-    <div class="row"><label style="min-width:80px">Code</label><select id="eCode"></select></div>
-    <div class="row"><label style="min-width:80px">Start–End</label><input type="time" id="eStart">–<input type="time" id="eEnd"></div>
-    <div class="row" style="justify-content:flex-end">
-      <button class="btn ghost" onclick="editDlg.close()">Cancel</button>
-      <button class="btn primary" id="eOK">Save</button>
-    </div>
-  </dialog>
+  <!-- Tooltip -->
+  <div id="tip" class="tooltip hidden"></div>
 
 <script>
 /* ========= Supabase ========= */
@@ -239,7 +223,7 @@ let sites=[],leaders=[],advisors=[];
 let selectedLeader=null;
 let selectedNames=new Set();
 let templates={};
-let assigned=new Map(); // key `${advisorId}-${dayIndex}` -> templateName
+let assigned=new Map(); // `${advisorId}-${dayIndex}` -> templateName
 let monday = toMonday(new Date());
 let sessionUser=null;
 
@@ -252,25 +236,26 @@ function toMonday(d){const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());
 function addDays(d,n){const x=new Date(d); x.setDate(x.getDate()+n); return x;}
 function toMin(t){if(!t)return null; const [h,m]=t.split(":").map(Number); return h*60+m;}
 function m2hhmm(m){return `${pad((m/60|0))}:${pad(m%60)}`;}
-function clsFor(code){const k=(code||"").toLowerCase(); if(k.includes("lunch"))return"c-lunch"; if(k.includes("break"))return"c-break"; if(k.includes("overtime"))return"c-ot"; if(k.includes("meeting")||k.includes("coach")||k.includes("121")||k.includes("training")||k.includes("team"))return"c-meet"; if(k.includes("social"))return"c-social"; if(k.includes("mirakl"))return"c-mirakl"; if(k.includes("email"))return"c-email"; if(["al","sick","rdo","maternity","lts"].some(w=>k.includes(w)))return"c-abs"; if(["shrink","project","huddle","atl","iti"].some(w=>k.includes(w)))return"c-shrink"; return"c-email";}
+function clsFor(code){const k=(code||"").toLowerCase(); if(k.includes("lunch"))return"c-lunch"; if(k.includes("break"))return"c-break"; if(k.includes("overtime"))return"c-ot"; if(k.includes("meeting")||k.includes("coach")||k.includes("121")||k.includes("training")||k.includes("team"))return"c-meet"; if(k.includes("social"))return"c-social"; if(k.includes("mirakl")||k.includes("email")||k.includes("work"))return"c-mirakl"; return"c-mirakl";}
 function spanPct(start,end){const S=+getComputedStyle(document.documentElement).getPropertyValue("--start")||6; const E=+getComputedStyle(document.documentElement).getPropertyValue("--end")||20; const total=(E-S)*60; const s=(start-S*60)/total*100; const w=(end-start)/total*100; return {left:Math.max(0,s),width:Math.max(0,Math.min(100-s,w))};}
+const TEMPLATE_BADGE = n => /early/i.test(n) ? "EA" : /middle/i.test(n) ? "MD" : /late/i.test(n) ? "LT" : "";
 
-/* ========= Auth (optional for Publish) ========= */
+/* ========= Auth ========= */
 $('#btnAuth').onclick=async()=>{
   const {data:{user}}=await sb.auth.getUser();
   if(user){ await sb.auth.signOut(); $('#btnAuth').textContent='Sign in'; alert('Signed out'); return; }
   const email=prompt('Enter your work email to receive a magic sign-in link'); if(!email) return;
   const {error}=await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.href.split('#')[0] }});
-  if(error) alert(error.message); else alert('Magic link sent. Check your inbox.');
+  if(error) alert(error.message); else alert('Magic link sent.');
 };
 (async()=>{ const {data:{user}}=await sb.auth.getUser(); sessionUser=user; $('#btnAuth').textContent=user?'Signed in':'Sign in'; })();
 
-/* ========= Load org data ========= */
+/* ========= Load org ========= */
 async function loadOrg(){
   const [s,l,a]=await Promise.all([
     sb.from('sites').select('id,name').order('name'),
     sb.from('leaders').select('id,name,site_id').order('name'),
-    sb.from('advisors').select('id,name,email,leader_id').order('name')
+    sb.from('advisors').select('id,name,leader_id').order('name')
   ]);
   sites=s.data||[]; leaders=l.data||[]; advisors=a.data||[];
   buildTopFilters(true);
@@ -282,30 +267,24 @@ async function loadOrg(){
 /* ========= Top filters (cascade) ========= */
 function buildTopFilters(first=false){
   const siteSel=$('#siteSel'), leaderSel=$('#leaderSel');
-
-  // Sites
   siteSel.innerHTML = sites.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
   if(first && sites.length){
-    // Prefer Debenhams if it exists
     const deb = sites.find(s=>/debenhams/i.test(s.name));
     siteSel.value = deb? deb.id : sites[0].id;
   }
-  // Leaders filtered by site
   const ls = leaders.filter(l=>String(l.site_id)===String(siteSel.value)).sort((a,b)=>a.name.localeCompare(b.name));
   leaderSel.innerHTML = ls.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
-  if(!selectedLeader || !ls.some(x=>x.id===selectedLeader)) selectedLeader = ls[0]?.id || null;
+  selectedLeader = ls[0]?.id || null;
   if(selectedLeader) leaderSel.value = selectedLeader;
 
   siteSel.onchange=()=>{
-    // When site changes, clear selection & pick first leader in that site
     selectedNames.clear();
     const nextLeaders = leaders.filter(l=>String(l.site_id)===String(siteSel.value)).sort((a,b)=>a.name.localeCompare(b.name));
     selectedLeader = nextLeaders[0]?.id || null;
     buildTopFilters(); buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline();
   };
   leaderSel.onchange=()=>{
-    selectedLeader=leaderSel.value;
-    selectedNames.clear(); // avoid sticking to a previous leader's picks
+    selectedLeader=leaderSel.value; selectedNames.clear();
     buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline();
   };
 
@@ -314,7 +293,7 @@ function buildTopFilters(first=false){
   H.innerHTML = Array.from({length:E-S},(_,i)=>`<div>${pad(S+i)}:00</div>`).join('');
 }
 
-/* ========= Right-side “Schedules” tree ========= */
+/* ========= Right tree ========= */
 function buildTree(){
   const t=$('#tree'); const q=$('#treeSearch').value.trim().toLowerCase();
   const siteId=$('#siteSel').value;
@@ -359,7 +338,7 @@ $('#btnClearSel').onclick=()=>{ selectedNames.clear(); refreshChips(); buildTree
 
 function refreshChips(){
   const c=$('#chips');
-  c.innerHTML=[...selectedNames].sort((a,b)=>a.localeCompare(b)).map(n=>`<span class="chip">${n}<button class="btn small ghost" data-x="${n}">×</button></span>`).join('');
+  c.innerHTML=[...selectedNames].sort((a,b)=>a.localeCompare(b)).map(n=>`<span class="chip">${n}<button class="btn ghost" data-x="${n}">×</button></span>`).join('');
   $$('#chips [data-x]').forEach(b=>b.onclick=()=>{ selectedNames.delete(b.dataset.x); buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline(); });
 }
 
@@ -370,9 +349,9 @@ async function loadTemplates(){
   templates={}; (data||[]).forEach(t=>templates[t.name]=t);
   renderTemplates(); rebuildAssignTable();
 }
-function codeGroupSelectHTML(val=''){
+function groupCodeSelect(val=''){
   const groups={
-    "Activity":["DEB Email","PLT Social","Mirakl","KM Email","KM Social","2nd Line","Admin","QA","Overtime"],
+    "Activity":["DEB Email","Mirakl","PLT Social","Admin","2nd Line","QA","Overtime"],
     "Absence":["AL","Sick","RDO","Maternity","LTS","Split Shift","Break","Lunch"],
     "Shrinkage":["121","ATL","Coaching","Huddle","ITI","Projects","Team Meeting","Training","Meeting"]
   };
@@ -386,18 +365,18 @@ function renderTemplates(){
     const t=templates[n];
     return `<div class="template" data-name="${n}">
       <div class="row"><div>Name</div><input data-f="name" value="${t.name}"></div>
-      <div class="row"><div>New code</div><select data-f="work_code">${codeGroupSelectHTML(t.work_code||'DEB Email')}</select></div>
+      <div class="row"><div>New code</div><select data-f="work_code">${groupCodeSelect(t.work_code||'DEB Email')}</select></div>
       <div class="row"><div>Start / Finish</div><div class="inline"><input type="time" data-f="start_time" value="${(t.start_time||'').slice(0,5)}"> <input type="time" data-f="finish_time" value="${(t.finish_time||'').slice(0,5)}"></div></div>
       <div class="row"><div>Breaks</div><div class="inline">
         <input type="time" data-f="break1" value="${(t.break1||'').slice(0,5)}" title="Break 1 (15m)">
         <input type="time" data-f="lunch"  value="${(t.lunch||'').slice(0,5)}"  title="Lunch (30m)">
         <input type="time" data-f="break2" value="${(t.break2||'').slice(0,5)}" title="Break 2 (15m)">
       </div></div>
-      <div class="actions"><button class="btn small ghost" data-dup="${n}">Duplicate</button><button class="btn small" style="background:#ffe8e6;color:#9a1919;border:1px solid #ffb7b0" data-del="${n}">Delete</button></div>
+      <div class="actions"><button class="btn ghost" data-dup="${n}">Duplicate</button><button class="btn" style="background:#ffe8e6;color:#9a1919;border:1px solid #ffb7b0" data-del="${n}">Delete</button></div>
     </div>`;
   }).join('');
 
-  // Bind
+  // Bind updates
   $$('#templWrap .template').forEach(box=>{
     const orig=box.dataset.name;
     box.querySelector('[data-dup]').onclick=async()=>{
@@ -443,7 +422,7 @@ $('#btnLoadSamples').onclick=async()=>{
   loadTemplates();
 };
 
-/* ========= Assignment table ========= */
+/* ========= Assignment ========= */
 function rebuildAssignTable(){
   const body=$('#assignBody');
   const lid=$('#leaderSel').value;
@@ -474,7 +453,7 @@ function segmentsFromTemplate(tmp){
   const b1=toMin(tmp.break1), l=toMin(tmp.lunch), b2=toMin(tmp.break2);
   const segs=[];
   function addWork(a,b){ if(a!=null && b!=null && b>a) segs.push({code:tmp.work_code,start:a,end:b}); }
-  function add(code,at,dur){ if(at!=null){ const d= code==='Lunch'?30:15; segs.push({code, start:at, end:at+(dur||d)}); } }
+  function add(code,at,dur){ if(at!=null){ const d=(code==='Lunch')?30:15; segs.push({code, start:at, end:at+(dur||d)}); } }
 
   if(b1){ addWork(s,b1); add('Break',b1,15); addWork(b1+15,(l||b2||e)); }
   else if(l){ addWork(s,l); add('Lunch',l,30); addWork(l+30,(b2||e)); }
@@ -498,9 +477,15 @@ function renderTimeline(fromAssignments=false){
   const team=advisors.filter(a=>String(a.leader_id)===String(lid)).sort((a,b)=>a.name.localeCompare(b.name));
   const rows = ($('#viewSel').value==='TEAM_SELECTED' && selectedNames.size)? team.filter(a=>selectedNames.has(a.name)) : team;
 
+  const S=+getComputedStyle(document.documentElement).getPropertyValue('--start')||6;
+  const E=+getComputedStyle(document.documentElement).getPropertyValue('--end')||20;
+
   rows.forEach(adv=>{
     const r=document.createElement('div'); r.className='row';
-    r.innerHTML=`<div class="rname">${adv.name}</div><div class="rline" data-row="${adv.id}"></div>`;
+    // Badge from MONDAY template (or the first non-empty day)
+    let badge='';
+    for(let di=0; di<7; di++){ const tName=assigned.get(`${adv.id}-${di}`); if(tName){ badge=TEMPLATE_BADGE(tName); break; } }
+    r.innerHTML=`<div class="rname">${adv.name}${badge?`<span class="badge-sm">${badge}</span>`:''}</div><div class="rline" data-row="${adv.id}"></div>`;
     body.appendChild(r);
     DAYS.forEach((_,di)=>{
       const tName=assigned.get(`${adv.id}-${di}`); if(!tName||!templates[tName]) return;
@@ -510,57 +495,43 @@ function renderTimeline(fromAssignments=false){
         const p=spanPct(start,end);
         const el=document.createElement('div'); el.className=`bar ${clsFor(seg.code)}`;
         el.style.left=`${p.left}%`; el.style.width=`${p.width}%`;
-        el.dataset.adv=adv.id; el.dataset.di=di; el.dataset.code=seg.code; el.dataset.start=seg.start; el.dataset.end=seg.end;
-        el.innerHTML=`<span>${seg.code.toUpperCase()}</span><span class="t">${m2hhmm(seg.start)}–${m2hhmm(seg.end)}</span>`;
-        el.onclick=()=>openEdit(el);
+        // Tooltip content
+        el.dataset.tt = `${seg.code}  ${m2hhmm(seg.start)}–${m2hhmm(seg.end)}`;
         r.lastElementChild.appendChild(el);
       });
     });
   });
 
-  if(fromAssignments) alert('Generated from assignments. Click blocks to tweak, then Publish.');
+  drawNowLine();
+
+  if(fromAssignments) console.log('Generated from assignments.');
 }
 
-/* Edit dialog */
-function codeOptionsHTML(sel=''){
-  const buckets={
-    Activity:["DEB Email","Mirakl","PLT Social","Admin","2nd Line","QA","Overtime"],
-    Absence:["AL","Sick","RDO","Maternity","LTS","Break","Lunch"],
-    Shrinkage:["121","ATL","Coaching","Huddle","ITI","Projects","Team Meeting","Training","Meeting"]
-  };
-  return Object.entries(buckets).map(([g,arr])=>`<optgroup label="${g}">${arr.map(c=>`<option ${c===sel?'selected':''}>${c}</option>`).join('')}</optgroup>`).join('');
-}
-function openEdit(bar){
-  $('#eCode').innerHTML=codeOptionsHTML(bar.dataset.code||'');
-  $('#eStart').value=m2hhmm(+bar.dataset.start);
-  $('#eEnd').value=m2hhmm(+bar.dataset.end);
-  editDlg.showModal();
-  $('#eOK').onclick=()=>{
-    const code=$('#eCode').value;
-    const s=toMin($('#eStart').value), e=toMin($('#eEnd').value);
-    if(!s||!e||e<=s){ alert('Check start/end times.'); return; }
-    bar.dataset.code=code; bar.dataset.start=s; bar.dataset.end=e;
-    bar.firstElementChild.textContent=code.toUpperCase();
-    bar.querySelector('.t').textContent=`${m2hhmm(s)}–${m2hhmm(e)}`;
-    const di=+bar.dataset.di; const p=spanPct(s+di*1440,e+di*1440);
-    bar.style.left=`${p.left}%`; bar.style.width=`${p.width}%`; bar.className=`bar ${clsFor(code)}`;
-    editDlg.close();
-  };
+/* Now line for current day/time */
+function drawNowLine(){
+  // remove previous
+  $$('#tlBody .nowline').forEach(n=>n.remove());
+  const today=new Date();
+  const weekStart=toMonday(new Date($('#weekInput').value||isoLocal(monday)));
+  const diffDays=Math.floor((today - weekStart)/(24*3600*1000));
+  if(diffDays<0 || diffDays>6) return; // out of this week
+  const mins=today.getHours()*60 + today.getMinutes();
+  const startDay = diffDays*1440;
+  const p=spanPct(startDay+mins,startDay+mins+1);
+  // add to every rline
+  $$('#tlBody .rline').forEach(line=>{
+    const nl=document.createElement('div'); nl.className='nowline'; nl.style.left=`${p.left}%`; line.appendChild(nl);
+  });
 }
 
-/* Save/Load JSON (local) */
-$('#btnSaveLocal').onclick=()=>{
-  const state={assigned:[...assigned],selected:[...selectedNames],monday:isoLocal(monday)};
-  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
-  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota_state.json'; a.click();
-};
-$('#btnLoadLocal').onclick=()=>{
-  const inp=document.createElement('input'); inp.type='file'; inp.accept='.json';
-  inp.onchange=()=>{ const f=inp.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ try{
-      const obj=JSON.parse(rd.result); assigned=new Map(obj.assigned||[]); selectedNames=new Set(obj.selected||[]); monday=toMonday(new Date(obj.monday)); $('#weekInput').value=isoLocal(monday); refreshChips(); buildTree(); rebuildAssignTable(); renderTimeline();
-  }catch(e){ alert('Invalid file'); } }; rd.readAsText(f); };
-  inp.click();
-};
+/* Hover tooltip */
+const tip=$('#tip');
+document.addEventListener('mousemove',e=>{
+  const bar=e.target.closest('.bar');
+  if(!bar){ tip.classList.add('hidden'); return; }
+  tip.textContent=bar.dataset.tt||''; tip.classList.remove('hidden');
+  tip.style.left=e.pageX+'px'; tip.style.top=e.pageY+'px';
+});
 
 /* Publish (rotas + rotas_published) */
 $('#btnPublish').onclick=async()=>{
@@ -599,7 +570,7 @@ $('#btnPublish').onclick=async()=>{
   }
 };
 
-/* ========= Week controls (LOCAL date handling to avoid 05/10 issue) ========= */
+/* ========= Week controls ========= */
 $('#weekInput').value = isoLocal(monday);
 $('#prevW').onclick=()=>{ monday=addDays(monday,-7); $('#weekInput').value=isoLocal(monday); renderTimeline(); };
 $('#nextW').onclick=()=>{ monday=addDays(monday,7);  $('#weekInput').value=isoLocal(monday); renderTimeline(); };
