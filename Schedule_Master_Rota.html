@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Professional Team Rota System — Supabase</title>
+<title>Professional Team Rota System — Supabase (Horizontal)</title>
 <style>
   :root{
     --brand:#0d47a1; --accent:#00c853; --ink:#1f2937; --paper:#ffffff; --wash:#f5f7fb; --line:#e4e9f2;
@@ -47,38 +47,27 @@
   thead th{background:#0d47a1;color:#fff;font-weight:800}
   td.name{position:sticky;left:0;background:#e8f1ff;font-weight:800}
 
-  /* Calendar */
-  .calendar{border-top:1px solid var(--line)}
-  .cal-grid{display:grid;grid-template-columns:80px repeat(7,1fr);grid-auto-flow:column;overflow:auto}
-  .hour-col{border-right:1px solid var(--line);background:#fafcfe}
-  .hour{height:calc(var(--timeline-height)/(var(--timeline-end)-var(--timeline-start)));border-bottom:1px solid var(--line);font-size:12px;color:#748099;text-align:right;padding-right:6px;position:relative;box-sizing:border-box}
-  .hour span{position:absolute;top:-7px;right:6px;background:#fafcfe;padding:0 4px}
+  /* Horizontal week view */
+  .hpanel{background:var(--paper);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 20px rgba(12,27,74,.06)}
+  .hpanel-header{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line)}
+  .hfilters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .hfilters .input{min-width:180px}
+  .hcal{overflow:auto}
+  .hcal table{width:100%;border-collapse:separate;border-spacing:0;min-width:1200px}
+  .hcal th,.hcal td{border-bottom:1px solid var(--line);border-right:1px solid var(--line);padding:6px;vertical-align:top}
+  .hcal th:first-child,.hcal td:first-child{border-left:1px solid var(--line)}
+  .hcal thead th{position:sticky;top:0;background:#f6f8fb;font-weight:800;text-align:center;z-index:2}
+  .hcal .name{position:sticky;left:0;background:#fff;font-weight:800;min-width:220px;z-index:3;text-align:left}
+  .hcal .contract{white-space:nowrap;color:#64748b;font-size:12px;text-align:right;position:sticky;right:0;background:#fff;z-index:2}
+  .hcell{min-width:120px}
+  .hrow{position:relative;height:56px}
+  .hbar{height:22px;border-radius:6px;display:inline-block;position:absolute;margin:3px 0;min-width:6px;top:16px}
+  .hbar .label{position:absolute;left:8px;top:2px;font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.25);white-space:nowrap}
+  .hlegend{display:flex;gap:8px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line);background:#fff}
+  .hchip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:12px}
+  .hdot{width:12px;height:12px;border-radius:50%}
 
-  .day-col{border-left:1px solid var(--line)}
-  .day-head{height:56px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;padding:6px 10px;background:#f6f8fb;font-weight:800}
-  .day-head small{font-weight:700;color:#8792a6}
-  .day-summary{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line)}
-  .summary-right{margin-left:auto;color:#5b6b7f;font-size:12px}
-  .day-actions{display:flex;gap:6px;border-bottom:1px solid var(--line);padding:6px 10px}
-  .iconbtn{border:1px solid var(--line);background:#fff;border-radius:6px;padding:6px 8px;cursor:pointer}
-  .off{height:40px;border-bottom:1px solid var(--line);padding:8px 10px;background:repeating-linear-gradient(45deg,#f2f3f7,#f2f3f7 8px,#e8ecf4 8px,#e8ecf4 16px);font-weight:800;color:#8892a0}
-  .timeline-cell{position:relative;height:var(--timeline-height);background:
-    linear-gradient(#0000,#0000),
-    repeating-linear-gradient(180deg,#0000,#0000 calc(100%/(var(--timeline-end) - var(--timeline-start))), var(--line) 0, var(--line) calc(100%/(var(--timeline-end) - var(--timeline-start)) + 1px));}
-  .block{position:absolute;left:10px;right:10px;border-radius:6px;padding:3px 6px;font-size:11px;font-weight:800;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12);line-height:1.1;cursor:pointer;display:flex;justify-content:space-between;gap:6px;align-items:flex-start}
-  .block .time{display:block;font-weight:700;font-size:10px;opacity:.95}
-
-  .c-email{background:var(--color-email)}
-  .c-mirakl{background:var(--color-mirakl)}
-  .c-social{background:var(--color-social)}
-  .c-break{background:var(--color-break);color:#213}
-  .c-lunch{background:var(--color-lunch);color:#213}
-  .c-overtime{background:var(--color-overtime)}
-  .c-absence{background:var(--color-absence)}
-  .c-shrink{background:var(--color-shrink);color:#213}
-
-  @media print{.no-print{display:none} .panel{box-shadow:none}}
-
+  @media print{.no-print{display:none} .panel,.hpanel{box-shadow:none}}
   /* Dialogs */
   .row{display:flex;gap:8px;align-items:center;margin:6px 0}
   .row .del{background:#ffe2e2;color:#b42318;border:1px solid #f2b8b5;border-radius:6px;padding:4px 8px;cursor:pointer}
@@ -96,7 +85,6 @@
   .node-actions button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:3px 6px;cursor:pointer;font-size:11px}
 </style>
 
-<!-- Supabase client library -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -110,9 +98,7 @@
   </div>
 
   <div class="layout">
-    <!-- Main column -->
     <div style="display:flex;flex-direction:column;gap:18px">
-      <!-- Controls -->
       <div class="panel">
         <div class="panel-body" style="display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center">
           <label>Week start (Monday)</label>
@@ -125,12 +111,10 @@
             <option>Friday</option><option>Saturday</option><option>Sunday</option>
           </select>
           <button class="btn" id="btnGenerate">Generate</button>
-          <button class="btn subtle" id="btnPublish">Publish</button>
           <span class="muted" id="rangeLabel" style="margin-left:auto"></span>
         </div>
       </div>
 
-      <!-- Collapsible Settings / Templates / Assignment -->
       <details class="panel collapsible no-print" id="settingsBox" open>
         <summary class="panel-header" style="cursor:pointer">
           <h2>Settings / Templates</h2><span class="chev">▶</span>
@@ -174,24 +158,49 @@
         </div>
       </details>
 
-      <!-- Calendar -->
-      <div class="panel">
-        <div class="panel-header"><h2 id="calTitle">Advisor Week (Calendar)</h2>
-          <div style="display:flex;gap:6px;align-items:center">
-            <button class="btn subtle icon" id="prevWeek">◀</button>
-            <button class="btn subtle icon" id="btnToday">Today</button>
-            <button class="btn subtle icon" id="nextWeek">▶</button>
+      <div class="hpanel">
+        <div class="hpanel-header">
+          <h2 style="margin:0">Team Week (Horizontal)</h2>
+          <div class="hfilters">
+            <input id="hSearch" class="input" placeholder="Filter by leader/advisor…"/>
+            <select id="hSite" class="input"></select>
+            <select id="hLeader" class="input"></select>
+            <label class="muted">Week:</label>
+            <input id="hWeekStart" type="date" class="input"/>
+            <button class="btn subtle icon" id="hPrev">◀</button>
+            <button class="btn subtle icon" id="hToday2">Today</button>
+            <button class="btn subtle icon" id="hNext">▶</button>
           </div>
+          <div class="muted" id="hRange"></div>
         </div>
-        <div class="panel-body calendar">
-          <div class="cal-grid" id="calGrid">
-            <div class="hour-col"><div id="hours"></div></div>
+        <div class="panel-body" style="padding:0">
+          <div class="hcal">
+            <table id="hTable">
+              <thead>
+                <tr>
+                  <th class="name">Name</th>
+                  <th>06:00</th><th>07:00</th><th>08:00</th><th>09:00</th><th>10:00</th>
+                  <th>11:00</th><th>12:00</th><th>13:00</th><th>14:00</th><th>15:00</th>
+                  <th>16:00</th><th>17:00</th><th>18:00</th><th>19:00</th><th>20:00</th>
+                  <th class="contract">Contract</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="hlegend">
+            <span class="hchip"><span class="hdot" style="background:var(--color-email)"></span>Email</span>
+            <span class="hchip"><span class="hdot" style="background:var(--color-mirakl)"></span>Mirakl</span>
+            <span class="hchip"><span class="hdot" style="background:var(--color-social)"></span>Social</span>
+            <span class="hchip"><span class="hdot" style="background:var(--color-meeting)"></span>Meeting/Training</span>
+            <span class="hchip"><span class="hdot" style="background:var(--color-overtime)"></span>Overtime</span>
+            <span class="hchip"><span class="hdot" style="background:var(--color-break)"></span>Break</span>
+            <span class="hchip"><span class="hdot" style="background:var(--color-lunch)"></span>Lunch</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Right sidebar: Schedules -->
     <div class="panel">
       <div class="panel-header"><h2>Schedules</h2></div>
       <div class="panel-body">
@@ -205,20 +214,6 @@
     </div>
   </div>
 
-
-  <!-- Publish confirmation dialog -->
-  <dialog id="publishDlg" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;">
-    <div style="font-weight:800;margin-bottom:6px">Publish changes</div>
-    <div class="muted" id="publishSummary" style="margin-bottom:8px"></div>
-    <div id="publishList" style="max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
-      <button id="publishOK" class="btn">Publish</button>
-      <button onclick="publishDlg.close()" class="btn subtle">Cancel</button>
-    </div>
-  </dialog>
-
-
-  <!-- Assign / Split dialog -->
   <dialog id="assignDlg" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;">
     <div style="font-weight:800;margin-bottom:6px"><span id="assignTitle">Assign</span></div>
     <div class="row"><label><input type="radio" name="mode" value="template" id="modeTemplate"> Use template</label>
@@ -245,7 +240,6 @@
     </div>
   </dialog>
 
-  <!-- Click-a-block Editor -->
   <dialog id="blockDlg" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;">
     <div style="font-weight:800;margin-bottom:6px"><span id="blockTitle">Edit block</span></div>
     <div class="row"><label><input type="radio" name="blockmode" value="whole" id="bmWhole"> Edit block</label>
@@ -268,15 +262,10 @@
   </dialog>
 
   <script>
-/* =========================
-   Supabase configuration
-   ========================= */
 const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
-
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-/* ===== App State ===== */
 const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 let ORG = { sites:{} };
 let TEMPLATES = {};
@@ -286,21 +275,14 @@ let ADVISOR_BY_ID = new Map();
 let ROTAS = new Map();
 let selectedAdvisors = new Set();
 
-/* ===== Helpers ===== */
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const pad=n=>String(n).padStart(2,'0');
-const fmt=(t)=>t?t.slice(0,5):''; // HH:MM from HH:MM:SS
+const fmt=(t)=>t?t.slice(0,5):'';
 function setToMonday(d){ const day=d.getDay(); const diff=(day===0?-6:1)-day; d.setDate(d.getDate()+diff); return d; }
 function toMin(t){ if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
 function m2t(m){ return `${pad(Math.floor(m/60))}:${pad(m%60)}`; }
+function getCss(varName, fallback){ return getComputedStyle(document.documentElement).getPropertyValue(varName)?.trim() || fallback; }
 
-const css=getComputedStyle(document.documentElement);
-const START=+css.getPropertyValue('--timeline-start')||7;
-const END=+css.getPropertyValue('--timeline-end')||20;
-const HEIGHT=+css.getPropertyValue('--timeline-height').replace('px','')||800;
-const PX_PER_MIN = HEIGHT/((END-START)*60);
-
-/* ===== Colours UI ===== */
 function buildColorKey(){
   const defs=[['email','Email','--color-email'],['mirakl','Mirakl','--color-mirakl'],['social','Social','--color-social'],['overtime','Overtime','--color-overtime'],['break','Break','--color-break'],['lunch','Lunch','--color-lunch'],['absence','Absence','--color-absence'],['shrink','Shrinkage','--color-shrink']];
   const el=$('#colorKey');
@@ -311,7 +293,6 @@ function buildColorKey(){
   $$('#colorKey input').forEach(inp=>inp.addEventListener('input',()=>{ document.documentElement.style.setProperty(inp.dataset.k, inp.value); }));
 }
 
-/* ===== Code groups for selectors ===== */
 const CODE_GROUPS = {
   "Activity":[
     "2nd Line","Admin","BH Email","BH Social","BH WhatsApp","DEB Email","DEB Social","DEB WhatsApp","Ebay",
@@ -339,26 +320,21 @@ function classForCode(code){
   return 'c-email';
 }
 
-/* ===== Templates UI ===== */
 function templateRow(t){
   return `<div class="template-row" data-name="${t.name}">
     <label>Name</label>
     <input data-f="name" type="text" value="${t.name}" style="width:140px">
-
     <label>New code</label>
     <select data-f="work_code">${codeSelectGroupedHTML(t.work_code||'Admin')}</select>
-
     <label>Start / Finish</label>
     <div class="inline"><input data-f="start_time" type="time" value="${fmt(t.start_time)||''}">
       <input data-f="finish_time" type="time" value="${fmt(t.finish_time)||''}"></div>
-
     <label>Breaks</label>
     <div class="inline">
       <input data-f="break1" type="time" value="${fmt(t.break1)||''}"  title="Break 1 (15m)">
       <input data-f="lunch"  type="time" value="${fmt(t.lunch)||''}"   title="Lunch (30m)">
       <input data-f="break2" type="time" value="${fmt(t.break2)||''}"  title="Break 2 (15m)">
     </div>
-
     <div class="full" style="display:flex;justify-content:flex-end">
       <button class="danger" data-act="del">Delete</button>
     </div>
@@ -405,22 +381,24 @@ function populateTemplateEditor(){
     };
   });
 }
-$('#btnAddTemplate').onclick = async()=>{
-  // Safe defaults to avoid NOT NULL issues
+document.addEventListener('click', (e)=>{
+  if(e.target && e.target.id==='btnAddTemplate') return;
+});
+
+$('#btnAddTemplate')?.addEventListener('click', async()=>{
   const name='Shift '+(Object.keys(TEMPLATES).length+1);
   const {error}=await sb.from('templates').insert([{name,work_code:'Admin',start_time:'09:00',finish_time:'17:00',break1:null,lunch:'12:30',break2:null}]);
   if(error) alert('Add failed: '+error.message);
-};
-$('#btnLoadDefaults').onclick = async()=>{
+});
+$('#btnLoadDefaults')?.addEventListener('click', async()=>{
   const defaults=[
     {name:'Early',  work_code:'DEB Email', start_time:'07:00', finish_time:'16:00', break1:'09:15', lunch:'12:00', break2:'15:15'},
     {name:'Middle', work_code:'Mirakl',    start_time:'11:00', finish_time:'20:00', break1:'11:30', lunch:'15:30', break2:'17:45'},
     {name:'Late',   work_code:'PLT Social',start_time:'12:00', finish_time:'21:00', break1:'13:15', lunch:'17:00', break2:'19:15'},
   ];
   for(const t of defaults){ await sb.from('templates').upsert(t, { onConflict:'name' }); }
-};
+});
 
-/* ===== Load Org (sites/leaders/advisors) ===== */
 async function loadOrg(){
   const [sitesRes, leadersRes, advisorsRes] = await Promise.all([
     sb.from('sites').select('*').order('name', {ascending:true}),
@@ -443,10 +421,8 @@ async function loadOrg(){
   ADVISOR_BY_ID   = new Map(ADVISORS_LIST.map(a=>[a.id,a.name]));
 }
 
-/* ===== Schedules Tree ===== */
 function rebuildTree(){
   const t=$('#tree'); const q=$('#treeSearch').value.trim().toLowerCase();
-
   function advisorNode(obj){
     const checked = selectedAdvisors.has(obj.name) ? 'checked' : '';
     return `<div class="node">
@@ -458,7 +434,6 @@ function rebuildTree(){
       </div>
     </div>`;
   }
-
   function leaderBlock(leaderName, leaderObj){
     const team = leaderObj.advisors || [];
     const match = (str)=>!q || str.toLowerCase().includes(q);
@@ -482,7 +457,6 @@ function rebuildTree(){
       </div>
     </details>`;
   }
-
   function siteBlock(siteName, siteObj){
     const leaders = siteObj.leaders || {};
     const blocks = Object.entries(leaders).map(([ln,lobj])=>leaderBlock(ln,lobj)).filter(Boolean);
@@ -501,35 +475,26 @@ function rebuildTree(){
       ${blocks.join('')}
     </details>`;
   }
-
   t.innerHTML = Object.entries(ORG.sites).sort((a,b)=>a[0].localeCompare(b[0])).map(([sn,so])=>siteBlock(sn,so)).join('') || '<div class="muted">No sites yet.</div>';
-
-  // Twisties update
   $$('#tree details').forEach(d=>{
     const twisty = d.querySelector('[data-twisty]');
     const update = ()=>{ twisty.textContent = d.open ? '−' : '+'; };
     d.addEventListener('toggle', update); update();
   });
-
-  // Leader select-all (visibly ticks children)
   $$('#tree [data-leader]').forEach(cb=>{
     cb.onchange=()=>{
       const leaderId=cb.dataset.leader;
       const leaderNode = Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===leaderId);
       (leaderNode?.advisors||[]).forEach(a=> cb.checked ? selectedAdvisors.add(a.name) : selectedAdvisors.delete(a.name));
-      refreshChips(); populateAssignTable(); renderCalendar(); rebuildTree(); // re-render to show ticks
+      refreshChips(); populateAssignTable(); renderCalendar(); rebuildTree();
     };
   });
-
-  // Advisor select
   $$('#tree [data-adv-id]').forEach(ch=>{
     ch.onchange=()=>{
       const name=ch.dataset.advName; ch.checked?selectedAdvisors.add(name):selectedAdvisors.delete(name);
       refreshChips(); populateAssignTable(); renderCalendar();
     };
   });
-
-  // Site actions
   $$('#tree [data-add-lead]').forEach(b=>b.onclick=async()=>{
     const siteId=b.dataset.addLead; const name=prompt('Leader name'); if(!name) return;
     const {error}=await sb.from('leaders').insert([{site_id:siteId, name}]); if(error) alert(error.message);
@@ -543,8 +508,6 @@ function rebuildTree(){
     const siteId=b.dataset.removeSite; if(!confirm('Delete site and its leaders/advisors?')) return;
     const {error}=await sb.from('sites').delete().eq('id',siteId); if(error) alert(error.message);
   });
-
-  // Leader actions
   $$('#tree [data-rename-lead]').forEach(b=>b.onclick=async()=>{
     const id=b.dataset.renameLead; const current = Object.values(ORG.sites).flatMap(s=>Object.entries(s.leaders)).find(([n,l])=>l.id===id)?.[0]||'';
     const nn=prompt('Rename leader', current); if(!nn||nn===current) return;
@@ -554,8 +517,6 @@ function rebuildTree(){
     const id=b.dataset.removeLead; if(!confirm('Remove leader and their advisors?')) return;
     const {error}=await sb.from('leaders').delete().eq('id',id); if(error) alert(error.message);
   });
-
-  // Advisor actions
   $$('#tree [data-add-adv]').forEach(b=>b.onclick=async()=>{
     const leaderId=b.dataset.addAdv; const n=prompt('Advisor name'); if(!n) return;
     const {error}=await sb.from('advisors').insert([{leader_id:leaderId, name:n}]); if(error) alert(error.message);
@@ -571,20 +532,14 @@ function rebuildTree(){
   });
 }
 
-/* ===== Helper: get leader team names ===== */
 function getLeaderTeamNames(leaderId){
-  const leader = Object.values(ORG.sites)
-    .flatMap(s => Object.values(s.leaders || {}))
-    .find(l => l.id === leaderId);
+  const leader = Object.values(ORG.sites).flatMap(s => Object.values(s.leaders || {})).find(l => l.id === leaderId);
   if(!leader) return [];
   return (leader.advisors || []).map(a => a.name).sort((a,b)=>a.localeCompare(b));
 }
 
-/* ===== Advisor dropdown (View) ===== */
 function rebuildAdvisorDropdown(){
   const sel = $('#advisorSelect');
-
-  // Leaders
   const leaders = [];
   Object.values(ORG.sites).forEach(site => {
     Object.entries(site.leaders || {}).forEach(([lname, lobj]) => {
@@ -592,15 +547,9 @@ function rebuildAdvisorDropdown(){
     });
   });
   leaders.sort((a,b)=>a.name.localeCompare(b.name));
-
-  // Advisors
-  const advisors = ADVISORS_LIST
-    .map(a => ({ id: a.id, name: a.name }))
-    .sort((a,b)=>a.name.localeCompare(b.name));
-
+  const advisors = ADVISORS_LIST.map(a => ({ id: a.id, name: a.name })).sort((a,b)=>a.name.localeCompare(b.name));
   const leaderOpts = leaders.map(l => `<option value="leader::${l.id}">${l.name} — Team</option>`).join('');
   const advisorOpts = advisors.map(a => `<option value="advisor::${a.id}">${a.name}</option>`).join('');
-
   sel.innerHTML = `
     <option value="__TEAM_SELECTED__">Team (Selected)</option>
     <option value="__TEAM_ALL__">Team (All)</option>
@@ -609,7 +558,6 @@ function rebuildAdvisorDropdown(){
   `;
 }
 
-/* ===== Assignment table ===== */
 function populateAssignTable(){
   const head=$('#dateHeaders'), body=$('#assignTable tbody');
   head.innerHTML=DAYS.map(d=>`<th>${d.slice(0,3)}<br><span class="muted" data-date></span></th>`).join('');
@@ -633,31 +581,19 @@ function populateAssignTable(){
       const current = data[day];
       const currentVal = (typeof current==='string') ? current : '';
       sel.value = currentVal;
-      
       sel.onchange = async()=>{
         const newVal = sel.value;
         const fresh = Object.assign({}, ROTAS.get(key) || {});
-        const willOverwrite = fresh.hasOwnProperty(day) && JSON.stringify(fresh[day]) !== JSON.stringify(newVal || '');
-        if (willOverwrite){
-          const ok = await confirmOverwriteDay(aId, ws, day, newVal || '');
-          if (!ok){ sel.value = (typeof fresh[day] === 'string') ? fresh[day] : ''; return; }
-        }
         if(newVal) fresh[day] = newVal; else delete fresh[day];
         await upsertRota(aId, ws, fresh);
         renderCalendar();
       };
-
       td.appendChild(sel); tr.appendChild(td);
     });
     body.appendChild(tr);
   });
 }
 
-/* ===== Hours / Calendar base ===== */
-function hoursHTML(){ let h=''; const START=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-start'))||7; const END=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-end'))||20; for(let i=START;i<=END;i++){ h+=`<div class="hour"><span>${String(i).padStart(2,'0')}:00</span></div>`; } return h; }
-function resetGrid(){ $('#calGrid').innerHTML = '<div class="hour-col"><div id="hours"></div></div>'; $('#hours').innerHTML=hoursHTML(); }
-
-/* ===== Templates → segments ===== */
 function processTemplateToSegments(t){
   if(!t||!t.start_time||!t.finish_time) return [];
   const s=toMin(fmt(t.start_time)), e=toMin(fmt(t.finish_time)); if(e<=s) return [];
@@ -697,125 +633,133 @@ function processDayValue(dayValue){
   return [];
 }
 
-/* ===== Calendar renderers ===== */
+const H_START = 6, H_END = 20;
+function getCss(varName, fallback){ return getComputedStyle(document.documentElement).getPropertyValue(varName)?.trim() || fallback; }
+function m2t(m){ const h=Math.floor(m/60), mm=m%60; return (h+'').padStart(2,'0')+':'+(mm+'').padStart(2,'0'); }
+function colorFor(code){
+  const k=(code||'').toLowerCase();
+  if(/\blunch\b/.test(k)) return getCss('--color-lunch','#b0bec5');
+  if(/\bbreak\b/.test(k)) return getCss('--color-break','#cfd8dc');
+  if(/\bovertime\b/.test(k)) return getCss('--color-overtime','#e53935');
+  if(/\bmirakl\b/.test(k)) return getCss('--color-mirakl','#b1b51e');
+  if(/\bsocial\b/.test(k)) return getCss('--color-social','#5e35b1');
+  if(/\bemail\b/.test(k)) return getCss('--color-email','#2ecc71');
+  if(['121','atl','coaching','huddle','iti','projects','team meeting','training'].some(w=>k.includes(w)))
+    return getCss('--color-meeting','#ffd700');
+  return getCss('--color-email','#2ecc71');
+}
+function hRangeLabel(d0){
+  const s=new Date(d0+'T00:00:00'); const e=new Date(s); e.setDate(e.getDate()+6);
+  const f=x=>x.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'});
+  return `${f(s)} – ${f(e)}`;
+}
+
+async function renderHorizontalWeek(){
+  const ws = $('#hWeekStart').value || $('#weekStart').value;
+  if(!ws) return;
+
+  let names = [...selectedAdvisors];
+  if(!names.length){
+    const val = $('#advisorSelect').value;
+    if(val && val.startsWith('leader::')){
+      names = getLeaderTeamNames(val.split('::')[1]);
+    } else if(val==='__TEAM_ALL__'){
+      names = ADVISORS_LIST.map(a=>a.name);
+    } else if(val && val.startsWith('advisor::')){
+      const id = val.split('::')[1];
+      names = [ ADVISOR_BY_ID.get(id) ].filter(Boolean);
+    } else {
+      names = ADVISORS_LIST.map(a=>a.name);
+    }
+  }
+
+  const q = ($('#hSearch').value||'').trim().toLowerCase();
+  if(q){ names = names.filter(n=> n.toLowerCase().includes(q)); }
+  names.sort((a,b)=>a.localeCompare(b));
+
+  if(!$('#hSite').dataset.ready){
+    $('#hSite').innerHTML = `<option value="">All sites</option>` +
+      Object.entries(ORG.sites).sort((a,b)=>a[0].localeCompare(b[0]))
+        .map(([n,s])=>`<option value="${s.id}">${n}</option>`).join('');
+    $('#hLeader').innerHTML = `<option value="">All leaders</option>` +
+      Object.values(ORG.sites).flatMap(s=>Object.entries(s.leaders))
+        .sort((a,b)=>a[0].localeCompare(b[0]))
+        .map(([n,l])=>`<option value="${l.id}">${n}</option>`).join('');
+    $('#hSite').dataset.ready='1'; $('#hLeader').dataset.ready='1';
+  }
+  const siteFilter = $('#hSite').value;
+  const leaderFilter = $('#hLeader').value;
+  if(siteFilter || leaderFilter){
+    const allowed = new Set();
+    Object.values(ORG.sites).forEach(s=>{
+      if(siteFilter && s.id!==siteFilter) return;
+      Object.values(s.leaders).forEach(l=>{
+        if(leaderFilter && l.id!==leaderFilter) return;
+        (l.advisors||[]).forEach(a=> allowed.add(a.name));
+      });
+    });
+    names = names.filter(n=>allowed.has(n));
+  }
+
+  $('#hRange').textContent = hRangeLabel(ws);
+
+  const tbody = document.querySelector('#hTable tbody');
+  tbody.innerHTML = '';
+
+  names.forEach(advName=>{
+    const tr=document.createElement('tr'); tr.className='hrow';
+    const nameTd=document.createElement('td'); nameTd.className='name'; nameTd.textContent=advName; tr.appendChild(nameTd);
+    for(let h=H_START; h<=H_END; h++){ const td=document.createElement('td'); td.className='hcell'; tr.appendChild(td); }
+    const c=document.createElement('td'); c.className='contract'; c.textContent=''; tr.appendChild(c);
+    tbody.appendChild(tr);
+  });
+
+  names.forEach(advName=>{
+    const aId=ADVISOR_BY_NAME.get(advName); if(!aId) return;
+    const key = `${aId}::${ws}`;
+    const data = ROTAS.get(key) || {};
+    const spanHours = (H_END - H_START);
+    const table = document.getElementById('hTable');
+    const firstRow = tbody.querySelector('tr');
+    const stickyOffset = firstRow ? firstRow.children[0].getBoundingClientRect().width : 220;
+
+    DAYS.forEach((dayName, di)=>{
+      const dayVal = data[dayName];
+      const segs = processDayValue(dayVal);
+      segs.forEach(seg=>{
+        let sMin = Math.max(H_START*60, seg.start);
+        let eMin = Math.min(H_END*60, seg.end);
+        if(eMin<=sMin) return;
+        const leftPct = ((sMin - H_START*60) / (spanHours*60)) * 100;
+        const widthPct = ((eMin - sMin) / (spanHours*60)) * 100;
+
+        const bar=document.createElement('div'); bar.className='hbar';
+        bar.style.left = `calc(${stickyOffset}px + ${leftPct}% * 1)`;
+        bar.style.width = `calc(${widthPct}% * 1)`;
+        bar.style.background = colorFor(seg.label);
+        bar.style.top = `${(di * 56) + 18}px`;
+        const label=document.createElement('span'); label.className='label';
+        label.textContent=`${(seg.label||'').toUpperCase()}  ${m2t(seg.start)}–${m2t(seg.end)}`;
+        bar.appendChild(label);
+        tbody.appendChild(bar);
+      });
+    });
+  });
+}
+
 function updateRangeLabel(){
-  const ws=$('#weekStart').value; const adv=$('#advisorSelect').value;
-  if(!ws){ $('#rangeLabel').textContent=''; return; }
+  const ws=$('#weekStart').value; if(!ws){ $('#rangeLabel').textContent=''; return; }
   const s=new Date(ws+'T00:00:00'); const e=new Date(s); e.setDate(e.getDate()+6);
   const f=d=>d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
-  if(adv==='__TEAM_SELECTED__' || adv==='__TEAM_ALL__'){
-    const idx=DAYS.indexOf($('#teamDay').value||'Monday'); const d=new Date(s); d.setDate(d.getDate()+idx);
-    $('#rangeLabel').textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
-    $('#calTitle').textContent=(adv==='__TEAM_ALL__'?'Team (All)':'Team (Selected)')+' – Single Day';
-  } else {
-    $('#rangeLabel').textContent=`${f(s)} – ${f(e)}`;
-    $('#calTitle').textContent='Advisor Week (Calendar)';
-  }
+  $('#rangeLabel').textContent=`${f(s)} – ${f(e)}`;
   $$('#dateHeaders [data-date]').forEach((span,i)=>{ const d=new Date(s); d.setDate(d.getDate()+i); span.textContent=d.toLocaleDateString('en-GB',{month:'short',day:'numeric'}); });
 }
-function renderCalendar(){
-  resetGrid();
-  const advVal=$('#advisorSelect').value;
+function renderCalendar(){ renderHorizontalWeek(); }
 
-  // Team views
-  if(advVal==='__TEAM_SELECTED__' || advVal==='__TEAM_ALL__'){ renderTeamDayCalendar(advVal==='__TEAM_ALL__'); return; }
+const assignDlg=document.getElementById('assignDlg'), assignSelect=document.getElementById('assignSelect'), assignTitle=document.getElementById('assignTitle');
+const modeTemplate=document.getElementById('modeTemplate'), modeSplit=document.getElementById('modeSplit'), modeHint=document.getElementById('modeHint');
+const segmentsWrap=document.getElementById('segmentsWrap');
 
-  // Single advisor view (support both "advisor::ID" and legacy name values)
-  let aId=null, advName=null;
-  if(advVal.startsWith && advVal.startsWith('advisor::')){
-    aId = advVal.split('::')[1];
-    advName = ADVISOR_BY_ID.get(aId) || '';
-  } else {
-    advName = advVal;
-    aId = ADVISOR_BY_NAME.get(advName);
-  }
-  if(!aId) return;
-
-  const ws=$('#weekStart').value; const key=`${aId}::${ws}`;
-  const data=ROTAS.get(key) || {};
-  const grid=$('#calGrid'); const s=ws?new Date(ws+'T00:00:00'):null;
-
-  DAYS.forEach((day,idx)=>{
-    const col=document.createElement('div'); col.className='day-col';
-    let month='—', num=''; if(s){ const d=new Date(s); d.setDate(d.getDate()+idx); month=d.toLocaleDateString('en-GB',{month:'long'}); num=d.getDate(); }
-    col.insertAdjacentHTML('beforeend',`<div class="day-head"><small>${month}</small>${day}<span style="float:right">${num}</span></div>`);
-
-    const dayVal = data[day];
-    if(dayVal && typeof dayVal==='object' && Array.isArray(dayVal.segments)){
-      const totalMins = processDayValue(dayVal).reduce((acc,b)=>acc+(b.end-b.start),0);
-      col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">Custom segments</span><span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
-    } else {
-      const tplName = (typeof dayVal==='string') ? dayVal : '';
-      const tpl=TEMPLATES[tplName];
-      if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
-      else { col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">${tplName}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${((toMin(fmt(tpl.finish_time))-toMin(fmt(tpl.start_time)))/60)}h</span></div>`); }
-    }
-
-    col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}">＋</button><button class="iconbtn" data-day="${day}" data-edit>✎</button></div>`);
-    const cell=document.createElement('div'); cell.className='timeline-cell';
-
-    const blocks = processDayValue(dayVal);
-    blocks.forEach(b=>{
-      const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN;
-      const el=document.createElement('div'); el.className=`block ${classForCode(b.label)}`;
-      el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px';
-      el.innerHTML=`<div>${b.label}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span></div>`;
-      el.dataset.day = day; el.dataset.adv = advName; el.dataset.start = m2t(b.start); el.dataset.end = m2t(b.end); el.dataset.code=b.label;
-      el.addEventListener('click', onBlockClick);
-      cell.appendChild(el);
-    });
-
-    col.appendChild(cell); grid.appendChild(col);
-  });
-
-  $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day, advName));
-}
-function renderTeamDayCalendar(showAll){
-  resetGrid();
-  const grid=$('#calGrid'); const ws=$('#weekStart').value; const day=$('#teamDay').value||'Monday';
-  const names = showAll ? ADVISORS_LIST.map(a=>a.name) : [...selectedAdvisors];
-  const s=new Date(ws+'T00:00:00'); const idx=DAYS.indexOf(day); s.setDate(s.getDate()+idx);
-
-  const head=document.createElement('div'); head.className='day-head'; head.style.gridColumn=`1 / span ${1+names.length}`; head.style.height='56px';
-  head.innerHTML=`<small>${s.toLocaleDateString('en-GB',{month:'long'})}</small>${day}<span style="float:right">${s.getDate()}</span>`;
-  grid.appendChild(head);
-
-  names.sort((a,b)=>a.localeCompare(b)).forEach(advName=>{
-    const aId=ADVISOR_BY_NAME.get(advName); if(!aId) return;
-    const key=`${aId}::${ws}`; const data=ROTAS.get(key) || {};
-    const col=document.createElement('div'); col.className='day-col';
-    col.insertAdjacentHTML('beforeend',`<div class="day-head" style="height:56px">${advName}</div>`);
-    const dayVal=data[day];
-    if(dayVal && typeof dayVal==='object' && Array.isArray(dayVal.segments)){
-      const totalMins = processDayValue(dayVal).reduce((acc,b)=>acc+(b.end-b.start),0);
-      col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">Custom segments</span><span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
-    } else {
-      const tplName=(typeof dayVal==='string')?dayVal:''; const tpl=TEMPLATES[tplName];
-      if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
-      else{ col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">${tplName}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${((toMin(fmt(tpl.finish_time))-toMin(fmt(tpl.start_time)))/60)}h</span></div>`); }
-    }
-    col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}" data-adv="${advName}">＋</button><button class="iconbtn" data-day="${day}" data-adv="${advName}" data-edit>✎</button></div>`);
-    const cell=document.createElement('div'); cell.className='timeline-cell';
-    const blocks=processDayValue(dayVal);
-    blocks.forEach(b=>{
-      const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN;
-      const el=document.createElement('div'); el.className=`block ${classForCode(b.label)}`;
-      el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px';
-      el.innerHTML=`<div>${b.label}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span></div>`;
-      el.dataset.day = day; el.dataset.adv = advName; el.dataset.start = m2t(b.start); el.dataset.end = m2t(b.end); el.dataset.code=b.label;
-      el.addEventListener('click', onBlockClick);
-      cell.appendChild(el);
-    });
-    col.appendChild(cell); grid.appendChild(col);
-  });
-
-  $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day, b.dataset.adv));
-}
-
-/* ===== Assign / Split ===== */
-const assignDlg=$('#assignDlg'), assignSelect=$('#assignSelect'), assignTitle=$('#assignTitle');
-const modeTemplate=$('#modeTemplate'), modeSplit=$('#modeSplit'), modeHint=$('#modeHint');
-const segmentsWrap=$('#segmentsWrap');
 function segmentRowHTML(s, idx){
   return `<div class="row" data-i="${idx}">
     <select class="seg-code">${codeSelectGroupedHTML(s.code||'')}</select>
@@ -837,43 +781,43 @@ function readSegmentsUI(){
   return list;
 }
 function openAssign(day, advisorName){
-  const advName=advisorName || $('#advisorSelect').value;
+  const advName=advisorName || document.getElementById('advisorSelect').value;
   const aId=ADVISOR_BY_NAME.get(advName); if(!aId) return;
-  const ws=$('#weekStart').value; const key=`${aId}::${ws}`;
+  const ws=document.getElementById('weekStart').value; const key=`${aId}::${ws}`;
   const data=ROTAS.get(key) || {};
   assignTitle.textContent=`${day} for ${advName}`;
   assignSelect.innerHTML=`<option value="">— Day Off —</option>`+Object.keys(TEMPLATES).sort().map(n=>`<option>${n}</option>`).join('');
 
   if(data[day] && typeof data[day]==='object' && Array.isArray(data[day].segments)){
     modeSplit.checked=true; modeTemplate.checked=false;
-    $('#templateMode').style.display='none'; $('#splitMode').style.display='block';
+    document.getElementById('templateMode').style.display='none'; document.getElementById('splitMode').style.display='block';
     loadSegmentsUI(data[day].segments);
   } else {
     modeTemplate.checked=true; modeSplit.checked=false;
-    $('#templateMode').style.display='block'; $('#splitMode').style.display='none';
+    document.getElementById('templateMode').style.display='block'; document.getElementById('splitMode').style.display='none';
     assignSelect.value = (typeof data[day]==='string')? data[day] : '';
     const tplName = assignSelect.value;
     modeHint.textContent = tplName? `Current: ${tplName}. Convert to editable segments to tweak a small part.` : '';
   }
 
-  $('#btnConvertToSplit').onclick=()=>{
+  document.getElementById('btnConvertToSplit').onclick=()=>{
     const base = assignSelect.value || '';
     const segs = toEditableSegments(base);
     modeSplit.checked=true; modeTemplate.checked=false;
-    $('#templateMode').style.display='none'; $('#splitMode').style.display='block';
+    document.getElementById('templateMode').style.display='none'; document.getElementById('splitMode').style.display='block';
     loadSegmentsUI(segs);
   };
-  $('#addSegment').onclick=()=>{
-    if($('#segmentsWrap .muted')) $('#segmentsWrap .muted').remove();
+  document.getElementById('addSegment').onclick=()=>{
+    if(document.querySelector('#segmentsWrap .muted')) document.querySelector('#segmentsWrap .muted').remove();
     const div=document.createElement('div'); div.className='row';
     div.innerHTML = `${'<select class="seg-code">'+codeSelectGroupedHTML('Admin')+'</select>'}
       <input type="time" class="seg-start" value="08:00"> <span>–</span> <input type="time" class="seg-end" value="12:00">
       <button class="del">Delete</button>`;
-    div.querySelector('.del').onclick=()=>{ div.remove(); if($$('#segmentsWrap .row').length===0) $('#segmentsWrap').innerHTML='<div class="muted">No segments yet. Add one.</div>'; };
+    div.querySelector('.del').onclick=()=>{ div.remove(); if($$('#segmentsWrap .row').length===0) document.getElementById('segmentsWrap').innerHTML='<div class="muted">No segments yet. Add one.</div>'; };
     segmentsWrap.appendChild(div);
   };
 
-  $('#assignOK').onclick=async()=>{
+  document.getElementById('assignOK').onclick=async()=>{
     const fresh = Object.assign({}, data);
     if(modeTemplate.checked){
       const tplName=assignSelect.value;
@@ -889,58 +833,6 @@ function openAssign(day, advisorName){
   assignDlg.showModal();
 }
 
-/* ===== Block editor (click a block) ===== */
-const blockDlg=$('#blockDlg');
-const bmWhole=$('#bmWhole'), bmSub=$('#bmSub');
-const bwStart=$('#bwStart'), bwEnd=$('#bwEnd'), bwCode=$('#bwCode');
-const bsStart=$('#bsStart'), bsEnd=$('#bsEnd'), bsCode=$('#bsCode');
-function buildBlockSelects(){ const codes=codeSelectGroupedHTML(); [bwCode,bsCode].forEach(sel=>sel.innerHTML=codes); }
-function onBlockClick(e){
-  const el=e.currentTarget; const advName=el.dataset.adv; const day=el.dataset.day;
-  const aId=ADVISOR_BY_NAME.get(advName); const ws=$('#weekStart').value; const key=`${aId}::${ws}`;
-  const data=ROTAS.get(key) || {}; const blocks=processDayValue(data[day]);
-  const origCode=el.dataset.code, origStart=el.dataset.start, origEnd=el.dataset.end;
-  $('#blockTitle').textContent=`Edit ${day} for ${advName}`; $('#blockHint').textContent=`Block: ${origCode} ${origStart}–${origEnd}`;
-  buildBlockSelects();
-  bmSub.checked=true; $('#blockSub').style.display='block'; $('#blockWhole').style.display='none';
-  bwCode.value = origCode; bwStart.value=origStart; bwEnd.value=origEnd;
-  bsCode.value = origCode; bsStart.value=origStart; bsEnd.value=origEnd;
-
-  bmWhole.onchange = bmSub.onchange = ()=>{
-    const whole=bmWhole.checked; $('#blockWhole').style.display=whole?'block':'none'; $('#blockSub').style.display=whole?'none':'block';
-  };
-
-  $('#blockOK').onclick=async()=>{
-    const baseSegs = toEditableSegments(data[day] || '');
-    const oS=toMin(origStart), oE=toMin(origEnd);
-    const idx = baseSegs.findIndex(s=>s.start===origStart && s.end===origEnd && (s.code||'')===origCode);
-    if(idx===-1){ alert('Could not find block.'); return; }
-
-    let segs=[...baseSegs];
-    if(bmWhole.checked){
-      const c=bwCode.value, s=bwStart.value, e=bwEnd.value;
-      if(!s||!e||toMin(e)<=toMin(s) || toMin(s)<oS || toMin(e)>oE){ alert('Invalid range.'); return; }
-      segs.splice(idx,1);
-      if(toMin(s)>oS) segs.splice(idx,0,{code:origCode,start:m2t(oS),end:s});
-      segs.splice(idx+(toMin(s)>oS?1:0),0,{code:c,start:s,end:e});
-      if(toMin(e)<oE) segs.splice(idx+(toMin(s)>oS?1:0)+1,0,{code:origCode,start:e,end:m2t(oE)});
-    } else {
-      const c=bsCode.value, s=bsStart.value, e=bsEnd.value;
-      if(!s||!e||toMin(e)<=toMin(s) || toMin(s)<oS || toMin(e)>oE){ alert('Invalid sub-range.'); return; }
-      segs.splice(idx,1);
-      if(toMin(s)>oS) segs.splice(idx,0,{code:origCode,start:m2t(oS),end:s});
-      segs.splice(idx+(toMin(s)>oS?1:0),0,{code:c,start:s,end:e});
-      if(toMin(e)<oE) segs.splice(idx+(toMin(s)>oS?1:0)+1,0,{code:origCode,start:e,end:m2t(oE)});
-    }
-    const fresh = Object.assign({}, data, { [day]: {segments: mergeAdjacent(segs)} });
-    await upsertRota(aId, ws, fresh);
-    blockDlg.close(); renderCalendar(); populateAssignTable();
-  };
-
-  blockDlg.showModal();
-}
-
-/* ===== Rotas DB ===== */
 async function upsertRota(advisorId, weekStartISO, dataObj){
   const { data, error } = await sb.from('rotas').upsert({
     advisor_id: advisorId,
@@ -955,7 +847,6 @@ async function fetchRotasForWeek(weekStartISO){
   ROTAS.clear(); (data||[]).forEach(r=> ROTAS.set(`${r.advisor_id}::${weekStartISO}`, r.data || {}));
 }
 
-/* ===== Templates & UI helpers ===== */
 async function loadTemplates(){
   const { data } = await sb.from('templates').select('*');
   TEMPLATES = {}; (data||[]).forEach(t=> TEMPLATES[t.name] = {
@@ -963,7 +854,7 @@ async function loadTemplates(){
   });
 }
 function refreshChips(){
-  const box=$('#activeChips'); box.innerHTML='';
+  const box=document.getElementById('activeChips'); box.innerHTML='';
   if(!selectedAdvisors.size){ box.innerHTML='<span class="muted">No advisors selected.</span>'; return; }
   [...selectedAdvisors].sort((a,b)=>a.localeCompare(b)).forEach(n=>{
     const chip=document.createElement('span'); chip.className='chip'; chip.textContent=n;
@@ -973,139 +864,25 @@ function refreshChips(){
   });
 }
 function updateViewSelector(){
-  const team = $('#advisorSelect').value;
+  const team = document.getElementById('advisorSelect').value;
   const showTeam = team==='__TEAM_SELECTED__' || team==='__TEAM_ALL__';
-  $('#lblTeamDay').style.display = showTeam ? 'inline' : 'none';
-  $('#teamDay').style.display     = showTeam ? 'inline' : 'none';
-}
-function setHours(){ $('#hours').innerHTML=hoursHTML(); }
-
-
-/* ===== Publish: target collection, confirmations & execution ===== */
-function collectPublishTargets(){
-  const ws = $('#weekStart').value;
-  const selVal = $('#advisorSelect').value;
-
-  // Team: Selected / All
-  if (selVal === '__TEAM_SELECTED__') {
-    return [...selectedAdvisors].map(name => ({ id: ADVISOR_BY_NAME.get(name), name, ws }));
-  }
-  if (selVal === '__TEAM_ALL__') {
-    return ADVISORS_LIST.map(a => ({ id: a.id, name: a.name, ws }));
-  }
-  // Single advisor
-  if (selVal && selVal.startsWith && selVal.startsWith('advisor::')){
-    const id = selVal.split('::')[1];
-    return [{ id, name: ADVISOR_BY_ID.get(id) || '', ws }];
-  }
-  // Fallback: if dropdown currently shows a raw name (legacy)
-  if (ADVISOR_BY_NAME.has(selVal)){
-    return [{ id: ADVISOR_BY_NAME.get(selVal), name: selVal, ws }];
-  }
-  return [];
+  document.getElementById('lblTeamDay').style.display = showTeam ? 'inline' : 'none';
+  document.getElementById('teamDay').style.display     = showTeam ? 'inline' : 'none';
 }
 
-// Returns true if OK to overwrite a specific day for that advisor
-async function confirmOverwriteDay(advisorId, ws, day, newValue){
-  const key = `${advisorId}::${ws}`;
-  const existing = ROTAS.get(key) || {};
-  const had = existing[day] !== undefined && existing[day] !== null && existing[day] !== '';
-  // If nothing set or identical, no need to confirm
-  const same = JSON.stringify(existing[day] || null) === JSON.stringify(newValue || null);
-  if (!had || same) return true;
-
-  return confirm(`You're about to overwrite ${ADVISOR_BY_ID.get(advisorId) || 'this advisor'} on ${day} for week ${ws}. Continue?`);
-}
-
-// Opens the publish dialog, listing who will be published
-function openPublishDialog(){
-  const targets = collectPublishTargets();
-  if (!targets.length){
-    alert('Select an advisor or team to publish.');
-    return;
-  }
-  const ws = $('#weekStart').value;
-  const dayMode = ($('#advisorSelect').value === '__TEAM_SELECTED__' || $('#advisorSelect').value === '__TEAM_ALL__');
-
-  $('#publishSummary').textContent = dayMode
-    ? `Publishing the selected day (${ $('#teamDay').value }) for ${targets.length} advisor(s), week starting ${ws}.`
-    : `Publishing the full week for ${targets.length} advisor(s), week starting ${ws}.`;
-
-  const ul = document.createElement('ul');
-  ul.style.margin = '6px 0 0 18px';
-  ul.style.padding = '0';
-  targets.forEach(t => {
-    const li = document.createElement('li');
-    li.textContent = t.name || t.id;
-    ul.appendChild(li);
-  });
-  const listBox = $('#publishList');
-  listBox.innerHTML = '';
-  listBox.appendChild(ul);
-
-  publishDlg.showModal();
-}
-
-// Performs the publish by upserting current working data
-async function doPublish(){
-  const targets = collectPublishTargets();
-  if (!targets.length){ publishDlg.close(); return; }
-
-  const ws = $('#weekStart').value;
-  const teamMode = ($('#advisorSelect').value === '__TEAM_SELECTED__' || $('#advisorSelect').value === '__TEAM_ALL__');
-  const teamDay = $('#teamDay').value;
-
-  let published = 0, skipped = 0;
-
-  for (const t of targets){
-    const key = `${t.id}::${ws}`;
-    const data = ROTAS.get(key) || {};
-
-    if (teamMode){
-      // Only publish the chosen day for each advisor
-      const newVal = data[teamDay] || null;
-      const ok = await confirmOverwriteDay(t.id, ws, teamDay, newVal);
-      if (!ok){ skipped++; continue; }
-      // Ensure object key exists even if day off
-      const fresh = Object.assign({}, data);
-      if (newVal === null || newVal === undefined) delete fresh[teamDay]; else fresh[teamDay] = newVal;
-      await upsertRota(t.id, ws, fresh);
-      published++;
-    } else {
-      // Full week for a single advisor (or explicit single-advisor selection)
-      // Confirm once per day that would be overwritten
-      let proceed = true;
-      for (const d of DAYS){
-        const ok = await confirmOverwriteDay(t.id, ws, d, data[d] || null);
-        if (!ok){ proceed = false; break; }
-      }
-      if (!proceed){ skipped++; continue; }
-      await upsertRota(t.id, ws, data);
-      published++;
-    }
-  }
-
-  publishDlg.close();
-  alert(`Publish complete. Updated: ${published}. Skipped: ${skipped}.`);
-}
-
-
-/* ===== Wire buttons ===== */
 function wire(){
-  // Publish button
-  $('#btnPublish').onclick = openPublishDialog;
-  $('#btnPrint').onclick=()=>window.print();
-  $('#btnGenerate').onclick=()=>{ updateRangeLabel(); renderCalendar(); };
-  $('#btnToday').onclick=()=>{ const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
-  $('#prevWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()-7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
-  $('#nextWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()+7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
+  document.getElementById('btnPrint').onclick=()=>window.print();
+  document.getElementById('btnGenerate').onclick=()=>{ updateRangeLabel(); renderCalendar(); };
+  document.getElementById('btnToday')?.addEventListener('click', ()=>{ const t=setToMonday(new Date()); document.getElementById('weekStart').value=t.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek(document.getElementById('weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); });
+  document.getElementById('prevWeek')?.addEventListener('click', ()=>{ const d=new Date(document.getElementById('weekStart').value||new Date()); d.setDate(d.getDate()-7); document.getElementById('weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek(document.getElementById('weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); });
+  document.getElementById('nextWeek')?.addEventListener('click', ()=>{ const d=new Date(document.getElementById('weekStart').value||new Date()); d.setDate(d.getDate()+7); document.getElementById('weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek(document.getElementById('weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); });
 
-  $('#btnSave').onclick=()=>{
-    const exportObj = { org:ORG, templates:TEMPLATES, weekStart:$('#weekStart').value };
+  document.getElementById('btnSave').onclick=()=>{
+    const exportObj = { org:ORG, templates:TEMPLATES, weekStart:document.getElementById('weekStart').value };
     const blob=new Blob([JSON.stringify(exportObj,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota-export.json'; a.click();
   };
-  $('#btnLoad').onclick=()=>$('#file').click();
-  $('#file').addEventListener('change',async e=>{
+  document.getElementById('btnLoad').onclick=()=>document.getElementById('file').click();
+  document.getElementById('file').addEventListener('change',async e=>{
     const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async ev=>{
       try{
         const data=JSON.parse(ev.target.result);
@@ -1123,34 +900,39 @@ function wire(){
     }; r.readAsText(f);
   });
 
-  $('#btnReset').onclick=()=>{ if(!confirm('Clear only local cache (does not delete Supabase data)?')) return; ROTAS.clear(); sessionStorage.clear(); localStorage.clear(); location.reload(); };
+  document.getElementById('btnReset').onclick=()=>{ if(!confirm('Clear only local cache (does not delete Supabase data)?')) return; ROTAS.clear(); sessionStorage.clear(); localStorage.clear(); location.reload(); };
 
-  // NEW: View change logic (supports leader picks)
-  $('#advisorSelect').addEventListener('change', ()=>{
-    const v = $('#advisorSelect').value;
-
+  document.getElementById('advisorSelect').addEventListener('change', ()=>{
+    const v = document.getElementById('advisorSelect').value;
     if(v.startsWith && v.startsWith('leader::')){
       const leaderId = v.split('::')[1];
       const names = getLeaderTeamNames(leaderId);
       selectedAdvisors = new Set(names);
       refreshChips();
       populateAssignTable();
-      $('#advisorSelect').value = '__TEAM_SELECTED__'; // switch to Team view
+      document.getElementById('advisorSelect').value = '__TEAM_SELECTED__';
     }
-
     updateViewSelector();
     updateRangeLabel();
     renderCalendar();
   });
 
-  $('#teamDay').addEventListener('change',()=>{ updateRangeLabel(); renderCalendar(); });
-  $('#weekStart').onchange=()=>{ updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
+  document.getElementById('teamDay').addEventListener('change',()=>{ updateRangeLabel(); renderCalendar(); });
+  document.getElementById('weekStart').onchange=()=>{ updateRangeLabel(); fetchRotasForWeek(document.getElementById('weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
 
-  $('#treeSearch').addEventListener('input',rebuildTree);
-  $('#btnClearSel').onclick=()=>{ selectedAdvisors.clear(); rebuildTree(); refreshChips(); populateAssignTable(); renderCalendar(); };
+  document.getElementById('treeSearch').addEventListener('input',rebuildTree);
+  document.getElementById('btnClearSel').onclick=()=>{ selectedAdvisors.clear(); rebuildTree(); refreshChips(); populateAssignTable(); renderCalendar(); };
+
+  document.getElementById('hWeekStart').value = document.getElementById('weekStart').value;
+  document.getElementById('hPrev').onclick = ()=>{ const d=new Date(document.getElementById('hWeekStart').value); d.setDate(d.getDate()-7); document.getElementById('hWeekStart').value=d.toISOString().slice(0,10); renderHorizontalWeek(); };
+  document.getElementById('hNext').onclick = ()=>{ const d=new Date(document.getElementById('hWeekStart').value); d.setDate(d.getDate()+7); document.getElementById('hWeekStart').value=d.toISOString().slice(0,10); renderHorizontalWeek(); };
+  document.getElementById('hToday2').onclick = ()=>{ const t=setToMonday(new Date()); document.getElementById('hWeekStart').value=t.toISOString().slice(0,10); renderHorizontalWeek(); };
+  document.getElementById('hWeekStart').onchange = ()=> renderHorizontalWeek();
+  document.getElementById('hSearch').addEventListener('input', ()=> renderHorizontalWeek());
+  document.getElementById('hSite').addEventListener('change', ()=> renderHorizontalWeek());
+  document.getElementById('hLeader').addEventListener('change', ()=> renderHorizontalWeek());
 }
 
-/* ===== Realtime ===== */
 function subscribeRealtime(){
   sb.channel('any-changes')
     .on('postgres_changes', { event:'*', schema:'public', table:'sites' },   ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
@@ -1158,20 +940,18 @@ function subscribeRealtime(){
     .on('postgres_changes', { event:'*', schema:'public', table:'advisors'}, ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
     .on('postgres_changes', { event:'*', schema:'public', table:'templates'},()=> loadTemplates().then(()=>{ populateTemplateEditor(); renderCalendar(); }))
     .on('postgres_changes', { event:'*', schema:'public', table:'rotas' },   ()=>{
-      const ws=$('#weekStart').value; fetchRotasForWeek(ws).then(()=>{ renderCalendar(); populateAssignTable(); });
+      const ws=document.getElementById('weekStart').value; fetchRotasForWeek(ws).then(()=>{ renderCalendar(); populateAssignTable(); });
     })
     .subscribe();
 }
 
-/* ===== INIT ===== */
 (async function init(){
   buildColorKey();
-  const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10);
-  setHours();
+  const t=setToMonday(new Date()); document.getElementById('weekStart').value=t.toISOString().slice(0,10);
   try{
     await loadOrg();
     await loadTemplates();
-    await fetchRotasForWeek($('#weekStart').value);
+    await fetchRotasForWeek(document.getElementById('weekStart').value);
   } catch(e){ console.warn(e); alert('Error loading initial data: '+e.message); }
   rebuildAdvisorDropdown();
   rebuildTree();
@@ -1179,14 +959,10 @@ function subscribeRealtime(){
   populateTemplateEditor();
   populateAssignTable();
   updateRangeLabel();
-  renderCalendar();
   wire();
+  renderCalendar();
   subscribeRealtime();
-  // Publish dialog actions
-  $('#publishOK').onclick = doPublish;
 })();
   </script>
 </body>
 </html>
-
-
