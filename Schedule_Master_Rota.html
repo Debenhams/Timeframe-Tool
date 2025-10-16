@@ -60,15 +60,63 @@ select,input[type="date"],input[type="text"]{border:1px solid var(--line);backgr
 /* Templates & Assignment (vertical, templates on top) */
 .templates-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
 }
 .template {
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 16px;
-  background: #fafcff;
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--wash);
+}
+.template-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.template-row:last-of-type {
+  margin-bottom: 12px;
+}
+.template-row > label {
+  font-weight: 500;
+  color: var(--ink);
+}
+.template input,
+.template select {
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: white;
+}
+.template-row .field-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.template-row .break-group {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.template-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.btn-duplicate {
+  background: var(--wash);
+  color: var(--brand);
+  border: 1px solid var(--line);
+}
+.btn-delete {
+  background: #fff1f0;
+  color: #cf1322;
+  border: 1px solid #ffa39e;
 }
 
 /* Updated timeline colors */
@@ -376,16 +424,34 @@ function renderTemplates(){
   w.innerHTML = names.map(n=>{
     const t=templates[n];
     return `<div class="template" data-name="${n}">
-      <div class="row"><div>Name</div><input data-f="name" value="${t.name}"></div>
-      <div class="row"><div>New code</div><select data-f="work_code">${groupCodeSelect(t.work_code||'DEB Email')}</select></div>
-      <div class="row"><div>Start / Finish</div><div class="inline"><input type="time" data-f="start_time" value="${(t.start_time||'').slice(0,5)}"> <input type="time" data-f="finish_time" value="${(t.finish_time||'').slice(0,5)}"></div></div>
-      <div class="row"><div>Breaks</div><div class="inline">
-        <input type="time" data-f="break1" value="${(t.break1||'').slice(0,5)}" title="Break 1 (15m)">
-        <input type="time" data-f="lunch"  value="${(t.lunch||'').slice(0,5)}"  title="Lunch (30m)">
-        <input type="time" data-f="break2" value="${(t.break2||'').slice(0,5)}" title="Break 2 (15m)">
-      </div></div>
-      <div class="actions"><button class="btn ghost" data-dup="${n}">Duplicate</button><button class="btn" style="background:#ffe8e6;color:#9a1919;border:1px solid #ffb7b0" data-del="${n}">Delete</button></div>
-    </div>`;
+  <div class="template-row">
+    <label>Name</label>
+    <input data-f="name" value="${t.name}">
+  </div>
+  <div class="template-row">
+    <label>New code</label>
+    <select data-f="work_code">${groupCodeSelect(t.work_code||'DEB Email')}</select>
+  </div>
+  <div class="template-row">
+    <label>Start / Finish</label>
+    <div class="field-group">
+      <input type="time" data-f="start_time" value="${(t.start_time||'').slice(0,5)}">
+      <input type="time" data-f="finish_time" value="${(t.finish_time||'').slice(0,5)}">
+    </div>
+  </div>
+  <div class="template-row">
+    <label>Breaks</label>
+    <div class="break-group">
+      <input type="time" data-f="break1" value="${(t.break1||'').slice(0,5)}" title="Break 1 (15m)">
+      <input type="time" data-f="lunch" value="${(t.lunch||'').slice(0,5)}" title="Lunch (30m)">
+      <input type="time" data-f="break2" value="${(t.break2||'').slice(0,5)}" title="Break 2 (15m)">
+    </div>
+  </div>
+  <div class="template-actions">
+    <button class="btn btn-duplicate" data-dup="${n}">Duplicate</button>
+    <button class="btn btn-delete" data-del="${n}">Delete</button>
+  </div>
+</div>`;
   }).join('');
 
   // Bind updates
