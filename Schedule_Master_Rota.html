@@ -150,10 +150,119 @@ select,input[type="date"],input[type="text"]{border:1px solid var(--line);backgr
   top: 0;
   bottom: 0;
   width: 1px;
-  background: rgba(0,0,0,0.15);
+  background: rgba(0,0,0,.2);
   pointer-events: none;
-  z-index: 3;
-  transition: left 0.1s;
+  z-index: 10;
+}
+.time-label {
+  position: absolute;
+  top: -20px;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.bar-edit {
+  position: absolute;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 240px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  z-index: 100;
+}
+.bar-edit .row {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  background: none;
+  border: 0;
+}
+.bar-edit .actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+/* Enhanced timeline colors */
+.c-work { background:#6b8e23 !important }
+.c-lunch { background:#8ddaf2 !important }
+.c-break { background:#e0e0e0 !important }
+.c-meeting { background:#ffcc00 !important }
+.c-overtime { background:#ff5722 !important }
+.c-social { background:#9c27b0 !important }
+
+/* Timeline */
+.timeline{grid-column:1/-1}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.legend .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:6px;border:1px solid rgba(0,0,0,.08)}
+.tl{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.tl-head{display:flex;background:#f6f8fb;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+.tl-name-col{width:var(--name-w);min-width:var(--name-w);padding:7px 10px;font-weight:800;border-right:1px solid var(--line)}
+.tl-hours{flex:1;display:grid;grid-template-columns:repeat(calc(var(--end) - var(--start)),1fr)}
+.tl-hours div{padding:6px 0;border-left:1px solid var(--line);font-size:12px;color:#68758a;text-align:center}
+.tl-body{display:flex;flex-direction:column}
+.row{display:flex;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:none}
+.row:nth-child(odd){background:#fbfdff}
+.rname{width:var(--name-w);min-width:var(--name-w);padding:8px 10px;border-right:1px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:8px}
+.rline{position:relative;flex:1;height:var(--row-h)}
+.bar{position:absolute;height:var(--bar-h);top:calc((var(--row-h) - var(--bar-h))/2);border-radius:2px;padding:0 2px;box-shadow:0 1px 2px rgba(0,0,0,.10)}
+
+/* No text in bars – info via tooltip */
+
+/* Mouse guide line */
+.time-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(0,0,0,.2);
+  pointer-events: none;
+  z-index: 10;
+}
+.time-label {
+  position: absolute;
+  top: -20px;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.bar-edit {
+  position: absolute;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 240px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.15);
+  z-index: 100;
+}
+.bar-edit .row {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  background: none;
+  border: 0;
+}
+.bar-edit .actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 /* Tooltip */
@@ -526,26 +635,35 @@ function rebuildAssignTable(){
 /* ========= Generate & Render ========= */
 $('#btnGenerate').onclick=()=>renderTimeline(true);
 
-function segmentsFromTemplate(tmp){
-  const s=toMin(tmp.start_time), e=toMin(tmp.finish_time);
-  const b1=toMin(tmp.break1), l=toMin(tmp.lunch), b2=toMin(tmp.break2);
-  const segs=[];
-  function addWork(a,b){ if(a!=null && b!=null && b>a) segs.push({code:tmp.work_code,start:a,end:b}); }
-  function add(code,at,dur){ if(at!=null){ const d=(code==='Lunch')?30:15; segs.push({code, start:at, end:at+(dur||d)}); } }
-
-  if(b1){ addWork(s,b1); add('Break',b1,15); addWork(b1+15,(l||b2||e)); }
-  else if(l){ addWork(s,l); add('Lunch',l,30); addWork(l+30,(b2||e)); }
-  else if(b2){ addWork(s,b2); add('Break',b2,15); addWork(b2+15,e); }
-  else { addWork(s,e); }
-
-  if(l && b2 && b2>l){
-    const last=segs.pop();
-    if(last && last.code===tmp.work_code){
-      if(last.start<b2) segs.push({code:tmp.work_code,start:last.start,end:b2});
-      segs.push({code:'Break',start:b2,end:b2+15});
-      if(b2+15<last.end) segs.push({code:tmp.work_code,start:b2+15,end:last.end});
-    } else if(last){ segs.push(last); }
+function segmentsFromTemplate(tmp, pushBreaks = false) {
+  const s = toMin(tmp.start_time), e = toMin(tmp.finish_time);
+  const b1 = toMin(tmp.break1), l = toMin(tmp.lunch), b2 = toMin(tmp.break2);
+  const segs = [];
+  
+  // Collect all segments first
+  const breaks = [];
+  if (b1) breaks.push({time: b1, dur: 15, type: 'Break'});
+  if (l) breaks.push({time: l, dur: 30, type: 'Lunch'});
+  if (b2) breaks.push({time: b2, dur: 15, type: 'Break'});
+  
+  // Sort breaks by time
+  breaks.sort((a,b) => a.time - b.time);
+  
+  let lastEnd = s;
+  // Add work segments between breaks
+  breaks.forEach(br => {
+    if (lastEnd < br.time) {
+      segs.push({code: tmp.work_code, start: lastEnd, end: br.time});
+    }
+    segs.push({code: br.type, start: br.time, end: br.time + br.dur});
+    lastEnd = br.time + br.dur;
+  });
+  
+  // Add final work segment if needed
+  if (lastEnd < e) {
+    segs.push({code: tmp.work_code, start: lastEnd, end: e});
   }
+  
   return segs;
 }
 
@@ -574,7 +692,7 @@ function renderTimeline(fromAssignments=false){
         const el=document.createElement('div'); el.className=`bar ${clsFor(seg.code)}`;
         el.style.left=`${p.left}%`; el.style.width=`${p.width}%`;
         // Tooltip content
-        el.dataset.tt = `${seg.code}  ${m2hhmm(seg.start)}–${m2hhmm(seg.end)}`;
+        el.dataset.tt = formatTooltip(seg);
         r.lastElementChild.appendChild(el);
       });
     });
@@ -583,6 +701,9 @@ function renderTimeline(fromAssignments=false){
   drawNowLine();
 
   if(fromAssignments) console.log('Generated from assignments.');
+
+  initTimeGuide();
+  initBarEdit();
 }
 
 /* Now line for current day/time */
@@ -612,39 +733,90 @@ document.addEventListener('mousemove',e=>{
 });
 
 /* Add mouse guide tracking */
-const guide = $('#timeGuide');
-$$('.rline').forEach(line => {
-  line.onmousemove = e => {
-    const rect = line.getBoundingClientRect();
-    const pct = (e.clientX - rect.left) / rect.width * 100;
-    guide.style.left = `${pct}%`;
-    guide.style.display = 'block';
-  };
-  line.onmouseleave = () => guide.style.display = 'none';
-});
-
-/* Enhanced tooltip content */
-function formatTooltip(seg) {
-  const type = seg.code.includes('Break') ? 'Break' : 
-               seg.code.includes('Lunch') ? 'Lunch' :
-               seg.code.includes('Meeting') ? 'Meeting' : 'Work';
-  return `${seg.code}\n${type}\n${m2hhmm(seg.start)}–${m2hhmm(seg.end)}`;
+function initTimeGuide() {
+  const guide = document.createElement('div');
+  guide.className = 'time-guide';
+  const label = document.createElement('div');
+  label.className = 'time-label';
+  guide.appendChild(label);
+  
+  $$('.rline').forEach(line => {
+    line.onmousemove = e => {
+      const rect = line.getBoundingClientRect();
+      const pct = (e.clientX - rect.left) / rect.width;
+      const mins = Math.round(pct * (14 * 60)); // 14 hours (06:00-20:00)
+      
+      guide.style.left = `${pct * 100}%`;
+      guide.style.display = 'block';
+      label.textContent = m2hhmm(mins + 6*60); // Add 6 hours offset
+    };
+    line.onmouseleave = () => guide.style.display = 'none';
+    line.appendChild(guide.cloneNode(true));
+  });
 }
 
-/* Live edit handling */
-function initLiveEdit() {
+/* Enhanced bar editing */
+function initBarEdit() {
   $$('.bar').forEach(bar => {
     bar.onclick = e => {
-      const overlay = document.createElement('div');
-      overlay.className = 'edit-overlay';
-      // Add edit controls here
-      document.body.appendChild(overlay);
+      const rect = bar.getBoundingClientRect();
+      const edit = document.createElement('div');
+      edit.className = 'bar-edit';
+      edit.style.left = rect.right + 'px';
+      edit.style.top = rect.top + 'px';
+      
+      const seg = {
+        code: bar.dataset.code,
+        start: bar.dataset.start,
+        end: bar.dataset.end
+      };
+      
+      edit.innerHTML = `
+        <div class="row">
+          <label>Type</label>
+          <select id="editType">
+            <option value="Work" ${seg.code.includes('Break')?'':'selected'}>Work</option>
+            <option value="Break" ${seg.code==='Break'?'selected':''}>Break</option>
+            <option value="Meeting">Meeting</option>
+          </select>
+        </div>
+        <div class="row">
+          <label>Start</label>
+          <input type="time" id="editStart" value="${m2hhmm(seg.start)}">
+        </div>
+        <div class="row">
+          <label>End</label>
+          <input type="time" id="editEnd" value="${m2hhmm(seg.end)}">
+        </div>
+        <div class="row">
+          <label>Platform</label>
+          <select id="editPlatform">${groupCodeSelect(seg.code)}</select>
+        </div>
+        <div class="actions">
+          <button class="btn ghost" onclick="this.closest('.bar-edit').remove()">Cancel</button>
+          <button class="btn primary" onclick="saveBarEdit(this)">Save</button>
+        </div>
+      `;
+      
+      document.body.appendChild(edit);
       e.stopPropagation();
     };
   });
 }
 
-/* Update renderTimeline to use new colors and tooltips */
+function saveBarEdit(btn) {
+  const edit = btn.closest('.bar-edit');
+  const type = edit.querySelector('#editType').value;
+  const start = toMin(edit.querySelector('#editStart').value);
+  const end = toMin(edit.querySelector('#editEnd').value);
+  const platform = edit.querySelector('#editPlatform').value;
+  
+  // Update template or create meeting
+  // Re-render row
+  edit.remove();
+}
+
+// Update renderTimeline to use new functions
 function renderTimeline(fromAssignments=false) {
   const body=$('#tlBody'); body.innerHTML='';
   const lid=$('#leaderSel').value;
@@ -680,8 +852,8 @@ function renderTimeline(fromAssignments=false) {
 
   if(fromAssignments) console.log('Generated from assignments.');
 
-  // Add live edit init
-  initLiveEdit();
+  initTimeGuide();
+  initBarEdit();
 }
 
 /* Publish (rotas + rotas_published) */
