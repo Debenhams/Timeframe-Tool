@@ -434,6 +434,8 @@ const state = {
   assigned: new Map()  // `${advisorId}-${dayIndex}` -> templateName
 };
 
+const slug = s => String(s||'').trim().toLowerCase().replace(/\s+/g,'-');
+
 /* ========= Helpers ========= */
 const $=s=>document.querySelector(s);
 const $$=s=>Array.from(document.querySelectorAll(s));
@@ -458,46 +460,117 @@ $('#btnAuth').onclick=async()=>{
 (async()=>{ const {data:{user}}=await sb.auth.getUser(); sessionUser=user; $('#btnAuth').textContent=user?'Signed in':'Sign in'; })();
 
 /* ========= Load org ========= */
-async function loadOrg() {
+async function loadOrganizations() {
   try {
-    const [sitesRes, leadersRes, advisorsRes] = await Promise.all([
+    console.time('loadOrg');
+    const [sites, leaders, advisors] = await Promise.all([
       sb.from('sites').select('id,name').order('name'),
       sb.from('leaders').select('id,name,site_id').order('name'),
       sb.from('advisors').select('id,name,leader_id').order('name')
     ]);
+    console.timeEnd('loadOrg');
 
-    if (!sitesRes.data?.length) {
-      console.error('No sites loaded');
-      return;
+    if (sites.data?.length) {
+      return {
+        sites: sites.data,
+        leaders: leaders.data || [],
+        advisors: advisors.data || []
+      };
     }
-
-    state.sites = sitesRes.data;
-    state.leaders = leadersRes.data || [];
-    state.advisors = advisorsRes.data || [];
-
-    DEBUG && console.log(`Loaded: ${state.sites.length} sites, ${state.leaders.length} leaders, ${state.advisors.length} advisors`);
-
-    // Set initial site (prefer Debenhams)
-    if (state.sites.length) {
-      const deb = state.sites.find(s => /debenhams/i.test(s.name));
-      state.selectedSite = deb?.id || state.sites[0].id;
-    }
-
-    // Set initial leader for site
-    const siteLeaders = state.leaders.filter(l => String(l.site_id) === String(state.selectedSite));
-    state.selectedLeader = siteLeaders[0]?.id || null;
-
-    // Rebuild UI
-    refreshDropdowns();
-    buildTree();
-    refreshChips();
-    rebuildAssignTable();
-    renderTimeline();
-
   } catch (err) {
-    console.error('Failed to load org:', err);
-    alert('Failed to load organization data. Please refresh.');
+    console.error('Remote org load failed:', err);
   }
+
+  // Try DOM fallback
+  const domOrg = loadOrganizationsFromDOM();
+  if (domOrg.leaders.length || domOrg.advisors.length) {
+    showInfo('Using organization data from page.');
+    return domOrg;
+  }
+
+  // Final fallback to seed data
+  showInfo('Using sample organization data.');
+  return {
+    sites: [{ id: 'default', name: 'Default Site' }],
+    leaders: [
+      { id: 'team-1', name: 'Team 1', site_id: 'default' },
+      { id: 'team-2', name: 'Team 2', site_id: 'default' }
+    ],
+    advisors: [
+      { id: 'adv-1', name: 'Advisor 1', leader_id: 'team-1' },
+      { id: 'adv-2', name: 'Advisor 2', leader_id: 'team-1' },
+      { id: 'adv-3', name: 'Advisor 3', leader_id: 'team-2' }
+    ]
+  };
+}
+
+function loadOrganizationsFromDOM() {
+  const org = { sites: [], leaders: [], advisors: [] };
+  
+  // Try reading site from select
+  const siteSelect = $('#siteSel');
+  if (siteSelect?.value) {
+    org.sites.push({ 
+      id: slug(siteSelect.value), 
+      name: siteSelect.selectedOptions[0]?.text || siteSelect.value 
+    });
+  }
+
+  // Read tree structure
+  $$('#tree details').forEach(detail => {
+    const leaderName = detail.querySelector('summary label')?.textContent?.trim();
+    if (!leaderName) return;
+
+    const leaderId = slug(leaderName);
+    org.leaders.push({
+      id: leaderId,
+      name: leaderName,
+      site_id: org.sites[0]?.id || 'default'
+    });
+
+    // Get advisors under this leader
+    detail.querySelectorAll('.node span').forEach(span => {
+      const name = span.textContent.trim();
+      if (name) {
+        org.advisors.push({
+          id: slug(name),
+          name: name,
+          leader_id: leaderId
+        });
+      }
+    });
+  });
+
+  return org;
+}
+
+/* Replace loadOrg() with resilient version */
+async function loadOrg() {
+  const org = await loadOrganizations();
+  
+  state.sites = org.sites;
+  state.leaders = org.leaders;
+  state.advisors = org.advisors;
+
+  if (!state.leaders.length || !state.advisors.length) {
+    showInfo('Organization data incomplete. Using available data for rendering.');
+  }
+
+  // Set initial selections
+  if (state.sites.length) {
+    const deb = state.sites.find(s => /debenhams/i.test(s.name));
+    state.selectedSite = deb?.id || state.sites[0].id;
+  }
+
+  const siteLeaders = state.leaders.filter(l => String(l.site_id) === String(state.selectedSite));
+  state.selectedLeader = siteLeaders[0]?.id || null;
+
+  // Rebuild UI (never skip)
+  refreshDropdowns();
+  buildTree();
+  refreshChips();
+  rebuildAssignTable();
+  renderTimeline();
 }
 
 /* Refresh dropdown cascading */
@@ -625,7 +698,7 @@ function groupCodeSelect(val=''){
     "Absence":["AL","Sick","RDO","Maternity","LTS","Split Shift","Break","Lunch"],
     "Shrinkage":["121","ATL","Coaching","Huddle","ITI","Projects","Team Meeting","Training","Meeting"]
   };
-  return Object.entries(groups).map(([g,c])=>`<optgroup label="${g}">${c.map(x=>`<option ${val===x?'selected':''}>${x}</option>`).join('')}</optgroup>`).join('');
+  return Object.entries(groups).map(([g,c])=>`<optgroup label="${g}">${c.mapx=>`<option ${val===x?'selected':''}>${x}</option>`).join('')}</optgroup>`).join('');
 }
 function renderTemplates(){
   const w=$('#templWrap');
@@ -994,25 +1067,28 @@ function showMessage(text, timeout = 3000) {
   setTimeout(() => banner.style.display = 'none', timeout);
 }
 
-/* Message helpers */
 function showError(msg) {
+  const el = document.getElementById('msgBanner');
+  if (el) {
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = '#fff3cd';
+    el.style.color = '#856404';
+    el.setAttribute('data-type', 'error');
+  }
   console.error(msg);
-  const banner = $('#msgBanner');
-  banner.style.background = '#fff3cd';
-  banner.style.color = '#856404';
-  banner.textContent = msg;
-  banner.style.display = 'block';
-  setTimeout(() => banner.style.display = 'none', 5000);
 }
 
 function showInfo(msg) {
+  const el = document.getElementById('msgBanner');
+  if (el) {
+    el.textContent = msg;
+    el.style.display = 'block';
+    el.style.background = '#d4edda';
+    el.style.color = '#155724';
+    el.setAttribute('data-type', 'info');
+  }
   console.info(msg);
-  const banner = $('#msgBanner');
-  banner.style.background = '#d4edda';
-  banner.style.color = '#155724';
-  banner.textContent = msg;
-  banner.style.display = 'block';
-  setTimeout(() => banner.style.display = 'none', 3000);
 }
 
 /* Week parsing */
@@ -1196,8 +1272,13 @@ $('#btnGenerate').onclick = async () => {
 };
 
 (async function init() {
-  await loadOrg();
-  await loadTemplates();
+  try {
+    await loadOrg();
+    await loadTemplates();
+  } catch (err) {
+    showError('Initialization error: ' + err.message);
+    console.error('Init failed:', err);
+  }
 })();
 </script>
 </body>
