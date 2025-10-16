@@ -1187,190 +1187,198 @@ async function doPublish(){
 }
 
 
-/* ===== Wire buttons ===== */
-function wire(){
-  // Publish button
-  $('#btnPublish').onclick = openPublishDialog;
-  $('#btnPrint').onclick=()=>window.print();
-  $('#btnGenerate').onclick=()=>{ updateRangeLabel(); renderCalendar(); };
-  $('#btnToday').onclick=()=>{ const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
-  $('#prevWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()-7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
-  $('#nextWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()+7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
+  /* ===== Wire buttons ===== */
+  function wire(){
+    // Publish button
+    $('#btnPublish').onclick = openPublishDialog;
+    $('#btnPrint').onclick=()=>window.print();
+    $('#btnGenerate').onclick=()=>{ updateRangeLabel(); renderCalendar(); };
+    $('#btnToday').onclick=()=>{ const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
+    $('#prevWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()-7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
+    $('#nextWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()+7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
 
-  $('#btnSave').onclick=()=>{
-    const exportObj = { org:ORG, templates:TEMPLATES, weekStart:$('#weekStart').value };
-    const blob=new Blob([JSON.stringify(exportObj,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota-export.json'; a.click();
-  };
-  $('#btnLoad').onclick=()=>$('#file').click();
-  $('#file').addEventListener('change',async e=>{
-    const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async ev=>{
-      try{
-        const data=JSON.parse(ev.target.result);
-        alert('Loaded JSON. This importer restores Templates locally; manage Sites/Leaders/Advisors in the Schedules panel.');
-        if(data.templates){
-          for(const t of Object.values(data.templates)){
-            await sb.from('templates').upsert({
-              name:t.name, work_code:t.work_code||'Admin',
-              start_time:t.start_time||null, finish_time:t.finish_time||null,
-              break1:t.break1||null, lunch:t.lunch||null, break2:t.break2||null
-            }, { onConflict:'name' });
+    $('#btnSave').onclick=()=>{ 
+      const exportObj = { org:ORG, templates:TEMPLATES, weekStart:$('#weekStart').value };
+      const blob=new Blob([JSON.stringify(exportObj,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota-export.json'; a.click();
+    };
+    $('#btnLoad').onclick=()=>$('#file').click();
+    $('#file').addEventListener('change',async e=>{
+      const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async ev=>{
+        try{
+          const data=JSON.parse(ev.target.result);
+          alert('Loaded JSON. This importer restores Templates locally; manage Sites/Leaders/Advisors in the Schedules panel.');
+          if(data.templates){
+            for(const t of Object.values(data.templates)){
+              await sb.from('templates').upsert({
+                name:t.name, work_code:t.work_code||'Admin',
+                start_time:t.start_time||null, finish_time:t.finish_time||null,
+                break1:t.break1||null, lunch:t.lunch||null, break2:t.break2||null
+              }, { onConflict:'name' });
+            }
           }
-        }
-      }catch{ alert('Invalid JSON'); }
-    }; r.readAsText(f);
-  });
+        }catch{ alert('Invalid JSON'); }
+      }; r.readAsText(f);
+    });
 
-  $('#btnReset').onclick=()=>{ if(!confirm('Clear only local cache (does not delete Supabase data)?')) return; ROTAS.clear(); sessionStorage.clear(); localStorage.clear(); location.reload(); };
+    $('#btnReset').onclick=()=>{ if(!confirm('Clear only local cache (does not delete Supabase data)?')) return; ROTAS.clear(); sessionStorage.clear(); localStorage.clear(); location.reload(); };
 
-  // NEW: View change logic (supports leader picks)
-  $('#advisorSelect').addEventListener('change', ()=>{
-    const v = $('#advisorSelect').value;
+    // NEW: View change logic (supports leader picks)
+    $('#advisorSelect').addEventListener('change', ()=>{ 
+      const v = $('#advisorSelect').value;
 
-    if(v.startsWith && v.startsWith('leader::')){
-      const leaderId = v.split('::')[1];
-      const names = getLeaderTeamNames(leaderId);
-      selectedAdvisors = new Set(names);
-      refreshChips();
-      populateAssignTable();
-      $('#advisorSelect').value = '__TEAM_SELECTED__'; // switch to Team view
-    }
+      if(v.startsWith && v.startsWith('leader::')){
+        const leaderId = v.split('::')[1];
+        const names = getLeaderTeamNames(leaderId);
+        selectedAdvisors = new Set(names);
+        refreshChips();
+        populateAssignTable();
+        $('#advisorSelect').value = '__TEAM_SELECTED__'; // switch to Team view
+      }
 
-    updateViewSelector();
+      updateViewSelector();
+      updateRangeLabel();
+      renderCalendar();
+    });
+
+    $('#teamDay').addEventListener('change',()=>{ updateRangeLabel(); renderCalendar(); });
+    $('#weekStart').onchange=()=>{ updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
+
+    $('#treeSearch').addEventListener('input',rebuildTree);
+    $('#btnClearSel').onclick=()=>{ selectedAdvisors.clear(); rebuildTree(); refreshChips(); populateAssignTable(); renderCalendar(); };
+  }
+
+  /* ===== Realtime ===== */
+  function subscribeRealtime(){
+    sb.channel('any-changes')
+      .on('postgres_changes', { event:'*', schema:'public', table:'sites' },   ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
+      .on('postgres_changes', { event:'*', schema:'public', table:'leaders' }, ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
+      .on('postgres_changes', { event:'*', schema:'public', table:'advisors'}, ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
+      .on('postgres_changes', { event:'*', schema:'public', table:'templates'},()=> loadTemplates().then(()=>{ populateTemplateEditor(); renderCalendar(); }))
+      .on('postgres_changes', { event:'*', schema:'public', table:'rotas' },   ()=>{ 
+        const ws=$('#weekStart').value; fetchRotasForWeek(ws).then(()=>{ renderCalendar(); populateAssignTable(); });
+      })
+      .subscribe();
+  }
+
+  /* ===== INIT ===== */
+  (async function init(){
+    buildColorKey();
+    const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10);
+    setHours();
+    try{
+      await loadOrg();
+      await loadTemplates();
+      await fetchRotasForWeek($('#weekStart').value);
+    } catch(e){ console.warn(e); alert('Error loading initial data: '+e.message); }
+    rebuildAdvisorDropdown();
+    rebuildTree();
+    refreshChips();
+    populateTemplateEditor();
+    populateAssignTable();
     updateRangeLabel();
     renderCalendar();
-  });
+    wire();
+    subscribeRealtime();
+    // Publish dialog actions
+    $('#publishOK').onclick = doPublish;
+  })();
 
-  $('#teamDay').addEventListener('change',()=>{ updateRangeLabel(); renderCalendar(); });
-  $('#weekStart').onchange=()=>{ updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
-
-  $('#treeSearch').addEventListener('input',rebuildTree);
-  $('#btnClearSel').onclick=()=>{ selectedAdvisors.clear(); rebuildTree(); refreshChips(); populateAssignTable(); renderCalendar(); };
-}
-
-/* ===== Realtime ===== */
-function subscribeRealtime(){
-  sb.channel('any-changes')
-    .on('postgres_changes', { event:'*', schema:'public', table:'sites' },   ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
-    .on('postgres_changes', { event:'*', schema:'public', table:'leaders' }, ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
-    .on('postgres_changes', { event:'*', schema:'public', table:'advisors'}, ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
-    .on('postgres_changes', { event:'*', schema:'public', table:'templates'},()=> loadTemplates().then(()=>{ populateTemplateEditor(); renderCalendar(); }))
-    .on('postgres_changes', { event:'*', schema:'public', table:'rotas' },   ()=>{
-      const ws=$('#weekStart').value; fetchRotasForWeek(ws).then(()=>{ renderCalendar(); populateAssignTable(); });
-    })
-    .subscribe();
-}
-
-/* ===== INIT ===== */
-(async function init(){
-  buildColorKey();
-  const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10);
-  setHours();
-  try{
-    await loadOrg();
-    await loadTemplates();
-    await fetchRotasForWeek($('#weekStart').value);
-  } catch(e){ console.warn(e); alert('Error loading initial data: '+e.message); }
-  rebuildAdvisorDropdown();
-  rebuildTree();
-  refreshChips();
-  populateTemplateEditor();
-  populateAssignTable();
-  updateRangeLabel();
-  renderCalendar();
-  wire();
-  subscribeRealtime();
-  // Publish dialog actions
-  $('#publishOK').onclick = doPublish;
-})();
-
-/* Planner helpers */
-function renderTimeHeader() {
-  const hours = $('#plannerHours');
-  hours.innerHTML = '';
-  for (let h = 6; h <= 20; h++) {
-    const div = document.createElement('div');
-    div.className = 'planner__hour';
-    div.textContent = `${String(h).padStart(2,'0')}:00`;
-    hours.appendChild(div);
+  /* Planner helpers */
+  function renderTimeHeader() {
+    const hours = $('#plannerHours');
+    hours.innerHTML = '';
+    for (let h = 6; h <= 20; h++) {
+      const div = document.createElement('div');
+      div.className = 'planner__hour';
+      div.textContent = `${String(h).padStart(2,'0')}:00`;
+      hours.appendChild(div);
+    }
   }
-}
 
-function renderPlanner(rows) {
-  const body = $('#plannerBody');
-  body.innerHTML = '';
-  
-  if (!rows?.length) {
-    body.innerHTML = '<div style="padding:20px;color:var(--muted)">No data to display.</div>';
-    return;
-  }
-  
-  rows.forEach(row => {
-    const r = document.createElement('div');
-    r.className = 'planner__row';
+  function renderPlanner(rows) {
+    const body = $('#plannerBody');
+    body.innerHTML = '';
     
-    // Name cell with badge
-    const badge = row.template ? TEMPLATE_BADGE(row.template) : '';
-    r.innerHTML = `
-      <div class="planner__name">
-        ${row.name}
-        ${badge ? `<span class="badge-sm">${badge}</span>` : ''}
-      </div>
-      <div class="planner__timeline" data-row="${row.id}"></div>
-    `;
+    if (!rows?.length) {
+      body.innerHTML = '<div style="padding:20px;color:var(--muted)">No data to display.</div>';
+      return;
+    }
     
-    // Add segments as bars
-    row.segments?.forEach(seg => {
-      const start = seg.start;
-      const end = seg.end;
-      const p = spanPct(start, end);
+    rows.forEach(row => {
+      const r = document.createElement('div');
+      r.className = 'planner__row';
       
-      const el = document.createElement('div');
-      el.className = `planner__bar ${clsFor(seg.code)}`;
-      el.style.left = `${p.left}%`;
-      el.style.width = `${p.width}%`;
+      // Name cell with badge
+      const badge = row.template ? TEMPLATE_BADGE(row.template) : '';
+      r.innerHTML = `
+        <div class="planner__name">
+          ${row.name}
+          ${badge ? `<span class="badge-sm">${badge}</span>` : ''}
+        </div>
+        <div class="planner__timeline" data-row="${row.id}"></div>
+      `;
       
-      // Store data for tooltip/edit
-      el.dataset.type = seg.type;
-      el.dataset.code = seg.code;
-      el.dataset.start = m2t(start);
-      el.dataset.end = m2t(end);
-      el.dataset.tt = `${seg.code}\n${seg.type}\n${m2t(start)}–${m2t(end)}`;
+      // Add segments as bars
+      row.segments?.forEach(seg => {
+        const start = seg.start;
+        const end = seg.end;
+        const p = spanPct(start, end);
+        
+        const el = document.createElement('div');
+        el.className = `planner__bar ${clsFor(seg.code)}`;
+        el.style.left = `${p.left}%`;
+        el.style.width = `${p.width}%`;
+        
+        // Store data for tooltip/edit
+        el.dataset.type = seg.type;
+        el.dataset.code = seg.code;
+        el.dataset.start = m2t(start);
+        el.dataset.end = m2t(end);
+        el.dataset.tt = `${seg.code}\n${seg.type}\n${m2t(start)}–${m2t(end)}`;
+        
+        // Reuse existing click handler
+        el.addEventListener('click', onBlockClick);
+        
+        r.lastElementChild.appendChild(el);
+      });
       
-      // Reuse existing click handler
-      el.addEventListener('click', onBlockClick);
-      
-      r.lastElementChild.appendChild(el);
+      body.appendChild(r);
     });
     
-    body.appendChild(r);
-  });
-  
-  // Add mouse guide
-  const guide = document.createElement('div');
-  guide.className = 'planner__guide';
-  
-  $$('.planner__timeline').forEach(timeline => {
-    timeline.onmousemove = e => {
-      const rect = timeline.getBoundingClientRect();
-      const pct = (e.clientX - rect.left) / rect.width;
-      guide.style.left = `${pct * 100}%`;
-      guide.style.display = 'block';
-    };
-    timeline.onmouseleave = () => guide.style.display = 'none';
-    timeline.appendChild(guide.cloneNode(true));
-  });
-}
+    // Add mouse guide
+    const guide = document.createElement('div');
+    guide.className = 'planner__guide';
+    
+    $$('.planner__timeline').forEach(timeline => {
+      timeline.onmousemove = e => {
+        const rect = timeline.getBoundingClientRect();
+        const pct = (e.clientX - rect.left) / rect.width;
+        guide.style.left = `${pct * 100}%`;
+        guide.style.display = 'block';
+      };
+      timeline.onmouseleave = () => guide.style.display = 'none';
+      timeline.appendChild(guide.cloneNode(true));
+    });
+  }
 
-// Modify the Generate button handler
-<script>
-(function () {
-
+  // Modify the Generate button handler
   // Generate button
-  $('#btnGenerate').on('click', async () => {
+  document.getElementById('btnGenerate')?.addEventListener('click', async () => {
     try {
-      const assignments = await loadAssignments();          // existing loader
-      const rows = buildRowsFrom(assignments, templates);   // your builder
+      const templates = await loadTemplates().catch(() => []);
+      if (!templates.length) {
+        showError('No templates available. Add some templates first.');
+        return;
+      }
 
+      const assignments = await loadAssignments().catch(() => []);
+      if (!assignments.length) {
+        showInfo('No assignments found for this week.');
+        document.querySelector('#plannerBody').innerHTML = '';
+        return;
+      }
+
+      const rows = buildRowsFrom(assignments, templates);
       if (!rows.length) {
         showInfo('Nothing to render for selected filter');
         document.querySelector('#plannerBody').innerHTML = '';
@@ -1388,8 +1396,6 @@ function renderPlanner(rows) {
   // Initial header render + boot log
   renderTimeHeader();
   console.log('Planner script booted');
-
-})();  // <-- close IIFE
 </script>
 </body>
 </html>
