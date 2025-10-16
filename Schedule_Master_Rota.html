@@ -994,85 +994,205 @@ function showMessage(text, timeout = 3000) {
   setTimeout(() => banner.style.display = 'none', timeout);
 }
 
-/* Update init and event handlers */
-async function init() {
-  const sites = await loadSites();
-  if (!sites.length) return;
-  
-  const siteSel = $('#siteSel');
-  siteSel.innerHTML = sites.map(s => 
-    `<option value="${s.id}">${s.name}</option>`
-  ).join('');
-  
-  // Load initial site's data
-  await handleSiteChange(sites[0].id);
+/* Message helpers */
+function showError(msg) {
+  console.error(msg);
+  const banner = $('#msgBanner');
+  banner.style.background = '#fff3cd';
+  banner.style.color = '#856404';
+  banner.textContent = msg;
+  banner.style.display = 'block';
+  setTimeout(() => banner.style.display = 'none', 5000);
 }
 
-async function handleSiteChange(siteId) {
-  const leaders = await loadLeaders(siteId);
-  if (!leaders.length) return;
-  
-  const leaderSel = $('#leaderSel');
-  leaderSel.innerHTML = leaders.map(l => 
-    `<option value="${l.id}">${l.name}</option>`
-  ).join('');
-  leaderSel.disabled = false;
-  
-  // Load initial leader's data
-  await handleLeaderChange(leaders[0].id);
+function showInfo(msg) {
+  console.info(msg);
+  const banner = $('#msgBanner');
+  banner.style.background = '#d4edda';
+  banner.style.color = '#155724';
+  banner.textContent = msg;
+  banner.style.display = 'block';
+  setTimeout(() => banner.style.display = 'none', 3000);
 }
 
-async function handleLeaderChange(leaderId) {
-  const [team, templates] = await Promise.all([
-    loadTeams(leaderId),
-    loadTemplates(leaderId)
-  ]);
-  
-  if (!team.length) {
-    $('#tlBody').innerHTML = '<div style="padding:20px;color:var(--muted)">No team members to display</div>';
-    return;
+/* Week parsing */
+function parseWeekInput() {
+  const input = $('#weekInput').value;
+  if (!input) {
+    const now = new Date();
+    return {
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      day: now.getDate(),
+      weekStartDate: toMonday(now)
+    };
   }
-  
-  buildTree(team);
-  refreshChips();
-  rebuildAssignTable();
+  try {
+    const [y,m,d] = input.split('-').map(Number);
+    const date = new Date(y, m-1, d);
+    if (isNaN(date.getTime())) throw new Error('Invalid date');
+    return {
+      year: y,
+      month: m,
+      day: d,
+      weekStartDate: toMonday(date)
+    };
+  } catch (err) {
+    showError('Invalid week selected. Using current week.');
+    return parseWeekInput(); // recurse to get default
+  }
 }
 
-/* Update Generate button handler */
+/* DOM fallbacks */
+function loadAssignmentsFromDOM() {
+  const assignments = [];
+  const rows = $$('#assignTbl tr').slice(1); // skip header
+  
+  rows.forEach(row => {
+    const advisorName = row.querySelector('.name').textContent;
+    const daySelects = row.querySelectorAll('select[data-assign]');
+    
+    daySelects.forEach((sel, day) => {
+      const templateName = sel.value;
+      if (templateName && templateName !== '(none)') {
+        assignments.push({
+          advisorId: advisorName,
+          day,
+          templateName,
+          site: $('#siteSel').value,
+          leader: $('#leaderSel').value
+        });
+      }
+    });
+  });
+  
+  return assignments;
+}
+
+function loadTemplatesFromDOM() {
+  const templates = [];
+  $$('.template').forEach(card => {
+    const template = {
+      name: card.querySelector('[data-f="name"]').value,
+      work_code: card.querySelector('[data-f="work_code"]').value,
+      start_time: card.querySelector('[data-f="start_time"]').value,
+      finish_time: card.querySelector('[data-f="finish_time"]').value,
+      breaks: [
+        card.querySelector('[data-f="break1"]').value,
+        card.querySelector('[data-f="lunch"]').value,
+        card.querySelector('[data-f="break2"]').value
+      ].filter(t => t)
+    };
+    if (template.name && template.start_time && template.finish_time) {
+      templates.push(template);
+    }
+  });
+  return templates;
+}
+
+/* Enhanced loaders with fallbacks */
+async function loadTemplates() {
+  try {
+    console.time('loadTemplates');
+    const {data, error} = await sb.from('templates').select('*');
+    console.timeEnd('loadTemplates');
+    
+    if (error) throw error;
+    if (!data?.length) {
+      showInfo('No templates in database, using local templates.');
+      return loadTemplatesFromDOM();
+    }
+    
+    return data;
+  } catch (err) {
+    showError(`Templates load failed: ${err.message}`);
+    return loadTemplatesFromDOM();
+  }
+}
+
+async function loadAssignments() {
+  try {
+    console.time('loadAssignments');
+    const week = parseWeekInput();
+    const {data, error} = await sb.from('rotas')
+      .select('advisor_id,week_start,data')
+      .eq('week_start', isoLocal(week.weekStartDate))
+      .eq('leader_id', $('#leaderSel').value);
+    console.timeEnd('loadAssignments');
+    
+    if (error) throw error;
+    if (!data?.length) {
+      return loadAssignmentsFromDOM();
+    }
+    
+    return data;
+  } catch (err) {
+    showError(`Assignments load failed: ${err.message}`);
+    return loadAssignmentsFromDOM();
+  }
+}
+
+/* Row building */
+function buildRowsFrom(assignments, templates) {
+  const rows = new Map(); // advisorId -> row
+  
+  assignments.forEach(assignment => {
+    const template = templates.find(t => t.name === assignment.templateName);
+    if (!template) return;
+    
+    let row = rows.get(assignment.advisorId);
+    if (!row) {
+      row = {
+        advisorId: assignment.advisorId,
+        name: assignment.advisorId,
+        segments: []
+      };
+      rows.set(assignment.advisorId, row);
+    }
+    
+    const daySegments = buildSegments(template).map(seg => ({
+      ...seg,
+      day: assignment.day
+    }));
+    
+    row.segments.push(...daySegments);
+  });
+  
+  const result = Array.from(rows.values());
+  console.log(`Built ${result.length} rows with ${result.reduce((sum,r) => sum + r.segments.length, 0)} segments`);
+  return result;
+}
+
+// Replace Generate button handler
 $('#btnGenerate').onclick = async () => {
-  const leaderId = $('#leaderSel').value;
-  const weekStart = $('#weekInput').value || isoLocal(monday);
-  
-  console.time('generate');
-  const assignments = await loadAssignments(leaderId, weekStart);
-  
-  if (!assignments.length) {
-    $('#tlBody').innerHTML = '<div style="padding:20px;color:var(--muted)">No assignments to display</div>';
-    return;
+  try {
+    const templates = await loadTemplates().catch(() => loadTemplatesFromDOM());
+    if (!templates.length) {
+      showError('No templates available. Add some templates first.');
+      return;
+    }
+    
+    const assignments = await loadAssignments().catch(() => loadAssignmentsFromDOM());
+    if (!assignments.length) {
+      showInfo('No assignments found for this week.');
+      $('#tlBody').innerHTML = '';
+      return;
+    }
+    
+    const rows = buildRowsFrom(assignments, templates);
+    if (!rows.length) {
+      showInfo('Nothing to render for selected filters.');
+      $('#tlBody').innerHTML = '';
+      return;
+    }
+    
+    renderTimeline(rows);
+    showInfo('Schedule generated.');
+    
+  } catch (err) {
+    showError(`Generate failed: ${err.message}`);
+    console.error(err);
   }
-  
-  const segments = buildSegments(assignments, templates);
-  renderTimeline(segments);
-  console.timeEnd('generate');
-};
-
-/* Add sample data fallback */
-const SAMPLE_DATA = {
-  templates: [
-    {name:'Early', work_code:'DEB Email', start_time:'07:00', finish_time:'16:00', break1:'09:15', lunch:'12:00', break2:'15:15'},
-    {name:'Middle', work_code:'Mirakl', start_time:'11:00', finish_time:'20:00', break1:'11:30', lunch:'15:30', break2:'17:45'}
-  ],
-  assignments: {
-    'Monday': [{advisor:'Jane', template:'Early'}, {advisor:'John', template:'Middle'}],
-    'Tuesday': [{advisor:'Jane', template:'Middle'}, {advisor:'John', template:'Early'}]
-  }
-};
-
-$('#btnLoadSamples').onclick = () => {
-  templates = SAMPLE_DATA.templates;
-  renderTemplates();
-  rebuildAssignTable();
-  renderTimeline();
 };
 
 (async function init() {
