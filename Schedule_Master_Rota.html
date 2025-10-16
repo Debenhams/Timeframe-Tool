@@ -58,15 +58,24 @@ select,input[type="date"],input[type="text"]{border:1px solid var(--line);backgr
 .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 8px}
 
 /* Templates & Assignment (vertical, templates on top) */
-.template{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fafcff;margin-bottom:10px}
-.template .row{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center;margin:6px 0}
-.template .row .inline{display:flex;gap:8px;flex-wrap:wrap}
-.actions{display:flex;gap:8px;margin:8px 0;flex-wrap:wrap}
-#assignWrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
-table{border-collapse:collapse;width:100%;min-width:900px}
-th,td{border:1px solid var(--line);padding:7px;text-align:center}
-thead th{background:#0d47a1;color:#fff;font-weight:800}
-td.name{position:sticky;left:0;background:#eef4ff;font-weight:800;white-space:nowrap}
+.templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.template {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  background: #fafcff;
+}
+
+/* Updated timeline colors */
+.c-email, .c-mirakl, .c-work { background:#6b8e23 !important }
+.c-lunch { background:#8ddaf2 !important }
+.c-break { background:#e0e0e0 !important }
+.c-meet { background:#ffcc00 !important }
 
 /* Timeline */
 .timeline{grid-column:1/-1}
@@ -87,19 +96,17 @@ td.name{position:sticky;left:0;background:#eef4ff;font-weight:800;white-space:no
 
 /* No text in bars – info via tooltip */
 
-/* Code colours */
-.c-email{background:#7f8b2b}
-.c-mirakl{background:#7f8b2b}
-.c-social{background:#35508e}
-.c-meet{background:#ffd700}
-.c-ot{background:#cc351f}
-.c-break{background:#d9dce3}
-.c-lunch{background:#96e8ee}
-.c-abs{background:#b0c4de}
-.c-shrink{background:#ffd166}
-
-/* Now-line */
-.nowline{position:absolute;top:0;bottom:0;width:2px;background:#1c64f2;opacity:.7}
+/* Mouse guide line */
+.time-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(0,0,0,0.15);
+  pointer-events: none;
+  z-index: 3;
+  transition: left 0.1s;
+}
 
 /* Tooltip */
 .tooltip{position:fixed;pointer-events:none;z-index:50;padding:6px 8px;background:#111827;color:#fff;border-radius:6px;font-weight:700;font-size:12px;transform:translate(-50%,-120%);white-space:nowrap}
@@ -157,7 +164,7 @@ td.name{position:sticky;left:0;background:#eef4ff;font-weight:800;white-space:no
       </div>
       <div class="panel-b">
         <!-- Templates -->
-        <div id="templWrap"></div>
+        <div id="templWrap" class="templates-grid"></div>
 
         <!-- Assignment -->
         <div id="assignWrap" style="margin-top:10px">
@@ -212,6 +219,9 @@ td.name{position:sticky;left:0;background:#eef4ff;font-weight:800;white-space:no
 
   <!-- Tooltip -->
   <div id="tip" class="tooltip hidden"></div>
+
+  <!-- Add mouse guide element -->
+  <div class="time-guide" id="timeGuide"></div>
 
 <script>
 /* ========= Supabase ========= */
@@ -534,6 +544,79 @@ document.addEventListener('mousemove',e=>{
   tip.textContent=bar.dataset.tt||''; tip.classList.remove('hidden');
   tip.style.left=e.pageX+'px'; tip.style.top=e.pageY+'px';
 });
+
+/* Add mouse guide tracking */
+const guide = $('#timeGuide');
+$$('.rline').forEach(line => {
+  line.onmousemove = e => {
+    const rect = line.getBoundingClientRect();
+    const pct = (e.clientX - rect.left) / rect.width * 100;
+    guide.style.left = `${pct}%`;
+    guide.style.display = 'block';
+  };
+  line.onmouseleave = () => guide.style.display = 'none';
+});
+
+/* Enhanced tooltip content */
+function formatTooltip(seg) {
+  const type = seg.code.includes('Break') ? 'Break' : 
+               seg.code.includes('Lunch') ? 'Lunch' :
+               seg.code.includes('Meeting') ? 'Meeting' : 'Work';
+  return `${seg.code}\n${type}\n${m2hhmm(seg.start)}–${m2hhmm(seg.end)}`;
+}
+
+/* Live edit handling */
+function initLiveEdit() {
+  $$('.bar').forEach(bar => {
+    bar.onclick = e => {
+      const overlay = document.createElement('div');
+      overlay.className = 'edit-overlay';
+      // Add edit controls here
+      document.body.appendChild(overlay);
+      e.stopPropagation();
+    };
+  });
+}
+
+/* Update renderTimeline to use new colors and tooltips */
+function renderTimeline(fromAssignments=false) {
+  const body=$('#tlBody'); body.innerHTML='';
+  const lid=$('#leaderSel').value;
+  const team=advisors.filter(a=>String(a.leader_id)===String(lid)).sort((a,b)=>a.name.localeCompare(b.name));
+  const rows = ($('#viewSel').value==='TEAM_SELECTED' && selectedNames.size)? team.filter(a=>selectedNames.has(a.name)) : team;
+
+  const S=+getComputedStyle(document.documentElement).getPropertyValue('--start')||6;
+  const E=+getComputedStyle(document.documentElement).getPropertyValue('--end')||20;
+
+  rows.forEach(adv=>{
+    const r=document.createElement('div'); r.className='row';
+    // Badge from MONDAY template (or the first non-empty day)
+    let badge='';
+    for(let di=0; di<7; di++){ const tName=assigned.get(`${adv.id}-${di}`); if(tName){ badge=TEMPLATE_BADGE(tName); break; } }
+    r.innerHTML=`<div class="rname">${adv.name}${badge?`<span class="badge-sm">${badge}</span>`:''}</div><div class="rline" data-row="${adv.id}"></div>`;
+    body.appendChild(r);
+    DAYS.forEach((_,di)=>{
+      const tName=assigned.get(`${adv.id}-${di}`); if(!tName||!templates[tName]) return;
+      const segs=segmentsFromTemplate(templates[tName]);
+      segs.forEach(seg=>{
+        const start = seg.start + di*1440, end = seg.end + di*1440;
+        const p=spanPct(start,end);
+        const el=document.createElement('div'); el.className=`bar ${clsFor(seg.code)}`;
+        el.style.left=`${p.left}%`; el.style.width=`${p.width}%`;
+        // Tooltip content
+        el.dataset.tt = formatTooltip(seg);
+        r.lastElementChild.appendChild(el);
+      });
+    });
+  });
+
+  drawNowLine();
+
+  if(fromAssignments) console.log('Generated from assignments.');
+
+  // Add live edit init
+  initLiveEdit();
+}
 
 /* Publish (rotas + rotas_published) */
 $('#btnPublish').onclick=async()=>{
