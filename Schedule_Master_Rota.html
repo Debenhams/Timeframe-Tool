@@ -94,6 +94,103 @@
   .tree .node{display:flex;gap:6px;align-items:center;padding:2px 2px}
   .chip{display:inline-flex;align-items:center;gap:6px;background:#eef2ff;border:1px solid #d6dcff;border-radius:999px;padding:3px 8px;font-size:12px}
   .node-actions button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:3px 6px;cursor:pointer;font-size:11px}
+
+  /* Planner styles */
+  .planner {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .planner__header {
+    display: flex;
+    background: #f6f8fb;
+    border-bottom: 1px solid var(--line);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .planner__name-col {
+    width: var(--name-w, 260px);
+    min-width: var(--name-w, 260px);
+    padding: 7px 10px;
+    font-weight: 800;
+    border-right: 1px solid var(--line);
+  }
+  .planner__hours {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(14, 1fr);
+  }
+  .planner__hour {
+    padding: 6px 0;
+    border-left: 1px solid var(--line);
+    font-size: 12px;
+    color: #68758a;
+    text-align: center;
+  }
+  .planner__body {
+    display: flex;
+    flex-direction: column;
+  }
+  .planner__row {
+    display: flex;
+    border-bottom: 1px solid var(--line);
+    position: relative;
+    height: 44px;
+  }
+  .planner__row:last-child { border-bottom: 0; }
+  .planner__row:nth-child(odd) { background: #fbfdff; }
+  .planner__name {
+    width: var(--name-w, 260px);
+    min-width: var(--name-w, 260px);
+    padding: 8px 10px;
+    border-right: 1px solid var(--line);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .planner__timeline {
+    position: relative;
+    flex: 1;
+    height: 44px;
+    background: linear-gradient(#f6f8fb 1px, transparent 1px) 0 0 / 60px 44px;
+  }
+  .planner__bar {
+    position: absolute;
+    height: 20px;
+    top: 12px;
+    border-radius: 3px;
+    z-index: 3;
+    opacity: 0.95;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  .planner__bar:hover { opacity: 1; }
+  .planner__guide {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(0,0,0,.2);
+    pointer-events: none;
+    z-index: 10;
+  }
+  .planner__tooltip {
+    position: fixed;
+    pointer-events: none;
+    z-index: 50;
+    padding: 6px 8px;
+    background: #111827;
+    color: #fff;
+    border-radius: 6px;
+    font-size: 12px;
+    transform: translate(-50%, -120%);
+    white-space: nowrap;
+  }
+
 </style>
 
 <!-- Supabase client library -->
@@ -1185,6 +1282,115 @@ function subscribeRealtime(){
   // Publish dialog actions
   $('#publishOK').onclick = doPublish;
 })();
-  </script>
-</body>
-</html>
+
+/* Planner helpers */
+function renderTimeHeader() {
+  const hours = $('#plannerHours');
+  hours.innerHTML = '';
+  for (let h = 6; h <= 20; h++) {
+    const div = document.createElement('div');
+    div.className = 'planner__hour';
+    div.textContent = `${String(h).padStart(2,'0')}:00`;
+    hours.appendChild(div);
+  }
+}
+
+function renderPlanner(rows) {
+  const body = $('#plannerBody');
+  body.innerHTML = '';
+  
+  if (!rows?.length) {
+    body.innerHTML = '<div style="padding:20px;color:var(--muted)">No data to display.</div>';
+    return;
+  }
+  
+  rows.forEach(row => {
+    const r = document.createElement('div');
+    r.className = 'planner__row';
+    
+    // Name cell with badge
+    const badge = row.template ? TEMPLATE_BADGE(row.template) : '';
+    r.innerHTML = `
+      <div class="planner__name">
+        ${row.name}
+        ${badge ? `<span class="badge-sm">${badge}</span>` : ''}
+      </div>
+      <div class="planner__timeline" data-row="${row.id}"></div>
+    `;
+    
+    // Add segments as bars
+    row.segments?.forEach(seg => {
+      const start = seg.start;
+      const end = seg.end;
+      const p = spanPct(start, end);
+      
+      const el = document.createElement('div');
+      el.className = `planner__bar ${clsFor(seg.code)}`;
+      el.style.left = `${p.left}%`;
+      el.style.width = `${p.width}%`;
+      
+      // Store data for tooltip/edit
+      el.dataset.type = seg.type;
+      el.dataset.code = seg.code;
+      el.dataset.start = m2t(start);
+      el.dataset.end = m2t(end);
+      el.dataset.tt = `${seg.code}\n${seg.type}\n${m2t(start)}–${m2t(end)}`;
+      
+      // Reuse existing click handler
+      el.addEventListener('click', onBlockClick);
+      
+      r.lastElementChild.appendChild(el);
+    });
+    
+    body.appendChild(r);
+  });
+  
+  // Add mouse guide
+  const guide = document.createElement('div');
+  guide.className = 'planner__guide';
+  
+  $$('.planner__timeline').forEach(timeline => {
+    timeline.onmousemove = e => {
+      const rect = timeline.getBoundingClientRect();
+      const pct = (e.clientX - rect.left) / rect.width;
+      guide.style.left = `${pct * 100}%`;
+      guide.style.display = 'block';
+    };
+    timeline.onmouseleave = () => guide.style.display = 'none';
+    timeline.appendChild(guide.cloneNode(true));
+  });
+}
+
+// Modify the Generate button handler
+$('#btnGenerate').onclick = async () => {
+  try {
+    const templates = await loadTemplates().catch(() => loadTemplatesFromDOM());
+    if (!templates.length) {
+      showError('No templates available. Add some templates first.');
+      return;
+    }
+    
+    const assignments = await loadAssignments().catch(() => loadAssignmentsFromDOM());
+    if (!assignments.length) {
+      showInfo('No assignments found for this week.');
+      $('#plannerBody').innerHTML = '';
+      return;
+    }
+    
+    const rows = buildRowsFrom(assignments, templates);
+    if (!rows.length) {
+      showInfo('Nothing to render for selected filters.');
+      $('#plannerBody').innerHTML = '';
+      return;
+    }
+    
+    renderPlanner(rows);
+    showInfo('Schedule generated.');
+    
+  } catch (err) {
+    showError(`Generate failed: ${err.message}`);
+    console.error(err);
+  }
+};
+
+renderTimeHeader();
