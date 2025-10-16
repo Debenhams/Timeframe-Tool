@@ -451,46 +451,107 @@ $('#btnAuth').onclick=async()=>{
 (async()=>{ const {data:{user}}=await sb.auth.getUser(); sessionUser=user; $('#btnAuth').textContent=user?'Signed in':'Sign in'; })();
 
 /* ========= Load org ========= */
-async function loadOrg(){
-  const [s,l,a]=await Promise.all([
-    sb.from('sites').select('id,name').order('name'),
-    sb.from('leaders').select('id,name,site_id').order('name'),
-    sb.from('advisors').select('id,name,leader_id').order('name')
-  ]);
-  sites=s.data||[]; leaders=l.data||[]; advisors=a.data||[];
-  buildTopFilters(true);
-  buildTree();
-  refreshChips();
-  rebuildAssignTable();
+async function loadOrg() {
+  console.log('Loading organization data...');
+  
+  try {
+    const [sites, leaders, advisors] = await Promise.all([
+      sb.from('sites').select('id,name').order('name'),
+      sb.from('leaders').select('id,name,site_id').order('name'),
+      sb.from('advisors').select('id,name,leader_id').order('name')
+    ]);
+
+    if (!sites.data?.length) {
+      console.error('No sites loaded');
+      return;
+    }
+
+    window.sites = sites.data;
+    window.leaders = leaders.data || [];
+    window.advisors = advisors.data || [];
+
+    console.log(`Loaded: ${sites.data.length} sites, ${leaders.data.length} leaders, ${advisors.data.length} advisors`);
+    
+    // Rebuild all dropdowns
+    buildTopFilters(true);
+    buildTree();
+    refreshChips();
+    rebuildAssignTable();
+    renderTimeline();
+    
+  } catch (err) {
+    console.error('Failed to load org:', err);
+    alert('Failed to load organization data. Please refresh.');
+  }
 }
 
-/* ========= Top filters (cascade) ========= */
-function buildTopFilters(first=false){
-  const siteSel=$('#siteSel'), leaderSel=$('#leaderSel');
-  siteSel.innerHTML = sites.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
-  if(first && sites.length){
-    const deb = sites.find(s=>/debenhams/i.test(s.name));
-    siteSel.value = deb? deb.id : sites[0].id;
+function buildTopFilters(first = false) {
+  const siteSel = $('#siteSel');
+  const leaderSel = $('#leaderSel');
+  const viewSel = $('#viewSel');
+  
+  // Populate sites
+  siteSel.innerHTML = sites
+    .sort((a,b) => a.name.localeCompare(b.name))
+    .map(s => `<option value="${s.id}">${s.name}</option>`)
+    .join('');
+
+  // Select default site
+  if (first && sites.length) {
+    const deb = sites.find(s => /debenhams/i.test(s.name));
+    siteSel.value = deb ? deb.id : sites[0].id;
   }
-  const ls = leaders.filter(l=>String(l.site_id)===String(siteSel.value)).sort((a,b)=>a.name.localeCompare(b.name));
-  leaderSel.innerHTML = ls.map(l=>`<option value="${l.id}">${l.name}</option>`).join('');
-  selectedLeader = ls[0]?.id || null;
-  if(selectedLeader) leaderSel.value = selectedLeader;
 
-  siteSel.onchange=()=>{
+  // Filter leaders by site
+  const siteLeaders = leaders
+    .filter(l => String(l.site_id) === String(siteSel.value))
+    .sort((a,b) => a.name.localeCompare(b.name));
+
+  leaderSel.innerHTML = siteLeaders
+    .map(l => `<option value="${l.id}">${l.name}</option>`)
+    .join('');
+
+  // Set selected leader
+  selectedLeader = siteLeaders[0]?.id || null;
+  if (selectedLeader) leaderSel.value = selectedLeader;
+
+  // Wire up change handlers
+  siteSel.onchange = () => {
     selectedNames.clear();
-    const nextLeaders = leaders.filter(l=>String(l.site_id)===String(siteSel.value)).sort((a,b)=>a.name.localeCompare(b.name));
+    const nextLeaders = leaders
+      .filter(l => String(l.site_id) === String(siteSel.value))
+      .sort((a,b) => a.name.localeCompare(b.name));
     selectedLeader = nextLeaders[0]?.id || null;
-    buildTopFilters(); buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline();
-  };
-  leaderSel.onchange=()=>{
-    selectedLeader=leaderSel.value; selectedNames.clear();
-    buildTree(); refreshChips(); rebuildAssignTable(); renderTimeline();
+    
+    buildTopFilters();
+    buildTree();
+    refreshChips();
+    rebuildAssignTable();
+    renderTimeline();
   };
 
-  // Hours header
-  const H=$('#tlHours'); const S=+getComputedStyle(document.documentElement).getPropertyValue('--start')||6; const E=+getComputedStyle(document.documentElement).getPropertyValue('--end')||20;
-  H.innerHTML = Array.from({length:E-S},(_,i)=>`<div>${pad(S+i)}:00</div>`).join('');
+  leaderSel.onchange = () => {
+    selectedLeader = leaderSel.value;
+    selectedNames.clear();
+    
+    buildTree();
+    refreshChips();
+    rebuildAssignTable();
+    renderTimeline();
+  };
+
+  viewSel.onchange = () => {
+    rebuildAssignTable();
+    renderTimeline();
+  };
+
+  // Rebuild hours header
+  const H = $('#tlHours');
+  const S = +getComputedStyle(document.documentElement).getPropertyValue('--start') || 6;
+  const E = +getComputedStyle(document.documentElement).getPropertyValue('--end') || 20;
+  H.innerHTML = Array.from({length: E-S}, (_,i) => 
+    `<div>${pad(S+i)}:00</div>`
+  ).join('');
 }
 
 /* ========= Right tree ========= */
@@ -828,6 +889,11 @@ document.getElementById('btnGenerate').onclick = () => {
   DEBUG && console.log('Generating timeline...');
   renderTimeline(true);
 };
+
+(async function init() {
+  await loadOrg();
+  await loadTemplates();
+})();
 </script>
 </body>
 </html>
