@@ -269,7 +269,38 @@ select,input[type="date"],input[type="text"]{border:1px solid var(--line);backgr
 .tooltip{position:fixed;pointer-events:none;z-index:50;padding:6px 8px;background:#111827;color:#fff;border-radius:6px;font-weight:700;font-size:12px;transform:translate(-50%,-120%);white-space:nowrap}
 .hidden{display:none}
 
-@media (max-width:1200px){ :root{ --name-w:200px } }
+/* Timeline fixes */
+.rline {
+  position: relative;
+  height: 44px !important;
+  min-height: 44px;
+  background: linear-gradient(#f6f8fb 1px, transparent 1px) 0 0 / 60px 44px;
+}
+.bar {
+  position: absolute;
+  height: 20px;
+  top: 12px;
+  border-radius: 3px;
+  z-index: 3;
+  opacity: 0.95;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.bar:hover { opacity: 1 }
+
+/* Template grid fixes */
+.templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 16px;
+  margin: 0 0 20px;
+}
+.template {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--wash);
+}
 </style>
 </head>
 
@@ -635,83 +666,81 @@ function rebuildAssignTable(){
 /* ========= Generate & Render ========= */
 $('#btnGenerate').onclick=()=>renderTimeline(true);
 
-/* Add robust time parsing */
+/* Debug flag */
+const DEBUG = false;
+
+/* Time parsing */
 function parseMinutes(time) {
   if (!time) return null;
+  
+  // Handle "7" -> "07:00"
+  if (/^\d{1,2}$/.test(time)) time = `${time.padStart(2,'0')}:00`;
+  
   const match = time.match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return null;
-  const [_, h, m] = match;
-  return parseInt(h) * 60 + parseInt(m);
-}
-
-/* Fix segment generation */
-function segmentsFromTemplate(tmp) {
-  console.log('Processing template:', tmp);
-  
-  const s = parseMinutes(tmp.start_time);
-  const e = parseMinutes(tmp.finish_time);
-  const b1 = parseMinutes(tmp.break1);
-  const l = parseMinutes(tmp.lunch);
-  const b2 = parseMinutes(tmp.break2);
-  
-  if (!s || !e) {
-    console.warn('Invalid start/end time:', tmp);
-    return [];
+  if (!match) {
+    DEBUG && console.warn(`Invalid time format: ${time}`);
+    return null;
   }
   
+  const h = parseInt(match[1]), m = parseInt(match[2]);
+  if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) {
+    DEBUG && console.warn(`Invalid time values: ${h}:${m}`);
+    return null;
+  }
+  
+  return h * 60 + m;
+}
+
+/* Segment building */
+function buildSegments(template) {
+  const s = parseMinutes(template.start_time);
+  const e = parseMinutes(template.finish_time);
+  if (!s || !e) {
+    DEBUG && console.warn('Invalid start/end time in template:', template);
+    return [];
+  }
+
+  const breaks = [
+    { time: parseMinutes(template.break1), dur: 15, type: 'Break' },
+    { time: parseMinutes(template.lunch), dur: 30, type: 'Lunch' },
+    { time: parseMinutes(template.break2), dur: 15, type: 'Break' }
+  ].filter(b => b.time !== null).sort((a,b) => a.time - b.time);
+  
   const segs = [];
-  const breaks = [];
-  
-  // Collect all breaks
-  if (b1) breaks.push({time: b1, dur: 15, type: 'Break'});
-  if (l) breaks.push({time: l, dur: 30, type: 'Lunch'});
-  if (b2) breaks.push({time: b2, dur: 15, type: 'Break'});
-  breaks.sort((a,b) => a.time - b.time);
-  
-  console.log('Breaks:', breaks);
-  
-  // Build segments
   let lastEnd = s;
+  
   breaks.forEach(br => {
     if (lastEnd < br.time) {
       segs.push({
-        code: tmp.work_code,
+        type: 'Work',
+        code: template.work_code,
         start: lastEnd,
-        end: br.time,
-        type: 'Work'
+        end: br.time
       });
     }
     segs.push({
+      type: br.type,
       code: br.type,
       start: br.time,
-      end: br.time + br.dur,
-      type: br.type
+      end: br.time + br.dur
     });
     lastEnd = br.time + br.dur;
   });
   
   if (lastEnd < e) {
     segs.push({
-      code: tmp.work_code,
+      type: 'Work',
+      code: template.work_code,
       start: lastEnd,
-      end: e,
-      type: 'Work'
+      end: e
     });
   }
   
-  console.log('Generated segments:', segs);
   return segs;
 }
 
-/* Enhanced tooltip */
-function formatTooltip(seg) {
-  return `${seg.code}\n${seg.type}\n${m2hhmm(seg.start)}–${m2hhmm(seg.end)}`;
-}
-
-/* Fix timeline rendering */
+/* Timeline rendering */
 function renderTimeline(fromAssignments=false) {
-  console.log('Rendering timeline, fromAssignments:', fromAssignments);
-  
   const body = $('#tlBody');
   body.innerHTML = '';
   
@@ -719,14 +748,14 @@ function renderTimeline(fromAssignments=false) {
   const team = advisors.filter(a => String(a.leader_id) === String(lid))
     .sort((a,b) => a.name.localeCompare(b.name));
   
-  const rows = ($('#viewSel').value === 'TEAM_SELECTED' && selectedNames.size) 
-    ? team.filter(a => selectedNames.has(a.name)) 
+  const rows = ($('#viewSel').value === 'TEAM_SELECTED' && selectedNames.size)
+    ? team.filter(a => selectedNames.has(a.name))
     : team;
-  
-  console.log('Processing rows:', rows.length);
-  
-  // Ensure container has height
-  body.style.minHeight = `${rows.length * 44}px`;
+    
+  if (!rows.length) {
+    DEBUG && console.warn('No rows to render');
+    return;
+  }
   
   rows.forEach(adv => {
     const r = document.createElement('div');
@@ -760,8 +789,11 @@ function renderTimeline(fromAssignments=false) {
       const tName = assigned.get(`${adv.id}-${di}`);
       if (!tName || !templates[tName]) return;
       
-      const segs = segmentsFromTemplate(templates[tName]);
-      console.log(`Day ${di}, Template ${tName}, Segments:`, segs);
+      const segs = buildSegments(templates[tName]);
+      if (!segs.length) {
+        DEBUG && console.warn(`No segments for ${adv.name} on day ${di}`);
+        return;
+      }
       
       segs.forEach(seg => {
         const start = seg.start + di*1440;
@@ -772,228 +804,30 @@ function renderTimeline(fromAssignments=false) {
         el.className = `bar ${clsFor(seg.code)}`;
         el.style.left = `${p.left}%`;
         el.style.width = `${p.width}%`;
-        el.style.zIndex = 2;
-        el.style.opacity = 0.9;
-        
-        // Store data for tooltip
-        el.dataset.code = seg.code;
         el.dataset.type = seg.type;
+        el.dataset.code = seg.code;
         el.dataset.start = seg.start;
         el.dataset.end = seg.end;
-        el.dataset.tt = formatTooltip(seg);
+        el.dataset.tt = `${seg.code}\n${seg.type}\n${m2hhmm(seg.start)}–${m2hhmm(seg.end)}`;
         
         r.lastElementChild.appendChild(el);
       });
     });
   });
-  
-  console.log('Timeline render complete');
-  
-  drawNowLine();
-  initTimeGuide();
-  initBarEdit();
-}
-
-/* Now line for current day/time */
-function drawNowLine(){
-  // remove previous
-  $$('#tlBody .nowline').forEach(n=>n.remove());
-  const today=new Date();
-  const weekStart=toMonday(new Date($('#weekInput').value||isoLocal(monday)));
-  const diffDays=Math.floor((today - weekStart)/(24*3600*1000));
-  if(diffDays<0 || diffDays>6) return; // out of this week
-  const mins=today.getHours()*60 + today.getMinutes();
-  const startDay = diffDays*1440;
-  const p=spanPct(startDay+mins,startDay+mins+1);
-  // add to every rline
-  $$('#tlBody .rline').forEach(line=>{
-    const nl=document.createElement('div'); nl.className='nowline'; nl.style.left=`${p.left}%`; line.appendChild(nl);
-  });
-}
-
-/* Hover tooltip */
-const tip=$('#tip');
-document.addEventListener('mousemove',e=>{
-  const bar=e.target.closest('.bar');
-  if(!bar){ tip.classList.add('hidden'); return; }
-  tip.textContent=bar.dataset.tt||''; tip.classList.remove('hidden');
-  tip.style.left=e.pageX+'px'; tip.style.top=e.pageY+'px';
-});
-
-/* Add mouse guide tracking */
-function initTimeGuide() {
-  const guide = document.createElement('div');
-  guide.className = 'time-guide';
-  const label = document.createElement('div');
-  label.className = 'time-label';
-  guide.appendChild(label);
-  
-  $$('.rline').forEach(line => {
-    line.onmousemove = e => {
-      const rect = line.getBoundingClientRect();
-      const pct = (e.clientX - rect.left) / rect.width;
-      const mins = Math.round(pct * (14 * 60)); // 14 hours (06:00-20:00)
-      
-      guide.style.left = `${pct * 100}%`;
-      guide.style.display = 'block';
-      label.textContent = m2hhmm(mins + 6*60); // Add 6 hours offset
-    };
-    line.onmouseleave = () => guide.style.display = 'none';
-    line.appendChild(guide.cloneNode(true));
-  });
-}
-
-/* Enhanced bar editing */
-function initBarEdit() {
-  $$('.bar').forEach(bar => {
-    bar.onclick = e => {
-      const rect = bar.getBoundingClientRect();
-      const edit = document.createElement('div');
-      edit.className = 'bar-edit';
-      edit.style.left = rect.right + 'px';
-      edit.style.top = rect.top + 'px';
-      
-      const seg = {
-        code: bar.dataset.code,
-        start: bar.dataset.start,
-        end: bar.dataset.end
-      };
-      
-      edit.innerHTML = `
-        <div class="row">
-          <label>Type</label>
-          <select id="editType">
-            <option value="Work" ${seg.code.includes('Break')?'':'selected'}>Work</option>
-            <option value="Break" ${seg.code==='Break'?'selected':''}>Break</option>
-            <option value="Meeting">Meeting</option>
-          </select>
-        </div>
-        <div class="row">
-          <label>Start</label>
-          <input type="time" id="editStart" value="${m2hhmm(seg.start)}">
-        </div>
-        <div class="row">
-          <label>End</label>
-          <input type="time" id="editEnd" value="${m2hhmm(seg.end)}">
-        </div>
-        <div class="row">
-          <label>Platform</label>
-          <select id="editPlatform">${groupCodeSelect(seg.code)}</select>
-        </div>
-        <div class="actions">
-          <button class="btn ghost" onclick="this.closest('.bar-edit').remove()">Cancel</button>
-          <button class="btn primary" onclick="saveBarEdit(this)">Save</button>
-        </div>
-      `;
-      
-      document.body.appendChild(edit);
-      e.stopPropagation();
-    };
-  });
-}
-
-function saveBarEdit(btn) {
-  const edit = btn.closest('.bar-edit');
-  const type = edit.querySelector('#editType').value;
-  const start = toMin(edit.querySelector('#editStart').value);
-  const end = toMin(edit.querySelector('#editEnd').value);
-  const platform = edit.querySelector('#editPlatform').value;
-  
-  // Update template or create meeting
-  // Re-render row
-  edit.remove();
-}
-
-// Update renderTimeline to use new functions
-function renderTimeline(fromAssignments=false) {
-  const body=$('#tlBody'); body.innerHTML='';
-  const lid=$('#leaderSel').value;
-  const team=advisors.filter(a=>String(a.leader_id)===String(lid)).sort((a,b)=>a.name.localeCompare(b.name));
-  const rows = ($('#viewSel').value==='TEAM_SELECTED' && selectedNames.size)? team.filter(a=>selectedNames.has(a.name)) : team;
-
-  const S=+getComputedStyle(document.documentElement).getPropertyValue('--start')||6;
-  const E=+getComputedStyle(document.documentElement).getPropertyValue('--end')||20;
-
-  rows.forEach(adv=>{
-    const r=document.createElement('div'); r.className='row';
-    // Badge from MONDAY template (or the first non-empty day)
-    let badge='';
-    for(let di=0; di<7; di++){ const tName=assigned.get(`${adv.id}-${di}`); if(tName){ badge=TEMPLATE_BADGE(tName); break; } }
-    r.innerHTML=`<div class="rname">${adv.name}${badge?`<span class="badge-sm">${badge}</span>`:''}</div><div class="rline" data-row="${adv.id}"></div>`;
-    body.appendChild(r);
-    DAYS.forEach((_,di)=>{
-      const tName=assigned.get(`${adv.id}-${di}`); if(!tName||!templates[tName]) return;
-      const segs=segmentsFromTemplate(templates[tName]);
-      segs.forEach(seg=>{
-        const start = seg.start + di*1440, end = seg.end + di*1440;
-        const p=spanPct(start,end);
-        const el=document.createElement('div'); el.className=`bar ${clsFor(seg.code)}`;
-        el.style.left=`${p.left}%`; el.style.width=`${p.width}%`;
-        // Tooltip content
-        el.dataset.tt = formatTooltip(seg);
-        r.lastElementChild.appendChild(el);
-      });
-    });
-  });
-
-  drawNowLine();
-
-  if(fromAssignments) console.log('Generated from assignments.');
 
   initTimeGuide();
   initBarEdit();
+  drawNowLine();
 }
 
-/* Publish (rotas + rotas_published) */
-$('#btnPublish').onclick=async()=>{
-  const lid=$('#leaderSel').value;
-  const team=advisors.filter(a=>String(a.leader_id)===String(lid));
-  const rows = ($('#viewSel').value==='TEAM_SELECTED' && selectedNames.size)? team.filter(a=>selectedNames.has(a.name)) : team;
-  if(!rows.length){ alert('No advisors to publish.'); return; }
+// Make renderer globally available
+window.renderTimeline = renderTimeline;
 
-  const payload=[];
-  rows.forEach(adv=>{
-    const weekData={};
-    DAYS.forEach((_,di)=>{
-      const tName=assigned.get(`${adv.id}-${di}`);
-      if(!tName||!templates[tName]) return;
-      const segs=segmentsFromTemplate(templates[tName]).map(s=>({code:s.code,start:m2hhmm(s.start),end:m2hhmm(s.end)}));
-      weekData[DAYS[di]]={segments:segs};
-    });
-    payload.push({ advisor_id:adv.id, week_start: isoLocal(monday), data: weekData, published_at: new Date().toISOString() });
-  });
-
-  if(!payload.length){ alert('Nothing to publish for this week.'); return; }
-
-  try{
-    await sb.from('rotas').delete().eq('week_start', isoLocal(monday)).in('advisor_id', payload.map(p=>p.advisor_id));
-    let {error:e1}=await sb.from('rotas').insert(payload.map(({advisor_id,week_start,data})=>({advisor_id,week_start,data})));
-    if(e1) throw e1;
-
-    await sb.from('rotas_published').delete().eq('week_start', isoLocal(monday)).in('advisor_id', payload.map(p=>p.advisor_id));
-    let {error:e2}=await sb.from('rotas_published').insert(payload);
-    if(e2) throw e2;
-
-    alert('Published ✓ Advisors will see this instantly.');
-  }catch(err){
-    console.error(err);
-    alert('Publish failed: '+(err?.message||err));
-  }
+// Wire up Generate button
+document.getElementById('btnGenerate').onclick = () => {
+  DEBUG && console.log('Generating timeline...');
+  renderTimeline(true);
 };
-
-/* ========= Week controls ========= */
-$('#weekInput').value = isoLocal(monday);
-$('#prevW').onclick=()=>{ monday=addDays(monday,-7); $('#weekInput').value=isoLocal(monday); renderTimeline(); };
-$('#nextW').onclick=()=>{ monday=addDays(monday,7);  $('#weekInput').value=isoLocal(monday); renderTimeline(); };
-$('#todayW').onclick=()=>{ monday=toMonday(new Date()); $('#weekInput').value=isoLocal(monday); renderTimeline(); };
-$('#weekInput').onchange=()=>{ const d=new Date($('#weekInput').value+'T00:00'); monday=toMonday(d); $('#weekInput').value=isoLocal(monday); renderTimeline(); };
-
-/* ========= Init ========= */
-(async function init(){
-  await loadOrg();
-  await loadTemplates();
-  renderTimeline();
-})();
 </script>
 </body>
 </html>
