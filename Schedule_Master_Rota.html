@@ -1362,39 +1362,34 @@ function renderPlanner(rows) {
 }
 
 // Modify the Generate button handler
-$('#btnGenerate').onclick = async () => {
-  try {
-    const templates = await loadTemplates().catch(() => loadTemplatesFromDOM());
-    if (!templates.length) {
-      showError('No templates available. Add some templates first.');
-      return;
+<script>
+(function () {
+
+  // Generate button
+  $('#btnGenerate').on('click', async () => {
+    try {
+      const assignments = await loadAssignments();          // existing loader
+      const rows = buildRowsFrom(assignments, templates);   // your builder
+
+      if (!rows.length) {
+        showInfo('Nothing to render for selected filter');
+        document.querySelector('#plannerBody').innerHTML = '';
+        return;
+      }
+
+      renderPlanner(rows);
+      showInfo('Schedule generated.');
+    } catch (err) {
+      showError(`Generate failed: ${err.message}`);
+      console.error(err);
     }
-    
-    const assignments = await loadAssignments().catch(() => loadAssignmentsFromDOM());
-    if (!assignments.length) {
-      showInfo('No assignments found for this week.');
-      $('#plannerBody').innerHTML = '';
-      return;
-    }
-    
-    const rows = buildRowsFrom(assignments, templates);
-    if (!rows.length) {
-      showInfo('Nothing to render for selected filters.');
-      $('#plannerBody').innerHTML = '';
-      return;
-    }
-    
-    renderPlanner(rows);
-    showInfo('Schedule generated.');
-    
-  } catch (err) {
-    showError(`Generate failed: ${err.message}`);
-    console.error(err);
-  }
-};
-renderTimeHeader();
-console.log('Planner script booted');
-})();
+  });
+
+  // Initial header render + boot log
+  renderTimeHeader();
+  console.log('Planner script booted');
+
+})();  // <-- close IIFE
 </script>
 </body>
 </html>
