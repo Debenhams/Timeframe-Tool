@@ -635,73 +635,161 @@ function rebuildAssignTable(){
 /* ========= Generate & Render ========= */
 $('#btnGenerate').onclick=()=>renderTimeline(true);
 
-function segmentsFromTemplate(tmp, pushBreaks = false) {
-  const s = toMin(tmp.start_time), e = toMin(tmp.finish_time);
-  const b1 = toMin(tmp.break1), l = toMin(tmp.lunch), b2 = toMin(tmp.break2);
-  const segs = [];
+/* Add robust time parsing */
+function parseMinutes(time) {
+  if (!time) return null;
+  const match = time.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const [_, h, m] = match;
+  return parseInt(h) * 60 + parseInt(m);
+}
+
+/* Fix segment generation */
+function segmentsFromTemplate(tmp) {
+  console.log('Processing template:', tmp);
   
-  // Collect all segments first
+  const s = parseMinutes(tmp.start_time);
+  const e = parseMinutes(tmp.finish_time);
+  const b1 = parseMinutes(tmp.break1);
+  const l = parseMinutes(tmp.lunch);
+  const b2 = parseMinutes(tmp.break2);
+  
+  if (!s || !e) {
+    console.warn('Invalid start/end time:', tmp);
+    return [];
+  }
+  
+  const segs = [];
   const breaks = [];
+  
+  // Collect all breaks
   if (b1) breaks.push({time: b1, dur: 15, type: 'Break'});
   if (l) breaks.push({time: l, dur: 30, type: 'Lunch'});
   if (b2) breaks.push({time: b2, dur: 15, type: 'Break'});
-  
-  // Sort breaks by time
   breaks.sort((a,b) => a.time - b.time);
   
+  console.log('Breaks:', breaks);
+  
+  // Build segments
   let lastEnd = s;
-  // Add work segments between breaks
   breaks.forEach(br => {
     if (lastEnd < br.time) {
-      segs.push({code: tmp.work_code, start: lastEnd, end: br.time});
+      segs.push({
+        code: tmp.work_code,
+        start: lastEnd,
+        end: br.time,
+        type: 'Work'
+      });
     }
-    segs.push({code: br.type, start: br.time, end: br.time + br.dur});
+    segs.push({
+      code: br.type,
+      start: br.time,
+      end: br.time + br.dur,
+      type: br.type
+    });
     lastEnd = br.time + br.dur;
   });
   
-  // Add final work segment if needed
   if (lastEnd < e) {
-    segs.push({code: tmp.work_code, start: lastEnd, end: e});
+    segs.push({
+      code: tmp.work_code,
+      start: lastEnd,
+      end: e,
+      type: 'Work'
+    });
   }
   
+  console.log('Generated segments:', segs);
   return segs;
 }
 
-function renderTimeline(fromAssignments=false){
-  const body=$('#tlBody'); body.innerHTML='';
-  const lid=$('#leaderSel').value;
-  const team=advisors.filter(a=>String(a.leader_id)===String(lid)).sort((a,b)=>a.name.localeCompare(b.name));
-  const rows = ($('#viewSel').value==='TEAM_SELECTED' && selectedNames.size)? team.filter(a=>selectedNames.has(a.name)) : team;
+/* Enhanced tooltip */
+function formatTooltip(seg) {
+  return `${seg.code}\n${seg.type}\n${m2hhmm(seg.start)}–${m2hhmm(seg.end)}`;
+}
 
-  const S=+getComputedStyle(document.documentElement).getPropertyValue('--start')||6;
-  const E=+getComputedStyle(document.documentElement).getPropertyValue('--end')||20;
-
-  rows.forEach(adv=>{
-    const r=document.createElement('div'); r.className='row';
-    // Badge from MONDAY template (or the first non-empty day)
-    let badge='';
-    for(let di=0; di<7; di++){ const tName=assigned.get(`${adv.id}-${di}`); if(tName){ badge=TEMPLATE_BADGE(tName); break; } }
-    r.innerHTML=`<div class="rname">${adv.name}${badge?`<span class="badge-sm">${badge}</span>`:''}</div><div class="rline" data-row="${adv.id}"></div>`;
+/* Fix timeline rendering */
+function renderTimeline(fromAssignments=false) {
+  console.log('Rendering timeline, fromAssignments:', fromAssignments);
+  
+  const body = $('#tlBody');
+  body.innerHTML = '';
+  
+  const lid = $('#leaderSel').value;
+  const team = advisors.filter(a => String(a.leader_id) === String(lid))
+    .sort((a,b) => a.name.localeCompare(b.name));
+  
+  const rows = ($('#viewSel').value === 'TEAM_SELECTED' && selectedNames.size) 
+    ? team.filter(a => selectedNames.has(a.name)) 
+    : team;
+  
+  console.log('Processing rows:', rows.length);
+  
+  // Ensure container has height
+  body.style.minHeight = `${rows.length * 44}px`;
+  
+  rows.forEach(adv => {
+    const r = document.createElement('div');
+    r.className = 'row';
+    r.style.height = '44px';
+    r.style.position = 'relative';
+    r.style.overflow = 'visible';
+    
+    // Get badge
+    let badge = '';
+    for(let di=0; di<7; di++) {
+      const tName = assigned.get(`${adv.id}-${di}`);
+      if(tName) {
+        badge = TEMPLATE_BADGE(tName);
+        break;
+      }
+    }
+    
+    r.innerHTML = `
+      <div class="rname">
+        ${adv.name}
+        ${badge ? `<span class="badge-sm">${badge}</span>` : ''}
+      </div>
+      <div class="rline" data-row="${adv.id}"></div>
+    `;
+    
     body.appendChild(r);
-    DAYS.forEach((_,di)=>{
-      const tName=assigned.get(`${adv.id}-${di}`); if(!tName||!templates[tName]) return;
-      const segs=segmentsFromTemplate(templates[tName]);
-      segs.forEach(seg=>{
-        const start = seg.start + di*1440, end = seg.end + di*1440;
-        const p=spanPct(start,end);
-        const el=document.createElement('div'); el.className=`bar ${clsFor(seg.code)}`;
-        el.style.left=`${p.left}%`; el.style.width=`${p.width}%`;
-        // Tooltip content
+    
+    // Add segments for each day
+    DAYS.forEach((_, di) => {
+      const tName = assigned.get(`${adv.id}-${di}`);
+      if (!tName || !templates[tName]) return;
+      
+      const segs = segmentsFromTemplate(templates[tName]);
+      console.log(`Day ${di}, Template ${tName}, Segments:`, segs);
+      
+      segs.forEach(seg => {
+        const start = seg.start + di*1440;
+        const end = seg.end + di*1440;
+        const p = spanPct(start, end);
+        
+        const el = document.createElement('div');
+        el.className = `bar ${clsFor(seg.code)}`;
+        el.style.left = `${p.left}%`;
+        el.style.width = `${p.width}%`;
+        el.style.zIndex = 2;
+        el.style.opacity = 0.9;
+        
+        // Store data for tooltip
+        el.dataset.code = seg.code;
+        el.dataset.type = seg.type;
+        el.dataset.start = seg.start;
+        el.dataset.end = seg.end;
         el.dataset.tt = formatTooltip(seg);
+        
         r.lastElementChild.appendChild(el);
       });
     });
   });
-
+  
+  console.log('Timeline render complete');
+  
   drawNowLine();
-
-  if(fromAssignments) console.log('Generated from assignments.');
-
   initTimeGuide();
   initBarEdit();
 }
