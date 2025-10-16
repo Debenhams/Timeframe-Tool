@@ -411,6 +411,9 @@ select,input[type="date"],input[type="text"]{border:1px solid var(--line);backgr
   <!-- Add mouse guide element -->
   <div class="time-guide" id="timeGuide"></div>
 
+  <!-- Message banner -->
+  <div id="msgBanner" aria-live="polite" style="position:fixed;top:0;left:0;right:0;background:#fff3cd;color:#856404;padding:8px;text-align:center;z-index:1000;display:none"></div>
+
 <script>
 /* ========= Supabase ========= */
 const SUPABASE_URL="https://oypdnjxhjpgpwmkltzmk.supabase.co";
@@ -890,10 +893,186 @@ function renderTimeline(fromAssignments=false) {
 // Make renderer globally available
 window.renderTimeline = renderTimeline;
 
-// Wire up Generate button
-document.getElementById('btnGenerate').onclick = () => {
-  DEBUG && console.log('Generating timeline...');
-  renderTimeline(true);
+/* Add data loading functions */
+async function loadSites() {
+  console.time('loadSites');
+  const {data, error} = await sb.from('sites').select('id,name').order('name');
+  console.timeEnd('loadSites');
+  
+  if (error) {
+    console.error('Failed to load sites:', error);
+    showMessage('Failed to load sites');
+    return [];
+  }
+  
+  if (!data?.length) {
+    console.warn('No sites found');
+    showMessage('No sites found');
+    return [];
+  }
+  
+  console.log('First 3 sites:', data.slice(0,3));
+  return data;
+}
+
+async function loadLeaders(siteId) {
+  console.time('loadLeaders');
+  const {data, error} = await sb.from('leaders')
+    .select('id,name,site_id')
+    .eq('site_id', siteId)
+    .order('name');
+  console.timeEnd('loadLeaders');
+  
+  if (error) {
+    console.error('Failed to load leaders:', error);
+    showMessage(`Failed to load leaders for site ${siteId}`);
+    return [];
+  }
+  
+  if (!data?.length) {
+    console.warn(`No leaders found for site ${siteId}`);
+    showMessage(`No leaders found for site ${siteId}`);
+    return [];
+  }
+  
+  console.log('First 3 leaders:', data.slice(0,3));
+  return data;
+}
+
+async function loadTeams(leaderId) {
+  console.time('loadTeams');
+  const {data, error} = await sb.from('advisors')
+    .select('id,name,leader_id')
+    .eq('leader_id', leaderId)
+    .order('name');
+  console.timeEnd('loadTeams');
+  
+  if (error) {
+    console.error('Failed to load team:', error);
+    showMessage(`Failed to load team for leader ${leaderId}`);
+    return [];
+  }
+  
+  if (!data?.length) {
+    console.warn(`No team found for leader ${leaderId}`);
+    showMessage(`No team found for leader ${leaderId}`);
+    return [];
+  }
+  
+  console.log('First 3 team members:', data.slice(0,3));
+  return data;
+}
+
+async function loadAssignments(leaderId, weekStart) {
+  console.time('loadAssignments');
+  const {data, error} = await sb.from('rotas')
+    .select('advisor_id,week_start,data')
+    .eq('week_start', weekStart)
+    .eq('leader_id', leaderId);
+  console.timeEnd('loadAssignments');
+  
+  if (error) {
+    console.error('Failed to load assignments:', error);
+    showMessage('Failed to load assignments');
+    return [];
+  }
+  
+  if (!data?.length) {
+    console.warn('No assignments found');
+    showMessage('No assignments found for this week');
+    return [];
+  }
+  
+  console.log('First 3 assignments:', data.slice(0,3));
+  return data;
+}
+
+function showMessage(text, timeout = 3000) {
+  const banner = $('#msgBanner');
+  banner.textContent = text;
+  banner.style.display = 'block';
+  setTimeout(() => banner.style.display = 'none', timeout);
+}
+
+/* Update init and event handlers */
+async function init() {
+  const sites = await loadSites();
+  if (!sites.length) return;
+  
+  const siteSel = $('#siteSel');
+  siteSel.innerHTML = sites.map(s => 
+    `<option value="${s.id}">${s.name}</option>`
+  ).join('');
+  
+  // Load initial site's data
+  await handleSiteChange(sites[0].id);
+}
+
+async function handleSiteChange(siteId) {
+  const leaders = await loadLeaders(siteId);
+  if (!leaders.length) return;
+  
+  const leaderSel = $('#leaderSel');
+  leaderSel.innerHTML = leaders.map(l => 
+    `<option value="${l.id}">${l.name}</option>`
+  ).join('');
+  leaderSel.disabled = false;
+  
+  // Load initial leader's data
+  await handleLeaderChange(leaders[0].id);
+}
+
+async function handleLeaderChange(leaderId) {
+  const [team, templates] = await Promise.all([
+    loadTeams(leaderId),
+    loadTemplates(leaderId)
+  ]);
+  
+  if (!team.length) {
+    $('#tlBody').innerHTML = '<div style="padding:20px;color:var(--muted)">No team members to display</div>';
+    return;
+  }
+  
+  buildTree(team);
+  refreshChips();
+  rebuildAssignTable();
+}
+
+/* Update Generate button handler */
+$('#btnGenerate').onclick = async () => {
+  const leaderId = $('#leaderSel').value;
+  const weekStart = $('#weekInput').value || isoLocal(monday);
+  
+  console.time('generate');
+  const assignments = await loadAssignments(leaderId, weekStart);
+  
+  if (!assignments.length) {
+    $('#tlBody').innerHTML = '<div style="padding:20px;color:var(--muted)">No assignments to display</div>';
+    return;
+  }
+  
+  const segments = buildSegments(assignments, templates);
+  renderTimeline(segments);
+  console.timeEnd('generate');
+};
+
+/* Add sample data fallback */
+const SAMPLE_DATA = {
+  templates: [
+    {name:'Early', work_code:'DEB Email', start_time:'07:00', finish_time:'16:00', break1:'09:15', lunch:'12:00', break2:'15:15'},
+    {name:'Middle', work_code:'Mirakl', start_time:'11:00', finish_time:'20:00', break1:'11:30', lunch:'15:30', break2:'17:45'}
+  ],
+  assignments: {
+    'Monday': [{advisor:'Jane', template:'Early'}, {advisor:'John', template:'Middle'}],
+    'Tuesday': [{advisor:'Jane', template:'Middle'}, {advisor:'John', template:'Early'}]
+  }
+};
+
+$('#btnLoadSamples').onclick = () => {
+  templates = SAMPLE_DATA.templates;
+  renderTemplates();
+  rebuildAssignTable();
+  renderTimeline();
 };
 
 (async function init() {
