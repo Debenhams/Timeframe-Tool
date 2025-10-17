@@ -1524,6 +1524,39 @@ subscribeRealtime();
   // initial ticks
   renderTimeHeader?.(document.getElementById('timeHeader'));
 })();
+// Guard missing globals so we don’t crash while wiring.
+if (typeof window.openPublishDialog !== 'function') {
+  window.openPublishDialog = () => console.warn('openPublishDialog not yet loaded');
+}
+if (typeof window.buildRowsFrom !== 'function') {
+  window.buildRowsFrom = (assignments, templates) => {
+    console.warn('buildRowsFrom not yet loaded; returning empty rows');
+    return [];
+  };
+}
+if (typeof window.renderPlanner !== 'function') {
+  window.renderPlanner = () => console.warn('renderPlanner not yet loaded');
+}
+if (typeof window.renderTimeHeader !== 'function') {
+  window.renderTimeHeader = () => {};
+}
+
+// Run after DOM is ready and within an async IIFE (so awaits are valid).
+document.addEventListener('DOMContentLoaded', () => {
+  (async () => {
+    try {
+      const [templates, assignments] =
+        await Promise.all([loadTemplates(), loadAssignments()]);
+      const rows = window.buildRowsFrom(assignments, templates);
+      const hdr = document.getElementById('timeHeader');
+      window.renderTimeHeader(hdr);
+      console.log('planner boot rows:', Array.isArray(rows) ? rows.length : rows);
+      window.renderPlanner(rows);
+    } catch (e) {
+      console.warn('planner boot skipped', e);
+    }
+  })();
+});
 </script>
 </body>
 </html>
