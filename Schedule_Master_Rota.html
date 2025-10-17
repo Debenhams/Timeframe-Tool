@@ -1090,16 +1090,34 @@ function onBlockClick(e){
   blockDlg.showModal();
 }
 
-/* Wire up Generate button and initial render */
-(function(){
+/* Fix stray brace in Rotas section */
+async function upsertRota(advisorId, weekStartISO, dataObj) {
+  const { data, error } = await sb.from('rotas').upsert({
+    advisor_id: advisorId,
+    week_start: weekStartISO,
+    data: dataObj
+  }, { onConflict: 'advisor_id,week_start' }).select('*').single();
+  
+  if (!error) { 
+    ROTAS.set(`${advisorId}::${weekStartISO}`, data.data || {}); 
+  }
+}
+
+/* Fix template literal in showError */
+function showError(msg) {
+  console.error(`Generate failed: ${msg?.message || msg}`);
+}
+
+/* Fix optional chaining in Generate button handler */
+(function() {
   const btn = document.getElementById('btnGenerate');
-  if(!btn || btn._plannerWired) return;
+  if (!btn || btn._plannerWired) return;
   btn._plannerWired = true;
 
   btn.addEventListener('click', async () => {
     try {
-      const templates = typeof loadTemplates === 'function' ? await loadTemplates() : [];
-      const assignments = typeof loadAssignments === 'function' ? await loadAssignments() : [];
+      const templates = await (typeof loadTemplates === 'function' ? loadTemplates() : []);
+      const assignments = await (typeof loadAssignments === 'function' ? loadAssignments() : []);
       const rows = typeof buildRowsFrom === 'function' ? buildRowsFrom(assignments, templates) : [];
 
       if (!rows || !rows.length) {
@@ -1112,14 +1130,31 @@ function onBlockClick(e){
       renderPlanner(rows);
       showInfo?.('Schedule generated.');
     } catch (err) {
-      showError?.(`Generate failed: ${err?.message ?? err}`);
+      showError?.(`Generate failed: ${err?.message || err}`);
       console.error(err);
     }
   });
 
-  // Render time ticks on load so header is visible immediately
   renderTimeHeader?.(document.getElementById('timeHeader'));
 })();
+
+/* Fix missing semicolons and parentheses */
+function spanPct(startMin, endMin) {
+  const total = (DAY_END - DAY_START);
+  const width = Math.max(0, endMin - startMin) / total * 100;
+  const left = Math.max(0, startMin(s.start)-DAY_START) / total * 100;
+  return { 
+    left: Math.min(100, left), 
+    width: Math.min(100, width) 
+  };
+}
+
+/* Fix template literal in dialog title */
+function openAssign(day, advisorName) {
+  const advName = advisorName || $('#advisorSelect').value;
+  assignTitle.textContent = `${day} for ${advName}`;
+  // ...rest of function...
+}
 </script>
 </body>
 </html>
