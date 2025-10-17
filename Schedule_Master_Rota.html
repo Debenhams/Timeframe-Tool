@@ -192,26 +192,127 @@
   }
 
   /* Enhanced planner styles */
-  .planner{margin-top:16px;border:1px solid var(--line,#e6e6f4);border-radius:8px;background:#fff}
-  .planner__header,.planner__row{display:grid;grid-template-columns:240px 1fr;align-items:center}
-  .planner__header{position:sticky;top:0;background:#f8fafc;z-index:2;padding:8px;border-bottom:1px solid var(--line,#e6e6f4)}
-  .planner__col--name{font-weight:600;padding-left:8px}
-  .planner__body{position:relative;overflow:auto;max-height:64vh}
-  .planner__row{height:44px;border-bottom:1px solid #f0f2f7}
-  .planner__name{display:flex;align-items:center;gap:8px;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .planner__badge{font-size:12px;line-height:18px;padding:0 6px;border-radius:6px;background:#eef2f7;color:#374151}
-  .time-scale{position:relative;height:24px}
-  .time-scale .tick{position:absolute;top:0;font-size:11px;transform:translateX(-50%);color:#6b7280}
-  .grid{position:relative;height:100%}
-  .grid .vline{position:absolute;top:0;bottom:0;width:1px;background:#e8ebf2}
-  .grid .guide{position:absolute;top:0;bottom:0;width:1px;background:#4fa3ff;opacity:.8;pointer-events:none;z-index:3}
-  .bar{position:absolute;top:8px;height:28px;border-radius:6px;opacity:.95;cursor:pointer}
-  .bar.is-work{background:var(--work,#6b8e23)}
-  .bar.is-lunch{background:var(--lunch,#bfe9ff)}
-  .bar.is-break{background:var(--break,#dfe5ee)}
-  .bar.is-meeting{background:var(--meeting,#ffd54d)}
-  .bar:hover{outline:2px solid rgba(0,0,0,.08)}
-  .tooltip{position:absolute;background:#111827;color:#fff;font-size:12px;padding:6px 8px;border-radius:6px;white-space:pre;transform:translate(-50%,-110%);pointer-events:none;z-index:4}
+  .planner {
+    margin-top: 16px;
+    border: 1px solid var(--line,#e6e6f4);
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .planner__header {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    z-index: 2;
+    padding: 8px;
+    border-bottom: 1px solid var(--line,#e6e6f4);
+  }
+
+  .planner__col--name {
+    font-weight: 600;
+    padding-left: 8px;
+  }
+
+  .planner__body {
+    position: relative; 
+    overflow: auto;
+    max-height: 64vh;
+  }
+
+  .planner__row {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    align-items: center;
+    height: 44px;
+    border-bottom: 1px solid #f0f2f7;
+  }
+
+  .planner__name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .planner__badge {
+    font-size: 12px;
+    line-height: 18px;
+    padding: 0 6px;
+    border-radius: 6px;
+    background: #eef2f7;
+    color: #374151;
+  }
+
+  .time-scale {
+    position: relative;
+    height: 24px;
+  }
+
+  .time-scale .tick {
+    position: absolute;
+    top: 0;
+    font-size: 11px;
+    transform: translateX(-50%);
+    color: #6b7280;
+  }
+
+  .grid {
+    position: relative;
+    height: 100%;
+  }
+
+  .grid .vline {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #e8ebf2;
+  }
+
+  .grid .guide {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #4fa3ff;
+    opacity: .85;
+    pointer-events: none;
+    z-index: 3;
+  }
+
+  .bar {
+    position: absolute;
+    top: 8px;
+    height: 28px;
+    border-radius: 6px;
+    opacity: .95;
+    cursor: pointer;
+  }
+
+  .bar.is-work { background: var(--work,#6b8e23); }
+  .bar.is-lunch { background: var(--lunch,#bfe9ff); }
+  .bar.is-break { background: var(--break,#dfe5ee); }
+  .bar.is-meeting { background: var(--meeting,#ffd54d); }
+  .bar:hover { outline: 2px solid rgba(0,0,0,.08); }
+
+  .tooltip {
+    position: absolute;
+    background: #111827;
+    color: #fff;
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    white-space: pre;
+    transform: translate(-50%,-110%);
+    pointer-events: none;
+    z-index: 4;
+  }
 
   /* Hide old palette panel */
   .colours-card,.palette,.color-panel{display:none!important}
