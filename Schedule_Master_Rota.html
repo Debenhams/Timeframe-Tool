@@ -1375,18 +1375,24 @@ $('#btnGenerate').onclick = async () => {
 
 /* Update init function to render planner on boot - insert right before wire() call */
 // Replace the simple try/catch block already added with this more complete version
-try {
-  const [templates, assignments] = await Promise.all([loadTemplates(), loadAssignments()]);
-  const rows = buildRowsFrom(assignments, templates);
-  renderTimeHeader(document.getElementById('timeHeader'));
-  console.log('planner boot rows=', Array.isArray(rows) ? rows.length : rows);
-  renderPlanner(rows);
-} catch(e) { 
-  console.warn('planner boot skipped', e); 
-}
+document.addEventListener('DOMContentLoaded', () => {
+  (async () => {
+    try {
+      const [templates, assignments] =
+        await Promise.all([loadTemplates(), loadAssignments()]);
+
+      const rows = buildRowsFrom(assignments, templates);
+      renderTimeHeader(document.getElementById('timeHeader'));
+      console.log('planner boot rows:', Array.isArray(rows) ? rows.length : rows);
+      renderPlanner(rows);
+    } catch (e) {
+      console.warn('planner boot skipped', e);
+    }
+  })();
+});
 wire();
 subscribeRealtime();
-  /* ===== Wire buttons ===== */
+/* ===== Wire buttons ===== */
   function wire(){
     // Publish button
     $('#btnPublish').onclick = openPublishDialog;
