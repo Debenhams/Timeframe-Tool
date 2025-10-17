@@ -192,127 +192,26 @@
   }
 
   /* Enhanced planner styles */
-  .planner {
-    margin-top: 16px;
-    border: 1px solid var(--line,#e6e6f4);
-    border-radius: 8px;
-    background: #fff;
-  }
-
-  .planner__header {
-    display: grid;
-    grid-template-columns: 240px 1fr;
-    align-items: center;
-    position: sticky;
-    top: 0;
-    background: #f8fafc;
-    z-index: 2;
-    padding: 8px;
-    border-bottom: 1px solid var(--line,#e6e6f4);
-  }
-
-  .planner__col--name {
-    font-weight: 600;
-    padding-left: 8px;
-  }
-
-  .planner__body {
-    position: relative; 
-    overflow: auto;
-    max-height: 64vh;
-  }
-
-  .planner__row {
-    display: grid;
-    grid-template-columns: 240px 1fr;
-    align-items: center;
-    height: 44px;
-    border-bottom: 1px solid #f0f2f7;
-  }
-
-  .planner__name {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 8px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .planner__badge {
-    font-size: 12px;
-    line-height: 18px;
-    padding: 0 6px;
-    border-radius: 6px;
-    background: #eef2f7;
-    color: #374151;
-  }
-
-  .time-scale {
-    position: relative;
-    height: 24px;
-  }
-
-  .time-scale .tick {
-    position: absolute;
-    top: 0;
-    font-size: 11px;
-    transform: translateX(-50%);
-    color: #6b7280;
-  }
-
-  .grid {
-    position: relative;
-    height: 100%;
-  }
-
-  .grid .vline {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: #e8ebf2;
-  }
-
-  .grid .guide {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: #4fa3ff;
-    opacity: .85;
-    pointer-events: none;
-    z-index: 3;
-  }
-
-  .bar {
-    position: absolute;
-    top: 8px;
-    height: 28px;
-    border-radius: 6px;
-    opacity: .95;
-    cursor: pointer;
-  }
-
-  .bar.is-work { background: var(--work,#6b8e23); }
-  .bar.is-lunch { background: var(--lunch,#bfe9ff); }
-  .bar.is-break { background: var(--break,#dfe5ee); }
-  .bar.is-meeting { background: var(--meeting,#ffd54d); }
-  .bar:hover { outline: 2px solid rgba(0,0,0,.08); }
-
-  .tooltip {
-    position: absolute;
-    background: #111827;
-    color: #fff;
-    font-size: 12px;
-    padding: 6px 8px;
-    border-radius: 6px;
-    white-space: pre;
-    transform: translate(-50%,-110%);
-    pointer-events: none;
-    z-index: 4;
-  }
+  .planner{margin-top:16px;border:1px solid var(--line,#e6e6f4);border-radius:8px;background:#fff}
+  .planner__header,.planner__row{display:grid;grid-template-columns:240px 1fr;align-items:center}
+  .planner__header{position:sticky;top:0;background:#f8fafc;z-index:2;padding:8px;border-bottom:1px solid var(--line,#e6e6f4)}
+  .planner__col--name{font-weight:600;padding-left:8px}
+  .planner__body{position:relative;overflow:auto;max-height:64vh}
+  .planner__row{height:44px;border-bottom:1px solid #f0f2f7}
+  .planner__name{display:flex;align-items:center;gap:8px;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .planner__badge{font-size:12px;line-height:18px;padding:0 6px;border-radius:6px;background:#eef2f7;color:#374151}
+  .time-scale{position:relative;height:24px}
+  .time-scale .tick{position:absolute;top:0;font-size:11px;transform:translateX(-50%);color:#6b7280}
+  .grid{position:relative;height:100%}
+  .grid .vline{position:absolute;top:0;bottom:0;width:1px;background:#e8ebf2}
+  .grid .guide{position:absolute;top:0;bottom:0;width:1px;background:#4fa3ff;opacity:.8;pointer-events:none;z-index:3}
+  .bar{position:absolute;top:8px;height:28px;border-radius:6px;opacity:.95;cursor:pointer}
+  .bar.is-work{background:var(--work,#6b8e23)}
+  .bar.is-lunch{background:var(--lunch,#bfe9ff)}
+  .bar.is-break{background:var(--break,#dfe5ee)}
+  .bar.is-meeting{background:var(--meeting,#ffd54d)}
+  .bar:hover{outline:2px solid rgba(0,0,0,.08)}
+  .tooltip{position:absolute;background:#111827;color:#fff;font-size:12px;padding:6px 8px;border-radius:6px;white-space:pre;transform:translate(-50%,-110%);pointer-events:none;z-index:4}
 
   /* Hide old palette panel */
   .colours-card,.palette,.color-panel{display:none!important}
@@ -521,16 +420,9 @@ let selectedAdvisors = new Set();
 /* ===== Helpers ===== */
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const pad=n=>String(n).padStart(2,'0');
-const fmt=(t)=>t?t.slice(0,5):'';
+const fmt=(t)=>t?t.slice(0,5):''; // HH:MM from HH:MM:SS
 function setToMonday(d){ const day=d.getDay(); const diff=(day===0?-6:1)-day; d.setDate(d.getDate()+diff); return d; }
-function toMin(v){
-  if (v == null || v === '') return null;
-  const parts = String(v).split(':');
-  const h = parseInt(parts[0], 10);
-  const m = parseInt(parts[1] ?? '0', 10);
-  if (Number.isNaN(h) || Number.isNaN(m)) return null;
-  return h * 60 + m;
-}
+function toMin(t){ if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
 function m2t(m){ return `${pad(Math.floor(m/60))}:${pad(m%60)}`; }
 
 const css=getComputedStyle(document.documentElement);
@@ -1211,7 +1103,7 @@ async function fetchRotasForWeek(weekStartISO){
   if(!weekStartISO) return;
   const { data } = await sb.from('rotas').select('advisor_id,week_start,data').eq('week_start', weekStartISO);
   ROTAS.clear(); (data||[]).forEach(r=> ROTAS.set(`${r.advisor_id}::${weekStartISO}`, r.data || {}));
- }
+}
 
 /* ===== Templates & UI helpers ===== */
 async function loadTemplates(){
@@ -1221,178 +1113,158 @@ async function loadTemplates(){
   });
 }
 
-/* Add loadAssignments() to convert ROTAS data to the format needed by the planner */
-async function loadAssignments() {
-  try {
-    const weekStartISO = $('#weekStart').value;
-    if (!weekStartISO) return [];
-    
-    // If ROTAS is empty, ensure we have data
-    if (ROTAS.size === 0) {
-      await fetchRotasForWeek(weekStartISO);
-    }
-    
-    const assignments = [];
-    
-    // Process all advisors with data for this week
-    for (const [key, data] of ROTAS.entries()) {
-      if (!key.includes(`::${weekStartISO}`)) continue;
-      
-      const [advisorId, _] = key.split('::');
-      const advisorName = ADVISOR_BY_ID.get(advisorId) || 'Unknown';
-      
-      // Create an assignment entry with template references
-      const assignment = {
-        id: advisorId,
-        name: advisorName,
-        template: null
-      };
-      
-      // For each day, add template name or custom segments
-      DAYS.forEach((day, dayIndex) => {
-        const dayValue = data[day];
-        if (!dayValue) return; // No schedule this day
-        
-        if (typeof dayValue === 'string' && TEMPLATES[dayValue]) {
-          // Template-based assignment
-          if (!assignment.templateName) {
-            assignment.templateName = dayValue;
-            assignment.template = TEMPLATES[dayValue];
-          }
-        }
-      });
-      
-      assignments.push(assignment);
-    }
-    
-    return assignments;
-  } catch (err) {
-    console.warn('loadAssignments fallback', err);
-    return [];
-  }
+/* Add buildRowsFrom helper */
+function buildRowsFrom(assignments,templates){
+  const rows=[];
+  (assignments||[]).forEach(a=>{
+    const t = (templates && (templates[a.templateName]||templates[a.templateId])) || a.template || {};
+    const s = t.startMin ?? t.start ?? 7*60;
+    const e = t.endMin   ?? t.end   ?? 16*60;
+    const non=[];
+    (t.breaks||[]).forEach(b=>non.push({type:'break',start:b.startMin??b.start??0,end:(b.startMin??b.start??0)+(b.dur??15)}));
+    if(t.lunch) non.push({type:'lunch',start:t.lunch.startMin??t.lunch.start??(12*60),end:(t.lunch.startMin??t.lunch.start??(12*60))+(t.lunch.dur??30)});
+    (a.meetings||[]).forEach(m=>non.push({type:'meeting',start:m.startMin??m.start,end:m.endMin??m.end}));
+    non.sort((x,y)=>x.start-y.start);
+    const segs=[]; let last=s;
+    non.forEach(n=>{ if(n.start>last) segs.push({type:'work',code:a.code,start:last,end:Math.min(n.start,e)});
+                     segs.push({type:n.type,code:n.code||n.type,start:Math.max(n.start,s),end:Math.min(n.end,e)});
+                     last=Math.max(last,n.end); });
+    if(last<e) segs.push({type:'work',code:a.code,start:last,end:e});
+    rows.push({name:a.name||a.advisorName||a.id,badge:a.badge||a.role||'',segments:segs});
+  });
+  return rows;
 }
 
-/* Add renderPlanner function that renders the horizontal bars */
-function renderPlanner(rows) {
-  console.log('renderPlanner rows=', Array.isArray(rows) ? rows.length : rows);
-  
-  const container = $('#plannerBody');
-  if (!container) return;
-  container.innerHTML = '';
-  
-  if (!rows || !rows.length) {
-    container.innerHTML = '<div class="muted" style="padding:20px;text-align:center">No schedule data to display</div>';
-    return;
-  }
-  
-  // Create a row for each advisor/assignment
-  rows.forEach(row => {
-    const rowEl = document.createElement('div');
-    rowEl.className = 'planner__row';
-    
-    // Name cell
-    const nameEl = document.createElement('div');
-    nameEl.className = 'planner__name';
-    nameEl.textContent = row.name || 'Unnamed';
-    
-    if (row.badge) {
-      const badge = document.createElement('span');
-      badge.className = 'planner__badge';
-      badge.textContent = row.badge;
-      nameEl.appendChild(badge);
-    }
-    
-    rowEl.appendChild(nameEl);
-    
-    // Timeline cell with grid
-    const timelineEl = document.createElement('div');
-    timelineEl.className = 'grid';
-    
-    // Add hour gridlines
-    for (let m = DAY_START; m <= DAY_END; m += 60) {
-      const vline = document.createElement('div');
-      vline.className = 'vline';
-      vline.style.left = `${((m - DAY_START) / (DAY_END - DAY_START)) * 100}%`;
-      timelineEl.appendChild(vline);
-    }
-    
-    // Add segments as bars
-    if (row.segments && row.segments.length) {
-      row.segments.forEach(segment => {
-        if (!segment.start || !segment.end) return;
-        
-        const barEl = document.createElement('div');
-        barEl.className = `bar is-${segment.type || 'work'}`;
-        
-        // Calculate position based on time
-        const pos = spanPct(segment.start, segment.end);
-        barEl.style.left = `${pos.left}%`;
-        barEl.style.width = `${pos.width}%`;
-        
-        // Store data for tooltips and click handlers
-        barEl.dataset.code = segment.code || '';
-        barEl.dataset.start = m2t(segment.start);
-        barEl.dataset.end = m2t(segment.end);
-        barEl.dataset.type = segment.type || 'work';
-        barEl.dataset.name = row.name;
-        
-        // Use existing block click handler if available
-        if (typeof onBlockClick === 'function') {
-          barEl.addEventListener('click', function(e) {
-            // Match the expected dataset structure from the vertical calendar
-            this.dataset.adv = row.name;
-            this.dataset.day = 'Monday'; // Default to Monday, adjust if dayIndex is available
-            onBlockClick.call(this, e);
-          });
-        }
-        
-        // Add tooltip
-        barEl.title = `${segment.code || 'Work'}: ${m2t(segment.start)} - ${m2t(segment.end)}`;
-        
-        timelineEl.appendChild(barEl);
-      });
-    }
-    
-    rowEl.appendChild(timelineEl);
-    container.appendChild(rowEl);
+function refreshChips(){
+  const box=$('#activeChips'); box.innerHTML='';
+  if(!selectedAdvisors.size){ box.innerHTML='<span class="muted">No advisors selected.</span>'; return; }
+  [...selectedAdvisors].sort((a,b)=>a.localeCompare(b)).forEach(n=>{
+    const chip=document.createElement('span'); chip.className='chip'; chip.textContent=n;
+    const x=document.createElement('button'); x.textContent='×'; x.style.border='none'; x.style.background='transparent'; x.style.cursor='pointer';
+    x.onclick=()=>{ selectedAdvisors.delete(n); refreshChips(); rebuildTree(); populateAssignTable(); renderCalendar(); };
+    chip.appendChild(x); box.appendChild(chip);
   });
 }
+function updateViewSelector(){
+  const team = $('#advisorSelect').value;
+  const showTeam = team==='__TEAM_SELECTED__' || team==='__TEAM_ALL__';
+  $('#lblTeamDay').style.display = showTeam ? 'inline' : 'none';
+  $('#teamDay').style.display     = showTeam ? 'inline' : 'none';
+}
+function setHours(){ $('#hours').innerHTML=hoursHTML(); }
 
-/* Update Generate button handler */
-$('#btnGenerate').onclick = async () => { 
-  updateRangeLabel(); 
-  renderCalendar(); 
-  
-  try {
-    const [templates, assignments] = await Promise.all([loadTemplates(), loadAssignments()]);
-    const rows = buildRowsFrom(assignments, templates);
-    renderTimeHeader(document.getElementById('timeHeader'));
-    renderPlanner(rows);
-  } catch (err) {
-    console.error('Generate failed:', err);
+
+/* ===== Publish: target collection, confirmations & execution ===== */
+function collectPublishTargets(){
+  const ws = $('#weekStart').value;
+  const selVal = $('#advisorSelect').value;
+
+  // Team: Selected / All
+  if (selVal === '__TEAM_SELECTED__') {
+    return [...selectedAdvisors].map(name => ({ id: ADVISOR_BY_NAME.get(name), name, ws }));
   }
-};
+  if (selVal === '__TEAM_ALL__') {
+    return ADVISORS_LIST.map(a => ({ id: a.id, name: a.name, ws }));
+  }
+  // Single advisor
 
-/* Update init function to render planner on boot - insert right before wire() call */
-// Replace the simple try/catch block already added with this more complete version
-document.addEventListener('DOMContentLoaded', () => {
-  (async () => {
-    try {
-      const [templates, assignments] =
-        await Promise.all([loadTemplates(), loadAssignments()]);
+  if (selVal && selVal.startsWith && selVal.startsWith('advisor::')){
+    const id = selVal.split('::')[1];
+    return [{ id, name: ADVISOR_BY_ID.get(id) || '', ws }];
+  }
+  // Fallback: if dropdown currently shows a raw name (legacy)
+  if (ADVISOR_BY_NAME.has(selVal)){
+    return [{ id: ADVISOR_BY_NAME.get(selVal), name: selVal, ws }];
+  }
+  return [];
+}
 
-      const rows = buildRowsFrom(assignments, templates);
-      renderTimeHeader(document.getElementById('timeHeader'));
-      console.log('planner boot rows:', Array.isArray(rows) ? rows.length : rows);
-      renderPlanner(rows);
-    } catch (e) {
-      console.warn('planner boot skipped', e);
+// Returns true if OK to overwrite a specific day for that advisor
+async function confirmOverwriteDay(advisorId, ws, day, newValue){
+  const key = `${advisorId}::${ws}`;
+  const existing = ROTAS.get(key) || {};
+  const had = existing[day] !== undefined && existing[day] !== null && existing[day] !== '';
+  // If nothing set or identical, no need to confirm
+  const same = JSON.stringify(existing[day] || null) === JSON.stringify(newValue || null);
+  if (!had || same) return true;
+
+  return confirm(`You're about to overwrite ${ADVISOR_BY_ID.get(advisorId) || 'this advisor'} on ${day} for week ${ws}. Continue?`);
+}
+
+// Opens the publish dialog, listing who will be published
+function openPublishDialog(){
+  const targets = collectPublishTargets();
+  if (!targets.length){
+    alert('Select an advisor or team to publish.');
+    return;
+  }
+  const ws = $('#weekStart').value;
+  const dayMode = ($('#advisorSelect').value === '__TEAM_SELECTED__' || $('#advisorSelect').value === '__TEAM_ALL__');
+
+  $('#publishSummary').textContent = dayMode
+    ? `Publishing the selected day (${ $('#teamDay').value }) for ${targets.length} advisor(s), week starting ${ws}.`
+    : `Publishing the full week for ${targets.length} advisor(s), week starting ${ws}.`;
+
+  const ul = document.createElement('ul');
+  ul.style.margin = '6px 0 0 18px';
+  ul.style.padding = '0';
+  targets.forEach(t => {
+    const li = document.createElement('li');
+    li.textContent = t.name || t.id;
+    ul.appendChild(li);
+  });
+  const listBox = $('#publishList');
+  listBox.innerHTML = '';
+  listBox.appendChild(ul);
+
+  publishDlg.showModal();
+}
+
+// Performs the publish by upserting current working data
+async function doPublish(){
+  const targets = collectPublishTargets();
+  if (!targets.length){ publishDlg.close(); return; }
+
+  const ws = $('#weekStart').value;
+  const teamMode = ($('#advisorSelect').value === '__TEAM_SELECTED__' || $('#advisorSelect').value === '__TEAM_ALL__');
+  const teamDay = $('#teamDay').value;
+
+  let published = 0, skipped = 0;
+
+  for (const t of targets){
+    const key = `${t.id}::${ws}`;
+    const data = ROTAS.get(key) || {};  // Fix: Remove stray }
+
+    if (teamMode){
+      // Only publish the chosen day for each advisor
+      const newVal = data[teamDay] || null;
+      const ok = await confirmOverwriteDay(t.id, ws, teamDay, newVal);
+      if (!ok){ skipped++; continue; }
+      // Ensure object key exists even if day off
+      const fresh = Object.assign({}, data);
+      if (newVal === null || newVal === undefined) delete fresh[teamDay]; else fresh[teamDay] = newVal;
+      await upsertRota(t.id, ws, fresh);
+      published++;
+    } else {
+      // Full week for a single advisor (or explicit single-advisor selection)
+      // Confirm once per day that would be overwritten
+      let proceed = true;
+      for (const d of DAYS){
+        const ok = await confirmOverwriteDay(t.id, ws, d, data[d] || null);
+        if (!ok){ proceed = false; break; }
+      }
+      if (!proceed){ skipped++; continue; }
+      await upsertRota(t.id, ws, data);
+      published++;
     }
-  })();
-});
-wire();
-subscribeRealtime();
-/* ===== Wire buttons ===== */
+  }
+
+  publishDlg.close();
+  alert(`Publish complete. Updated: ${published}. Skipped: ${skipped}.`);
+}
+
+
+  /* ===== Wire buttons ===== */
   function wire(){
     // Publish button
     $('#btnPublish').onclick = openPublishDialog;
@@ -1482,12 +1354,6 @@ subscribeRealtime();
     populateAssignTable();
     updateRangeLabel();
     renderCalendar();
-    try {
-      const [templates, assignments] = await Promise.all([loadTemplates(), loadAssignments()]);
-      const rows = buildRowsFrom(assignments, templates);
-      renderTimeHeader(document.getElementById('timeHeader'));
-      renderPlanner(rows);
-    } catch(e) { console.warn('planner boot skipped', e); }
     wire();
     subscribeRealtime();
     // Publish dialog actions
@@ -1501,9 +1367,16 @@ subscribeRealtime();
   if (btn) {
     btn.addEventListener('click', async () => {
       try {
-        const [templates, assignments] = await Promise.all([loadTemplates(), loadAssignments()]);
-        const rows = buildRowsFrom(assignments, templates);
-        renderTimeHeader(document.getElementById('timeHeader'));
+        const templates =
+          typeof loadTemplates === 'function' ? await loadTemplates() : [];
+
+        const assignments =
+          typeof loadAssignments === 'function' ? await loadAssignments() : [];
+
+        const rows =
+          typeof buildRowsFrom === 'function'
+            ? buildRowsFrom(assignments, templates)
+            : [];
 
         if (!rows || !rows.length) {
           showInfo?.('Nothing to render for selected filter');
@@ -1524,39 +1397,6 @@ subscribeRealtime();
   // initial ticks
   renderTimeHeader?.(document.getElementById('timeHeader'));
 })();
-// Guard missing globals so we don’t crash while wiring.
-if (typeof window.openPublishDialog !== 'function') {
-  window.openPublishDialog = () => console.warn('openPublishDialog not yet loaded');
-}
-if (typeof window.buildRowsFrom !== 'function') {
-  window.buildRowsFrom = (assignments, templates) => {
-    console.warn('buildRowsFrom not yet loaded; returning empty rows');
-    return [];
-  };
-}
-if (typeof window.renderPlanner !== 'function') {
-  window.renderPlanner = () => console.warn('renderPlanner not yet loaded');
-}
-if (typeof window.renderTimeHeader !== 'function') {
-  window.renderTimeHeader = () => {};
-}
-
-// Run after DOM is ready and within an async IIFE (so awaits are valid).
-document.addEventListener('DOMContentLoaded', () => {
-  (async () => {
-    try {
-      const [templates, assignments] =
-        await Promise.all([loadTemplates(), loadAssignments()]);
-      const rows = window.buildRowsFrom(assignments, templates);
-      const hdr = document.getElementById('timeHeader');
-      window.renderTimeHeader(hdr);
-      console.log('planner boot rows:', Array.isArray(rows) ? rows.length : rows);
-      window.renderPlanner(rows);
-    } catch (e) {
-      console.warn('planner boot skipped', e);
-    }
-  })();
-});
 </script>
 </body>
 </html>
