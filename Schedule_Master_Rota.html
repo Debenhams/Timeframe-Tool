@@ -450,113 +450,820 @@ function renderTimeHeader(el){
   el.appendChild(w);
 }
 
-/* ===== Horizontal planner: build rows from current state + render ===== */
-function _plannerNames() {
-  const teamMode = ($('#advisorSelect').value === '__TEAM_SELECTED__' || $('#advisorSelect').value === '__TEAM_ALL__');
-  if (teamMode) {
-    const all = $('#advisorSelect').value === '__TEAM_ALL__';
-    return all ? ADVISORS_LIST.map(a => a.name) : [...selectedAdvisors];
-  }
-  const v = $('#advisorSelect').value || '';
-  if (v.startsWith && v.startsWith('advisor::')) {
-    const id = v.split('::')[1];
-    return [ADVISOR_BY_ID.get(id) || ''];
-  }
-  return v ? [v] : [...selectedAdvisors];
+/* ===== Colours UI ===== */
+function buildColorKey(){
+  const defs=[['email','Email','--color-email'],['mirakl','Mirakl','--color-mirakl'],['social','Social','--color-social'],['overtime','Overtime','--color-overtime'],['break','Break','--color-break'],['lunch','Lunch','--color-lunch'],['absence','Absence','--color-absence'],['shrink','Shrinkage','--color-shrink']];
+  const el=$('#colorKey');
+  el.innerHTML = defs.map(([k,l,cssVar])=>{
+    const v=getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
+    return `<div class="key-row"><span class="swatch" style="background:${v}"></span><strong>${l}</strong><input type="text" data-k="${cssVar}" value="${v}"></div>`;
+  }).join('');
+  $$('#colorKey input').forEach(inp=>inp.addEventListener('input',()=>{ document.documentElement.style.setProperty(inp.dataset.k, inp.value); }));
 }
 
-function _codeType(code) {
-  const k = (code || '').toLowerCase();
-  if (/\blunch\b/.test(k))   return {type:'lunch',   cls:'is-lunch'};
-  if (/\bbreak\b/.test(k))   return {type:'break',   cls:'is-break'};
-  if (/\bmeeting\b/.test(k)) return {type:'meeting', cls:'is-meeting'};
-  return {type:'work', cls:'is-work'};
+/* ===== Code groups for selectors ===== */
+const CODE_GROUPS = {
+  "Activity":[
+    "2nd Line","Admin","BH Email","BH Social","BH WhatsApp","DEB Email","DEB Social","DEB WhatsApp","Ebay",
+    "KM Email","KM Social","KM WhatsApp","Mirakl","Mixing","PayPlus","PLT Email","PLT Social","PLT WhatsApp",
+    "QA","Overtime"
+  ],
+  "Absence":[ "AL","Break","Lunch","Sick","Split Shift","RDO","Maternity","LTS" ],
+  "Shrinkage":[ "121","ATL","Coaching","Huddle","ITI","Projects","Team Meeting","Training" ]
+};
+function codeSelectGroupedHTML(val=''){
+  return Object.entries(CODE_GROUPS).map(([grp,codes])=>
+    `<optgroup label="${grp}">${codes.map(c=>`<option ${val===c?'selected':''}>${c}</option>`).join('')}</optgroup>`
+  ).join('');
+}
+function classForCode(code){
+  const k=(code||'').toLowerCase();
+  if(/\blunch\b/.test(k)) return 'c-lunch';
+  if(/\bbreak\b/.test(k)) return 'c-break';
+  if(/\bovertime\b/.test(k)) return 'c-overtime';
+  if(/\bmirakl\b/.test(k)) return 'c-mirakl';
+  if(/\bsocial\b/.test(k)) return 'c-social';
+  if(/\bemail\b/.test(k)) return 'c-email';
+  if(['al','sick','rdo','maternity','lts','split shift'].some(w=>k.includes(w))) return 'c-absence';
+  if(['121','atl','coaching','huddle','iti','projects','team meeting','training'].some(w=>k.includes(w))) return 'c-shrink';
+  return 'c-email';
 }
 
-function buildPlannerRowsFromState() {
-  const ws   = $('#weekStart').value;
-  const day  = $('#teamDay').value || 'Monday';
-  const list = _plannerNames().filter(Boolean).sort((a,b)=>a.localeCompare(b));
-  const rows = [];
+/* ===== Templates UI ===== */
+function templateRow(t){
+  return `<div class="template-row" data-name="${t.name}">
+    <label>Name</label>
+    <input data-f="name" type="text" value="${t.name}" style="width:140px">
 
-  list.forEach(name => {
-    const id   = ADVISOR_BY_NAME.get(name);
-    if (!id) return;
-    const key  = `${id}::${ws}`;
-    const data = ROTAS.get(key) || {};
-    const blocks = processDayValue(data[day]); // -> [{label,start(min),end(min)}]
+    <label>New code</label>
+    <select data-f="work_code">${codeSelectGroupedHTML(t.work_code||'Admin')}</select>
 
-    const segments = blocks.map(b => {
-      const m = _codeType(b.label);
-      return { type: m.type, code: b.label, start: b.start, end: b.end };
+    <label>Start / Finish</label>
+    <div class="inline"><input data-f="start_time" type="time" value="${fmt(t.start_time)||''}">
+      <input data-f="finish_time" type="time" value="${fmt(t.finish_time)||''}"></div>
+
+    <label>Breaks</label>
+    <div class="inline">
+      <input data-f="break1" type="time" value="${fmt(t.break1)||''}"  title="Break 1 (15m)">
+      <input data-f="lunch"  type="time" value="${fmt(t.lunch)||''}"   title="Lunch (30m)">
+      <input data-f="break2" type="time" value="${fmt(t.break2)||''}"  title="Break 2 (15m)">
+    </div>
+
+    <div class="full" style="display:flex;justify-content:flex-end">
+      <button class="danger" data-act="del">Delete</button>
+    </div>
+  </div>`;
+}
+function populateTemplateEditor(){
+  const ed=$('#templateEditor'); const list=Object.values(TEMPLATES).sort((a,b)=>a.name.localeCompare(b.name));
+  ed.innerHTML = list.length? list.map(templateRow).join('') : '<div class="muted">No templates. Add or load samples.</div>';
+  $$('#templateEditor .template-row').forEach(row=>{
+    const origName=row.dataset.name;
+    $$('input,select',row).forEach(inp=>{
+      const f=inp.dataset.f; if(!f) return;
+      inp.addEventListener('input', async()=>{
+        const updated = Object.assign({}, TEMPLATES[origName], { [f]: inp.value || null });
+        if(f==='name' && inp.value.trim()!==origName){
+          await sb.from('templates').delete().eq('name', origName);
+          const {error} = await sb.from('templates').insert([{
+            name: (updated.name||'').trim(),
+            work_code: updated.work_code || 'Admin',
+            start_time: updated.start_time,
+            finish_time: updated.finish_time,
+            break1: updated.break1,
+            lunch: updated.lunch,
+            break2: updated.break2
+          }]);
+          if(error) alert('Template rename failed: '+error.message);
+        } else {
+          const {error} = await sb.from('templates').update({
+            work_code: updated.work_code || 'Admin',
+            start_time: updated.start_time,
+            finish_time: updated.finish_time,
+            break1: updated.break1,
+            lunch: updated.lunch,
+            break2: updated.break2
+          }).eq('name', origName);
+          if(error) alert('Template update failed: '+error.message);
+        }
+      });
     });
+    row.querySelector('[data-act="del"]').onclick=async()=>{
+      if(!confirm(`Delete template "${origName}"?`)) return;
+      const {error}=await sb.from('templates').delete().eq('name',origName);
+      if(error) alert('Delete failed: '+error.message);
+    };
+  });
+}
+$('#btnAddTemplate').onclick = async()=>{
+  // Safe defaults to avoid NOT NULL issues
+  const name='Shift '+(Object.keys(TEMPLATES).length+1);
+  const {error}=await sb.from('templates').insert([{name,work_code:'Admin',start_time:'09:00',finish_time:'17:00',break1:null,lunch:'12:30',break2:null}]);
+  if(error) alert('Add failed: '+error.message);
+};
+$('#btnLoadDefaults').onclick = async()=>{
+  const defaults=[
+    {name:'Early',  work_code:'DEB Email', start_time:'07:00', finish_time:'16:00', break1:'09:15', lunch:'12:00', break2:'15:15'},
+    {name:'Middle', work_code:'Mirakl',    start_time:'11:00', finish_time:'20:00', break1:'11:30', lunch:'15:30', break2:'17:45'},
+    {name:'Late',   work_code:'PLT Social',start_time:'12:00', finish_time:'21:00', break1:'13:15', lunch:'17:00', break2:'19:15'},
+  ];
+  for(const t of defaults){ await sb.from('templates').upsert(t, { onConflict:'name' }); }
+};
 
-    rows.push({ name, badge:'', segments });
+/* ===== Load Org (sites/leaders/advisors) ===== */
+async function loadOrg(){
+  const [sitesRes, leadersRes, advisorsRes] = await Promise.all([
+    sb.from('sites').select('*').order('name', {ascending:true}),
+    sb.from('leaders').select('*'),
+    sb.from('advisors').select('*')
+  ]);
+  ORG = { sites:{} };
+  (sitesRes.data||[]).forEach(s=> ORG.sites[s.name] = { id:s.id, leaders:{} });
+  (leadersRes.data||[]).forEach(l=>{
+    const siteEntry = Object.values(ORG.sites).find(x=>x.id===l.site_id);
+    if(siteEntry) siteEntry.leaders[l.name] = { id:l.id, advisors:[] };
+  });
+  (advisorsRes.data||[]).forEach(a=>{
+    const leaderNode = Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===a.leader_id);
+    if(leaderNode){ leaderNode.advisors.push({id:a.id, name:a.name, email:a.email||''}); }
   });
 
+  ADVISORS_LIST = (advisorsRes.data||[]).map(a=>({id:a.id,name:a.name,leader_id:a.leader_id}));
+  ADVISOR_BY_NAME = new Map(ADVISORS_LIST.map(a=>[a.name,a.id]));
+  ADVISOR_BY_ID   = new Map(ADVISORS_LIST.map(a=>[a.id,a.name]));
+}
+
+/* ===== Schedules Tree ===== */
+function rebuildTree(){
+  const t=$('#tree'); const q=$('#treeSearch').value.trim().toLowerCase();
+
+  function advisorNode(obj){
+    const checked = selectedAdvisors.has(obj.name) ? 'checked' : '';
+    return `<div class="node">
+      <input type="checkbox" data-adv-id="${obj.id}" data-adv-name="${obj.name}" ${checked}/>
+      <span>${obj.name}</span>
+      <div class="node-actions" style="margin-left:auto;display:flex;gap:6px">
+        <button data-rename-adv="${obj.id}">✎</button>
+        <button data-remove-adv="${obj.id}">🗑</button>
+      </div>
+    </div>`;
+  }
+
+  function leaderBlock(leaderName, leaderObj){
+    const team = leaderObj.advisors || [];
+    const match = (str)=>!q || str.toLowerCase().includes(q);
+    if(q && !match(leaderName) && !team.some(a=>match(a.name))) return '';
+    const allSelected = team.length>0 && team.every(a=>selectedAdvisors.has(a.name));
+    return `<details open data-leader-id="${leaderObj.id}">
+      <summary>
+        <span class="twisty" data-twisty>−</span>
+        <label style="display:flex;align-items:center;gap:6px;margin-left:4px">
+          <input type="checkbox" data-leader="${leaderObj.id}" ${allSelected?'checked':''}/>
+          <span>👤 ${leaderName}</span>
+        </label>
+        <div class="node-actions" style="margin-left:auto;display:flex;gap:6px">
+          <button data-add-adv="${leaderObj.id}">+ Advisor</button>
+          <button data-rename-lead="${leaderObj.id}">✎</button>
+          <button data-remove-lead="${leaderObj.id}">🗑</button>
+        </div>
+      </summary>
+      <div class="advisor-list">
+        ${team.sort((a,b)=>a.name.localeCompare(b.name)).map(advisorNode).join('')}
+      </div>
+    </details>`;
+  }
+
+  function siteBlock(siteName, siteObj){
+    const leaders = siteObj.leaders || {};
+    const blocks = Object.entries(leaders).map(([ln,lobj])=>leaderBlock(ln,lobj)).filter(Boolean);
+    const match = (str)=>!q || str.toLowerCase().includes(q);
+    if(q && !match(siteName) && blocks.join('')==='') return '';
+    return `<details open data-site-id="${siteObj.id}">
+      <summary>
+        <span class="twisty" data-twisty>−</span>
+        <strong>📁 ${siteName}</strong>
+        <div class="node-actions" style="margin-left:auto;display:flex;gap:6px">
+          <button data-add-lead="${siteObj.id}">+ Leader</button>
+          <button data-rename-site="${siteObj.id}">✎</button>
+          <button data-remove-site="${siteObj.id}">🗑</button>
+        </div>
+      </summary>
+      ${blocks.join('')}
+    </details>`;
+  }
+
+  t.innerHTML = Object.entries(ORG.sites).sort((a,b)=>a[0].localeCompare(b[0])).map(([sn,so])=>siteBlock(sn,so)).join('') || '<div class="muted">No sites yet.</div>';
+
+  // Twisties update
+  $$('#tree details').forEach(d=>{
+    const twisty = d.querySelector('[data-twisty]');
+    const update = ()=>{ twisty.textContent = d.open ? '−' : '+'; };
+    d.addEventListener('toggle', update); update();
+  });
+
+  // Leader select-all (visibly ticks children)
+  $$('#tree [data-leader]').forEach(cb=>{
+    cb.onchange=()=>{
+      const leaderId=cb.dataset.leader;
+      const leaderNode = Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===leaderId);
+      (leaderNode?.advisors||[]).forEach(a=> cb.checked ? selectedAdvisors.add(a.name) : selectedAdvisors.delete(a.name));
+      refreshChips(); populateAssignTable(); renderCalendar(); rebuildTree(); // re-render to show ticks
+    };
+  });
+
+  // Advisor select
+  $$('#tree [data-adv-id]').forEach(ch=>{
+    ch.onchange=()=>{
+      const name=ch.dataset.advName; ch.checked?selectedAdvisors.add(name):selectedAdvisors.delete(name);
+      refreshChips(); populateAssignTable(); renderCalendar();
+    };
+  });
+
+  // Site actions
+  $$('#tree [data-add-lead]').forEach(b=>b.onclick=async()=>{
+    const siteId=b.dataset.addLead; const name=prompt('Leader name'); if(!name) return;
+    const {error}=await sb.from('leaders').insert([{site_id:siteId, name}]); if(error) alert(error.message);
+  });
+  $$('#tree [data-rename-site]').forEach(b=>b.onclick=async()=>{
+    const siteId=b.dataset.renameSite; const current = Object.entries(ORG.sites).find(([n,s])=>s.id===siteId)?.[0]||'';
+    const nn=prompt('Rename site', current); if(!nn||nn===current) return;
+    const {error}=await sb.from('sites').update({name:nn}).eq('id',siteId); if(error) alert(error.message);
+  });
+  $$('#tree [data-remove-site]').forEach(b=>b.onclick=async()=>{
+    const siteId=b.dataset.removeSite; if(!confirm('Delete site and its leaders/advisors?')) return;
+    const {error}=await sb.from('sites').delete().eq('id',siteId); if(error) alert(error.message);
+  });
+
+  // Leader actions
+  $$('#tree [data-rename-lead]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.renameLead; const current = Object.values(ORG.sites).flatMap(s=>Object.entries(s.leaders)).find(([n,l])=>l.id===id)?.[0]||'';
+    const nn=prompt('Rename leader', current); if(!nn||nn===current) return;
+    const {error}=await sb.from('leaders').update({name:nn}).eq('id',id); if(error) alert(error.message);
+  });
+  $$('#tree [data-remove-lead]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.removeLead; if(!confirm('Remove leader and their advisors?')) return;
+    const {error}=await sb.from('leaders').delete().eq('id',id); if(error) alert(error.message);
+  });
+
+  // Advisor actions
+  $$('#tree [data-add-adv]').forEach(b=>b.onclick=async()=>{
+    const leaderId=b.dataset.addAdv; const n=prompt('Advisor name'); if(!n) return;
+    const {error}=await sb.from('advisors').insert([{leader_id:leaderId, name:n}]); if(error) alert(error.message);
+  });
+  $$('#tree [data-rename-adv]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.renameAdv; const current = ADVISORS_LIST.find(a=>a.id===id)?.name||'';
+    const nn=prompt('Rename advisor', current); if(!nn||nn===current) return;
+    const {error}=await sb.from('advisors').update({name:nn}).eq('id',id); if(error) alert(error.message);
+  });
+  $$('#tree [data-remove-adv]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.removeAdv; if(!confirm('Remove advisor?')) return;
+    const {error}=await sb.from('advisors').delete().eq('id',id); if(error) alert(error.message);
+  });
+}
+
+/* ===== Helper: get leader team names ===== */
+function getLeaderTeamNames(leaderId){
+  const leader = Object.values(ORG.sites)
+    .flatMap(s => Object.values(s.leaders || {}))
+    .find(l => l.id === leaderId);
+  if(!leader) return [];
+  return (leader.advisors || []).map(a => a.name).sort((a,b)=>a.localeCompare(b));
+}
+
+/* ===== Advisor dropdown (View) ===== */
+function rebuildAdvisorDropdown(){
+  const sel = $('#advisorSelect');
+
+  // Leaders
+  const leaders = [];
+  Object.values(ORG.sites).forEach(site => {
+    Object.entries(site.leaders || {}).forEach(([lname, lobj]) => {
+      leaders.push({ id: lobj.id, name: lname, advisors: lobj.advisors || [] });
+    });
+  });
+  leaders.sort((a,b)=>a.name.localeCompare(b.name));
+
+  // Advisors
+  const advisors = ADVISORS_LIST
+    .map(a => ({ id: a.id, name: a.name }))
+    .sort((a,b)=>a.name.localeCompare(b.name));
+
+  const leaderOpts = leaders.map(l => `<option value="leader::${l.id}">${l.name} — Team</option>`).join('');
+  const advisorOpts = advisors.map(a => `<option value="advisor::${a.id}">${a.name}</option>`).join('');
+
+  sel.innerHTML = `
+    <option value="__TEAM_SELECTED__">Team (Selected)</option>
+    <option value="__TEAM_ALL__">Team (All)</option>
+    ${leaders.length ? `<optgroup label="Team Leaders">${leaderOpts}</optgroup>` : ''}
+    ${advisors.length ? `<optgroup label="Advisors">${advisorOpts}</optgroup>` : ''}
+  `;
+}
+
+/* ===== Assignment table ===== */
+function populateAssignTable(){
+  const head=$('#dateHeaders'), body=$('#assignTable tbody');
+  head.innerHTML=DAYS.map(d=>`<th>${d.slice(0,3)}<br><span class="muted" data-date></span></th>`).join('');
+  const list = selectedAdvisors.size ? [...selectedAdvisors] : [];
+  if(list.length===0){
+    body.innerHTML='<tr><td colspan="8" class="muted" style="text-align:left;padding:10px">Select a Team Leader (or advisors) in <strong>Schedules</strong> to populate this table.</td></tr>';
+    return;
+  }
+  const opts=Object.keys(TEMPLATES).sort().map(n=>`<option value="${n}">${n}</option>`).join('');
+  body.innerHTML='';
+  list.sort((a,b)=>a.localeCompare(b)).forEach(name=>{
+    const tr=document.createElement('tr');
+    const tdName=document.createElement('td'); tdName.className='name'; tdName.textContent=name; tr.appendChild(tdName);
+    DAYS.forEach(day=>{
+      const td=document.createElement('td'); const sel=document.createElement('select');
+      sel.innerHTML=`<option value="">-- Day Off --</option>${opts}`;
+      const aId = ADVISOR_BY_NAME.get(name);
+      const ws = $('#weekStart').value;
+      const key = `${aId}::${ws}`;
+      const data = ROTAS.get(key) || {};
+      const current = data[day];
+      const currentVal = (typeof current==='string') ? current : '';
+      sel.value = currentVal;
+      
+      sel.onchange = async()=>{
+        const newVal = sel.value;
+        const fresh = Object.assign({}, ROTAS.get(key) || {});
+        const willOverwrite = fresh.hasOwnProperty(day) && JSON.stringify(fresh[day]) !== JSON.stringify(newVal || '');
+        if (willOverwrite){
+          const ok = await confirmOverwriteDay(aId, ws, day, newVal || '');
+          if (!ok){ sel.value = (typeof fresh[day] === 'string') ? fresh[day] : ''; return; }
+        }
+        if(newVal) fresh[day] = newVal; else delete fresh[day];
+        await upsertRota(aId, ws, fresh);
+        renderCalendar();
+      };
+
+      td.appendChild(sel); tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+}
+
+/* ===== Hours / Calendar base ===== */
+function hoursHTML(){ let h=''; const START=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-start'))||7; const END=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-end'))||20; for(let i=START;i<=END;i++){ h+=`<div class="hour"><span>${String(i).padStart(2,'0')}:00</span></div>`; } return h; }
+function resetGrid(){ $('#calGrid').innerHTML = '<div class="hour-col"><div id="hours"></div></div>'; $('#hours').innerHTML=hoursHTML(); }
+
+/* ===== Templates → segments ===== */
+function processTemplateToSegments(t){
+  if(!t||!t.start_time||!t.finish_time) return [];
+  const s=toMin(fmt(t.start_time)), e=toMin(fmt(t.finish_time)); if(e<=s) return [];
+  const ev=[{t:s,type:'start'},{t:e,type:'end'}];
+  [['break1',15,'Break'],['lunch',30,'Lunch'],['break2',15,'Break']].forEach(([k,d,label])=>{ if(t[k]) ev.push({t:toMin(fmt(t[k])),type:'pause',d,label}); });
+  ev.sort((a,b)=>a.t-b.t||((a.type==='end')-(b.type==='end')));
+  const out=[]; let cur=s;
+  for(const evn of ev){
+    if(evn.t>cur) out.push({code: t.work_code || 'Admin', start:m2t(cur), end:m2t(evn.t)});
+    if(evn.type==='pause'){ out.push({code:evn.label, start:m2t(evn.t), end:m2t(evn.t+evn.d)}); cur=evn.t+evn.d; }
+  }
+  return out;
+}
+function toEditableSegments(dayVal){
+  if(dayVal && typeof dayVal==='object' && Array.isArray(dayVal.segments)) return JSON.parse(JSON.stringify(dayVal.segments));
+  if(typeof dayVal==='string' && TEMPLATES[dayVal]) return processTemplateToSegments(TEMPLATES[dayVal]);
+  return [];
+}
+function mergeAdjacent(segs){
+  const s=[...segs].sort((a,b)=>toMin(a.start)-toMin(b.start));
+  const out=[];
+  for(const x of s){
+    if(!out.length){ out.push({...x}); continue; }
+    const p=out[out.length-1];
+    if(p.code===x.code && toMin(p.end)===toMin(x.start)){ p.end=x.end; }
+    else out.push({...x});
+  }
+  return out;
+}
+function processDayValue(dayValue){
+  if(dayValue && typeof dayValue==='object' && Array.isArray(dayValue.segments)){
+    return dayValue.segments.map(s=>({label:s.code,start:toMin(s.start),end:toMin(s.end)})).filter(b=>b.end>b.start).sort((a,b)=>a.start-b.start);
+  }
+  if(typeof dayValue==='string' && TEMPLATES[dayValue]){
+    return processTemplateToSegments(TEMPLATES[dayValue]).map(s=>({label:s.code,start:toMin(s.start),end:toMin(s.end)}));
+  }
+  return [];
+}
+
+/* ===== Calendar renderers ===== */
+function updateRangeLabel(){
+  const ws=$('#weekStart').value; const adv=$('#advisorSelect').value;
+  if(!ws){ $('#rangeLabel').textContent=''; return; }
+  const s=new Date(ws+'T00:00:00'); const e=new Date(s); e.setDate(e.getDate()+6);
+  const f=d=>d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
+  if(adv==='__TEAM_SELECTED__' || adv==='__TEAM_ALL__'){
+    const idx=DAYS.indexOf($('#teamDay').value||'Monday'); const d=new Date(s); d.setDate(d.getDate()+idx);
+    $('#rangeLabel').textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+    $('#calTitle').textContent=(adv==='__TEAM_ALL__'?'Team (All)':'Team (Selected)')+' – Single Day';
+  } else {
+    $('#rangeLabel').textContent=`${f(s)} – ${f(e)}`;
+    $('#calTitle').textContent='Advisor Week (Calendar)';
+  }
+  $$('#dateHeaders [data-date]').forEach((span,i)=>{ const d=new Date(s); d.setDate(d.getDate()+i); span.textContent=d.toLocaleDateString('en-GB',{month:'short',day:'numeric'}); });
+}
+function renderCalendar(){
+  resetGrid();
+  const advVal=$('#advisorSelect').value;
+
+  // Team views
+  if(advVal==='__TEAM_SELECTED__' || advVal==='__TEAM_ALL__'){ renderTeamDayCalendar(advVal==='__TEAM_ALL__'); return; }
+
+  // Single advisor view (support both "advisor::ID" and legacy name values)
+  let aId=null, advName=null;
+  if(advVal.startsWith && advVal.startsWith('advisor::')){
+    aId = advVal.split('::')[1];
+    advName = ADVISOR_BY_ID.get(aId) || '';
+  } else {
+    advName = advVal;
+    aId = ADVISOR_BY_NAME.get(advName);
+  }
+  if(!aId) return;
+
+  const ws=$('#weekStart').value; const key=`${aId}::${ws}`;
+  const data=ROTAS.get(key) || {};
+  const grid=$('#calGrid'); const s=ws?new Date(ws+'T00:00:00'):null;
+
+  DAYS.forEach((day,idx)=>{
+    const col=document.createElement('div'); col.className='day-col';
+    let month='—', num=''; if(s){ const d=new Date(s); d.setDate(d.getDate()+idx); month=d.toLocaleDateString('en-GB',{month:'long'}); num=d.getDate(); }
+    col.insertAdjacentHTML('beforeend',`<div class="day-head"><small>${month}</small>${day}<span style="float:right">${num}</span></div>`);
+
+    const dayVal = data[day];
+    if(dayVal && typeof dayVal==='object' && Array.isArray(dayVal.segments)){
+      const totalMins = processDayValue(dayVal).reduce((acc,b)=>acc+(b.end-b.start),0);
+      col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">Custom segments</span><span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
+    } else {
+      const tplName = (typeof dayVal==='string') ? dayVal : '';
+      const tpl=TEMPLATES[tplName];
+      if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
+      else { col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">${tplName}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${((toMin(fmt(tpl.finish_time))-toMin(fmt(tpl.start_time)))/60)}h</span></div>`); }
+    }
+
+    col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}">＋</button><button class="iconbtn" data-day="${day}" data-edit>✎</button></div>`);
+    const cell=document.createElement('div'); cell.className='timeline-cell';
+
+    const blocks = processDayValue(dayVal);
+    blocks.forEach(b=>{
+      const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN;
+      const el=document.createElement('div'); el.className=`block ${classForCode(b.label)}`;
+      el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px';
+      el.innerHTML=`<div>${b.label}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span></div>`;
+      el.dataset.day = day; el.dataset.adv = advName; el.dataset.start = m2t(b.start); el.dataset.end = m2t(b.end); el.dataset.code=b.label;
+      el.addEventListener('click', onBlockClick);
+      cell.appendChild(el);
+    });
+
+    col.appendChild(cell); grid.appendChild(col);
+  });
+
+  $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day, advName));
+}
+function renderTeamDayCalendar(showAll){
+  resetGrid();
+  const grid=$('#calGrid'); const ws=$('#weekStart').value; const day=$('#teamDay').value||'Monday';
+  const names = showAll ? ADVISORS_LIST.map(a=>a.name) : [...selectedAdvisors];
+  const s=new Date(ws+'T00:00:00'); const idx=DAYS.indexOf(day); s.setDate(s.getDate()+idx);
+
+  const head=document.createElement('div'); head.className='day-head'; head.style.gridColumn=`1 / span ${1+names.length}`; head.style.height='56px';
+  head.innerHTML=`<small>${s.toLocaleDateString('en-GB',{month:'long'})}</small>${day}<span style="float:right">${s.getDate()}</span>`;
+  grid.appendChild(head);
+
+  names.sort((a,b)=>a.localeCompare(b)).forEach(advName=>{
+    const aId=ADVISOR_BY_NAME.get(advName); if(!aId) return;
+    const key=`${aId}::${ws}`; const data=ROTAS.get(key) || {};
+    const col=document.createElement('div'); col.className='day-col';
+    col.insertAdjacentHTML('beforeend',`<div class="day-head" style="height:56px">${advName}</div>`);
+    const dayVal=data[day];
+    if(dayVal && typeof dayVal==='object' && Array.isArray(dayVal.segments)){
+      const totalMins = processDayValue(dayVal).reduce((acc,b)=>acc+(b.end-b.start),0);
+      col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">Custom segments</span><span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
+    } else {
+      const tplName=(typeof dayVal==='string')?dayVal:''; const tpl=TEMPLATES[tplName];
+      if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
+      else{ col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">${tplName}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${((toMin(fmt(tpl.finish_time))-toMin(fmt(tpl.start_time)))/60)}h</span></div>`); }
+    }
+    col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}" data-adv="${advName}">＋</button><button class="iconbtn" data-day="${day}" data-adv="${advName}" data-edit>✎</button></div>`);
+    const cell=document.createElement('div'); cell.className='timeline-cell';
+    const blocks=processDayValue(dayVal);
+    blocks.forEach(b=>{
+      const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN;
+      const el=document.createElement('div'); el.className=`block ${classForCode(b.label)}`;
+      el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px';
+      el.innerHTML=`<div>${b.label}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span></div>`;
+      el.dataset.day = day; el.dataset.adv = advName; el.dataset.start = m2t(b.start); el.dataset.end = m2t(b.end); el.dataset.code=b.label;
+      el.addEventListener('click', onBlockClick);
+      cell.appendChild(el);
+    });
+    col.appendChild(cell); grid.appendChild(col);
+  });
+
+  $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day, b.dataset.adv));
+}
+
+/* ===== Assign / Split ===== */
+const assignDlg=$('#assignDlg'), assignSelect=$('#assignSelect'), assignTitle=$('#assignTitle');
+const modeTemplate=$('#modeTemplate'), modeSplit=$('#modeSplit'), modeHint=$('#modeHint');
+const segmentsWrap=$('#segmentsWrap');
+function segmentRowHTML(s, idx){
+  return `<div class="row" data-i="${idx}">
+    <select class="seg-code">${codeSelectGroupedHTML(s.code||'')}</select>
+    <input type="time" class="seg-start" value="${s.start||''}"> <span>–</span>
+    <input type="time" class="seg-end" value="${s.end||''}">
+    <button class="del">Delete</button>
+  </div>`;
+}
+function loadSegmentsUI(arr){
+  segmentsWrap.innerHTML = (arr&&arr.length)? arr.map((s,i)=>segmentRowHTML(s,i)).join('') : '<div class="muted">No segments yet. Add one.</div>';
+  $$('#segmentsWrap .row .del').forEach(btn=>btn.onclick=()=>{ btn.parentElement.remove(); if($$('#segmentsWrap .row').length===0) segmentsWrap.innerHTML='<div class="muted">No segments yet. Add one.</div>'; });
+}
+function readSegmentsUI(){
+  const rows=$$('#segmentsWrap .row');
+  const list=rows.map(r=>({ code:r.querySelector('.seg-code').value, start:r.querySelector('.seg-start').value, end:r.querySelector('.seg-end').value }))
+                 .filter(s=>s.code && s.start && s.end && toMin(s.end)>toMin(s.start))
+                 .sort((a,b)=>toMin(a.start)-toMin(b.start));
+  for(let i=1;i<list.length;i++){ if(toMin(list[i].start)<toMin(list[i-1].end)){ alert('Segments overlap.'); return null; } }
+  return list;
+}
+function openAssign(day, advisorName){
+  const advName=advisorName || $('#advisorSelect').value;
+  const aId=ADVISOR_BY_NAME.get(advName); if(!aId) return;
+  const ws=$('#weekStart').value; const key=`${aId}::${ws}`;
+  const data=ROTAS.get(key) || {};
+  assignTitle.textContent=`${day} for ${advName}`;
+  assignSelect.innerHTML=`<option value="">— Day Off —</option>`+Object.keys(TEMPLATES).sort().map(n=>`<option>${n}</option>`).join('');
+
+  if(data[day] && typeof data[day]==='object' && Array.isArray(data[day].segments)){
+    modeSplit.checked=true; modeTemplate.checked=false;
+    $('#templateMode').style.display='none'; $('#splitMode').style.display='block';
+    loadSegmentsUI(data[day].segments);
+  } else {
+    modeTemplate.checked=true; modeSplit.checked=false;
+    $('#templateMode').style.display='block'; $('#splitMode').style.display='none';
+    assignSelect.value = (typeof data[day]==='string')? data[day] : '';
+    const tplName = assignSelect.value;
+    modeHint.textContent = tplName? `Current: ${tplName}. Convert to editable segments to tweak a small part.` : '';
+  }
+
+  $('#btnConvertToSplit').onclick=()=>{
+    const base = assignSelect.value || '';
+    const segs = toEditableSegments(base);
+    modeSplit.checked=true; modeTemplate.checked=false;
+    $('#templateMode').style.display='none'; $('#splitMode').style.display='block';
+    loadSegmentsUI(segs);
+  };
+  $('#addSegment').onclick=()=>{
+    if($('#segmentsWrap .muted')) $('#segmentsWrap .muted').remove();
+    const div=document.createElement('div'); div.className='row';
+    div.innerHTML = `${'<select class="seg-code">'+codeSelectGroupedHTML('Admin')+'</select>'}
+      <input type="time" class="seg-start" value="08:00"> <span>–</span> <input type="time" class="seg-end" value="12:00">
+      <button class="del">Delete</button>`;
+    div.querySelector('.del').onclick=()=>{ div.remove(); if($$('#segmentsWrap .row').length===0) $('#segmentsWrap').innerHTML='<div class="muted">No segments yet. Add one.</div>'; };
+    segmentsWrap.appendChild(div);
+  };
+
+  $('#assignOK').onclick=async()=>{
+    const fresh = Object.assign({}, data);
+    if(modeTemplate.checked){
+      const tplName=assignSelect.value;
+      if(tplName) fresh[day]=tplName; else delete fresh[day];
+    } else {
+      const segs=readSegmentsUI(); if(!segs) return;
+      fresh[day] = { segments: segs };
+    }
+    await upsertRota(aId, ws, fresh);
+    assignDlg.close(); renderCalendar(); populateAssignTable();
+  };
+
+  assignDlg.showModal();
+}
+
+/* ===== Block editor (click a block) ===== */
+const blockDlg=$('#blockDlg');
+const bmWhole=$('#bmWhole'), bmSub=$('#bmSub');
+const bwStart=$('#bwStart'), bwEnd=$('#bwEnd'), bwCode=$('#bwCode');
+const bsStart=$('#bsStart'), bsEnd=$('#bsEnd'), bsCode=$('#bsCode');
+function buildBlockSelects(){ const codes=codeSelectGroupedHTML(); [bwCode,bsCode].forEach(sel=>sel.innerHTML=codes); }
+function onBlockClick(e){
+  const el=e.currentTarget; const advName=el.dataset.adv; const day=el.dataset.day;
+  const aId=ADVISOR_BY_NAME.get(advName); const ws=$('#weekStart').value; const key=`${aId}::${ws}`;
+  const data=ROTAS.get(key) || {}; const blocks=processDayValue(data[day]);
+  const origCode=el.dataset.code, origStart=el.dataset.start, origEnd=el.dataset.end;
+  $('#blockTitle').textContent=`Edit ${day} for ${advName}`; $('#blockHint').textContent=`Block: ${origCode} ${origStart}–${origEnd}`;
+  buildBlockSelects();
+  bmSub.checked=true; $('#blockSub').style.display='block'; $('#blockWhole').style.display='none';
+  bwCode.value = origCode; bwStart.value=origStart; bwEnd.value=origEnd;
+  bsCode.value = origCode; bsStart.value=origStart; bsEnd.value=origEnd;
+
+  bmWhole.onchange = bmSub.onchange = ()=>{
+    const whole=bmWhole.checked; $('#blockWhole').style.display=whole?'block':'none'; $('#blockSub').style.display=whole?'none':'block';
+  };
+
+  $('#blockOK').onclick=async()=>{
+    const baseSegs = toEditableSegments(data[day] || '');
+    const oS=toMin(origStart), oE=toMin(origEnd);
+    const idx = baseSegs.findIndex(s=>s.start===origStart && s.end===origEnd && (s.code||'')===origCode);
+    if(idx===-1){ alert('Could not find block.'); return; }
+
+    let segs=[...baseSegs];
+    if(bmWhole.checked){
+      const c=bwCode.value, s=bwStart.value, e=bwEnd.value;
+      if(!s||!e||toMin(e)<=toMin(s) || toMin(s)<oS || toMin(e)>oE){ alert('Invalid range.'); return; }
+      segs.splice(idx,1);
+      if(toMin(s)>oS) segs.splice(idx,0,{code:origCode,start:m2t(oS),end:s});
+      segs.splice(idx+(toMin(s)>oS?1:0),0,{code:c,start:s,end:e});
+      if(toMin(e)<oE) segs.splice(idx+(toMin(s)>oS?1:0)+1,0,{code:origCode,start:e,end:m2t(oE)});
+    } else {
+      const c=bsCode.value, s=bsStart.value, e=bsEnd.value;
+      if(!s||!e||toMin(e)<=toMin(s) || toMin(s)<oS || toMin(e)>oE){ alert('Invalid sub-range.'); return; }
+      segs.splice(idx,1);
+      if(toMin(s)>oS) segs.splice(idx,0,{code:origCode,start:m2t(oS),end:s});
+      segs.splice(idx+(toMin(s)>oS?1:0),0,{code:c,start:s,end:e});
+      if(toMin(e)<oE) segs.splice(idx+(toMin(s)>oS?1:0)+1,0,{code:origCode,start:e,end:m2t(oE)});
+    }
+    const fresh = Object.assign({}, data, { [day]: {segments: mergeAdjacent(segs)} });
+    await upsertRota(aId, ws, fresh);
+    blockDlg.close(); renderCalendar(); populateAssignTable();
+  };
+
+  blockDlg.showModal();
+}
+
+/* ===== Rotas DB ===== */
+async function upsertRota(advisorId, weekStartISO, dataObj){
+  const { data, error } = await sb.from('rotas').upsert({
+    advisor_id: advisorId,
+    week_start: weekStartISO,
+    data: dataObj
+  }, { onConflict: 'advisor_id,week_start' }).select('*').single();
+  if(!error){ ROTAS.set(`${advisorId}::${weekStartISO}`, data.data || {}); }
+}
+async function fetchRotasForWeek(weekStartISO){
+  if(!weekStartISO) return;
+  const { data } = await sb.from('rotas').select('advisor_id,week_start,data').eq('week_start', weekStartISO);
+  ROTAS.clear(); (data||[]).forEach(r=> ROTAS.set(`${r.advisor_id}::${weekStartISO}`, r.data || {}));
+}
+
+/* ===== Templates & UI helpers ===== */
+async function loadTemplates(){
+  const { data } = await sb.from('templates').select('*');
+  TEMPLATES = {}; (data||[]).forEach(t=> TEMPLATES[t.name] = {
+    name:t.name, work_code:t.work_code, start_time:t.start_time, finish_time:t.finish_time, break1:t.break1, lunch:t.lunch, break2:t.break2
+  });
+}
+
+/* Add buildRowsFrom helper */
+function buildRowsFrom(assignments,templates){
+  const rows=[];
+  (assignments||[]).forEach(a=>{
+    const t = (templates && (templates[a.templateName]||templates[a.templateId])) || a.template || {};
+    const s = t.startMin ?? t.start ?? 7*60;
+    const e = t.endMin   ?? t.end   ?? 16*60;
+    const non=[];
+    (t.breaks||[]).forEach(b=>non.push({type:'break',start:b.startMin??b.start??0,end:(b.startMin??b.start??0)+(b.dur??15)}));
+    if(t.lunch) non.push({type:'lunch',start:t.lunch.startMin??t.lunch.start??(12*60),end:(t.lunch.startMin??t.lunch.start??(12*60))+(t.lunch.dur??30)});
+    (a.meetings||[]).forEach(m=>non.push({type:'meeting',start:m.startMin??m.start,end:m.endMin??m.end}));
+    non.sort((x,y)=>x.start-y.start);
+    const segs=[]; let last=s;
+    non.forEach(n=>{ if(n.start>last) segs.push({type:'work',code:a.code,start:last,end:Math.min(n.start,e)});
+                     segs.push({type:n.type,code:n.code||n.type,start:Math.max(n.start,s),end:Math.min(n.end,e)});
+                     last=Math.max(last,n.end); });
+    if(last<e) segs.push({type:'work',code:a.code,start:last,end:e});
+    rows.push({name:a.name||a.advisorName||a.id,badge:a.badge||a.role||'',segments:segs});
+  });
   return rows;
 }
 
-function renderPlanner(rows) {
-  console.log('renderPlanner rows=', Array.isArray(rows) ? rows.length : rows);
-  const body = document.getElementById('plannerBody');
-  if (!body) return;
-
-  if (!rows || !rows.length) {
-    body.innerHTML = '<div class="muted" style="padding:10px">Nothing to render for current selection.</div>';
-    return;
-  }
-
-  const hdr = document.getElementById('timeHeader');
-  if (hdr) { hdr.innerHTML = ''; renderTimeHeader(hdr); }
-
-  body.innerHTML = '';
-  rows.forEach(row => {
-    const wrap = document.createElement('div');
-    wrap.className = 'planner__row';
-
-    const nameCell = document.createElement('div');
-    nameCell.className = 'planner__name';
-    nameCell.innerHTML = row.badge ? `<span class="planner__badge">${row.badge}</span> ${row.name}` : row.name;
-
-    const tl = document.createElement('div');
-    tl.className = 'planner__timeline';
-
-    (row.segments || []).forEach(seg => {
-      const span = DAY_END - DAY_START;
-      const left = Math.max(0, (seg.start - DAY_START*60) / (span*60) * 100);
-      const width = Math.max(0, Math.min(100, (seg.end - seg.start) / (span*60) * 100));
-      if (width <= 0) return;
-
-      const bar = document.createElement('div');
-      bar.className = `bar planner__bar ${seg.type ? 'is-' + seg.type : ''}`;
-      bar.style.left  = `${left}%`;
-      bar.style.width = `${width}%`;
-      bar.title = `${seg.code} ${m2t(seg.start)}–${m2t(seg.end)}`;
-
-      bar.addEventListener('click', () => {
-        const ev = {
-          currentTarget: {
-            dataset: {
-              adv: row.name,
-              day: ($('#teamDay').value || 'Monday'),
-              code: seg.code,
-              start: m2t(seg.start),
-              end:   m2t(seg.end)
-            }
-          }
-        };
-        onBlockClick(ev);
-      });
-
-      tl.appendChild(bar);
-    });
-
-    wrap.appendChild(nameCell);
-    wrap.appendChild(tl);
-    body.appendChild(wrap);
+function refreshChips(){
+  const box=$('#activeChips'); box.innerHTML='';
+  if(!selectedAdvisors.size){ box.innerHTML='<span class="muted">No advisors selected.</span>'; return; }
+  [...selectedAdvisors].sort((a,b)=>a.localeCompare(b)).forEach(n=>{
+    const chip=document.createElement('span'); chip.className='chip'; chip.textContent=n;
+    const x=document.createElement('button'); x.textContent='×'; x.style.border='none'; x.style.background='transparent'; x.style.cursor='pointer';
+    x.onclick=()=>{ selectedAdvisors.delete(n); refreshChips(); rebuildTree(); populateAssignTable(); renderCalendar(); };
+    chip.appendChild(x); box.appendChild(chip);
   });
 }
+function updateViewSelector(){
+  const team = $('#advisorSelect').value;
+  const showTeam = team==='__TEAM_SELECTED__' || team==='__TEAM_ALL__';
+  $('#lblTeamDay').style.display = showTeam ? 'inline' : 'none';
+  $('#teamDay').style.display     = showTeam ? 'inline' : 'none';
+}
+function setHours(){ $('#hours').innerHTML=hoursHTML(); }
+
+
+/* ===== Publish: target collection, confirmations & execution ===== */
+function collectPublishTargets(){
+  const ws = $('#weekStart').value;
+  const selVal = $('#advisorSelect').value;
+
+  // Team: Selected / All
+  if (selVal === '__TEAM_SELECTED__') {
+    return [...selectedAdvisors].map(name => ({ id: ADVISOR_BY_NAME.get(name), name, ws }));
+  }
+  if (selVal === '__TEAM_ALL__') {
+    return ADVISORS_LIST.map(a => ({ id: a.id, name: a.name, ws }));
+  }
+  // Single advisor
+
+  if (selVal && selVal.startsWith && selVal.startsWith('advisor::')){
+    const id = selVal.split('::')[1];
+    return [{ id, name: ADVISOR_BY_ID.get(id) || '', ws }];
+  }
+  // Fallback: if dropdown currently shows a raw name (legacy)
+  if (ADVISOR_BY_NAME.has(selVal)){
+    return [{ id: ADVISOR_BY_NAME.get(selVal), name: selVal, ws }];
+  }
+  return [];
+}
+
+// Returns true if OK to overwrite a specific day for that advisor
+async function confirmOverwriteDay(advisorId, ws, day, newValue){
+  const key = `${advisorId}::${ws}`;
+  const existing = ROTAS.get(key) || {};
+  const had = existing[day] !== undefined && existing[day] !== null && existing[day] !== '';
+  // If nothing set or identical, no need to confirm
+  const same = JSON.stringify(existing[day] || null) === JSON.stringify(newValue || null);
+  if (!had || same) return true;
+
+  return confirm(`You're about to overwrite ${ADVISOR_BY_ID.get(advisorId) || 'this advisor'} on ${day} for week ${ws}. Continue?`);
+}
+
+// Opens the publish dialog, listing who will be published
+function openPublishDialog(){
+  const targets = collectPublishTargets();
+  if (!targets.length){
+    alert('Select an advisor or team to publish.');
+    return;
+  }
+  const ws = $('#weekStart').value;
+  const dayMode = ($('#advisorSelect').value === '__TEAM_SELECTED__' || $('#advisorSelect').value === '__TEAM_ALL__');
+
+  $('#publishSummary').textContent = dayMode
+    ? `Publishing the selected day (${ $('#teamDay').value }) for ${targets.length} advisor(s), week starting ${ws}.`
+    : `Publishing the full week for ${targets.length} advisor(s), week starting ${ws}.`;
+
+  const ul = document.createElement('ul');
+  ul.style.margin = '6px 0 0 18px';
+  ul.style.padding = '0';
+  targets.forEach(t => {
+    const li = document.createElement('li');
+    li.textContent = t.name || t.id;
+    ul.appendChild(li);
+  });
+  const listBox = $('#publishList');
+  listBox.innerHTML = '';
+  listBox.appendChild(ul);
+
+  publishDlg.showModal();
+}
+
+// Performs the publish by upserting current working data
+async function doPublish(){
+  const targets = collectPublishTargets();
+  if (!targets.length){ publishDlg.close(); return; }
+
+  const ws = $('#weekStart').value;
+  const teamMode = ($('#advisorSelect').value === '__TEAM_SELECTED__' || $('#advisorSelect').value === '__TEAM_ALL__');
+  const teamDay = $('#teamDay').value;
+
+  let published = 0, skipped = 0;
+
+  for (const t of targets){
+    const key = `${t.id}::${ws}`;
+    const data = ROTAS.get(key) || {};  // Fix: Remove stray }
+
+    if (teamMode){
+      // Only publish the chosen day for each advisor
+      const newVal = data[teamDay] || null;
+      const ok = await confirmOverwriteDay(t.id, ws, teamDay, newVal);
+      if (!ok){ skipped++; continue; }
+      // Ensure object key exists even if day off
+      const fresh = Object.assign({}, data);
+      if (newVal === null || newVal === undefined) delete fresh[teamDay]; else fresh[teamDay] = newVal;
+      await upsertRota(t.id, ws, fresh);
+      published++;
+    } else {
+      // Full week for a single advisor (or explicit single-advisor selection)
+      // Confirm once per day that would be overwritten
+      let proceed = true;
+      for (const d of DAYS){
+        const ok = await confirmOverwriteDay(t.id, ws, d, data[d] || null);
+        if (!ok){ proceed = false; break; }
+      }
+      if (!proceed){ skipped++; continue; }
+      await upsertRota(t.id, ws, data);
+      published++;
+    }
+  }
+
+  publishDlg.close();
+  alert(`Publish complete. Updated: ${published}. Skipped: ${skipped}.`);
+}
+
+
   /* ===== Wire buttons ===== */
   function wire(){
     // Publish button
@@ -659,24 +1366,35 @@ function renderPlanner(rows) {
 
   if (btn) {
     btn.addEventListener('click', async () => {
-      $('#btnGenerate').onclick = async () => {
-        try {
-          const rows = buildPlannerRowsFromState();
-          if (!rows || !rows.length) {
-            showInfo?.('Nothing to render for selected filter');
-            const c = document.getElementById('plannerBody');
-            if (c) c.innerHTML = '';
-            return;
-          }
-          renderPlanner(rows);
-          showInfo?.('Schedule generated.');
-        } catch (err) {
-          showError?.(`Generate failed: ${err?.message ?? err}`);
-          console.error(err);
+      try {
+        const templates =
+          typeof loadTemplates === 'function' ? await loadTemplates() : [];
+
+        const assignments =
+          typeof loadAssignments === 'function' ? await loadAssignments() : [];
+
+        const rows =
+          typeof buildRowsFrom === 'function'
+            ? buildRowsFrom(assignments, templates)
+            : [];
+
+        if (!rows || !rows.length) {
+          showInfo?.('Nothing to render for selected filter');
+          const c = document.getElementById('plannerBody');
+          if (c) c.innerHTML = '';
+          return;
         }
-      };
+
+        renderPlanner(rows);
+        showInfo?.('Schedule generated.');
+      } catch (err) {
+        showError?.(`Generate failed: ${err?.message ?? err}`);
+        console.error(err);
+      }
     });
   }
+
+  // initial ticks
   renderTimeHeader?.(document.getElementById('timeHeader'));
 })();
 </script>
