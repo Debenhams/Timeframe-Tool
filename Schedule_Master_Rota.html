@@ -204,7 +204,7 @@
   .time-scale .tick{position:absolute;top:0;font-size:11px;transform:translateX(-50%);color:#6b7280}
   .grid{position:relative;height:100%}
   .grid .vline{position:absolute;top:0;bottom:0;width:1px;background:#e8ebf2}
-  .grid .guide{position:absolute;top:0;bottom:0;width:1px;background:#4fa3ff;opacity:.8;pointer-events:none;z-index:3}
+  .grid .guide{position:absolute;top:0;bottom:0;width:1px;background:#4fa3ff;opacity:.85;pointer-events:none;z-index:3}
   .bar{position:absolute;top:8px;height:28px;border-radius:6px;opacity:.95;cursor:pointer}
   .bar.is-work{background:var(--work,#6b8e23)}
   .bar.is-lunch{background:var(--lunch,#bfe9ff)}
@@ -1090,311 +1090,34 @@ function onBlockClick(e){
   blockDlg.showModal();
 }
 
-/* ===== Rotas DB ===== */
-async function upsertRota(advisorId, weekStartISO, dataObj){
-  const { data, error } = await sb.from('rotas').upsert({
-    advisor_id: advisorId,
-    week_start: weekStartISO,
-    data: dataObj
-  }, { onConflict: 'advisor_id,week_start' }).select('*').single();
-  if(!error){ ROTAS.set(`${advisorId}::${weekStartISO}`, data.data || {}); }
-}
-async function fetchRotasForWeek(weekStartISO){
-  if(!weekStartISO) return;
-  const { data } = await sb.from('rotas').select('advisor_id,week_start,data').eq('week_start', weekStartISO);
-  ROTAS.clear(); (data||[]).forEach(r=> ROTAS.set(`${r.advisor_id}::${weekStartISO}`, r.data || {}));
-}
-
-/* ===== Templates & UI helpers ===== */
-async function loadTemplates(){
-  const { data } = await sb.from('templates').select('*');
-  TEMPLATES = {}; (data||[]).forEach(t=> TEMPLATES[t.name] = {
-    name:t.name, work_code:t.work_code, start_time:t.start_time, finish_time:t.finish_time, break1:t.break1, lunch:t.lunch, break2:t.break2
-  });
-}
-
-/* Add buildRowsFrom helper */
-function buildRowsFrom(assignments,templates){
-  const rows=[];
-  (assignments||[]).forEach(a=>{
-    const t = (templates && (templates[a.templateName]||templates[a.templateId])) || a.template || {};
-    const s = t.startMin ?? t.start ?? 7*60;
-    const e = t.endMin   ?? t.end   ?? 16*60;
-    const non=[];
-    (t.breaks||[]).forEach(b=>non.push({type:'break',start:b.startMin??b.start??0,end:(b.startMin??b.start??0)+(b.dur??15)}));
-    if(t.lunch) non.push({type:'lunch',start:t.lunch.startMin??t.lunch.start??(12*60),end:(t.lunch.startMin??t.lunch.start??(12*60))+(t.lunch.dur??30)});
-    (a.meetings||[]).forEach(m=>non.push({type:'meeting',start:m.startMin??m.start,end:m.endMin??m.end}));
-    non.sort((x,y)=>x.start-y.start);
-    const segs=[]; let last=s;
-    non.forEach(n=>{ if(n.start>last) segs.push({type:'work',code:a.code,start:last,end:Math.min(n.start,e)});
-                     segs.push({type:n.type,code:n.code||n.type,start:Math.max(n.start,s),end:Math.min(n.end,e)});
-                     last=Math.max(last,n.end); });
-    if(last<e) segs.push({type:'work',code:a.code,start:last,end:e});
-    rows.push({name:a.name||a.advisorName||a.id,badge:a.badge||a.role||'',segments:segs});
-  });
-  return rows;
-}
-
-function refreshChips(){
-  const box=$('#activeChips'); box.innerHTML='';
-  if(!selectedAdvisors.size){ box.innerHTML='<span class="muted">No advisors selected.</span>'; return; }
-  [...selectedAdvisors].sort((a,b)=>a.localeCompare(b)).forEach(n=>{
-    const chip=document.createElement('span'); chip.className='chip'; chip.textContent=n;
-    const x=document.createElement('button'); x.textContent='×'; x.style.border='none'; x.style.background='transparent'; x.style.cursor='pointer';
-    x.onclick=()=>{ selectedAdvisors.delete(n); refreshChips(); rebuildTree(); populateAssignTable(); renderCalendar(); };
-    chip.appendChild(x); box.appendChild(chip);
-  });
-}
-function updateViewSelector(){
-  const team = $('#advisorSelect').value;
-  const showTeam = team==='__TEAM_SELECTED__' || team==='__TEAM_ALL__';
-  $('#lblTeamDay').style.display = showTeam ? 'inline' : 'none';
-  $('#teamDay').style.display     = showTeam ? 'inline' : 'none';
-}
-function setHours(){ $('#hours').innerHTML=hoursHTML(); }
-
-
-/* ===== Publish: target collection, confirmations & execution ===== */
-function collectPublishTargets(){
-  const ws = $('#weekStart').value;
-  const selVal = $('#advisorSelect').value;
-
-  // Team: Selected / All
-  if (selVal === '__TEAM_SELECTED__') {
-    return [...selectedAdvisors].map(name => ({ id: ADVISOR_BY_NAME.get(name), name, ws }));
-  }
-  if (selVal === '__TEAM_ALL__') {
-    return ADVISORS_LIST.map(a => ({ id: a.id, name: a.name, ws }));
-  }
-  // Single advisor
-
-  if (selVal && selVal.startsWith && selVal.startsWith('advisor::')){
-    const id = selVal.split('::')[1];
-    return [{ id, name: ADVISOR_BY_ID.get(id) || '', ws }];
-  }
-  // Fallback: if dropdown currently shows a raw name (legacy)
-  if (ADVISOR_BY_NAME.has(selVal)){
-    return [{ id: ADVISOR_BY_NAME.get(selVal), name: selVal, ws }];
-  }
-  return [];
-}
-
-// Returns true if OK to overwrite a specific day for that advisor
-async function confirmOverwriteDay(advisorId, ws, day, newValue){
-  const key = `${advisorId}::${ws}`;
-  const existing = ROTAS.get(key) || {};
-  const had = existing[day] !== undefined && existing[day] !== null && existing[day] !== '';
-  // If nothing set or identical, no need to confirm
-  const same = JSON.stringify(existing[day] || null) === JSON.stringify(newValue || null);
-  if (!had || same) return true;
-
-  return confirm(`You're about to overwrite ${ADVISOR_BY_ID.get(advisorId) || 'this advisor'} on ${day} for week ${ws}. Continue?`);
-}
-
-// Opens the publish dialog, listing who will be published
-function openPublishDialog(){
-  const targets = collectPublishTargets();
-  if (!targets.length){
-    alert('Select an advisor or team to publish.');
-    return;
-  }
-  const ws = $('#weekStart').value;
-  const dayMode = ($('#advisorSelect').value === '__TEAM_SELECTED__' || $('#advisorSelect').value === '__TEAM_ALL__');
-
-  $('#publishSummary').textContent = dayMode
-    ? `Publishing the selected day (${ $('#teamDay').value }) for ${targets.length} advisor(s), week starting ${ws}.`
-    : `Publishing the full week for ${targets.length} advisor(s), week starting ${ws}.`;
-
-  const ul = document.createElement('ul');
-  ul.style.margin = '6px 0 0 18px';
-  ul.style.padding = '0';
-  targets.forEach(t => {
-    const li = document.createElement('li');
-    li.textContent = t.name || t.id;
-    ul.appendChild(li);
-  });
-  const listBox = $('#publishList');
-  listBox.innerHTML = '';
-  listBox.appendChild(ul);
-
-  publishDlg.showModal();
-}
-
-// Performs the publish by upserting current working data
-async function doPublish(){
-  const targets = collectPublishTargets();
-  if (!targets.length){ publishDlg.close(); return; }
-
-  const ws = $('#weekStart').value;
-  const teamMode = ($('#advisorSelect').value === '__TEAM_SELECTED__' || $('#advisorSelect').value === '__TEAM_ALL__');
-  const teamDay = $('#teamDay').value;
-
-  let published = 0, skipped = 0;
-
-  for (const t of targets){
-    const key = `${t.id}::${ws}`;
-    const data = ROTAS.get(key) || {};  // Fix: Remove stray }
-
-    if (teamMode){
-      // Only publish the chosen day for each advisor
-      const newVal = data[teamDay] || null;
-      const ok = await confirmOverwriteDay(t.id, ws, teamDay, newVal);
-      if (!ok){ skipped++; continue; }
-      // Ensure object key exists even if day off
-      const fresh = Object.assign({}, data);
-      if (newVal === null || newVal === undefined) delete fresh[teamDay]; else fresh[teamDay] = newVal;
-      await upsertRota(t.id, ws, fresh);
-      published++;
-    } else {
-      // Full week for a single advisor (or explicit single-advisor selection)
-      // Confirm once per day that would be overwritten
-      let proceed = true;
-      for (const d of DAYS){
-        const ok = await confirmOverwriteDay(t.id, ws, d, data[d] || null);
-        if (!ok){ proceed = false; break; }
-      }
-      if (!proceed){ skipped++; continue; }
-      await upsertRota(t.id, ws, data);
-      published++;
-    }
-  }
-
-  publishDlg.close();
-  alert(`Publish complete. Updated: ${published}. Skipped: ${skipped}.`);
-}
-
-
-  /* ===== Wire buttons ===== */
-  function wire(){
-    // Publish button
-    $('#btnPublish').onclick = openPublishDialog;
-    $('#btnPrint').onclick=()=>window.print();
-    $('#btnGenerate').onclick=()=>{ updateRangeLabel(); renderCalendar(); };
-    $('#btnToday').onclick=()=>{ const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
-    $('#prevWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()-7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
-    $('#nextWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()+7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
-
-    $('#btnSave').onclick=()=>{ 
-      const exportObj = { org:ORG, templates:TEMPLATES, weekStart:$('#weekStart').value };
-      const blob=new Blob([JSON.stringify(exportObj,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota-export.json'; a.click();
-    };
-    $('#btnLoad').onclick=()=>$('#file').click();
-    $('#file').addEventListener('change',async e=>{
-      const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async ev=>{
-        try{
-          const data=JSON.parse(ev.target.result);
-          alert('Loaded JSON. This importer restores Templates locally; manage Sites/Leaders/Advisors in the Schedules panel.');
-          if(data.templates){
-            for(const t of Object.values(data.templates)){
-              await sb.from('templates').upsert({
-                name:t.name, work_code:t.work_code||'Admin',
-                start_time:t.start_time||null, finish_time:t.finish_time||null,
-                break1:t.break1||null, lunch:t.lunch||null, break2:t.break2||null
-              }, { onConflict:'name' });
-            }
-          }
-        }catch{ alert('Invalid JSON'); }
-      }; r.readAsText(f);
-    });
-
-    $('#btnReset').onclick=()=>{ if(!confirm('Clear only local cache (does not delete Supabase data)?')) return; ROTAS.clear(); sessionStorage.clear(); localStorage.clear(); location.reload(); };
-
-    // NEW: View change logic (supports leader picks)
-    $('#advisorSelect').addEventListener('change', ()=>{ 
-      const v = $('#advisorSelect').value;
-
-      if(v.startsWith && v.startsWith('leader::')){
-        const leaderId = v.split('::')[1];
-        const names = getLeaderTeamNames(leaderId);
-        selectedAdvisors = new Set(names);
-        refreshChips();
-        populateAssignTable();
-        $('#advisorSelect').value = '__TEAM_SELECTED__'; // switch to Team view
-      }
-
-      updateViewSelector();
-      updateRangeLabel();
-      renderCalendar();
-    });
-
-    $('#teamDay').addEventListener('change',()=>{ updateRangeLabel(); renderCalendar(); });
-    $('#weekStart').onchange=()=>{ updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
-
-    $('#treeSearch').addEventListener('input',rebuildTree);
-    $('#btnClearSel').onclick=()=>{ selectedAdvisors.clear(); rebuildTree(); refreshChips(); populateAssignTable(); renderCalendar(); };
-  }
-
-  /* ===== Realtime ===== */
-  function subscribeRealtime(){
-    sb.channel('any-changes')
-      .on('postgres_changes', { event:'*', schema:'public', table:'sites' },   ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
-      .on('postgres_changes', { event:'*', schema:'public', table:'leaders' }, ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
-      .on('postgres_changes', { event:'*', schema:'public', table:'advisors'}, ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
-      .on('postgres_changes', { event:'*', schema:'public', table:'templates'},()=> loadTemplates().then(()=>{ populateTemplateEditor(); renderCalendar(); }))
-      .on('postgres_changes', { event:'*', schema:'public', table:'rotas' },   ()=>{ 
-        const ws=$('#weekStart').value; fetchRotasForWeek(ws).then(()=>{ renderCalendar(); populateAssignTable(); });
-      })
-      .subscribe();
-  }
-
-  /* ===== INIT ===== */
-  (async function init(){
-    buildColorKey();
-    const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10);
-    setHours();
-    try{
-      await loadOrg();
-      await loadTemplates();
-      await fetchRotasForWeek($('#weekStart').value);
-    } catch(e){ console.warn(e); alert('Error loading initial data: '+e.message); }
-    rebuildAdvisorDropdown();
-    rebuildTree();
-    refreshChips();
-    populateTemplateEditor();
-    populateAssignTable();
-    updateRangeLabel();
-    renderCalendar();
-    wire();
-    subscribeRealtime();
-    // Publish dialog actions
-    $('#publishOK').onclick = doPublish;
-})();
-
-/* Generate button + initial header render */
-(function () {
+/* Wire up Generate button and initial render */
+(function(){
   const btn = document.getElementById('btnGenerate');
+  if(!btn || btn._plannerWired) return;
+  btn._plannerWired = true;
 
-  if (btn) {
-    btn.addEventListener('click', async () => {
-      try {
-        const templates =
-          typeof loadTemplates === 'function' ? await loadTemplates() : [];
+  btn.addEventListener('click', async () => {
+    try {
+      const templates = typeof loadTemplates === 'function' ? await loadTemplates() : [];
+      const assignments = typeof loadAssignments === 'function' ? await loadAssignments() : [];
+      const rows = typeof buildRowsFrom === 'function' ? buildRowsFrom(assignments, templates) : [];
 
-        const assignments =
-          typeof loadAssignments === 'function' ? await loadAssignments() : [];
-
-        const rows =
-          typeof buildRowsFrom === 'function'
-            ? buildRowsFrom(assignments, templates)
-            : [];
-
-        if (!rows || !rows.length) {
-          showInfo?.('Nothing to render for selected filter');
-          const c = document.getElementById('plannerBody');
-          if (c) c.innerHTML = '';
-          return;
-        }
-
-        renderPlanner(rows);
-        showInfo?.('Schedule generated.');
-      } catch (err) {
-        showError?.(`Generate failed: ${err?.message ?? err}`);
-        console.error(err);
+      if (!rows || !rows.length) {
+        showInfo?.('Nothing to render for selected filter');
+        const c = document.getElementById('plannerBody');
+        if (c) c.innerHTML = '';
+        return;
       }
-    });
-  }
 
-  // initial ticks
+      renderPlanner(rows);
+      showInfo?.('Schedule generated.');
+    } catch (err) {
+      showError?.(`Generate failed: ${err?.message ?? err}`);
+      console.error(err);
+    }
+  });
+
+  // Render time ticks on load so header is visible immediately
   renderTimeHeader?.(document.getElementById('timeHeader'));
 })();
 </script>
