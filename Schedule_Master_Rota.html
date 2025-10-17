@@ -1535,6 +1535,12 @@ async function doPublish(){
     populateAssignTable();
     updateRangeLabel();
     renderCalendar();
+    try {
+      const [templates, assignments] = await Promise.all([loadTemplates(), loadAssignments()]);
+      const rows = buildRowsFrom(assignments, templates);
+      renderTimeHeader(document.getElementById('timeHeader'));
+      renderPlanner(rows);
+    } catch(e) { console.warn('planner boot skipped', e); }
     wire();
     subscribeRealtime();
     // Publish dialog actions
@@ -1548,16 +1554,9 @@ async function doPublish(){
   if (btn) {
     btn.addEventListener('click', async () => {
       try {
-        const templates =
-          typeof loadTemplates === 'function' ? await loadTemplates() : [];
-
-        const assignments =
-          typeof loadAssignments === 'function' ? await loadAssignments() : [];
-
-        const rows =
-          typeof buildRowsFrom === 'function'
-            ? buildRowsFrom(assignments, templates)
-            : [];
+        const [templates, assignments] = await Promise.all([loadTemplates(), loadAssignments()]);
+        const rows = buildRowsFrom(assignments, templates);
+        renderTimeHeader(document.getElementById('timeHeader'));
 
         if (!rows || !rows.length) {
           showInfo?.('Nothing to render for selected filter');
