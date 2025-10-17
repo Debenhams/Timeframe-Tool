@@ -1211,7 +1211,7 @@ async function fetchRotasForWeek(weekStartISO){
   if(!weekStartISO) return;
   const { data } = await sb.from('rotas').select('advisor_id,week_start,data').eq('week_start', weekStartISO);
   ROTAS.clear(); (data||[]).forEach(r=> ROTAS.set(`${r.advisor_id}::${weekStartISO}`, r.data || {}));
-}
+ }
 
 /* ===== Templates & UI helpers ===== */
 async function loadTemplates(){
@@ -1228,15 +1228,13 @@ function buildRowsFrom(assignments, templates){
   const templateMap = (templates && typeof templates === 'object')
     ? templates
     : (typeof TEMPLATES === 'object' ? TEMPLATES : {});
-
   for (const a of data){
     if (!a) continue;
     const templateKey = a.templateName ?? a.template_id ?? a.templateId ?? a.template?.name;
     const tmpl = templateKey != null ? (templateMap[templateKey] ?? a.template) : (a.template ?? null);
     if (!tmpl) continue;
-
     const start = toMin(tmpl.start_time);
-    const end = toMin(tmpl.finish_time);
+    const end   = toMin(tmpl.finish_time);
     if (start == null || end == null || end <= start) continue;
 
     const stops = [];
@@ -1246,11 +1244,9 @@ function buildRowsFrom(assignments, templates){
         stops.push({ minute, type, payload });
       }
     };
-
     addStop(tmpl.break1, 'break');
     addStop(tmpl.lunch, 'lunch');
     addStop(tmpl.break2, 'break');
-
     if (Array.isArray(a.meetings)){
       for (const meeting of a.meetings){
         const ms = toMin(meeting?.start);
@@ -1261,24 +1257,19 @@ function buildRowsFrom(assignments, templates){
         }
       }
     }
-
     stops.sort((x,y)=>x.minute - y.minute);
 
     const workCode = tmpl.work_code || a.work_code || a.code || '';
     const segments = [];
-    const pushWork = (s,e)=>{
-      if (e > s){
-        segments.push({ type: 'work', start: s, end: e, code: workCode });
-      }
-    };
+    const pushWork = (s,e)=>{ if (e > s) segments.push({ type:'work', start:s, end:e, code:workCode }); };
 
     const meetings = [];
-    for (let i = 0; i < stops.length; i++){
+    for (let i=0;i<stops.length;i++){
       const entry = stops[i];
       if (entry.type === 'meeting-start'){
         const startMinute = entry.minute;
         let endMinute = null;
-        for (let j = i + 1; j < stops.length; j++){
+        for (let j=i+1;j<stops.length;j++){
           if (stops[j].type === 'meeting-end' && stops[j].payload === entry.payload){
             endMinute = stops[j].minute;
             stops.splice(j,1);
@@ -1286,51 +1277,30 @@ function buildRowsFrom(assignments, templates){
           }
         }
         if (endMinute != null && endMinute > startMinute){
-          meetings.push({
-            type: 'meeting',
-            start: startMinute,
-            end: endMinute,
-            code: entry.payload?.code || entry.payload?.title || 'Meeting'
-          });
+          meetings.push({ type:'meeting', start:startMinute, end:endMinute, code: entry.payload?.code || entry.payload?.title || 'Meeting' });
         }
       }
     }
 
     const nonWork = [];
-    const blockFor = (minute, type)=>{
+    const blockFor = (minute,type)=>{
       const duration = type === 'lunch' ? 30 : 15;
-      return {
-        type,
-        start: minute,
-        end: Math.min(end, minute + duration),
-        code: type === 'lunch' ? 'Lunch' : 'Break'
-      };
+      return { type, start: minute, end: Math.min(end, minute + duration), code: type === 'lunch' ? 'Lunch' : 'Break' };
     };
-
     for (const entry of stops){
-      if (entry.type === 'break' || entry.type === 'lunch'){
-        nonWork.push(blockFor(entry.minute, entry.type));
-      }
+      if (entry.type === 'break' || entry.type === 'lunch') nonWork.push(blockFor(entry.minute, entry.type));
     }
     for (const meeting of meetings){
-      nonWork.push({
-        type: 'meeting',
-        start: Math.max(start, meeting.start),
-        end: Math.min(end, meeting.end),
-        code: meeting.code || 'Meeting'
-      });
+      nonWork.push({ type:'meeting', start: Math.max(start, meeting.start), end: Math.min(end, meeting.end), code: meeting.code || 'Meeting' });
     }
-
-    nonWork.sort((a,b)=>a.start - b.start);
+    nonWork.sort((a,b)=>a.start-b.start);
 
     let cursor = start;
     for (const block of nonWork){
       const blockStart = Math.max(start, block.start);
-      const blockEnd = Math.min(end, block.end);
+      const blockEnd   = Math.min(end, block.end);
       if (blockEnd <= blockStart) continue;
-      if (blockStart > cursor){
-        pushWork(cursor, blockStart);
-      }
+      if (blockStart > cursor) pushWork(cursor, blockStart);
       segments.push({
         type: block.type === 'break' ? 'break' : block.type,
         start: blockStart,
@@ -1339,16 +1309,10 @@ function buildRowsFrom(assignments, templates){
       });
       cursor = Math.max(cursor, blockEnd);
     }
-
     pushWork(cursor, end);
 
-    rows.push({
-      name: a.name || a.advisorName || a.id || 'Advisor',
-      badge: a.badge || a.teamTag || a.role || '',
-      segments
-    });
+    rows.push({ name: a.name || a.advisorName || a.id || 'Advisor', badge: a.badge || a.teamTag || a.role || '', segments });
   }
-
   return rows;
 }
 
