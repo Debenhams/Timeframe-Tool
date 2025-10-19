@@ -135,8 +135,17 @@
         const aId = ADVISOR_BY_NAME.get(name);
         if (!aId) continue;
 
-        const key = `${aId}::${ws}`;
-        const weekData = ROTAS.get(key) || {};
+        // tolerate different ROTAS key formats
+const key1 = `${aId}::${ws}`;
+const key2 = `${aId}:${ws}`;
+const key3 = `${aId}|${ws}`;
+const weekData =
+  (window.ROTAS &&
+    (ROTAS.get?.(key1) ||
+     ROTAS.get?.(key2) ||
+     ROTAS.get?.(key3) ||
+     ROTAS.get?.(aId)      // some datasets store by advisor only
+    )) || {};
         const dayVal = weekData[dayName];
         let segs = [];
 
