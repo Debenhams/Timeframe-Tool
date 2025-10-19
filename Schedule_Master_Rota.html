@@ -265,18 +265,7 @@ function codeSelectGroupedHTML(val=''){
     `<optgroup label="${grp}">${codes.map(c=>`<option ${val===c?'selected':''}>${c}</option>`).join('')}</optgroup>`
   ).join('');
 }
-function classForCode(code){
-  const k=(code||'').toLowerCase();
-  if(/\blunch\b/.test(k)) return 'c-lunch';
-  if(/\bbreak\b/.test(k)) return 'c-break';
-  if(/\bovertime\b/.test(k)) return 'c-overtime';
-  if(/\bmirakl\b/.test(k)) return 'c-mirakl';
-  if(/\bsocial\b/.test(k)) return 'c-social';
-  if(/\bemail\b/.test(k)) return 'c-email';
-  if(['al','sick','rdo','maternity','lts','split shift'].some(w=>k.includes(w))) return 'c-absence';
-  if(['121','atl','coaching','huddle','iti','projects','team meeting','training'].some(w=>k.includes(w))) return 'c-shrink';
-  return 'c-email';
-}
+
 
 /* ===== Templates UI ===== */
 function templateRow(t){

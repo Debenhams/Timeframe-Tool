@@ -20,6 +20,25 @@
     return ((mins - DAY_START) / SPAN) * 100;
   }
 
+  // --- classForCode moved from HTML (guarded) ---
+if (typeof window.classForCode !== 'function') {
+  window.classForCode = function classForCode(code) {
+    const k = (code || '').toLowerCase();
+    if (/\blunch\b/.test(k)) return 'c-lunch';
+    if (/\bbreak\b/.test(k)) return 'c-break';
+    if (/\bovertime\b/.test(k)) return 'c-overtime';
+    if (/\bmirakl\b/.test(k)) return 'c-mirakl';
+    if (/\bsocial\b/.test(k)) return 'c-social';
+    if (/\bemail\b/.test(k)) return 'c-email';
+    if (/\b121\b/.test(k) || /\batl\b/.test(k) ||
+        /\bcoaching\b/.test(k) || /\bhuddle\b/.test(k) ||
+        /\biti\b/.test(k) || /\bprojects\b/.test(k) ||
+        /\bteam\b/.test(k) || /\bmeeting\b/.test(k) ||
+        /\btraining\b/.test(k))
+      return 'c-email';
+    return 'c-email';
+  };
+}
   // match existing colour classes
   function classFor(code) {
     const k = String(code || "").toLowerCase();
