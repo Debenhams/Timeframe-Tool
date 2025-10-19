@@ -42,4 +42,51 @@
       if (typeof window.initPlanner === "function") window.initPlanner();
     });
   }
+  // --- SAFE BOOT (runs once when DOM is ready) ---
+const boot = async () => {
+  try {
+    // Load data (only if those helpers exist)
+    if (typeof loadOrg === "function") await loadOrg();
+    if (typeof loadTemplates === "function") await loadTemplates();
+    if (typeof loadAssignments === "function") await loadAssignments();
+
+    // Rebuild UI bits (only if they exist)
+    if (typeof rebuildAdvisorDropdown === "function") rebuildAdvisorDropdown();
+    if (typeof rebuildTree === "function") rebuildTree();
+    if (typeof refreshChips === "function") refreshChips();
+    if (typeof populateTemplateEditor === "function") populateTemplateEditor();
+    if (typeof populateAssignTable === "function") populateAssignTable();
+    if (typeof updateRangeLabel === "function") updateRangeLabel();
+    if (typeof renderCalendar === "function") renderCalendar();
+
+    // Initial header ticks + initial render (only if helpers exist)
+    const headerEl = document.getElementById("timeHeader");
+    if (headerEl && typeof window.renderTimeHeader === "function") {
+      window.renderTimeHeader(headerEl);
+    }
+
+    const rows =
+      typeof window.computePlannerRowsFromState === "function"
+        ? window.computePlannerRowsFromState()
+        : [];
+
+    if (typeof window.renderPlanner === "function") {
+      window.renderPlanner(rows);
+    }
+  } catch (e) {
+    console.warn("planner boot skipped", e);
+  }
+
+  // Realtime subscriptions if available
+  if (typeof window.subscribeRealtime === "function") {
+    window.subscribeRealtime();
+  }
+};
+
+// Run once when DOM is ready
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", boot, { once: true });
+} else {
+  boot();
+}
 })();
