@@ -1,0 +1,88 @@
+/* === Planner layout (external overrides) === */
+/* Make the horizontal planner use the full page width and keep rows tidy */
+
+.planner{
+  width:100%;
+  max-width:100%;
+  margin:0;
+  padding:0;
+  background: var(--paper);
+  border:none;
+  border-radius:0;
+}
+
+/* Header + body stretch edge-to-edge: name column + timeline */
+.planner__header,
+.planner__body{
+  display:grid;
+  grid-template-columns: var(--name-w,260px) 1fr;
+  gap:0;
+  width:100%;
+}
+
+/* Header styling keeps the sticky bar tidy */
+.planner__header{
+  position:sticky;
+  top:0;
+  z-index:2;
+  background:#f6f8fb;
+  border-bottom:1px solid var(--line);
+}
+
+/* Name cells */
+.planner__col--name,
+.planner__name{
+  width:var(--name-w,260px);
+  min-width:var(--name-w,260px);
+  padding:8px 10px;
+  border-right:1px solid var(--line);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  font-weight:600;
+}
+
+/* Time header (ticks) should fill the timeline area */
+#timeHeader{
+  width:100%;
+  overflow-x:hidden;
+}
+
+/* Planner scroll container (vertical scroll inside, horizontal if needed) */
+#plannerBody{
+  width:100%;
+  max-height:64vh;          /* keeps it visible without huge page scroll */
+  overflow:auto;            /* vertical + horizontal as needed */
+}
+
+/* Each data row = name + timeline */
+.planner__row{
+  display:grid;
+  grid-template-columns: var(--name-w,260px) 1fr;
+  align-items:center;
+  height:44px;
+  border-bottom:1px solid #f0f2f7;
+}
+.planner__row:nth-child(odd){ background:#fbfdff; }
+
+/* Timeline track shows subtle hourly grid */
+.planner__timeline{
+  position:relative;
+  height:44px;
+  background: linear-gradient(#f6f8fb 1px, transparent 1px) 0 0 / 60px 44px;
+}
+
+/* Bars stay the same size/feel */
+.planner__bar{
+  position:absolute;
+  top:12px;
+  height:20px;
+  border-radius:3px;
+  opacity:.95;
+  cursor:pointer;
+  transition:opacity .15s;
+}
+.planner__bar:hover{ opacity:1; }
+
+/* Optional: make page background white so the “grey margins” vanish */
+body{ background:#fff; }
