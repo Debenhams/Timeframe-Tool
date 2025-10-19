@@ -1150,42 +1150,10 @@ async function doPublish(){
 })();
 
 /* Generate button + initial header render */
-(function () {
-  const btn = document.getElementById('btnGenerate');
 
-  if (btn) {
-    btn.addEventListener('click', async () => {
-      try {
-        const templates =
-          typeof loadTemplates === 'function' ? await loadTemplates() : [];
-
-        const assignments =
-          typeof loadAssignments === 'function' ? await loadAssignments() : [];
-
-        const rows =
-          typeof buildRowsFrom === 'function'
-            ? buildRowsFrom(assignments, templates)
-            : [];
-
-        if (!rows || !rows.length) {
-          showInfo?.('Nothing to render for selected filter');
-          const c = document.getElementById('plannerBody');
-          if (c) c.innerHTML = '';
-          return;
-        }
-
-        renderPlanner(rows);
-        showInfo?.('Schedule generated.');
-      } catch (err) {
-        showError?.(`Generate failed: ${err?.message ?? err}`);
-        console.error(err);
-      }
-    });
-  }
 
   // initial ticks
-  renderTimeHeader?.(document.getElementById('timeHeader'));
-})();
+  
 /* ==== HORIZONTAL PLANNER: state → rows + renderer (INSERT-ONLY) ==== */
 if (typeof window.computePlannerRowsFromState !== 'function') {
   window.computePlannerRowsFromState = function computePlannerRowsFromState() {
