@@ -86,14 +86,15 @@
     });
   }
   // --- SAFE BOOT (runs once when DOM is ready) ---
+// --- SAFE BOOT (restored clean version) ---
 const boot = async () => {
   try {
-    // Load data (only if those helpers exist)
+    // Load data (only if helpers exist)
     if (typeof loadOrg === "function") await loadOrg();
     if (typeof loadTemplates === "function") await loadTemplates();
     if (typeof loadAssignments === "function") await loadAssignments();
 
-    // Rebuild UI bits (only if they exist)
+    // Rebuild UI components
     if (typeof rebuildAdvisorDropdown === "function") rebuildAdvisorDropdown();
     if (typeof rebuildTree === "function") rebuildTree();
     if (typeof refreshChips === "function") refreshChips();
@@ -102,12 +103,13 @@ const boot = async () => {
     if (typeof updateRangeLabel === "function") updateRangeLabel();
     if (typeof renderCalendar === "function") renderCalendar();
 
-    // Initial header ticks + initial render (only if helpers exist)
+    // Draw header timeline
     const headerEl = document.getElementById("timeHeader");
     if (headerEl && typeof window.renderTimeHeader === "function") {
       window.renderTimeHeader(headerEl);
     }
 
+    // Compute and render rows
     const rows =
       typeof window.computePlannerRowsFromState === "function"
         ? window.computePlannerRowsFromState()
@@ -116,14 +118,39 @@ const boot = async () => {
     if (typeof window.renderPlanner === "function") {
       window.renderPlanner(rows);
     }
+
+    // Restore vertical view rendering (Advisor Week)
     if (typeof window.renderAdvisorWeek === "function") {
       window.renderAdvisorWeek(rows);
+    }
+
+    // Hook up top dropdown auto-load
+    const viewDropdown = document.getElementById("viewSelect");
+    if (viewDropdown) {
+      viewDropdown.addEventListener("change", () => {
+        if (typeof rebuildAdvisorDropdown === "function")
+          rebuildAdvisorDropdown();
+        if (typeof updateRangeLabel === "function") updateRangeLabel();
+        if (typeof renderCalendar === "function") renderCalendar();
+        if (typeof window.renderPlanner === "function")
+          window.renderPlanner(
+            window.computePlannerRowsFromState
+              ? window.computePlannerRowsFromState()
+              : []
+          );
+        if (typeof window.renderAdvisorWeek === "function")
+          window.renderAdvisorWeek(
+            window.computePlannerRowsFromState
+              ? window.computePlannerRowsFromState()
+              : []
+          );
+      });
     }
   } catch (e) {
     console.warn("planner boot skipped", e);
   }
 
-  // Realtime subscriptions if available
+  // Real-time subscriptions if available
   if (typeof window.subscribeRealtime === "function") {
     window.subscribeRealtime();
   }
