@@ -23,11 +23,92 @@
     if (el.dataset) el.dataset[flag] = "1";
   }
 
-  // ---- sources that should trigger a refresh ----
+  // ---- keep selectedAdvisors usable ----
+  if (!("selectedAdvisors" in window)) {
+    window.selectedAdvisors = new Set(); // names
+  } else if (!(window.selectedAdvisors instanceof Set)) {
+    window.selectedAdvisors = new Set(window.selectedAdvisors || []);
+  }
+
+  // ---- TOP DROPDOWN: build selection + refresh (ID = #advisorSelect) ----
+  function wireAdvisorSelect() {
+    const sel = document.getElementById("advisorSelect");
+    if (!sel) return;
+
+    wireOnce(sel, "change", (evt) => {
+      const val = evt.target.value || "";
+
+      // helper: best-effort resolve a single name by advisor id
+      const nameForId = (id) => {
+        if (id && typeof window.ADVISOR_BY_ID === "object") {
+          return window.ADVISOR_BY_ID.get?.(id) || window.ADVISOR_BY_ID[id];
+        }
+        if (Array.isArray(window.ADVISORS_LIST)) {
+          const hit = window.ADVISORS_LIST.find(a => String(a.id) === String(id));
+          return hit?.name;
+        }
+        return undefined;
+      };
+
+      // helper: best-effort resolve team names by leader id
+      const namesForLeader = (leaderId) => {
+        if (typeof window.getLeaderTeamNames === "function") {
+          return window.getLeaderTeamNames(leaderId) || [];
+        }
+        if (window.LEADER_TEAMS && typeof window.LEADER_TEAMS.get === "function") {
+          return window.LEADER_TEAMS.get(leaderId) || [];
+        }
+        if (Array.isArray(window.ADVISORS_LIST)) {
+          return window.ADVISORS_LIST
+            .filter(a => String(a.leaderId) === String(leaderId))
+            .map(a => a.name);
+        }
+        return [];
+      };
+
+      let changed = false;
+
+      if (val.startsWith("leader::")) {
+        const id = val.split("::")[1];
+        const names = namesForLeader(id);
+        if (names.length) {
+          window.selectedAdvisors = new Set(names);
+          changed = true;
+        }
+      } else if (val === "__TEAM_ALL__") {
+        if (Array.isArray(window.ADVISORS_LIST)) {
+          window.selectedAdvisors = new Set(window.ADVISORS_LIST.map(a => a.name));
+          changed = true;
+        }
+      } else if (val.startsWith("advisor::")) {
+        const id = val.split("::")[1];
+        const nm = nameForId(id);
+        if (nm) {
+          window.selectedAdvisors = new Set([nm]);
+          changed = true;
+        }
+      } else if (window.ADVISOR_BY_NAME?.has?.(val)) {
+        window.selectedAdvisors = new Set([val]);
+        changed = true;
+      }
+
+      // optional UI hooks (if present)
+      if (changed) {
+        if (typeof window.refreshChips === "function") window.refreshChips();
+        if (typeof window.populateAssignTable === "function") window.populateAssignTable();
+        if (typeof window.updateRangeLabel === "function") window.updateRangeLabel();
+        if (typeof window.renderCalendar === "function") window.renderCalendar();
+      }
+
+      refreshPlannerUI();
+    });
+  }
+
+  // ---- other sources that should trigger a refresh ----
   function wirePlannerRefreshSources() {
     // week/day controls
     wireOnce(document.getElementById("weekStart"), "change", refreshPlannerUI);
-    wireOnce(document.getElementById("teamDay"), "change", refreshPlannerUI);
+    wireOnce(document.getElementById("teamDay"),   "change", refreshPlannerUI);
 
     // right panel tree / checkbox list (try several known selectors)
     const candidates = [
@@ -37,7 +118,7 @@
       ".advisor-tree",
       "[data-role='advisor-tree']",
       "[data-tree-panel]",
-      ".schedules-panel"
+      ".schedules-panel",
     ];
     for (const sel of candidates) {
       const el = document.querySelector(sel);
@@ -46,79 +127,18 @@
     }
   }
 
-  // ---- top view dropdown (Leader/Team) drives selection + refresh ----
-  function wireTopViewDropdown() {
-    const viewDropdown =
-      document.querySelector("[data-master-view-dropdown]") ||
-      document.getElementById("viewSelect") ||
-      document.getElementById("viewLeaderTeam") ||
-      document.querySelector('select[name="viewLeaderTeam"]');
-
-    if (!viewDropdown) return;
-
-    wireOnce(
-      viewDropdown,
-      "change",
-      (evt) => {
-        const opt = evt.target.selectedOptions?.[0];
-        const val = opt?.value ?? evt.target.value;
-
-        // Optional app hooks (only if present)
-        if (typeof window.onMasterSelectionChange === "function") {
-          window.onMasterSelectionChange(val, opt);
-        }
-        if (typeof window.setActiveMasterAssignment === "function") {
-          window.setActiveMasterAssignment(val, opt);
-        }
-        if (typeof window.renderMasterAssignment === "function") {
-          window.renderMasterAssignment(val, opt);
-        }
-        if (typeof window.loadMasterAssignment === "function") {
-          window.loadMasterAssignment(val, opt);
-        }
-
-        // Try to mirror old behavior by “clicking” matching item in right panel
-        const lookupId =
-          opt?.dataset?.leaderId ||
-          opt?.dataset?.teamId ||
-          opt?.dataset?.assignmentId ||
-          val;
-
-        if (lookupId) {
-          const targetEl =
-            document.querySelector(`[data-leader-id="${lookupId}"]`) ||
-            document.querySelector(`[data-team-id="${lookupId}"]`) ||
-            document.querySelector(`[data-assignment-id="${lookupId}"]`);
-          if (targetEl) {
-            targetEl.dispatchEvent(
-              new MouseEvent("click", { bubbles: true, cancelable: true })
-            );
-          }
-        }
-
-        refreshPlannerUI();
-      },
-      "_wired_change"
-    );
-  }
-
   // ---- Generate button: recompute & render ----
   function wireGenerateButton() {
     const btn = document.getElementById("btnGenerate");
     if (!btn) return;
-    wireOnce(
-      btn,
-      "click",
-      async () => {
-        try {
-          refreshPlannerUI();
-          console.log("Schedule generated.");
-        } catch (err) {
-          console.error("Generate failed:", err);
-        }
-      },
-      "_wired_click"
-    );
+    wireOnce(btn, "click", async () => {
+      try {
+        refreshPlannerUI();
+        console.log("Schedule generated.");
+      } catch (err) {
+        console.error("Generate failed:", err);
+      }
+    });
   }
 
   // ---- SAFE BOOT ----
@@ -138,14 +158,25 @@
       if (typeof updateRangeLabel === "function")       updateRangeLabel();
       if (typeof renderCalendar === "function")         renderCalendar();
 
-      // Time header
+      // Time header (horizontal view)
       const headerEl = document.getElementById("timeHeader");
       if (headerEl && typeof window.renderTimeHeader === "function") {
         window.renderTimeHeader(headerEl);
       }
 
-      // Initial render
+      // Wire interactions
+      wireAdvisorSelect();
+      wireGenerateButton();
+      wirePlannerRefreshSources();
+
+      // Kick an initial compute+render
       refreshPlannerUI();
+
+      // If the top dropdown already has a value, trigger its change once
+      const sel = document.getElementById("advisorSelect");
+      if (sel && sel.value) {
+        sel.dispatchEvent(new Event("change", { bubbles: true }));
+      }
     } catch (e) {
       console.warn("planner boot skipped", e);
     }
@@ -154,11 +185,6 @@
     if (typeof window.subscribeRealtime === "function") {
       window.subscribeRealtime();
     }
-
-    // Wire interactions
-    wireGenerateButton();
-    wireTopViewDropdown();
-    wirePlannerRefreshSources();
   };
 
   // Run once when DOM is ready
