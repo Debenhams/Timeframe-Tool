@@ -1288,20 +1288,7 @@ if (typeof window.renderPlanner !== 'function') {
     }
   };
 }
-if (typeof window.renderTimeHeader !== 'function') {
-  window.renderTimeHeader = function renderTimeHeader(el){
-    if(!el) return; el.innerHTML='';
-    const wrap = document.createElement('div'); wrap.className='time-scale';
-    const DAY_START=6*60, DAY_END=20*60;
-    for(let m=DAY_START;m<=DAY_END;m+=60){
-      const t=document.createElement('div'); t.className='tick';
-      t.style.left=`${((m-DAY_START)/(DAY_END-DAY_START))*100}%`;
-      const h=Math.floor(m/60), mm=String(m%60).padStart(2,'0'); t.textContent=`${h}:${mm}`;
-      wrap.appendChild(t);
-    }
-    el.appendChild(wrap);
-  };
-}
+
   </script>
   <!-- Split JS (placeholders for now) -->
 <script defer src="./src/planner.js"></script>
