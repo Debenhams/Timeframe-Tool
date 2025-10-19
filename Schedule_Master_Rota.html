@@ -1253,40 +1253,7 @@ if (typeof window.computePlannerRowsFromState !== 'function') {
   };
 }
 if (typeof window.renderPlanner !== 'function') {
-  window.renderPlanner = function renderPlanner(rows) {
-    try {
-      const body = document.getElementById('plannerBody');
-      if (!body) return;
-      body.innerHTML = '';
-      const DAY_START = 6 * 60, DAY_END = 20 * 60, SPAN = DAY_END - DAY_START;
-      const pct = m => (m - DAY_START) / SPAN * 100;
-      rows.forEach(r => {
-        const row = document.createElement('div');
-        row.className = 'planner__row';
-        const left = document.createElement('div');
-        left.className = 'planner__name';
-        left.textContent = r.name;
-        row.appendChild(left);
-        const tl = document.createElement('div');
-        tl.className = 'planner__timeline';
-        r.segments.forEach(s => {
-          const bar = document.createElement('div');
-          bar.className = 'planner__bar ' + (s.type === 'work'
-            ? (classForCode(s.code) || 'c-email')
-            : s.type === 'lunch' ? 'c-lunch' : s.type === 'break' ? 'c-break' : 'c-email');
-          bar.style.left  = Math.max(0, pct(s.start)) + '%';
-          bar.style.width = Math.max(0, pct(s.end) - pct(s.start)) + '%';
-          bar.title = `${s.code} ${m2t(s.start)}–${m2t(s.end)}`;
-          tl.appendChild(bar);
-        });
-        row.appendChild(tl);
-        body.appendChild(row);
-      });
-      console.log('renderPlanner rows=', Array.isArray(rows)? rows.length : rows);
-    } catch (e) {
-      console.warn('renderPlanner error', e);
-    }
-  };
+  
 }
 
   </script>
