@@ -216,6 +216,49 @@
   /* Hide old palette panel */
   .colours-card,.palette,.color-panel{display:none!important}
 
+  /* Ensure planner spans full width */
+  .planner {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    background: var(--paper);
+    border: none;
+  }
+  /* Header and body stretch evenly */
+  .planner__header,
+  .planner__body {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  /* Time header uses full space */
+  #timeHeader {
+    width: 100%;
+    overflow-x: hidden;
+  }
+  /* Bars container */
+  #plannerBody {
+    width: 100%;
+    overflow-x: auto;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+  }
+  /* Each bar row spans correctly */
+  .planner__row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    margin: 0;
+  }
+  /* Optional: cleaner background */
+  body {
+    background-color: #ffffff;
+  }
+
 </style>
 
 <!-- Supabase client library -->
