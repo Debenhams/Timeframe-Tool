@@ -24,12 +24,55 @@
             if (typeof window.renderPlanner === "function") {
               window.renderPlanner(rows);
             }
+            if (typeof window.renderAdvisorWeek === "function") {
+              window.renderAdvisorWeek(rows);
+            }
             console.log("Schedule generated.");
           } catch (err) {
             console.error("Generate failed:", err);
           }
         });
         btn.dataset._wired = "1";
+      }
+      const viewDropdown =
+        document.querySelector('[data-master-view-dropdown]') ||
+        document.getElementById("viewLeaderTeam") ||
+        document.querySelector('select[name="viewLeaderTeam"]');
+      if (viewDropdown && !viewDropdown.dataset._wired) {
+        viewDropdown.addEventListener("change", (evt) => {
+          const selectedOption = evt.target.selectedOptions?.[0];
+          const selectedValue = selectedOption?.value ?? evt.target.value;
+          if (typeof window.onMasterSelectionChange === "function") {
+            window.onMasterSelectionChange(selectedValue, selectedOption);
+          }
+          if (typeof window.setActiveMasterAssignment === "function") {
+            window.setActiveMasterAssignment(selectedValue, selectedOption);
+          }
+          if (typeof window.renderMasterAssignment === "function") {
+            window.renderMasterAssignment(selectedValue, selectedOption);
+          }
+          if (typeof window.loadMasterAssignment === "function") {
+            window.loadMasterAssignment(selectedValue, selectedOption);
+          }
+          const lookupId =
+            selectedOption?.dataset?.leaderId ||
+            selectedOption?.dataset?.teamId ||
+            selectedOption?.dataset?.assignmentId ||
+            selectedValue;
+          if (lookupId) {
+            const targetEl =
+              document.querySelector(`[data-leader-id="${lookupId}"]`) ||
+              document.querySelector(`[data-team-id="${lookupId}"]`) ||
+              document.querySelector(`[data-assignment-id="${lookupId}"]`);
+            if (targetEl) {
+              targetEl.dispatchEvent(
+                new MouseEvent("click", { bubbles: true, cancelable: true })
+              );
+            }
+          }
+        });
+        viewDropdown.dataset._wired = "1";
+        viewDropdown.dispatchEvent(new Event("change", { bubbles: true }));
       }
     };
   }
@@ -72,6 +115,9 @@ const boot = async () => {
 
     if (typeof window.renderPlanner === "function") {
       window.renderPlanner(rows);
+    }
+    if (typeof window.renderAdvisorWeek === "function") {
+      window.renderAdvisorWeek(rows);
     }
   } catch (e) {
     console.warn("planner boot skipped", e);
