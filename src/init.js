@@ -1,60 +1,17 @@
 // src/init.js
 (() => {
-  // -----------------------
-  // Template builder (from Settings/Templates UI)
-  // -----------------------
-  function buildTemplatesFromUI() {
-    const root = document.getElementById('settingsBox') || document;
-    const editor = root.querySelector('#templateEditor') || root;
-
-    const cards = Array.from(
-      editor.querySelectorAll(
-        '[data-template-card], .template-card, .tpl, .row, .panel-body > div, #templateEditor > div'
-      )
-    ).filter(el => el.querySelector('input[type="time"]'));
-
-    const map = {};
-    cards.forEach(card => {
-      const nameEl =
-        card.querySelector('input[type="text"]') ||
-        card.querySelector('[data-name]') ||
-        card.querySelector('.tpl-name');
-
-      const name = (nameEl?.value || nameEl?.textContent || '').trim();
-      if (!name) return;
-
-      const codeEl =
-        card.querySelector('input[placeholder="New code"]') ||
-        card.querySelector('input[name="code"]') ||
-        card.querySelector('[data-code]');
-
-      const times = Array.from(card.querySelectorAll('input[type="time"]'))
-        .map(i => i.value?.trim())
-        .filter(Boolean);
-
-      const [start_time, finish_time, break1, lunch, break2] = times;
-
-      map[name] = {
-        start_time,
-        finish_time,
-        break1,
-        lunch,
-        break2,
-        work_code: (codeEl?.value || codeEl?.textContent || name || 'Admin').trim()
-      };
-    });
-
-    window.TEMPLATES = map;
-    return map;
+  // ------------------------------
+  // Utilities
+  // ------------------------------
+  function wireOnce(el, ev, handler, flag = `_wired_${ev}`) {
+    if (!el) return;
+    if (el.dataset && el.dataset[flag]) return;
+    el.addEventListener(ev, handler);
+    if (el.dataset) el.dataset[flag] = "1";
   }
 
-  // Recompute and render both views
+  // Recompute + render both views
   function refreshPlannerUI() {
-    // Ensure templates exist before building rows
-    if (!window.TEMPLATES || !Object.keys(window.TEMPLATES).length) {
-      buildTemplatesFromUI();
-    }
-
     const rows =
       typeof window.computePlannerRowsFromState === "function"
         ? window.computePlannerRowsFromState()
@@ -68,56 +25,144 @@
     }
   }
 
-  // One-time wiring helper
-  function wireOnce(el, ev, handler, flag = `_wired_${ev}`) {
+  // Make sure weekStart always has a Monday ISO date
+  function setMondayIfEmpty() {
+    const el = document.getElementById("weekStart");
     if (!el) return;
-    if (el.dataset && el.dataset[flag]) return;
-    el.addEventListener(ev, handler);
-    if (el.dataset) el.dataset[flag] = "1";
-  }
-
-  // Rebuild templates whenever the template editor changes
-  function wireTemplateEditor() {
-    const root = document.getElementById('settingsBox') || document;
-    const editor = root.querySelector('#templateEditor') || root;
-    const targets = [
-      editor,
-      ...editor.querySelectorAll('input[type="text"], input[type="time"], [data-code], [data-name]')
-    ];
-    targets.forEach(t => {
-      wireOnce(t, 'change', () => { buildTemplatesFromUI(); refreshPlannerUI(); });
-      wireOnce(t, 'input',  () => { buildTemplatesFromUI(); });
-    });
-  }
-
-  // Sources that should trigger a refresh
-  function wirePlannerRefreshSources() {
-    wireOnce(document.getElementById("weekStart"), "change", refreshPlannerUI);
-    wireOnce(document.getElementById("teamDay"), "change", refreshPlannerUI);
-    const candidates = [
-      "#advisorTree",
-      "#treePanel",
-      "[data-tree-root]",
-      ".advisor-tree",
-      "[data-role='advisor-tree']",
-      "[data-tree-panel]",
-      ".schedules-panel"
-    ];
-    for (const sel of candidates) {
-      const el = document.querySelector(sel);
-      wireOnce(el, "change", refreshPlannerUI, "_wired_change_refresh");
-      wireOnce(el, "click",  refreshPlannerUI, "_wired_click_refresh");
+    if (!el.value) {
+      const d = new Date();
+      const dow = (d.getDay() + 6) % 7; // Monday = 0
+      d.setDate(d.getDate() - dow);
+      el.value = d.toISOString().slice(0, 10);
+      el.dispatchEvent(new Event("change", { bubbles: true }));
     }
   }
 
-  // Top view dropdown (Leader/Team)
+  // ------------------------------
+  // Build advisor indexes from the Master Assignment table
+  // ------------------------------
+  function rebuildAdvisorIndexesFromTable() {
+    const table = document.getElementById("assignTable");
+    if (!table) return;
+
+    const names = Array.from(table.querySelectorAll("tbody tr"))
+      .map((tr) => (tr.querySelector("th,td")?.textContent || "").trim())
+      .filter(Boolean);
+
+    // Use the visible name as the stable ID (works for the in-page planner)
+    window.ADVISOR_BY_NAME = new Map(names.map((n) => [n, n]));
+    window.ADVISOR_BY_ID = new Map(names.map((n) => [n, n]));
+  }
+
+  // ------------------------------
+  // Prime ROTAS from the Master Assignment table (for the selected week/day)
+  // Writes entries like: ROTAS.set(`${advisorId}::${weekStart}`, { Monday: 'Early', ... })
+  // ------------------------------
+  function primeRotasFromAssignTable() {
+    const ws = document.getElementById("weekStart")?.value;
+    const dayName = document.getElementById("teamDay")?.value || "Monday";
+    const table = document.getElementById("assignTable");
+    if (!ws || !table || !(window.ADVISOR_BY_NAME instanceof Map)) return;
+
+    const DAYS = [
+      "Monday",
+      "Tuesday",
+      "Wednesday",
+      "Thursday",
+      "Friday",
+      "Saturday",
+      "Sunday",
+    ];
+    const dayIdx = DAYS.indexOf(dayName);
+    if (dayIdx < 0) return;
+
+    window.ROTAS = window.ROTAS instanceof Map ? window.ROTAS : new Map();
+
+    Array.from(table.querySelectorAll("tbody tr")).forEach((tr) => {
+      const name = (tr.querySelector("th,td")?.textContent || "").trim();
+      if (!name) return;
+      const aId = window.ADVISOR_BY_NAME.get(name);
+      if (!aId) return;
+
+      // Find where the day columns begin for this row
+      const cells = Array.from(tr.children || []);
+      let startIdx =
+        cells.findIndex(
+          (td) => td.querySelector("select") || /Early|Late|Middle|Day\s*Off/i.test(td.textContent)
+        ) || 1;
+      if (startIdx < 0) startIdx = 1; // fallback
+
+      const cell = cells[startIdx + dayIdx];
+      if (!cell) return;
+
+      const sel = cell.querySelector("select,[data-template],[data-value]");
+      let tpl =
+        (sel && "value" in sel ? sel.value : null) ||
+        sel?.getAttribute?.("data-template") ||
+        sel?.getAttribute?.("data-value") ||
+        cell.textContent;
+
+      tpl = (tpl || "").replace(/\r|\n/g, " ").replace(/\s+/g, " ").trim();
+      if (!tpl || /(^|\s)day\s*off(\s|$)/i.test(tpl)) return; // skip Day Off / empty
+
+      const key = `${aId}::${ws}`;
+      const weekObj = window.ROTAS.get(key) || {};
+      weekObj[dayName] = tpl; // planner.js expands this template to segments
+      window.ROTAS.set(key, weekObj);
+    });
+  }
+
+  // ------------------------------
+  // Wire sources that should trigger a refresh/prime
+  // ------------------------------
+  function wirePlannerRefreshSources() {
+    // week/day controls
+    wireOnce(document.getElementById("weekStart"), "change", () => {
+      // reload week if a loader exists, then prime & render
+      const ws = document.getElementById("weekStart")?.value;
+      if (ws && typeof window.fetchRotasForWeek === "function") {
+        window
+          .fetchRotasForWeek(ws)
+          .catch((e) => console.warn("fetchRotasForWeek failed:", e))
+          .finally(() => {
+            primeRotasFromAssignTable();
+            refreshPlannerUI();
+          });
+      } else {
+        primeRotasFromAssignTable();
+        refreshPlannerUI();
+      }
+    });
+
+    wireOnce(document.getElementById("teamDay"), "change", () => {
+      primeRotasFromAssignTable();
+      refreshPlannerUI();
+    });
+
+    // Master Assignment table changes -> re-prime + render
+    const table = document.getElementById("assignTable");
+    if (table) {
+      wireOnce(
+        table,
+        "change",
+        () => {
+          primeRotasFromAssignTable();
+          refreshPlannerUI();
+        },
+        "_wired_change_assign"
+      );
+    }
+  }
+
+  // ------------------------------
+  // Top view dropdown (Leader/Team/Advisor) -> sync & refresh
+  // ------------------------------
   function wireAdvisorSelect() {
     const viewDropdown =
       document.querySelector("[data-master-view-dropdown]") ||
-      document.getElementById("advisorSelect") ||
       document.getElementById("viewSelect") ||
       document.getElementById("viewLeaderTeam") ||
-      document.querySelector('select[name="viewLeaderTeam"]');
+      document.getElementById("advisorSelect");
 
     if (!viewDropdown) return;
 
@@ -160,13 +205,18 @@
           }
         }
 
+        // after a selection, re-prime & render (covers “Team (Selected)”)
+        rebuildAdvisorIndexesFromTable();
+        primeRotasFromAssignTable();
         refreshPlannerUI();
       },
       "_wired_change"
     );
   }
 
-  // Generate button
+  // ------------------------------
+  // Generate button just forces a recompute+render
+  // ------------------------------
   function wireGenerateButton() {
     const btn = document.getElementById("btnGenerate");
     if (!btn) return;
@@ -174,57 +224,72 @@
       btn,
       "click",
       async () => {
-        // Make sure templates exist at click time
-        if (!window.TEMPLATES || !Object.keys(window.TEMPLATES).length) {
-          buildTemplatesFromUI();
+        try {
+          rebuildAdvisorIndexesFromTable();
+          primeRotasFromAssignTable();
+          refreshPlannerUI();
+          console.log("Schedule generated.");
+        } catch (err) {
+          console.error("Generate failed:", err);
         }
-        refreshPlannerUI();
-        console.log("Schedule generated.");
       },
       "_wired_click"
     );
   }
 
-  // -----------------------
-  // SAFE BOOT
-  // -----------------------
+  // ------------------------------
+  // BOOT
+  // ------------------------------
+  // Ensure the in-memory rota cache exists for the horizontal view logic
   window.ROTAS = window.ROTAS || new Map();
 
   const boot = async () => {
     try {
-      // Load data (only if helpers exist)
-      if (typeof window.loadOrg === "function")         await window.loadOrg();
-      if (typeof window.loadTemplates === "function")   await window.loadTemplates().catch(()=>{});
+      // 1) Load data (only if helpers exist)
+      if (typeof window.loadOrg === "function") await window.loadOrg();
+      if (typeof window.loadTemplates === "function") await window.loadTemplates();
       if (typeof window.loadAssignments === "function") await window.loadAssignments();
 
-      // Build templates from UI if the loader didn’t populate them
-      if (!window.TEMPLATES || !Object.keys(window.TEMPLATES).length) {
-        buildTemplatesFromUI();
-      }
+      // 2) Rebuild UI (only if helpers exist)
+      if (typeof window.rebuildAdvisorDropdown === "function")
+        window.rebuildAdvisorDropdown();
+      if (typeof window.rebuildTree === "function") window.rebuildTree();
+      if (typeof window.refreshChips === "function") window.refreshChips();
+      if (typeof window.populateTemplateEditor === "function")
+        window.populateTemplateEditor();
+      if (typeof window.populateAssignTable === "function")
+        window.populateAssignTable();
+      if (typeof window.updateRangeLabel === "function") window.updateRangeLabel();
+      if (typeof window.renderCalendar === "function") window.renderCalendar();
 
-      // Rebuild UI (only if helpers exist)
-      if (typeof window.rebuildAdvisorDropdown === "function") window.rebuildAdvisorDropdown();
-      if (typeof window.rebuildTree === "function")            window.rebuildTree();
-      if (typeof window.refreshChips === "function")           window.refreshChips();
-      if (typeof window.populateTemplateEditor === "function") window.populateTemplateEditor();
-      if (typeof window.populateAssignTable === "function")    window.populateAssignTable();
-      if (typeof window.updateRangeLabel === "function")       window.updateRangeLabel();
-      if (typeof window.renderCalendar === "function")         window.renderCalendar();
-
-      // Time header
+      // 3) Time header
       const headerEl = document.getElementById("timeHeader");
       if (headerEl && typeof window.renderTimeHeader === "function") {
         window.renderTimeHeader(headerEl);
       }
 
-      // Wire interactions
+      // 4) Make sure weekStart has a Monday value
+      setMondayIfEmpty();
+
+      // 5) If you have a week-specific loader, fetch then prime ROTAS
+      const ws = document.getElementById("weekStart")?.value;
+      if (ws && typeof window.fetchRotasForWeek === "function") {
+        try {
+          await window.fetchRotasForWeek(ws); // should fill/extend window.ROTAS
+        } catch (e) {
+          console.warn("fetchRotasForWeek failed:", e);
+        }
+      }
+
+      // 6) Build advisor indexes + prime ROTAS from the table, then render
+      rebuildAdvisorIndexesFromTable();
+      primeRotasFromAssignTable();
+      refreshPlannerUI();
+
+      // 7) Wire interactions
       wireAdvisorSelect();
       wireGenerateButton();
       wirePlannerRefreshSources();
-      wireTemplateEditor();
-
-      // Initial render
-      refreshPlannerUI();
     } catch (e) {
       console.warn("planner boot skipped", e);
     }
