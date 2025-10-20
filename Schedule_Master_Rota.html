@@ -1098,14 +1098,7 @@ async function doPublish(){
         window.renderTimeHeader(document.getElementById('timeHeader'));
         window.renderPlanner(rows);
       } catch(e) { console.warn('planner boot skipped', e); }
-      wire();
     });
-
-    $('#teamDay').addEventListener('change',()=>{ updateRangeLabel(); renderCalendar(); });
-    $('#weekStart').onchange=()=>{ updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
-
-    $('#treeSearch').addEventListener('input',rebuildTree);
-    $('#btnClearSel').onclick=()=>{ selectedAdvisors.clear(); rebuildTree(); refreshChips(); populateAssignTable(); renderCalendar(); };
   }
 
   /* ===== Realtime ===== */
@@ -1122,7 +1115,40 @@ async function doPublish(){
   }
 
   /* ===== INIT ===== */
-   
+  (async function boot() {
+    // 1) Ensure weekStart is set to the Monday of the current week
+    const setToMonday = (d) => { const day=d.getDay(); const diff=(day===0?-6:1)-day; d.setDate(d.getDate()+diff); return d; };
+    const wsEl = document.getElementById('weekStart');
+    if (wsEl && !wsEl.value) {
+      const monday = setToMonday(new Date());
+      wsEl.value = monday.toISOString().slice(0,10);
+    }
+
+    // 2) Load core data (only if helpers exist)
+    try {
+      if (typeof loadOrg === 'function')         await loadOrg();
+      if (typeof loadTemplates === 'function')   await loadTemplates();
+      if (typeof fetchRotasForWeek === 'function') {
+        await fetchRotasForWeek(wsEl?.value);
+      }
+    } catch (e) {
+      console.warn('Initial data load failed:', e);
+    }
+
+    // 3) Build UI and first render (only if helpers exist)
+    if (typeof rebuildAdvisorDropdown === 'function') rebuildAdvisorDropdown();
+    if (typeof rebuildTree === 'function')            rebuildTree();
+    if (typeof buildColorKey === 'function')          buildColorKey();
+    if (typeof updateViewSelector === 'function')     updateViewSelector();
+    if (typeof updateRangeLabel === 'function')       updateRangeLabel();
+    if (typeof populateTemplateEditor === 'function') populateTemplateEditor();
+    if (typeof populateAssignTable === 'function')    populateAssignTable();
+    if (typeof renderCalendar === 'function')         renderCalendar();
+
+    // 4) Wire listeners and realtime (only if helpers exist)
+    if (typeof wire === 'function')                   wire();
+    if (typeof subscribeRealtime === 'function')      subscribeRealtime();
+  })();
   </script>
 <script defer src="./src/planner.js"></script>
 <script defer src="./src/init.js"></script>
