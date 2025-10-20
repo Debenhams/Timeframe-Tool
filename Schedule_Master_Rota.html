@@ -1,172 +1,1156 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Professional Team Rota System — Supabase</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Professional Team Rota System — Supabase</title>
 
-  <!-- Core Styles -->
-  <link rel="stylesheet" href="styles/planner.css" />
 
-  <style>
-    /* --- hidden palette section --- */
-    #colourPalette, .colour-palette, .color-key {
-      display: none !important;
-      visibility: hidden !important;
-    }
-
-    /* --- layout and dropdown toggle --- */
-    .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
-      background: var(--wash);
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid var(--line);
-    }
-
-    .planner-wrapper {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-      width: 100%;
-      margin: 0 auto;
-    }
-
-    .collapse-toggle {
-      background: var(--brand);
-      color: #fff;
-      border: none;
-      padding: 0.6rem 1rem;
-      font-size: 0.95rem;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: 0.3s;
-    }
-    .collapse-toggle:hover { background: var(--accent); }
-
-    .collapse-container {
-      max-height: 0;
-      overflow: hidden;
-      transition: max-height 0.4s ease, opacity 0.4s ease;
-      opacity: 0;
-    }
-    .collapse-container.active {
-      max-height: 2000px; /* expand fully */
-      opacity: 1;
-    }
-
-    /* simple fade animation for table */
-    .fade-in {
-      animation: fadeIn 0.3s ease;
-    }
-    @keyframes fadeIn {
-      from {opacity: 0;}
-      to {opacity: 1;}
-    }
-
-    /* Keep planners full width */
-    #plannerBody, #advisorWeek {
-      width: 100%;
-      overflow-x: auto;
-    }
-
-  </style>
+<!-- Supabase client library -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="./styles/planner.css">
 </head>
-
 <body>
-  <div class="planner-wrapper">
-    <!-- SECTION: Header Controls -->
-    <div class="section-header">
-      <div class="left-controls">
-        <select id="viewSelect" data-master-view-dropdown>
-          <option value="">Select Leader / Team</option>
-          <option value="leader::AlexHiggins" data-leader-id="AlexHiggins">Alex Higgins (Leader)</option>
-          <option value="leader::StaceyLane" data-leader-id="StaceyLane">Stacey Lane (Leader)</option>
-          <option value="team::TeamA" data-team-id="TeamA">Team A</option>
-          <option value="team::TeamB" data-team-id="TeamB">Team B</option>
-        </select>
-        <button id="btnGenerate">Generate</button>
-      </div>
-      <div class="right-info">
-        <span id="weekLabel"></span>
-      </div>
+  <div class="topbar">
+    <h1>Professional Team Rota System</h1>
+    <div class="seg" style="margin-left:auto">
+      <button class="active" id="segWeek">Week</button>
+      <button id="segMonth" disabled class="muted">Month</button>
     </div>
+    <button class="btn subtle no-print" id="btnPrint">🖨️ Print</button>
+  </div>
 
-    <!-- SECTION: Horizontal Planner -->
-    <div id="plannerContainer">
-      <div id="timeHeader"></div>
-      <div id="plannerBody"></div>
-    </div>
+  <div class="layout">
+    <!-- Main column -->
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <!-- Controls -->
+      <div class="panel">
+        <div class="panel-body" style="display:flex;flex-wrap:wrap;gap:10px 12px;align-items:center">
+          <label>Week start (Monday)</label>
+          <input type="date" id="weekStart" class="input"/>
+          <label>View</label>
+          <select id="advisorSelect" class="input"></select>
+          <label id="lblTeamDay" class="muted" style="display:none">Day</label>
+          <select id="teamDay" class="input" style="display:none">
+            <option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option>
+            <option>Friday</option><option>Saturday</option><option>Sunday</option>
+          </select>
+          <button class="btn" id="btnGenerate">Generate</button>
+          <button class="btn subtle" id="btnPublish">Publish</button>
+          <span class="muted" id="rangeLabel" style="margin-left:auto"></span>
+        </div>
+      </div>
 
-    <!-- SECTION: Vertical Advisor Week -->
-    <div id="advisorWeek"></div>
+      <!-- Collapsible Settings / Templates / Assignment -->
+      <details class="panel collapsible no-print" id="settingsBox" open>
+        <summary class="panel-header" style="cursor:pointer">
+          <h2>Settings / Templates</h2><span class="chev">▶</span>
+        </summary>
+        <div class="panel-body">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start">
+            <div>
+              <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                <button class="btn subtle" id="btnAddTemplate">➕ Add Template</button>
+                <button class="btn subtle" id="btnLoadDefaults">↺ Load Sample Templates</button>
+              </div>
+              <div id="templateEditor"></div>
+            </div>
+            <div>
+              <h3 style="margin:6px 0">🎨 Colours</h3>
+              <div id="colorKey"></div>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="btn subtle" id="btnSave">💾 Save JSON</button>
+                <input type="file" id="file" accept=".json" style="display:none"/>
+                <button class="btn subtle" id="btnLoad">📂 Load JSON</button>
+                <button class="btn danger" id="btnReset">🧹 Clear (local cache)</button>
+              </div>
+            </div>
+          </div>
 
-    <!-- SECTION: Master Assignment Dropdown -->
-    <div>
-      <button id="toggleAssignments" class="collapse-toggle">Show Master Assignment ▼</button>
-      <div id="assignmentContainer" class="collapse-container">
-        <div id="masterAssignmentTable" class="fade-in">
-          <!-- Existing master assignment table inserted dynamically -->
+          <div style="margin-top:16px">
+            <h3 style="margin:6px 0">📅 Master Assignment (Team)</h3>
+            <div class="table-wrap">
+              <table id="assignTable">
+                <thead>
+                  <tr><th rowspan="2">Advisor</th><th colspan="7">Select Shift Template</th></tr>
+                  <tr id="dateHeaders"></tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="muted" style="margin-top:8px">
+              Blank until you select a Team Leader or advisors in the <strong>Schedules</strong> panel.
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <!-- Team Planner -->
+      <section id="teamPlanner" class="planner">
+        <div class="planner__header">
+          <div class="planner__col--name">Name</div>
+          <div class="planner__col--time" id="timeHeader"></div>
+        </div>
+        <div class="planner__body" id="plannerBody"></div>
+      </section>
+
+      <!-- Calendar -->
+      <div class="panel">
+        <div class="panel-header"><h2 id="calTitle">Advisor Week (Calendar)</h2>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn subtle icon" id="prevWeek">◀</button>
+            <button class="btn subtle icon" id="btnToday">Today</button>
+            <button class="btn subtle icon" id="nextWeek">▶</button>
+          </div>
+        </div>
+        <div class="panel-body calendar">
+          <div class="cal-grid" id="calGrid">
+            <div class="hour-col"><div id="hours"></div></div>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- SECTION: Hidden Colour Palette -->
-    <div id="colourPalette" style="display:none;"></div>
+    <!-- Right sidebar: Schedules -->
+    <div class="panel">
+      <div class="panel-header"><h2>Schedules</h2></div>
+      <div class="panel-body">
+        <div class="tree-search">
+          <input id="treeSearch" class="input" placeholder="Select sites / leaders / advisors…" style="flex:1"/>
+          <button class="btn subtle" id="btnClearSel">Clear</button>
+        </div>
+        <div class="tree" id="tree"></div>
+        <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px" id="activeChips"></div>
+      </div>
+    </div>
   </div>
 
-  <!-- Core Scripts -->
-  <script src="src/init.js"></script>
-  <script src="src/planner.js"></script>
+
+  <!-- Publish confirmation dialog -->
+  <dialog id="publishDlg" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;">
+    <div style="font-weight:800;margin-bottom:6px">Publish changes</div>
+    <div class="muted" id="publishSummary" style="margin-bottom:8px"></div>
+    <div id="publishList" style="max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button id="publishOK" class="btn">Publish</button>
+      <button onclick="publishDlg.close()" class="btn subtle">Cancel</button>
+    </div>
+  </dialog>
+
+
+  <!-- Assign / Split dialog -->
+  <dialog id="assignDlg" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;">
+    <div style="font-weight:800;margin-bottom:6px"><span id="assignTitle">Assign</span></div>
+    <div class="row"><label><input type="radio" name="mode" value="template" id="modeTemplate"> Use template</label>
+      <label><input type="radio" name="mode" value="split" id="modeSplit"> Use split segments</label>
+      <span class="muted" id="modeHint" style="margin-left:6px"></span>
+    </div>
+    <div id="templateMode">
+      <select id="assignSelect" style="width:100%"></select>
+      <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+        <button class="btn subtle" id="btnConvertToSplit">Convert this template to editable segments</button>
+        <span class="muted">Fast way to tweak just part of the shift.</span>
+      </div>
+    </div>
+    <div id="splitMode" style="display:none">
+      <div id="segmentsWrap"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn subtle" id="addSegment">＋ Add segment</button>
+        <span class="muted">Each segment = Code + Start–End.</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button id="assignOK" class="btn">Save</button>
+      <button onclick="assignDlg.close()" class="btn subtle">Cancel</button>
+    </div>
+  </dialog>
+
+  <!-- Click-a-block Editor -->
+  <dialog id="blockDlg" style="border:1px solid var(--line);border-radius:12px;padding:12px 14px;">
+    <div style="font-weight:800;margin-bottom:6px"><span id="blockTitle">Edit block</span></div>
+    <div class="row"><label><input type="radio" name="blockmode" value="whole" id="bmWhole"> Edit block</label>
+      <label><input type="radio" name="blockmode" value="sub" id="bmSub"> Change part of block</label>
+      <span class="muted" id="blockHint" style="margin-left:6px"></span></div>
+    <div id="blockWhole">
+      <div class="row"><label style="min-width:90px">Code</label><select id="bwCode"></select></div>
+      <div class="row"><label style="min-width:90px">Start–End</label><input type="time" id="bwStart"> <span>–</span> <input type="time" id="bwEnd"></div>
+      <div class="muted">If you shrink the block, we keep the before/after so no gaps appear.</div>
+    </div>
+    <div id="blockSub" style="display:none">
+      <div class="row"><label style="min-width:90px">New code</label><select id="bsCode"></select></div>
+      <div class="row"><label style="min-width:90px">Sub-range</label><input type="time" id="bsStart"> <span>–</span> <input type="time" id="bsEnd"></div>
+      <div class="muted">We split into left remainder + your new code + right remainder. Neighbours stay the same.</div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button id="blockOK" class="btn">Save</button>
+      <button onclick="blockDlg.close()" class="btn subtle">Cancel</button>
+    </div>
+  </dialog>
 
   <script>
-    // --- Collapsible Master Assignment Table ---
-    const toggleBtn = document.getElementById("toggleAssignments");
-    const assignContainer = document.getElementById("assignmentContainer");
+/* =========================
+   Supabase configuration
+   ========================= */
+const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 
-    toggleBtn.addEventListener("click", () => {
-      assignContainer.classList.toggle("active");
-      const expanded = assignContainer.classList.contains("active");
-      toggleBtn.textContent = expanded
-        ? "Hide Master Assignment ▲"
-        : "Show Master Assignment ▼";
-    });
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // --- Sync dropdown + sidebar selections ---
-    document.addEventListener("change", (e) => {
-      if (e.target.matches("[data-master-view-dropdown]")) {
-        const val = e.target.value;
-        const targetEl =
-          document.querySelector(`[data-leader-id="${val}"]`) ||
-          document.querySelector(`[data-team-id="${val}"]`);
-        if (targetEl) {
-          targetEl.dispatchEvent(
-            new MouseEvent("click", { bubbles: true, cancelable: true })
-          );
+/* ===== App State ===== */
+const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+let ORG = { sites:{} };
+let TEMPLATES = {};
+let ADVISORS_LIST = [];
+let ADVISOR_BY_NAME = new Map();
+let ADVISOR_BY_ID = new Map();
+let ROTAS = new Map();
+let selectedAdvisors = new Set();
+
+/* ===== Helpers ===== */
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+const pad=n=>String(n).padStart(2,'0');
+const fmt=(t)=>t?t.slice(0,5):''; // HH:MM from HH:MM:SS
+function setToMonday(d){ const day=d.getDay(); const diff=(day===0?-6:1)-day; d.setDate(d.getDate()+diff); return d; }
+function toMin(t){ if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
+function m2t(m){ return `${pad(Math.floor(m/60))}:${pad(m%60)}`; }
+
+const css=getComputedStyle(document.documentElement);
+const START=+css.getPropertyValue('--timeline-start')||7;
+const END=+css.getPropertyValue('--timeline-end')||20;
+const HEIGHT=+css.getPropertyValue('--timeline-height').replace('px','')||800;
+const PX_PER_MIN = HEIGHT/((END-START)*60);
+
+/* Add planner time helpers */
+const DAY_START=6*60,DAY_END=20*60;
+function m2hmm(m){const h=Math.floor(m/60),mm=String(m%60).padStart(2,'0');return`${h}:${mm}`;}
+function spanPct(s,e){const span=DAY_END-DAY_START;return{
+  left: Math.max(0,(s-DAY_START)/span*100),
+  width: Math.max(0,Math.min(100,(e-s)/span*100))
+};}
+function renderTimeHeader(el){
+  if(!el) return; el.innerHTML='';
+  const w=document.createElement('div'); w.className='time-scale';
+  for(let m=DAY_START;m<=DAY_END;m+=60){
+    const t=document.createElement('div'); t.className='tick';
+    t.style.left=`${((m-DAY_START)/(DAY_END-DAY_START))*100}%`;
+    t.textContent=m2hmm(m);
+    w.appendChild(t);
+  }
+  el.appendChild(w);
+}
+
+/* ===== Colours UI ===== */
+function buildColorKey(){
+  const defs=[['email','Email','--color-email'],['mirakl','Mirakl','--color-mirakl'],['social','Social','--color-social'],['overtime','Overtime','--color-overtime'],['break','Break','--color-break'],['lunch','Lunch','--color-lunch'],['absence','Absence','--color-absence'],['shrink','Shrinkage','--color-shrink']];
+  const el=$('#colorKey');
+  el.innerHTML = defs.map(([k,l,cssVar])=>{
+    const v=getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
+    return `<div class="key-row"><span class="swatch" style="background:${v}"></span><strong>${l}</strong><input type="text" data-k="${cssVar}" value="${v}"></div>`;
+  }).join('');
+  $$('#colorKey input').forEach(inp=>inp.addEventListener('input',()=>{ document.documentElement.style.setProperty(inp.dataset.k, inp.value); }));
+}
+
+/* ===== Code groups for selectors ===== */
+const CODE_GROUPS = {
+  "Activity":[
+    "2nd Line","Admin","BH Email","BH Social","BH WhatsApp","DEB Email","DEB Social","DEB WhatsApp","Ebay",
+    "KM Email","KM Social","KM WhatsApp","Mirakl","Mixing","PayPlus","PLT Email","PLT Social","PLT WhatsApp",
+    "QA","Overtime"
+  ],
+  "Absence":[ "AL","Break","Lunch","Sick","Split Shift","RDO","Maternity","LTS" ],
+  "Shrinkage":[ "121","ATL","Coaching","Huddle","ITI","Projects","Team Meeting","Training" ]
+};
+function codeSelectGroupedHTML(val=''){
+  return Object.entries(CODE_GROUPS).map(([grp,codes])=>
+    `<optgroup label="${grp}">${codes.map(c=>`<option ${val===c?'selected':''}>${c}</option>`).join('')}</optgroup>`
+  ).join('');
+}
+
+
+/* ===== Templates UI ===== */
+function templateRow(t){
+  return `<div class="template-row" data-name="${t.name}">
+    <label>Name</label>
+    <input data-f="name" type="text" value="${t.name}" style="width:140px">
+
+    <label>New code</label>
+    <select data-f="work_code">${codeSelectGroupedHTML(t.work_code||'Admin')}</select>
+
+    <label>Start / Finish</label>
+    <div class="inline"><input data-f="start_time" type="time" value="${fmt(t.start_time)||''}">
+      <input data-f="finish_time" type="time" value="${fmt(t.finish_time)||''}"></div>
+
+    <label>Breaks</label>
+    <div class="inline">
+      <input data-f="break1" type="time" value="${fmt(t.break1)||''}"  title="Break 1 (15m)">
+      <input data-f="lunch"  type="time" value="${fmt(t.lunch)||''}"   title="Lunch (30m)">
+      <input data-f="break2" type="time" value="${fmt(t.break2)||''}"  title="Break 2 (15m)">
+    </div>
+
+    <div class="full" style="display:flex;justify-content:flex-end">
+      <button class="danger" data-act="del">Delete</button>
+    </div>
+  </div>`;
+}
+function populateTemplateEditor(){
+  const ed=$('#templateEditor'); const list=Object.values(TEMPLATES).sort((a,b)=>a.name.localeCompare(b.name));
+  ed.innerHTML = list.length? list.map(templateRow).join('') : '<div class="muted">No templates. Add or load samples.</div>';
+  $$('#templateEditor .template-row').forEach(row=>{
+    const origName=row.dataset.name;
+    $$('input,select',row).forEach(inp=>{
+      const f=inp.dataset.f; if(!f) return;
+      inp.addEventListener('input', async()=>{
+        const updated = Object.assign({}, TEMPLATES[origName], { [f]: inp.value || null });
+        if(f==='name' && inp.value.trim()!==origName){
+          await sb.from('templates').delete().eq('name', origName);
+          const {error} = await sb.from('templates').insert([{
+            name: (updated.name||'').trim(),
+            work_code: updated.work_code || 'Admin',
+            start_time: updated.start_time,
+            finish_time: updated.finish_time,
+            break1: updated.break1,
+            lunch: updated.lunch,
+            break2: updated.break2
+          }]);
+          if(error) alert('Template rename failed: '+error.message);
+        } else {
+          const {error} = await sb.from('templates').update({
+            work_code: updated.work_code || 'Admin',
+            start_time: updated.start_time,
+            finish_time: updated.finish_time,
+            break1: updated.break1,
+            lunch: updated.lunch,
+            break2: updated.break2
+          }).eq('name', origName);
+          if(error) alert('Template update failed: '+error.message);
         }
-      }
+      });
+    });
+    row.querySelector('[data-act="del"]').onclick=async()=>{
+      if(!confirm(`Delete template "${origName}"?`)) return;
+      const {error}=await sb.from('templates').delete().eq('name',origName);
+      if(error) alert('Delete failed: '+error.message);
+    };
+  });
+}
+$('#btnAddTemplate').onclick = async()=>{
+  // Safe defaults to avoid NOT NULL issues
+  const name='Shift '+(Object.keys(TEMPLATES).length+1);
+  const {error}=await sb.from('templates').insert([{name,work_code:'Admin',start_time:'09:00',finish_time:'17:00',break1:null,lunch:'12:30',break2:null}]);
+  if(error) alert('Add failed: '+error.message);
+};
+$('#btnLoadDefaults').onclick = async()=>{
+  const defaults=[
+    {name:'Early',  work_code:'DEB Email', start_time:'07:00', finish_time:'16:00', break1:'09:15', lunch:'12:00', break2:'15:15'},
+    {name:'Middle', work_code:'Mirakl',    start_time:'11:00', finish_time:'20:00', break1:'11:30', lunch:'15:30', break2:'17:45'},
+    {name:'Late',   work_code:'PLT Social',start_time:'12:00', finish_time:'21:00', break1:'13:15', lunch:'17:00', break2:'19:15'},
+  ];
+  for(const t of defaults){ await sb.from('templates').upsert(t, { onConflict:'name' }); }
+};
+
+/* ===== Load Org (sites/leaders/advisors) ===== */
+async function loadOrg(){
+  const [sitesRes, leadersRes, advisorsRes] = await Promise.all([
+    sb.from('sites').select('*').order('name', {ascending:true}),
+    sb.from('leaders').select('*'),
+    sb.from('advisors').select('*')
+  ]);
+  ORG = { sites:{} };
+  (sitesRes.data||[]).forEach(s=> ORG.sites[s.name] = { id:s.id, leaders:{} });
+  (leadersRes.data||[]).forEach(l=>{
+    const siteEntry = Object.values(ORG.sites).find(x=>x.id===l.site_id);
+    if(siteEntry) siteEntry.leaders[l.name] = { id:l.id, advisors:[] };
+  });
+  (advisorsRes.data||[]).forEach(a=>{
+    const leaderNode = Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===a.leader_id);
+    if(leaderNode){ leaderNode.advisors.push({id:a.id, name:a.name, email:a.email||''}); }
+  });
+
+  ADVISORS_LIST = (advisorsRes.data||[]).map(a=>({id:a.id,name:a.name,leader_id:a.leader_id}));
+  ADVISOR_BY_NAME = new Map(ADVISORS_LIST.map(a=>[a.name,a.id]));
+  ADVISOR_BY_ID   = new Map(ADVISORS_LIST.map(a=>[a.id,a.name]));
+}
+
+/* ===== Schedules Tree ===== */
+function rebuildTree(){
+  const t=$('#tree'); const q=$('#treeSearch').value.trim().toLowerCase();
+
+  function advisorNode(obj){
+    const checked = selectedAdvisors.has(obj.name) ? 'checked' : '';
+    return `<div class="node">
+      <input type="checkbox" data-adv-id="${obj.id}" data-adv-name="${obj.name}" ${checked}/>
+      <span>${obj.name}</span>
+      <div class="node-actions" style="margin-left:auto;display:flex;gap:6px">
+        <button data-rename-adv="${obj.id}">✎</button>
+        <button data-remove-adv="${obj.id}">🗑</button>
+      </div>
+    </div>`;
+  }
+
+  function leaderBlock(leaderName, leaderObj){
+    const team = leaderObj.advisors || [];
+    const match = (str)=>!q || str.toLowerCase().includes(q);
+    if(q && !match(leaderName) && !team.some(a=>match(a.name))) return '';
+    const allSelected = team.length>0 && team.every(a=>selectedAdvisors.has(a.name));
+    return `<details open data-leader-id="${leaderObj.id}">
+      <summary>
+        <span class="twisty" data-twisty>−</span>
+        <label style="display:flex;align-items:center;gap:6px;margin-left:4px">
+          <input type="checkbox" data-leader="${leaderObj.id}" ${allSelected?'checked':''}/>
+          <span>👤 ${leaderName}</span>
+        </label>
+        <div class="node-actions" style="margin-left:auto;display:flex;gap:6px">
+          <button data-add-adv="${leaderObj.id}">+ Advisor</button>
+          <button data-rename-lead="${leaderObj.id}">✎</button>
+          <button data-remove-lead="${leaderObj.id}">🗑</button>
+        </div>
+      </summary>
+      <div class="advisor-list">
+        ${team.sort((a,b)=>a.name.localeCompare(b.name)).map(advisorNode).join('')}
+      </div>
+    </details>`;
+  }
+
+  function siteBlock(siteName, siteObj){
+    const leaders = siteObj.leaders || {};
+    const blocks = Object.entries(leaders).map(([ln,lobj])=>leaderBlock(ln,lobj)).filter(Boolean);
+    const match = (str)=>!q || str.toLowerCase().includes(q);
+    if(q && !match(siteName) && blocks.join('')==='') return '';
+    return `<details open data-site-id="${siteObj.id}">
+      <summary>
+        <span class="twisty" data-twisty>−</span>
+        <strong>📁 ${siteName}</strong>
+        <div class="node-actions" style="margin-left:auto;display:flex;gap:6px">
+          <button data-add-lead="${siteObj.id}">+ Leader</button>
+          <button data-rename-site="${siteObj.id}">✎</button>
+          <button data-remove-site="${siteObj.id}">🗑</button>
+        </div>
+      </summary>
+      ${blocks.join('')}
+    </details>`;
+  }
+
+  t.innerHTML = Object.entries(ORG.sites).sort((a,b)=>a[0].localeCompare(b[0])).map(([sn,so])=>siteBlock(sn,so)).join('') || '<div class="muted">No sites yet.</div>';
+
+  // Twisties update
+  $$('#tree details').forEach(d=>{
+    const twisty = d.querySelector('[data-twisty]');
+    const update = ()=>{ twisty.textContent = d.open ? '−' : '+'; };
+    d.addEventListener('toggle', update); update();
+  });
+
+  // Leader select-all (visibly ticks children)
+  $$('#tree [data-leader]').forEach(cb=>{
+    cb.onchange=()=>{
+      const leaderId=cb.dataset.leader;
+      const leaderNode = Object.values(ORG.sites).flatMap(s=>Object.values(s.leaders)).find(l=>l.id===leaderId);
+      (leaderNode?.advisors||[]).forEach(a=> cb.checked ? selectedAdvisors.add(a.name) : selectedAdvisors.delete(a.name));
+      refreshChips(); populateAssignTable(); renderCalendar(); rebuildTree(); // re-render to show ticks
+    };
+  });
+
+  // Advisor select
+  $$('#tree [data-adv-id]').forEach(ch=>{
+    ch.onchange=()=>{
+      const name=ch.dataset.advName; ch.checked?selectedAdvisors.add(name):selectedAdvisors.delete(name);
+      refreshChips(); populateAssignTable(); renderCalendar();
+    };
+  });
+
+  // Site actions
+  $$('#tree [data-add-lead]').forEach(b=>b.onclick=async()=>{
+    const siteId=b.dataset.addLead; const name=prompt('Leader name'); if(!name) return;
+    const {error}=await sb.from('leaders').insert([{site_id:siteId, name}]); if(error) alert(error.message);
+  });
+  $$('#tree [data-rename-site]').forEach(b=>b.onclick=async()=>{
+    const siteId=b.dataset.renameSite; const current = Object.entries(ORG.sites).find(([n,s])=>s.id===siteId)?.[0]||'';
+    const nn=prompt('Rename site', current); if(!nn||nn===current) return;
+    const {error}=await sb.from('sites').update({name:nn}).eq('id',siteId); if(error) alert(error.message);
+  });
+  $$('#tree [data-remove-site]').forEach(b=>b.onclick=async()=>{
+    const siteId=b.dataset.removeSite; if(!confirm('Delete site and its leaders/advisors?')) return;
+    const {error}=await sb.from('sites').delete().eq('id',siteId); if(error) alert(error.message);
+  });
+
+  // Leader actions
+  $$('#tree [data-rename-lead]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.renameLead; const current = Object.values(ORG.sites).flatMap(s=>Object.entries(s.leaders)).find(([n,l])=>l.id===id)?.[0]||'';
+    const nn=prompt('Rename leader', current); if(!nn||nn===current) return;
+    const {error}=await sb.from('leaders').update({name:nn}).eq('id',id); if(error) alert(error.message);
+  });
+  $$('#tree [data-remove-lead]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.removeLead; if(!confirm('Remove leader and their advisors?')) return;
+    const {error}=await sb.from('leaders').delete().eq('id',id); if(error) alert(error.message);
+  });
+
+  // Advisor actions
+  $$('#tree [data-add-adv]').forEach(b=>b.onclick=async()=>{
+    const leaderId=b.dataset.addAdv; const n=prompt('Advisor name'); if(!n) return;
+    const {error}=await sb.from('advisors').insert([{leader_id:leaderId, name:n}]); if(error) alert(error.message);
+  });
+  $$('#tree [data-rename-adv]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.renameAdv; const current = ADVISORS_LIST.find(a=>a.id===id)?.name||'';
+    const nn=prompt('Rename advisor', current); if(!nn||nn===current) return;
+    const {error}=await sb.from('advisors').update({name:nn}).eq('id',id); if(error) alert(error.message);
+  });
+  $$('#tree [data-remove-adv]').forEach(b=>b.onclick=async()=>{
+    const id=b.dataset.removeAdv; if(!confirm('Remove advisor?')) return;
+    const {error}=await sb.from('advisors').delete().eq('id',id); if(error) alert(error.message);
+  });
+}
+
+/* ===== Helper: get leader team names ===== */
+function getLeaderTeamNames(leaderId){
+  const leader = Object.values(ORG.sites)
+    .flatMap(s => Object.values(s.leaders || {}))
+    .find(l => l.id === leaderId);
+  if(!leader) return [];
+  return (leader.advisors || []).map(a => a.name).sort((a,b)=>a.localeCompare(b));
+}
+
+/* ===== Advisor dropdown (View) ===== */
+function rebuildAdvisorDropdown(){
+  const sel = $('#advisorSelect');
+
+  // Leaders
+  const leaders = [];
+  Object.values(ORG.sites).forEach(site => {
+    Object.entries(site.leaders || {}).forEach(([lname, lobj]) => {
+      leaders.push({ id: lobj.id, name: lname, advisors: lobj.advisors || [] });
+    });
+  });
+  leaders.sort((a,b)=>a.name.localeCompare(b.name));
+
+  // Advisors
+  const advisors = ADVISORS_LIST
+    .map(a => ({ id: a.id, name: a.name }))
+    .sort((a,b)=>a.name.localeCompare(b.name));
+
+  const leaderOpts = leaders.map(l => `<option value="leader::${l.id}">${l.name} — Team</option>`).join('');
+  const advisorOpts = advisors.map(a => `<option value="advisor::${a.id}">${a.name}</option>`).join('');
+
+  sel.innerHTML = `
+    <option value="__TEAM_SELECTED__">Team (Selected)</option>
+    <option value="__TEAM_ALL__">Team (All)</option>
+    ${leaders.length ? `<optgroup label="Team Leaders">${leaderOpts}</optgroup>` : ''}
+    ${advisors.length ? `<optgroup label="Advisors">${advisorOpts}</optgroup>` : ''}
+  `;
+}
+
+/* ===== Assignment table ===== */
+function populateAssignTable(){
+  const head=$('#dateHeaders'), body=$('#assignTable tbody');
+  head.innerHTML=DAYS.map(d=>`<th>${d.slice(0,3)}<br><span class="muted" data-date></span></th>`).join('');
+  const list = selectedAdvisors.size ? [...selectedAdvisors] : [];
+  if(list.length===0){
+    body.innerHTML='<tr><td colspan="8" class="muted" style="text-align:left;padding:10px">Select a Team Leader (or advisors) in <strong>Schedules</strong> to populate this table.</td></tr>';
+    return;
+  }
+  const opts=Object.keys(TEMPLATES).sort().map(n=>`<option value="${n}">${n}</option>`).join('');
+  body.innerHTML='';
+  list.sort((a,b)=>a.localeCompare(b)).forEach(name=>{
+    const tr=document.createElement('tr');
+    const tdName=document.createElement('td'); tdName.className='name'; tdName.textContent=name; tr.appendChild(tdName);
+    DAYS.forEach(day=>{
+      const td=document.createElement('td'); const sel=document.createElement('select');
+      sel.innerHTML=`<option value="">-- Day Off --</option>${opts}`;
+      const aId = ADVISOR_BY_NAME.get(name);
+      const ws = $('#weekStart').value;
+      const key = `${aId}::${ws}`;
+      const data = ROTAS.get(key) || {};
+      const current = data[day];
+      const currentVal = (typeof current==='string') ? current : '';
+      sel.value = currentVal;
+      
+      sel.onchange = async()=>{
+        const newVal = sel.value;
+        const fresh = Object.assign({}, ROTAS.get(key) || {});
+        const willOverwrite = fresh.hasOwnProperty(day) && JSON.stringify(fresh[day]) !== JSON.stringify(newVal || '');
+        if (willOverwrite){
+          const ok = await confirmOverwriteDay(aId, ws, day, newVal || '');
+          if (!ok){ sel.value = (typeof fresh[day] === 'string') ? fresh[day] : ''; return; }
+        }
+        if(newVal) fresh[day] = newVal; else delete fresh[day];
+        await upsertRota(aId, ws, fresh);
+        renderCalendar();
+      };
+
+      td.appendChild(sel); tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+}
+
+/* ===== Hours / Calendar base ===== */
+function hoursHTML(){ let h=''; const START=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-start'))||7; const END=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-end'))||20; for(let i=START;i<=END;i++){ h+=`<div class="hour"><span>${String(i).padStart(2,'0')}:00</span></div>`; } return h; }
+function resetGrid(){ $('#calGrid').innerHTML = '<div class="hour-col"><div id="hours"></div></div>'; $('#hours').innerHTML=hoursHTML(); }
+
+/* ===== Templates → segments ===== */
+function processTemplateToSegments(t){
+  if(!t||!t.start_time||!t.finish_time) return [];
+  const s=toMin(fmt(t.start_time)), e=toMin(fmt(t.finish_time)); if(e<=s) return [];
+  const ev=[{t:s,type:'start'},{t:e,type:'end'}];
+  [['break1',15,'Break'],['lunch',30,'Lunch'],['break2',15,'Break']].forEach(([k,d,label])=>{ if(t[k]) ev.push({t:toMin(fmt(t[k])),type:'pause',d,label}); });
+  ev.sort((a,b)=>a.t-b.t||((a.type==='end')-(b.type==='end')));
+  const out=[]; let cur=s;
+  for(const evn of ev){
+    if(evn.t>cur) out.push({code: t.work_code || 'Admin', start:m2t(cur), end:m2t(evn.t)});
+    if(evn.type==='pause'){ out.push({code:evn.label, start:m2t(evn.t), end:m2t(evn.t+evn.d)}); cur=evn.t+evn.d; }
+  }
+  return out;
+}
+function toEditableSegments(dayVal){
+  if(dayVal && typeof dayVal==='object' && Array.isArray(dayVal.segments)) return JSON.parse(JSON.stringify(dayVal.segments));
+  if(typeof dayVal==='string' && TEMPLATES[dayVal]) return processTemplateToSegments(TEMPLATES[dayVal]);
+  return [];
+}
+function mergeAdjacent(segs){
+  const s=[...segs].sort((a,b)=>toMin(a.start)-toMin(b.start));
+  const out=[];
+  for(const x of s){
+    if(!out.length){ out.push({...x}); continue; }
+    const p=out[out.length-1];
+    if(p.code===x.code && toMin(p.end)===toMin(x.start)){ p.end=x.end; }
+    else out.push({...x});
+  }
+  return out;
+}
+function processDayValue(dayValue){
+  if(dayValue && typeof dayValue==='object' && Array.isArray(dayValue.segments)){
+    return dayValue.segments.map(s=>({label:s.code,start:toMin(s.start),end:toMin(s.end)})).filter(b=>b.end>b.start).sort((a,b)=>a.start-b.start);
+  }
+  if(typeof dayValue==='string' && TEMPLATES[dayValue]){
+    return processTemplateToSegments(TEMPLATES[dayValue]).map(s=>({label:s.code,start:toMin(s.start),end:toMin(s.end)}));
+  }
+  return [];
+}
+
+/* ===== Calendar renderers ===== */
+function updateRangeLabel(){
+  const ws=$('#weekStart').value; const adv=$('#advisorSelect').value;
+  if(!ws){ $('#rangeLabel').textContent=''; return; }
+  const s=new Date(ws+'T00:00:00'); const e=new Date(s); e.setDate(e.getDate()+6);
+  const f=d=>d.toLocaleDateString('en-GB',{day:'2-digit',month:'2-digit',year:'numeric'});
+  if(adv==='__TEAM_SELECTED__' || adv==='__TEAM_ALL__'){
+    const idx=DAYS.indexOf($('#teamDay').value||'Monday'); const d=new Date(s); d.setDate(d.getDate()+idx);
+    $('#rangeLabel').textContent=d.toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+    $('#calTitle').textContent=(adv==='__TEAM_ALL__'?'Team (All)':'Team (Selected)')+' – Single Day';
+  } else {
+    $('#rangeLabel').textContent=`${f(s)} – ${f(e)}`;
+    $('#calTitle').textContent='Advisor Week (Calendar)';
+  }
+  $$('#dateHeaders [data-date]').forEach((span,i)=>{ const d=new Date(s); d.setDate(d.getDate()+i); span.textContent=d.toLocaleDateString('en-GB',{month:'short',day:'numeric'}); });
+}
+function renderCalendar(){
+  resetGrid();
+  const advVal=$('#advisorSelect').value;
+
+  // Team views
+  if(advVal==='__TEAM_SELECTED__' || advVal==='__TEAM_ALL__'){ renderTeamDayCalendar(advVal==='__TEAM_ALL__'); return; }
+
+  // Single advisor view (support both "advisor::ID" and legacy name values)
+  let aId=null, advName=null;
+  if(advVal.startsWith && advVal.startsWith('advisor::')){
+    aId = advVal.split('::')[1];
+    advName = ADVISOR_BY_ID.get(aId) || '';
+  } else {
+    advName = advVal;
+    aId = ADVISOR_BY_NAME.get(advName);
+  }
+  if(!aId) return;
+
+  const ws=$('#weekStart').value; const key=`${aId}::${ws}`;
+  const data=ROTAS.get(key) || {};
+  const grid=$('#calGrid'); const s=ws?new Date(ws+'T00:00:00'):null;
+
+  DAYS.forEach((day,idx)=>{
+    const col=document.createElement('div'); col.className='day-col';
+    let month='—', num=''; if(s){ const d=new Date(s); d.setDate(d.getDate()+idx); month=d.toLocaleDateString('en-GB',{month:'long'}); num=d.getDate(); }
+    col.insertAdjacentHTML('beforeend',`<div class="day-head"><small>${month}</small>${day}<span style="float:right">${num}</span></div>`);
+
+    const dayVal = data[day];
+    if(dayVal && typeof dayVal==='object' && Array.isArray(dayVal.segments)){
+      const totalMins = processDayValue(dayVal).reduce((acc,b)=>acc+(b.end-b.start),0);
+      col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">Custom segments</span><span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
+    } else {
+      const tplName = (typeof dayVal==='string') ? dayVal : '';
+      const tpl=TEMPLATES[tplName];
+      if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
+      else { col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">${tplName}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${((toMin(fmt(tpl.finish_time))-toMin(fmt(tpl.start_time)))/60)}h</span></div>`); }
+    }
+
+    col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}">＋</button><button class="iconbtn" data-day="${day}" data-edit>✎</button></div>`);
+    const cell=document.createElement('div'); cell.className='timeline-cell';
+
+    const blocks = processDayValue(dayVal);
+    blocks.forEach(b=>{
+      const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN;
+      const el=document.createElement('div'); el.className=`block ${classForCode(b.label)}`;
+      el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px';
+      el.innerHTML=`<div>${b.label}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span></div>`;
+      el.dataset.day = day; el.dataset.adv = advName; el.dataset.start = m2t(b.start); el.dataset.end = m2t(b.end); el.dataset.code=b.label;
+      el.addEventListener('click', onBlockClick);
+      cell.appendChild(el);
     });
 
-    // --- Force refresh on page load ---
-    document.addEventListener("DOMContentLoaded", () => {
-      if (typeof window.initPlanner === "function") window.initPlanner();
-      if (typeof window.renderPlanner === "function") {
-        const rows =
-          typeof window.computePlannerRowsFromState === "function"
-            ? window.computePlannerRowsFromState()
-            : [];
-        window.renderPlanner(rows);
-      }
-      if (typeof window.renderAdvisorWeek === "function") {
-        const rows =
-          typeof window.computePlannerRowsFromState === "function"
-            ? window.computePlannerRowsFromState()
-            : [];
-        window.renderAdvisorWeek(rows);
-      }
+    col.appendChild(cell); grid.appendChild(col);
+  });
+
+  $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day, advName));
+}
+function renderTeamDayCalendar(showAll){
+  resetGrid();
+  const grid=$('#calGrid'); const ws=$('#weekStart').value; const day=$('#teamDay').value||'Monday';
+  const names = showAll ? ADVISORS_LIST.map(a=>a.name) : [...selectedAdvisors];
+  const s=new Date(ws+'T00:00:00'); const idx=DAYS.indexOf(day); s.setDate(s.getDate()+idx);
+
+  const head=document.createElement('div'); head.className='day-head'; head.style.gridColumn=`1 / span ${1+names.length}`; head.style.height='56px';
+  head.innerHTML=`<small>${s.toLocaleDateString('en-GB',{month:'long'})}</small>${day}<span style="float:right">${s.getDate()}</span>`;
+  grid.appendChild(head);
+
+  names.sort((a,b)=>a.localeCompare(b)).forEach(advName=>{
+    const aId=ADVISOR_BY_NAME.get(advName); if(!aId) return;
+    const key=`${aId}::${ws}`; const data=ROTAS.get(key) || {};
+    const col=document.createElement('div'); col.className='day-col';
+    col.insertAdjacentHTML('beforeend',`<div class="day-head" style="height:56px">${advName}</div>`);
+    const dayVal=data[day];
+    if(dayVal && typeof dayVal==='object' && Array.isArray(dayVal.segments)){
+      const totalMins = processDayValue(dayVal).reduce((acc,b)=>acc+(b.end-b.start),0);
+      col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">Custom segments</span><span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
+    } else {
+      const tplName=(typeof dayVal==='string')?dayVal:''; const tpl=TEMPLATES[tplName];
+      if(!tplName){ col.insertAdjacentHTML('beforeend',`<div class="off">Roster Day Off</div>`); }
+      else{ col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">${tplName}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${((toMin(fmt(tpl.finish_time))-toMin(fmt(tpl.start_time)))/60)}h</span></div>`); }
+    }
+    col.insertAdjacentHTML('beforeend',`<div class="day-actions"><button class="iconbtn" data-day="${day}" data-adv="${advName}">＋</button><button class="iconbtn" data-day="${day}" data-adv="${advName}" data-edit>✎</button></div>`);
+    const cell=document.createElement('div'); cell.className='timeline-cell';
+    const blocks=processDayValue(dayVal);
+    blocks.forEach(b=>{
+      const top=(b.start-START*60)*PX_PER_MIN; const h=(b.end-b.start)*PX_PER_MIN;
+      const el=document.createElement('div'); el.className=`block ${classForCode(b.label)}`;
+      el.style.top=top+'px'; el.style.height=Math.max(16,h)+'px';
+      el.innerHTML=`<div>${b.label}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span></div>`;
+      el.dataset.day = day; el.dataset.adv = advName; el.dataset.start = m2t(b.start); el.dataset.end = m2t(b.end); el.dataset.code=b.label;
+      el.addEventListener('click', onBlockClick);
+      cell.appendChild(el);
     });
+    col.appendChild(cell); grid.appendChild(col);
+  });
+
+  $$('.day-actions .iconbtn').forEach(b=>b.onclick=()=>openAssign(b.dataset.day, b.dataset.adv));
+}
+
+/* ===== Assign / Split ===== */
+const assignDlg=$('#assignDlg'), assignSelect=$('#assignSelect'), assignTitle=$('#assignTitle');
+const modeTemplate=$('#modeTemplate'), modeSplit=$('#modeSplit'), modeHint=$('#modeHint');
+const segmentsWrap=$('#segmentsWrap');
+function segmentRowHTML(s, idx){
+  return `<div class="row" data-i="${idx}">
+    <select class="seg-code">${codeSelectGroupedHTML(s.code||'')}</select>
+    <input type="time" class="seg-start" value="${s.start||''}"> <span>–</span>
+    <input type="time" class="seg-end" value="${s.end||''}">
+    <button class="del">Delete</button>
+  </div>`;
+}
+function loadSegmentsUI(arr){
+  segmentsWrap.innerHTML = (arr&&arr.length)? arr.map((s,i)=>segmentRowHTML(s,i)).join('') : '<div class="muted">No segments yet. Add one.</div>';
+  $$('#segmentsWrap .row .del').forEach(btn=>btn.onclick=()=>{ btn.parentElement.remove(); if($$('#segmentsWrap .row').length===0) segmentsWrap.innerHTML='<div class="muted">No segments yet. Add one.</div>'; });
+}
+function readSegmentsUI(){
+  const rows=$$('#segmentsWrap .row');
+  const list=rows.map(r=>({ code:r.querySelector('.seg-code').value, start:r.querySelector('.seg-start').value, end:r.querySelector('.seg-end').value }))
+                 .filter(s=>s.code && s.start && s.end && toMin(s.end)>toMin(s.start))
+                 .sort((a,b)=>toMin(a.start)-toMin(b.start));
+  for(let i=1;i<list.length;i++){ if(toMin(list[i].start)<toMin(list[i-1].end)){ alert('Segments overlap.'); return null; } }
+  return list;
+}
+function openAssign(day, advisorName){
+  const advName=advisorName || $('#advisorSelect').value;
+  const aId=ADVISOR_BY_NAME.get(advName); if(!aId) return;
+  const ws=$('#weekStart').value; const key=`${aId}::${ws}`;
+  const data=ROTAS.get(key) || {};
+  assignTitle.textContent=`${day} for ${advName}`;
+  assignSelect.innerHTML=`<option value="">— Day Off —</option>`+Object.keys(TEMPLATES).sort().map(n=>`<option>${n}</option>`).join('');
+
+  if(data[day] && typeof data[day]==='object' && Array.isArray(data[day].segments)){
+    modeSplit.checked=true; modeTemplate.checked=false;
+    $('#templateMode').style.display='none'; $('#splitMode').style.display='block';
+    loadSegmentsUI(data[day].segments);
+  } else {
+    modeTemplate.checked=true; modeSplit.checked=false;
+    $('#templateMode').style.display='block'; $('#splitMode').style.display='none';
+    assignSelect.value = (typeof data[day]==='string')? data[day] : '';
+    const tplName = assignSelect.value;
+    modeHint.textContent = tplName? `Current: ${tplName}. Convert to editable segments to tweak a small part.` : '';
+  }
+
+  $('#btnConvertToSplit').onclick=()=>{
+    const base = assignSelect.value || '';
+    const segs = toEditableSegments(base);
+    modeSplit.checked=true; modeTemplate.checked=false;
+    $('#templateMode').style.display='none'; $('#splitMode').style.display='block';
+    loadSegmentsUI(segs);
+  };
+  $('#addSegment').onclick=()=>{
+    if($('#segmentsWrap .muted')) $('#segmentsWrap .muted').remove();
+    const div=document.createElement('div'); div.className='row';
+    div.innerHTML = `${'<select class="seg-code">'+codeSelectGroupedHTML('Admin')+'</select>'}
+      <input type="time" class="seg-start" value="08:00"> <span>–</span> <input type="time" class="seg-end" value="12:00">
+      <button class="del">Delete</button>`;
+    div.querySelector('.del').onclick=()=>{ div.remove(); if($$('#segmentsWrap .row').length===0) $('#segmentsWrap').innerHTML='<div class="muted">No segments yet. Add one.</div>'; };
+    segmentsWrap.appendChild(div);
+  };
+
+  $('#assignOK').onclick=async()=>{
+    const fresh = Object.assign({}, data);
+    if(modeTemplate.checked){
+      const tplName=assignSelect.value;
+      if(tplName) fresh[day]=tplName; else delete fresh[day];
+    } else {
+      const segs=readSegmentsUI(); if(!segs) return;
+      fresh[day] = { segments: segs };
+    }
+    await upsertRota(aId, ws, fresh);
+    assignDlg.close(); renderCalendar(); populateAssignTable();
+  };
+
+  assignDlg.showModal();
+}
+
+/* ===== Block editor (click a block) ===== */
+const blockDlg=$('#blockDlg');
+const bmWhole=$('#bmWhole'), bmSub=$('#bmSub');
+const bwStart=$('#bwStart'), bwEnd=$('#bwEnd'), bwCode=$('#bwCode');
+const bsStart=$('#bsStart'), bsEnd=$('#bsEnd'), bsCode=$('#bsCode');
+function buildBlockSelects(){ const codes=codeSelectGroupedHTML(); [bwCode,bsCode].forEach(sel=>sel.innerHTML=codes); }
+function onBlockClick(e){
+  const el=e.currentTarget; const advName=el.dataset.adv; const day=el.dataset.day;
+  const aId=ADVISOR_BY_NAME.get(advName); const ws=$('#weekStart').value; const key=`${aId}::${ws}`;
+  const data=ROTAS.get(key) || {}; const blocks=processDayValue(data[day]);
+  const origCode=el.dataset.code, origStart=el.dataset.start, origEnd=el.dataset.end;
+  $('#blockTitle').textContent=`Edit ${day} for ${advName}`; $('#blockHint').textContent=`Block: ${origCode} ${origStart}–${origEnd}`;
+  buildBlockSelects();
+  bmSub.checked=true; $('#blockSub').style.display='block'; $('#blockWhole').style.display='none';
+  bwCode.value = origCode; bwStart.value=origStart; bwEnd.value=origEnd;
+  bsCode.value = origCode; bsStart.value=origStart; bsEnd.value=origEnd;
+
+  bmWhole.onchange = bmSub.onchange = ()=>{
+    const whole=bmWhole.checked; $('#blockWhole').style.display=whole?'block':'none'; $('#blockSub').style.display=whole?'none':'block';
+  };
+
+  $('#blockOK').onclick=async()=>{
+    const baseSegs = toEditableSegments(data[day] || '');
+    const oS=toMin(origStart), oE=toMin(origEnd);
+    const idx = baseSegs.findIndex(s=>s.start===origStart && s.end===origEnd && (s.code||'')===origCode);
+    if(idx===-1){ alert('Could not find block.'); return; }
+
+    let segs=[...baseSegs];
+    if(bmWhole.checked){
+      const c=bwCode.value, s=bwStart.value, e=bwEnd.value;
+      if(!s||!e||toMin(e)<=toMin(s) || toMin(s)<oS || toMin(e)>oE){ alert('Invalid range.'); return; }
+      segs.splice(idx,1);
+      if(toMin(s)>oS) segs.splice(idx,0,{code:origCode,start:m2t(oS),end:s});
+      segs.splice(idx+(toMin(s)>oS?1:0),0,{code:c,start:s,end:e});
+      if(toMin(e)<oE) segs.splice(idx+(toMin(s)>oS?1:0)+1,0,{code:origCode,start:e,end:m2t(oE)});
+    } else {
+      const c=bsCode.value, s=bsStart.value, e=bsEnd.value;
+      if(!s||!e||toMin(e)<=toMin(s) || toMin(s)<oS || toMin(e)>oE){ alert('Invalid sub-range.'); return; }
+      segs.splice(idx,1);
+      if(toMin(s)>oS) segs.splice(idx,0,{code:origCode,start:m2t(oS),end:s});
+      segs.splice(idx+(toMin(s)>oS?1:0),0,{code:c,start:s,end:e});
+      if(toMin(e)<oE) segs.splice(idx+(toMin(s)>oS?1:0)+1,0,{code:origCode,start:e,end:m2t(oE)});
+    }
+    const fresh = Object.assign({}, data, { [day]: {segments: mergeAdjacent(segs)} });
+    await upsertRota(aId, ws, fresh);
+    blockDlg.close(); renderCalendar(); populateAssignTable();
+  };
+
+  blockDlg.showModal();
+}
+
+/* ===== Rotas DB ===== */
+async function upsertRota(advisorId, weekStartISO, dataObj){
+  const { data, error } = await sb.from('rotas').upsert({
+    advisor_id: advisorId,
+    week_start: weekStartISO,
+    data: dataObj
+  }, { onConflict: 'advisor_id,week_start' }).select('*').single();
+  if(!error){ ROTAS.set(`${advisorId}::${weekStartISO}`, data.data || {}); }
+}
+async function fetchRotasForWeek(weekStartISO){
+  if(!weekStartISO) return;
+  const { data } = await sb.from('rotas').select('advisor_id,week_start,data').eq('week_start', weekStartISO);
+  ROTAS.clear(); (data||[]).forEach(r=> ROTAS.set(`${r.advisor_id}::${weekStartISO}`, r.data || {}));
+}
+
+/* ===== Templates & UI helpers ===== */
+async function loadTemplates(){
+  const { data } = await sb.from('templates').select('*');
+  TEMPLATES = {}; (data||[]).forEach(t=> TEMPLATES[t.name] = {
+    name:t.name, work_code:t.work_code, start_time:t.start_time, finish_time:t.finish_time, break1:t.break1, lunch:t.lunch, break2:t.break2
+  });
+}
+
+/* Add buildRowsFrom helper */
+function buildRowsFrom(assignments,templates){
+  const rows=[];
+  (assignments||[]).forEach(a=>{
+    const t = (templates && (templates[a.templateName]||templates[a.templateId])) || a.template || {};
+    const s = t.startMin ?? t.start ?? 7*60;
+    const e = t.endMin   ?? t.end   ?? 16*60;
+    const non=[];
+    (t.breaks||[]).forEach(b=>non.push({type:'break',start:b.startMin??b.start??0,end:(b.startMin??b.start??0)+(b.dur??15)}));
+    if(t.lunch) non.push({type:'lunch',start:t.lunch.startMin??t.lunch.start??(12*60),end:(t.lunch.startMin??t.lunch.start??(12*60))+(t.lunch.dur??30)});
+    (a.meetings||[]).forEach(m=>non.push({type:'meeting',start:m.startMin??m.start,end:m.endMin??m.end}));
+    non.sort((x,y)=>x.start-y.start);
+    const segs=[]; let last=s;
+    non.forEach(n=>{ if(n.start>last) segs.push({type:'work',code:a.code,start:last,end:Math.min(n.start,e)});
+                     segs.push({type:n.type,code:n.code||n.type,start:Math.max(n.start,s),end:Math.min(n.end,e)});
+                     last=Math.max(last,n.end); });
+    if(last<e) segs.push({type:'work',code:a.code,start:last,end:e});
+    rows.push({name:a.name||a.advisorName||a.id,badge:a.badge||a.role||'',segments:segs});
+  });
+  return rows;
+}
+
+function refreshChips(){
+  const box=$('#activeChips'); box.innerHTML='';
+  if(!selectedAdvisors.size){ box.innerHTML='<span class="muted">No advisors selected.</span>'; return; }
+  [...selectedAdvisors].sort((a,b)=>a.localeCompare(b)).forEach(n=>{
+    const chip=document.createElement('span'); chip.className='chip'; chip.textContent=n;
+    const x=document.createElement('button'); x.textContent='×'; x.style.border='none'; x.style.background='transparent'; x.style.cursor='pointer';
+    x.onclick=()=>{ selectedAdvisors.delete(n); refreshChips(); rebuildTree(); populateAssignTable(); renderCalendar(); };
+    chip.appendChild(x); box.appendChild(chip);
+  });
+}
+function updateViewSelector(){
+  const team = $('#advisorSelect').value;
+  const showTeam = team==='__TEAM_SELECTED__' || team==='__TEAM_ALL__';
+  $('#lblTeamDay').style.display = showTeam ? 'inline' : 'none';
+  $('#teamDay').style.display     = showTeam ? 'inline' : 'none';
+}
+function setHours(){ $('#hours').innerHTML=hoursHTML(); }
+
+
+/* ===== Publish: target collection, confirmations & execution ===== */
+function collectPublishTargets(){
+  const ws = $('#weekStart').value;
+  const selVal = $('#advisorSelect').value;
+
+  // Team: Selected / All
+  if (selVal === '__TEAM_SELECTED__') {
+    return [...selectedAdvisors].map(name => ({ id: ADVISOR_BY_NAME.get(name), name, ws }));
+  }
+  if (selVal === '__TEAM_ALL__') {
+    return ADVISORS_LIST.map(a => ({ id: a.id, name: a.name, ws }));
+  }
+  // Single advisor
+
+  if (selVal && selVal.startsWith && selVal.startsWith('advisor::')){
+    const id = selVal.split('::')[1];
+    return [{ id, name: ADVISOR_BY_ID.get(id) || '', ws }];
+  }
+  // Fallback: if dropdown currently shows a raw name (legacy)
+  if (ADVISOR_BY_NAME.has(selVal)){
+    return [{ id: ADVISOR_BY_NAME.get(selVal), name: selVal, ws }];
+  }
+  return [];
+}
+
+// Returns true if OK to overwrite a specific day for that advisor
+async function confirmOverwriteDay(advisorId, ws, day, newValue){
+  const key = `${advisorId}::${ws}`;
+  const existing = ROTAS.get(key) || {};
+  const had = existing[day] !== undefined && existing[day] !== null && existing[day] !== '';
+  // If nothing set or identical, no need to confirm
+  const same = JSON.stringify(existing[day] || null) === JSON.stringify(newValue || null);
+  if (!had || same) return true;
+
+  return confirm(`You're about to overwrite ${ADVISOR_BY_ID.get(advisorId) || 'this advisor'} on ${day} for week ${ws}. Continue?`);
+}
+
+// Opens the publish dialog, listing who will be published
+function openPublishDialog(){
+  const targets = collectPublishTargets();
+  if (!targets.length){
+    alert('Select an advisor or team to publish.');
+    return;
+  }
+  const ws = $('#weekStart').value;
+  const dayMode = ($('#advisorSelect').value === '__TEAM_SELECTED__' || $('#advisorSelect').value === '__TEAM_ALL__');
+
+  $('#publishSummary').textContent = dayMode
+    ? `Publishing the selected day (${ $('#teamDay').value }) for ${targets.length} advisor(s), week starting ${ws}.`
+    : `Publishing the full week for ${targets.length} advisor(s), week starting ${ws}.`;
+
+  const ul = document.createElement('ul');
+  ul.style.margin = '6px 0 0 18px';
+  ul.style.padding = '0';
+  targets.forEach(t => {
+    const li = document.createElement('li');
+    li.textContent = t.name || t.id;
+    ul.appendChild(li);
+  });
+  const listBox = $('#publishList');
+  listBox.innerHTML = '';
+  listBox.appendChild(ul);
+
+  publishDlg.showModal();
+}
+
+// Performs the publish by upserting current working data
+async function doPublish(){
+  const targets = collectPublishTargets();
+  if (!targets.length){ publishDlg.close(); return; }
+
+  const ws = $('#weekStart').value;
+  const teamMode = ($('#advisorSelect').value === '__TEAM_SELECTED__' || $('#advisorSelect').value === '__TEAM_ALL__');
+  const teamDay = $('#teamDay').value;
+
+  let published = 0, skipped = 0;
+
+  for (const t of targets){
+    const key = `${t.id}::${ws}`;
+    const data = ROTAS.get(key) || {};  // Fix: Remove stray }
+
+    if (teamMode){
+      // Only publish the chosen day for each advisor
+      const newVal = data[teamDay] || null;
+      const ok = await confirmOverwriteDay(t.id, ws, teamDay, newVal);
+      if (!ok){ skipped++; continue; }
+      // Ensure object key exists even if day off
+      const fresh = Object.assign({}, data);
+      if (newVal === null || newVal === undefined) delete fresh[teamDay]; else fresh[teamDay] = newVal;
+      await upsertRota(t.id, ws, fresh);
+      published++;
+    } else {
+      // Full week for a single advisor (or explicit single-advisor selection)
+      // Confirm once per day that would be overwritten
+      let proceed = true;
+      for (const d of DAYS){
+        const ok = await confirmOverwriteDay(t.id, ws, d, data[d] || null);
+        if (!ok){ proceed = false; break; }
+      }
+      if (!proceed){ skipped++; continue; }
+      await upsertRota(t.id, ws, data);
+      published++;
+    }
+  }
+
+  publishDlg.close();
+  alert(`Publish complete. Updated: ${published}. Skipped: ${skipped}.`);
+}
+
+
+  /* ===== Wire buttons ===== */
+  function wire(){
+    // Publish button
+    $('#btnPublish').onclick = openPublishDialog;
+    $('#btnPrint').onclick=()=>window.print();
+    $('#btnGenerate').onclick=()=>{ updateRangeLabel(); renderCalendar(); };
+    $('#btnToday').onclick=()=>{ const t=setToMonday(new Date()); $('#weekStart').value=t.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
+    $('#prevWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()-7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
+    $('#nextWeek').onclick=()=>{ const d=new Date($('#weekStart').value||new Date()); d.setDate(d.getDate()+7); $('#weekStart').value=d.toISOString().slice(0,10); updateRangeLabel(); fetchRotasForWeek($('#weekStart').value).then(()=>{ renderCalendar(); populateAssignTable(); }); };
+
+    $('#btnSave').onclick=()=>{ 
+      const exportObj = { org:ORG, templates:TEMPLATES, weekStart:$('#weekStart').value };
+      const blob=new Blob([JSON.stringify(exportObj,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='rota-export.json'; a.click();
+    };
+    $('#btnLoad').onclick=()=>$('#file').click();
+    $('#file').addEventListener('change',async e=>{
+      const f=e.target.files[0]; if(!f) return; const r=new FileReader(); r.onload=async ev=>{
+        try{
+          const data=JSON.parse(ev.target.result);
+          alert('Loaded JSON. This importer restores Templates locally; manage Sites/Leaders/Advisors in the Schedules panel.');
+          if(data.templates){
+            for(const t of Object.values(data.templates)){
+              await sb.from('templates').upsert({
+                name:t.name, work_code:t.work_code||'Admin',
+                start_time:t.start_time||null, finish_time:t.finish_time||null,
+                break1:t.break1||null, lunch:t.lunch||null, break2:t.break2||null
+              }, { onConflict:'name' });
+            }
+          }
+        }catch{ alert('Invalid JSON'); }
+      }; r.readAsText(f);
+    });
+
+    $('#btnReset').onclick=()=>{ if(!confirm('Clear only local cache (does not delete Supabase data)?')) return; ROTAS.clear(); sessionStorage.clear(); localStorage.clear(); location.reload(); };
+
+    // NEW: View change logic (supports leader picks)
+    $('#advisorSelect').addEventListener('change', ()=>{ 
+      const v = $('#advisorSelect').value;
+
+      if(v.startsWith && v.startsWith('leader::')){
+        const leaderId = v.split('::')[1];
+        const names = getLeaderTeamNames(leaderId);
+        selectedAdvisors = new Set(names);
+        refreshChips();
+        populateAssignTable();
+        $('#advisorSelect').value = '__TEAM_SELECTED__'; // switch to Team view
+      }
+
+      updateViewSelector();
+      updateRangeLabel();
+      renderCalendar();
+      try {
+        const rows = window.computePlannerRowsFromState();
+        window.renderTimeHeader(document.getElementById('timeHeader'));
+        window.renderPlanner(rows);
+      } catch(e) { console.warn('planner boot skipped', e); }
+    });
+  }
+
+  /* ===== Realtime ===== */
+  function subscribeRealtime(){
+    sb.channel('any-changes')
+      .on('postgres_changes', { event:'*', schema:'public', table:'sites' },   ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
+      .on('postgres_changes', { event:'*', schema:'public', table:'leaders' }, ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
+      .on('postgres_changes', { event:'*', schema:'public', table:'advisors'}, ()=> loadOrg().then(()=>{ rebuildTree(); rebuildAdvisorDropdown(); }))
+      .on('postgres_changes', { event:'*', schema:'public', table:'templates'},()=> loadTemplates().then(()=>{ populateTemplateEditor(); renderCalendar(); }))
+      .on('postgres_changes', { event:'*', schema:'public', table:'rotas' },   ()=>{ 
+        const ws=$('#weekStart').value; fetchRotasForWeek(ws).then(()=>{ renderCalendar(); populateAssignTable(); });
+      })
+      .subscribe();
+  }
+
+  /* ===== INIT ===== */
+  (async function boot() {
+    // 1) Ensure weekStart is set to the Monday of the current week
+    const setToMonday = (d) => { const day=d.getDay(); const diff=(day===0?-6:1)-day; d.setDate(d.getDate()+diff); return d; };
+    const wsEl = document.getElementById('weekStart');
+    if (wsEl && !wsEl.value) {
+      const monday = setToMonday(new Date());
+      wsEl.value = monday.toISOString().slice(0,10);
+    }
+
+    // 2) Load core data (only if helpers exist)
+    try {
+      if (typeof loadOrg === 'function')         await loadOrg();
+      if (typeof loadTemplates === 'function')   await loadTemplates();
+      if (typeof fetchRotasForWeek === 'function') {
+        await fetchRotasForWeek(wsEl?.value);
+      }
+    } catch (e) {
+      console.warn('Initial data load failed:', e);
+    }
+
+    // 3) Build UI and first render (only if helpers exist)
+    if (typeof rebuildAdvisorDropdown === 'function') rebuildAdvisorDropdown();
+    if (typeof rebuildTree === 'function')            rebuildTree();
+    if (typeof buildColorKey === 'function')          buildColorKey();
+    if (typeof updateViewSelector === 'function')     updateViewSelector();
+    if (typeof updateRangeLabel === 'function')       updateRangeLabel();
+    if (typeof populateTemplateEditor === 'function') populateTemplateEditor();
+    if (typeof populateAssignTable === 'function')    populateAssignTable();
+    if (typeof renderCalendar === 'function')         renderCalendar();
+
+    // 4) Wire listeners and realtime (only if helpers exist)
+    if (typeof wire === 'function')                   wire();
+    if (typeof subscribeRealtime === 'function')      subscribeRealtime();
+  })();
   </script>
+<script defer src="./src/planner.js"></script>
+<script defer src="./src/init.js"></script>
 </body>
 </html>
