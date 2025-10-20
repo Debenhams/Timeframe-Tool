@@ -112,6 +112,19 @@
       if (typeof window.loadAssignments === "function")
         await window.loadAssignments();
 
+      // ---- HOTFIX A: make sure advisor indexes + ROTAS Map exist ----
+try {
+  if (!window.ADVISOR_BY_NAME && Array.isArray(window.ADVISORS_LIST)) {
+    window.ADVISOR_BY_NAME = new Map(window.ADVISORS_LIST.map(a => [a.name, a.id]));
+  }
+  if (!window.ADVISOR_BY_ID && Array.isArray(window.ADVISORS_LIST)) {
+    window.ADVISOR_BY_ID = new Map(window.ADVISORS_LIST.map(a => [a.id, a.name]));
+  }
+} catch (e) {
+  console.warn("advisor index build failed:", e);
+}
+// ensure ROTAS is a Map (empty if needed)
+window.ROTAS = window.ROTAS instanceof Map ? window.ROTAS : new Map();
       // Rebuild UI (only if helpers exist)
       if (typeof window.rebuildAdvisorDropdown === "function")
         window.rebuildAdvisorDropdown();
@@ -141,7 +154,22 @@
           console.warn("fetchRotasForWeek failed:", e);
         }
       }
-
+// ---- HOTFIX B: normalize ROTAS if a loader left it as an array ----
+try {
+  if (!(window.ROTAS instanceof Map) && Array.isArray(window.ROTAS)) {
+    const m = new Map();
+    for (const row of window.ROTAS) {
+      const aId = row.advisor_id ?? row.adviser_id ?? row.advisorId;
+      const ws = row.week_start ?? row.weekStart;
+      let data = row.weekData ?? row.week_data ?? row.week_data_json ?? row.data;
+      if (typeof data === "string") { try { data = JSON.parse(data); } catch {} }
+      if (aId && ws && data) m.set(`${aId}::${ws}`, data);
+    }
+    window.ROTAS = m;
+  }
+} catch (e) {
+  console.warn("ROTAS normalize failed:", e);
+}
       // Initial render
       refreshPlannerUI();
 
