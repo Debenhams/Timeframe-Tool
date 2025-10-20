@@ -1,132 +1,158 @@
 // src/init.js
 (() => {
-  // ---- recompute + render both views (safe: guards around helpers) ----
+  // ---------- helpers ----------
+  const get = (id) => document.getElementById(id);
+
   function refreshPlannerUI() {
     const rows =
       typeof window.computePlannerRowsFromState === "function"
         ? window.computePlannerRowsFromState()
         : [];
-
-    if (typeof window.renderPlanner === "function") {
-      window.renderPlanner(rows);
-    }
-    // If you have a vertical renderer, it'll be called; otherwise this is a no-op
-    if (typeof window.renderAdvisorWeek === "function") {
-      window.renderAdvisorWeek(rows);
-    }
+    if (typeof window.renderPlanner === "function") window.renderPlanner(rows);
+    if (typeof window.renderAdvisorWeek === "function") window.renderAdvisorWeek(rows);
   }
 
-  // ---- one-time wiring helper ----
-  function wireOnce(el, ev, handler, flag = `_wired_${ev}`) {
+  function wireOnce(el, ev, handler, key) {
     if (!el) return;
-    if (el.dataset && el.dataset[flag]) return;
+    key = key || `_wired_${ev}`;
+    if (el.dataset && el.dataset[key]) return;
     el.addEventListener(ev, handler);
-    if (el.dataset) el.dataset[flag] = "1";
+    if (el.dataset) el.dataset[key] = "1";
   }
 
-  // ---- sources that should trigger a refresh ----
-  function wirePlannerRefreshSources() {
-    // week/day controls
-    wireOnce(document.getElementById("weekStart"), "change", () => {
-      if (typeof updateRangeLabel === "function") updateRangeLabel();
-      if (typeof renderCalendar === "function") renderCalendar();
-      refreshPlannerUI();
-    });
-
-    wireOnce(document.getElementById("teamDay"), "change", () => {
-      if (typeof updateRangeLabel === "function") updateRangeLabel();
-      if (typeof renderCalendar === "function") renderCalendar();
-      refreshPlannerUI();
-    });
-
-    // Right panel tree and chips (these are the actual IDs in your HTML)
-    wireOnce(document.getElementById("tree"), "change", refreshPlannerUI);
-    wireOnce(document.getElementById("tree"), "click", refreshPlannerUI);
-    wireOnce(document.getElementById("activeChips"), "click", refreshPlannerUI);
+  // Set #weekStart = Monday of current week if empty
+  function ensureWeekStartDefault() {
+    const el = get("weekStart");
+    if (!el || el.value) return;
+    const d = new Date();
+    const offset = (d.getDay() + 6) % 7; // Monday=0
+    d.setDate(d.getDate() - offset);
+    el.value = d.toISOString().slice(0, 10);
   }
 
-  // ---- top view dropdown (Leader/Team) drives selection + refresh ----
-  function wireTopViewDropdown() {
-    // Your page uses id="advisorSelect"
-    const viewDropdown = document.getElementById("advisorSelect");
-    if (!viewDropdown) return;
-
+  // Keep top dropdown and right panel in sync
+  function wireAdvisorSelect() {
+    const sel = get("advisorSelect");
+    if (!sel) return;
     wireOnce(
-      viewDropdown,
+      sel,
       "change",
       (evt) => {
-        // The inline HTML code already updates selectedAdvisors when a leader is chosen.
-        // Here we simply keep the old behavior: update labels/calendar + refresh planner.
-        if (typeof updateRangeLabel === "function") updateRangeLabel();
-        if (typeof renderCalendar === "function") renderCalendar();
+        const opt = evt.target.selectedOptions?.[0];
+        const val = opt?.value ?? evt.target.value;
+
+        // Try to mirror right-panel click so your old code runs
+        const lookupId =
+          opt?.dataset?.leaderId ||
+          opt?.dataset?.teamId ||
+          opt?.dataset?.assignmentId ||
+          val;
+
+        if (lookupId) {
+          const target =
+            document.querySelector(`[data-leader-id="${lookupId}"]`) ||
+            document.querySelector(`[data-team-id="${lookupId}"]`) ||
+            document.querySelector(`[data-assignment-id="${lookupId}"]`);
+          if (target) {
+            target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+          }
+        }
+
         refreshPlannerUI();
       },
       "_wired_change"
     );
   }
 
-  // ---- Generate button: recompute & render ----
   function wireGenerateButton() {
-    const btn = document.getElementById("btnGenerate");
+    const btn = get("btnGenerate");
     if (!btn) return;
     wireOnce(
       btn,
       "click",
       async () => {
-        try {
-          // original flow: labels + calendar + planner
-          if (typeof updateRangeLabel === "function") updateRangeLabel();
-          if (typeof renderCalendar === "function") renderCalendar();
-          refreshPlannerUI();
-        } catch (err) {
-          console.error("Generate failed:", err);
+        // make sure data for the chosen week is loaded before render
+        if (typeof window.fetchRotasForWeek === "function") {
+          const ws = get("weekStart")?.value;
+          try { await window.fetchRotasForWeek(ws); } catch (e) {}
         }
+        refreshPlannerUI();
+        console.log("Schedule generated.");
       },
       "_wired_click"
     );
   }
 
-  // ---- SAFE BOOT ----
+  function wirePlannerRefreshSources() {
+    wireOnce(get("weekStart"), "change", async () => {
+      if (typeof window.fetchRotasForWeek === "function") {
+        try { await window.fetchRotasForWeek(get("weekStart")?.value); } catch (e) {}
+      }
+      refreshPlannerUI();
+    });
+
+    wireOnce(get("teamDay"), "change", refreshPlannerUI, "_wired_day");
+
+    // Right panel tree/checkboxes – trigger refresh on clicks or changes
+    const candidates = [
+      "#advisorTree",
+      "#treePanel",
+      "[data-tree-root]",
+      ".advisor-tree",
+      "[data-role='advisor-tree']",
+      "[data-tree-panel]",
+      ".schedules-panel",
+    ];
+    for (const sel of candidates) {
+      const el = document.querySelector(sel);
+      wireOnce(el, "click",  refreshPlannerUI, "_wired_click_refresh");
+      wireOnce(el, "change", refreshPlannerUI, "_wired_change_refresh");
+    }
+  }
+
+  async function loadAllDataForWeek() {
+    // Base datasets
+    if (typeof window.loadOrg === "function")         { try { await window.loadOrg(); } catch (e) {} }
+    if (typeof window.loadTemplates === "function")   { try { await window.loadTemplates(); } catch (e) {} }
+    if (typeof window.loadAssignments === "function") { try { await window.loadAssignments(); } catch (e) {} }
+
+    // Week-specific rotas
+    if (typeof window.fetchRotasForWeek === "function") {
+      const ws = get("weekStart")?.value;
+      try { await window.fetchRotasForWeek(ws); } catch (e) {}
+    }
+  }
+
+  // ---------- boot ----------
   const boot = async () => {
     try {
-      // Load data (only if helpers exist)
-      if (typeof loadOrg === "function")         await loadOrg();
-      if (typeof loadTemplates === "function")   await loadTemplates();
-      if (typeof loadAssignments === "function") await loadAssignments();
+      ensureWeekStartDefault();
 
-      // Rebuild UI (only if helpers exist)
-      if (typeof rebuildAdvisorDropdown === "function") rebuildAdvisorDropdown();
-      if (typeof rebuildTree === "function")            rebuildTree();
-      if (typeof refreshChips === "function")           refreshChips();
-      if (typeof populateTemplateEditor === "function") populateTemplateEditor();
-      if (typeof populateAssignTable === "function")    populateAssignTable();
-      if (typeof updateRangeLabel === "function")       updateRangeLabel();
-      if (typeof renderCalendar === "function")         renderCalendar();
-
-      // Time header
-      const headerEl = document.getElementById("timeHeader");
+      // draw hour ticks if renderer exists
+      const headerEl = get("timeHeader");
       if (headerEl && typeof window.renderTimeHeader === "function") {
         window.renderTimeHeader(headerEl);
       }
 
-      // First render of planner/vertical
+      // load datasets (org, templates, assignments, rotas for week)
+      await loadAllDataForWeek();
+
+      // wire interactions
+      wireAdvisorSelect();
+      wireGenerateButton();
+      wirePlannerRefreshSources();
+
+      // initial render (after data is confirmed loaded)
       refreshPlannerUI();
     } catch (e) {
       console.warn("planner boot skipped", e);
     }
 
-    // Live updates
     if (typeof window.subscribeRealtime === "function") {
       window.subscribeRealtime();
     }
-
-    // Wire interactions
-    wireGenerateButton();
-    wireTopViewDropdown();
-    wirePlannerRefreshSources();
   };
 
-  // Run once when DOM is ready
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot, { once: true });
   } else {
