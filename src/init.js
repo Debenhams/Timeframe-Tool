@@ -306,83 +306,162 @@
   } else {
     boot();
   }
-  // --- PERMANENT FIX: prime ROTAS from Master Assignment table & keep it in sync ---
+  /* -----------------------------------------------------------
+   PERMANENT: prime ROTAS from the Master Assignment table
+   and render the horizontal planner directly from ROTAS+TEMPLATES
+   (kept very defensive: no error if something is missing)
+----------------------------------------------------------- */
 (() => {
-  // 1) Build advisor lookup maps from the Master Assignment table (left-most name column)
-  if (!window.rebuildAdvisorIndexesFromTable) {
-    window.rebuildAdvisorIndexesFromTable = function rebuildAdvisorIndexesFromTable() {
-      const table = document.getElementById('assignTable');
-      if (!table) return false;
 
-      const names = Array.from(table.querySelectorAll('tbody tr'))
-        .map(tr => (tr.querySelector('th,td')?.textContent || '').trim())
-        .filter(Boolean);
-
-      window.ADVISOR_BY_NAME = new Map(names.map(n => [n, n]));
-      window.ADVISOR_BY_ID   = new Map(names.map(n => [n, n]));
-      return window.ADVISOR_BY_NAME.size > 0;
-    };
+  // ---------- helpers ----------
+  function toMin(t) {
+    if (!t) return null;
+    const [h, m] = String(t).split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    return h * 60 + m;
   }
 
-  // 2) Prime window.ROTAS from the table values for the selected week/day
-  if (!window.primeRotasFromAssignTable) {
-    window.primeRotasFromAssignTable = function primeRotasFromAssignTable() {
-      const ws      = document.getElementById('weekStart')?.value;
-      const dayName = document.getElementById('teamDay')?.value || 'Monday';
-      const table   = document.getElementById('assignTable');
-      if (!ws || !table || !(window.ADVISOR_BY_NAME instanceof Map)) return 0;
-
-      window.ROTAS = (window.ROTAS instanceof Map) ? window.ROTAS : new Map();
-
-      const DAYS   = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-      const dayIdx = DAYS.indexOf(dayName);
-      if (dayIdx < 0) return 0;
-
-      let primed = 0;
-      Array.from(table.querySelectorAll('tbody tr')).forEach(tr => {
-        const name = (tr.querySelector('th,td')?.textContent || '').trim();
-        const aId  = window.ADVISOR_BY_NAME.get(name);
-        if (!aId) return;
-
-        const cell = tr.querySelectorAll('td')[dayIdx];
-        if (!cell) return;
-
-        // accept <select>, data attributes, or plain text
-        const sel = cell.querySelector('select,[data-template],[data-value]');
-        let tpl = (sel && 'value' in sel) ? sel.value
-               : (sel?.getAttribute?.('data-template') || sel?.getAttribute?.('data-value') || cell.textContent || '');
-
-        tpl = String(tpl).replace(/[–—]/g,'-').trim();
-        if (!tpl || /^day\s*off$/i.test(tpl)) return; // ignore Day Off / blank
-
-        const key     = `${aId}::${ws}`;
-        const weekObj = window.ROTAS.get(key) || {};
-        weekObj[dayName] = tpl;          // planner.js will expand template name -> segments using window.TEMPLATES
-        window.ROTAS.set(key, weekObj);
-        primed++;
-      });
-
-      return primed;
-    };
-  }
-
-  // 3) Re-prime + re-render whenever the assignment table changes
-  const table = document.getElementById('assignTable');
-  if (table && !table.dataset.primeWired) {
-    table.addEventListener('change', () => {
-      window.rebuildAdvisorIndexesFromTable?.();
-      const n = window.primeRotasFromAssignTable?.() || 0;
-      if (typeof window.computePlannerRowsFromState === 'function' &&
-          typeof window.renderPlanner === 'function') {
-        const rows = window.computePlannerRowsFromState() || [];
-        if (rows.length || n) window.renderPlanner(rows);
+  function buildSegmentsFromTemplate(tpl) {
+    if (!tpl) return [];
+    const segs = [];
+    const s = toMin(tpl.start), e = toMin(tpl.end);
+    if (s != null && e != null && e > s) {
+      segs.push({ type: 'work', code: tpl.work_code || 'Shift', start: s, end: e });
+    }
+    (tpl.breaks || []).forEach(b => {
+      const bs = toMin(b.start), be = toMin(b.end);
+      if (bs != null && be != null && be > bs) {
+        segs.push({ type: 'break', code: 'Break', start: bs, end: be });
       }
     });
-    table.dataset.primeWired = '1';
+    return segs.sort((a, b) => a.start - b.start);
   }
 
-  // 4) Run once on load
-  window.rebuildAdvisorIndexesFromTable?.();
-  window.primeRotasFromAssignTable?.();
-})();
+  // Build advisor lookups from the Master Assignment table (left-most name col)
+  function rebuildAdvisorIndexesFromTable() {
+    const table = document.getElementById('assignTable');
+    if (!table) return false;
+
+    const names = Array.from(table.querySelectorAll('tbody tr'))
+      .map(tr => (tr.querySelector('th,td')?.textContent || '').trim())
+      .filter(Boolean);
+
+    window.ADVISOR_BY_NAME = new Map(names.map(n => [n, n])); // name -> id (name)
+    window.ADVISOR_BY_ID   = new Map(names.map(n => [n, n])); // id (name) -> name
+    return window.ADVISOR_BY_NAME.size > 0;
+  }
+
+  // Prime window.ROTAS from the table for the current week/day
+  function primeRotasFromAssignTable() {
+    const ws      = document.getElementById('weekStart')?.value;
+    const dayName = document.getElementById('teamDay')?.value || 'Monday';
+    const table   = document.getElementById('assignTable');
+    if (!ws || !table || !(window.ADVISOR_BY_NAME instanceof Map)) return 0;
+
+    const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    const dayIdx = DAYS.indexOf(dayName);
+    if (dayIdx < 0) return 0;
+
+    const rotas = (window.ROTAS instanceof Map) ? window.ROTAS : (window.ROTAS = new Map());
+
+    let primed = 0;
+    Array.from(table.querySelectorAll('tbody tr')).forEach(tr => {
+      const name = (tr.querySelector('th,td')?.textContent || '').trim();
+      if (!name) return;
+      const aId = window.ADVISOR_BY_NAME.get(name);
+      if (!aId) return;
+
+      const cell = tr.querySelectorAll('td')[dayIdx];
+      if (!cell) return;
+
+      // read template from <select>, data attrs, or plain text
+      const sel = cell.querySelector('select,[data-template],[data-value]');
+      let tplName = (sel && 'value' in sel) ? sel.value :
+                    sel?.getAttribute?.('data-template') ||
+                    sel?.getAttribute?.('data-value') ||
+                    cell.textContent || '';
+
+      tplName = String(tplName).replace(/[\r\n]/g,' ').replace(/\s+/g,' ').trim();
+      if (!tplName || /^(\^|\s*)day\s*off(\s|$)/i.test(tplName)) return; // ignore Day Off / blank
+
+      const key = `${aId}::${ws}`;
+      const weekObj = rotas.get(key) || {};
+      weekObj[dayName] = tplName;                // planner.js will expand template using TEMPLATES
+      rotas.set(key, weekObj);
+      primed++;
+    });
+
+    return primed;
+  }
+
+  // Build rows from ROTAS + TEMPLATES and call the existing horizontal renderer
+  function renderHorizontalFromRotas() {
+    const ws      = document.getElementById('weekStart')?.value;
+    const dayName = document.getElementById('teamDay')?.value || 'Monday';
+    if (!ws || !(window.ROTAS instanceof Map)) return;
+
+    const TPLS = window.TEMPLATES?.get ? (name => window.TEMPLATES.get(name))
+                                       : (name => window.TEMPLATES?.[name]);
+
+    // name lookup (works whether we keyed by name or by id)
+    const nameById = (window.ADVISOR_BY_ID instanceof Map)
+      ? window.ADVISOR_BY_ID
+      : (window.ADVISOR_BY_NAME instanceof Map
+            ? new Map(Array.from(window.ADVISOR_BY_NAME.keys()).map(n => [n, n]))
+            : new Map());
+
+    const rows = [];
+    for (const [key, weekObj] of window.ROTAS) {
+      const [aId, kws] = String(key).split('::');
+      if (kws !== ws) continue;
+      const tplName = weekObj?.[dayName];
+      if (!tplName) continue;
+
+      const tpl = TPLS(tplName);
+      if (!tpl) continue;
+
+      const segments = buildSegmentsFromTemplate(tpl);
+      if (!segments.length) continue;
+
+      const name = nameById.get(aId) || aId;
+      rows.push({ name, badge: '', segments });
+    }
+
+    rows.sort((a, b) => a.name.localeCompare(b.name));
+    if (rows.length && typeof window.renderPlanner === 'function') {
+      window.renderPlanner(rows);
+    }
+  }
+
+  // Wire changes so it stays in sync
+  function wireRecalc() {
+    const table = document.getElementById('assignTable');
+    if (table && !table.dataset.primeWired) {
+      table.addEventListener('change', () => {
+        rebuildAdvisorIndexesFromTable();
+        const n = primeRotasFromAssignTable();
+        renderHorizontalFromRotas();
+      });
+      table.dataset.primeWired = '1';
+    }
+
+    ['weekStart','teamDay','advisorSelect'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el && !el.dataset.primeWired) {
+        el.addEventListener('change', () => {
+          // re-prime (day/week may have changed)
+          primeRotasFromAssignTable();
+          renderHorizontalFromRotas();
+        });
+        el.dataset.primeWired = '1';
+      }
+    });
+  }
+
+  // Run once on load
+  rebuildAdvisorIndexesFromTable();
+  primeRotasFromAssignTable();
+  renderHorizontalFromRotas();
+  wireRecalc();
+
 })();
