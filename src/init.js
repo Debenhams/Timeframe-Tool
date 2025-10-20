@@ -306,4 +306,83 @@
   } else {
     boot();
   }
+  // --- PERMANENT FIX: prime ROTAS from Master Assignment table & keep it in sync ---
+(() => {
+  // 1) Build advisor lookup maps from the Master Assignment table (left-most name column)
+  if (!window.rebuildAdvisorIndexesFromTable) {
+    window.rebuildAdvisorIndexesFromTable = function rebuildAdvisorIndexesFromTable() {
+      const table = document.getElementById('assignTable');
+      if (!table) return false;
+
+      const names = Array.from(table.querySelectorAll('tbody tr'))
+        .map(tr => (tr.querySelector('th,td')?.textContent || '').trim())
+        .filter(Boolean);
+
+      window.ADVISOR_BY_NAME = new Map(names.map(n => [n, n]));
+      window.ADVISOR_BY_ID   = new Map(names.map(n => [n, n]));
+      return window.ADVISOR_BY_NAME.size > 0;
+    };
+  }
+
+  // 2) Prime window.ROTAS from the table values for the selected week/day
+  if (!window.primeRotasFromAssignTable) {
+    window.primeRotasFromAssignTable = function primeRotasFromAssignTable() {
+      const ws      = document.getElementById('weekStart')?.value;
+      const dayName = document.getElementById('teamDay')?.value || 'Monday';
+      const table   = document.getElementById('assignTable');
+      if (!ws || !table || !(window.ADVISOR_BY_NAME instanceof Map)) return 0;
+
+      window.ROTAS = (window.ROTAS instanceof Map) ? window.ROTAS : new Map();
+
+      const DAYS   = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+      const dayIdx = DAYS.indexOf(dayName);
+      if (dayIdx < 0) return 0;
+
+      let primed = 0;
+      Array.from(table.querySelectorAll('tbody tr')).forEach(tr => {
+        const name = (tr.querySelector('th,td')?.textContent || '').trim();
+        const aId  = window.ADVISOR_BY_NAME.get(name);
+        if (!aId) return;
+
+        const cell = tr.querySelectorAll('td')[dayIdx];
+        if (!cell) return;
+
+        // accept <select>, data attributes, or plain text
+        const sel = cell.querySelector('select,[data-template],[data-value]');
+        let tpl = (sel && 'value' in sel) ? sel.value
+               : (sel?.getAttribute?.('data-template') || sel?.getAttribute?.('data-value') || cell.textContent || '');
+
+        tpl = String(tpl).replace(/[–—]/g,'-').trim();
+        if (!tpl || /^day\s*off$/i.test(tpl)) return; // ignore Day Off / blank
+
+        const key     = `${aId}::${ws}`;
+        const weekObj = window.ROTAS.get(key) || {};
+        weekObj[dayName] = tpl;          // planner.js will expand template name -> segments using window.TEMPLATES
+        window.ROTAS.set(key, weekObj);
+        primed++;
+      });
+
+      return primed;
+    };
+  }
+
+  // 3) Re-prime + re-render whenever the assignment table changes
+  const table = document.getElementById('assignTable');
+  if (table && !table.dataset.primeWired) {
+    table.addEventListener('change', () => {
+      window.rebuildAdvisorIndexesFromTable?.();
+      const n = window.primeRotasFromAssignTable?.() || 0;
+      if (typeof window.computePlannerRowsFromState === 'function' &&
+          typeof window.renderPlanner === 'function') {
+        const rows = window.computePlannerRowsFromState() || [];
+        if (rows.length || n) window.renderPlanner(rows);
+      }
+    });
+    table.dataset.primeWired = '1';
+  }
+
+  // 4) Run once on load
+  window.rebuildAdvisorIndexesFromTable?.();
+  window.primeRotasFromAssignTable?.();
+})();
 })();
