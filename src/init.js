@@ -1,99 +1,33 @@
 // src/init.js
 (() => {
   // ---------- helpers ----------
-  const get = (id) => document.getElementById(id);
-
   function refreshPlannerUI() {
     const rows =
       typeof window.computePlannerRowsFromState === "function"
         ? window.computePlannerRowsFromState()
         : [];
-    if (typeof window.renderPlanner === "function") window.renderPlanner(rows);
-    if (typeof window.renderAdvisorWeek === "function") window.renderAdvisorWeek(rows);
+
+    if (typeof window.renderPlanner === "function") {
+      window.renderPlanner(rows);
+    }
+    if (typeof window.renderAdvisorWeek === "function") {
+      window.renderAdvisorWeek(rows);
+    }
   }
 
-  function wireOnce(el, ev, handler, key) {
+  function wireOnce(el, ev, handler, flag = `_wired_${ev}`) {
     if (!el) return;
-    key = key || `_wired_${ev}`;
-    if (el.dataset && el.dataset[key]) return;
+    if (el.dataset && el.dataset[flag]) return;
     el.addEventListener(ev, handler);
-    if (el.dataset) el.dataset[key] = "1";
-  }
-
-  // Set #weekStart = Monday of current week if empty
-  function ensureWeekStartDefault() {
-    const el = get("weekStart");
-    if (!el || el.value) return;
-    const d = new Date();
-    const offset = (d.getDay() + 6) % 7; // Monday=0
-    d.setDate(d.getDate() - offset);
-    el.value = d.toISOString().slice(0, 10);
-  }
-
-  // Keep top dropdown and right panel in sync
-  function wireAdvisorSelect() {
-    const sel = get("advisorSelect");
-    if (!sel) return;
-    wireOnce(
-      sel,
-      "change",
-      (evt) => {
-        const opt = evt.target.selectedOptions?.[0];
-        const val = opt?.value ?? evt.target.value;
-
-        // Try to mirror right-panel click so your old code runs
-        const lookupId =
-          opt?.dataset?.leaderId ||
-          opt?.dataset?.teamId ||
-          opt?.dataset?.assignmentId ||
-          val;
-
-        if (lookupId) {
-          const target =
-            document.querySelector(`[data-leader-id="${lookupId}"]`) ||
-            document.querySelector(`[data-team-id="${lookupId}"]`) ||
-            document.querySelector(`[data-assignment-id="${lookupId}"]`);
-          if (target) {
-            target.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
-          }
-        }
-
-        refreshPlannerUI();
-      },
-      "_wired_change"
-    );
-  }
-
-  function wireGenerateButton() {
-    const btn = get("btnGenerate");
-    if (!btn) return;
-    wireOnce(
-      btn,
-      "click",
-      async () => {
-        // make sure data for the chosen week is loaded before render
-        if (typeof window.fetchRotasForWeek === "function") {
-          const ws = get("weekStart")?.value;
-          try { await window.fetchRotasForWeek(ws); } catch (e) {}
-        }
-        refreshPlannerUI();
-        console.log("Schedule generated.");
-      },
-      "_wired_click"
-    );
+    if (el.dataset) el.dataset[flag] = "1";
   }
 
   function wirePlannerRefreshSources() {
-    wireOnce(get("weekStart"), "change", async () => {
-      if (typeof window.fetchRotasForWeek === "function") {
-        try { await window.fetchRotasForWeek(get("weekStart")?.value); } catch (e) {}
-      }
-      refreshPlannerUI();
-    });
+    // week/day controls
+    wireOnce(document.getElementById("weekStart"), "change", refreshPlannerUI);
+    wireOnce(document.getElementById("teamDay"), "change", refreshPlannerUI);
 
-    wireOnce(get("teamDay"), "change", refreshPlannerUI, "_wired_day");
-
-    // Right panel tree/checkboxes – trigger refresh on clicks or changes
+    // right panel candidates (if they exist in this build)
     const candidates = [
       "#advisorTree",
       "#treePanel",
@@ -105,54 +39,127 @@
     ];
     for (const sel of candidates) {
       const el = document.querySelector(sel);
-      wireOnce(el, "click",  refreshPlannerUI, "_wired_click_refresh");
       wireOnce(el, "change", refreshPlannerUI, "_wired_change_refresh");
+      wireOnce(el, "click", refreshPlannerUI, "_wired_click_refresh");
     }
   }
 
-  async function loadAllDataForWeek() {
-    // Base datasets
-    if (typeof window.loadOrg === "function")         { try { await window.loadOrg(); } catch (e) {} }
-    if (typeof window.loadTemplates === "function")   { try { await window.loadTemplates(); } catch (e) {} }
-    if (typeof window.loadAssignments === "function") { try { await window.loadAssignments(); } catch (e) {} }
-
-    // Week-specific rotas
-    if (typeof window.fetchRotasForWeek === "function") {
-      const ws = get("weekStart")?.value;
-      try { await window.fetchRotasForWeek(ws); } catch (e) {}
-    }
+  function wireGenerateButton() {
+    const btn = document.getElementById("btnGenerate");
+    if (!btn) return;
+    wireOnce(
+      btn,
+      "click",
+      async () => {
+        try {
+          // try to reload the week first (mirrors boot)
+          const ws = document.getElementById("weekStart")?.value;
+          if (ws && typeof window.fetchRotasForWeek === "function") {
+            try {
+              await window.fetchRotasForWeek(ws);
+            } catch (e) {
+              console.warn("fetchRotasForWeek (Generate) failed:", e);
+            }
+          }
+          refreshPlannerUI();
+          console.log("Schedule generated.");
+        } catch (err) {
+          console.error("Generate failed:", err);
+        }
+      },
+      "_wired_click"
+    );
   }
 
-  // ---------- boot ----------
+  function wireAdvisorSelect() {
+    const sel =
+      document.getElementById("advisorSelect") ||
+      document.querySelector("[data-master-view-dropdown]");
+    if (!sel) return;
+    wireOnce(
+      sel,
+      "change",
+      () => {
+        // optional app hooks if they exist
+        const opt = sel.selectedOptions?.[0];
+        const val = opt?.value ?? sel.value;
+
+        if (typeof window.onMasterSelectionChange === "function")
+          window.onMasterSelectionChange(val, opt);
+        if (typeof window.setActiveMasterAssignment === "function")
+          window.setActiveMasterAssignment(val, opt);
+        if (typeof window.renderMasterAssignment === "function")
+          window.renderMasterAssignment(val, opt);
+        if (typeof window.loadMasterAssignment === "function")
+          window.loadMasterAssignment(val, opt);
+
+        refreshPlannerUI();
+      },
+      "_wired_change"
+    );
+  }
+
+  // ---------- SAFE BOOT ----------
+  // Ensure the in-memory rota cache exists for the horizontal view logic
+  window.ROTAS = window.ROTAS || new Map();
+
   const boot = async () => {
     try {
-      ensureWeekStartDefault();
+      // Load data (only if helpers exist)
+      if (typeof window.loadOrg === "function") await window.loadOrg();
+      if (typeof window.loadTemplates === "function")
+        await window.loadTemplates();
+      if (typeof window.loadAssignments === "function")
+        await window.loadAssignments();
 
-      // draw hour ticks if renderer exists
-      const headerEl = get("timeHeader");
+      // Rebuild UI (only if helpers exist)
+      if (typeof window.rebuildAdvisorDropdown === "function")
+        window.rebuildAdvisorDropdown();
+      if (typeof window.rebuildTree === "function") window.rebuildTree();
+      if (typeof window.refreshChips === "function") window.refreshChips();
+      if (typeof window.populateTemplateEditor === "function")
+        window.populateTemplateEditor();
+      if (typeof window.populateAssignTable === "function")
+        window.populateAssignTable();
+      if (typeof window.updateRangeLabel === "function")
+        window.updateRangeLabel();
+      if (typeof window.renderCalendar === "function")
+        window.renderCalendar();
+
+      // Draw time header
+      const headerEl = document.getElementById("timeHeader");
       if (headerEl && typeof window.renderTimeHeader === "function") {
         window.renderTimeHeader(headerEl);
       }
 
-      // load datasets (org, templates, assignments, rotas for week)
-      await loadAllDataForWeek();
+      // NEW: load the selected week's rotas so ROTAS is populated
+      const ws = document.getElementById("weekStart")?.value;
+      if (ws && typeof window.fetchRotasForWeek === "function") {
+        try {
+          await window.fetchRotasForWeek(ws); // fills window.ROTAS
+        } catch (e) {
+          console.warn("fetchRotasForWeek failed:", e);
+        }
+      }
 
-      // wire interactions
+      // Initial render
+      refreshPlannerUI();
+
+      // Wire interactions (once)
       wireAdvisorSelect();
       wireGenerateButton();
       wirePlannerRefreshSources();
-
-      // initial render (after data is confirmed loaded)
-      refreshPlannerUI();
     } catch (e) {
       console.warn("planner boot skipped", e);
     }
 
+    // Live updates
     if (typeof window.subscribeRealtime === "function") {
       window.subscribeRealtime();
     }
   };
 
+  // ---------- run once when DOM is ready ----------
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot, { once: true });
   } else {
