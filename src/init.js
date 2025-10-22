@@ -308,16 +308,81 @@
   } else {
     boot();
   }
-// --- Force hide the colour palette panel reliably ---
-window.addEventListener("load", () => {
-  // Find the specific settings details element that holds the Colours section
-  const settingsPanel = document.querySelector("details#settingsBox.panel.collapsible.no-print");
-  if (settingsPanel) {
-    // Hide the entire panel (including Colours heading and inputs)
-    settingsPanel.style.display = "none";
-    console.log("✅ Full colour palette panel hidden successfully.");
-  } else {
-    console.warn("⚠️ Could not find the Colours settings panel in DOM.");
+  // --- Hide the "Colours" section (heading + inputs + buttons) but keep DOM nodes ---
+// Works on initial load and if the settings panel re-renders later.
+(function () {
+  let hidOnce = false;
+
+  function hideColorsSection() {
+    try {
+      const settings =
+        document.querySelector('#settingsBox .panel-body') ||
+        document.getElementById('settingsBox') ||
+        document.body;
+
+      if (!settings) return;
+
+      // Find the Colours heading (handles "Colour" / "Colors")
+      let heading = Array.from(settings.querySelectorAll('h2,h3,h4'))
+        .find(h => /colou?rs?/i.test((h.textContent || '').trim()));
+
+      // Also locate the color key block if present
+      const key = document.getElementById('colorKey');
+
+      if (!heading && !key) return; // Nothing to do
+
+      // If we found the heading, hide it…
+      if (heading) {
+        heading.style.setProperty('display', 'none', 'important');
+      }
+
+      // Hide the block(s) that belong to the Colours section:
+      // from the heading's next sibling forward until the next heading,
+      // or, if we didn't find a heading, at least hide #colorKey itself.
+      let el = heading ? heading.nextElementSibling : key;
+      while (el) {
+        if (heading && /^H[2-4]$/.test(el.tagName)) break; // stop at next section
+        el.style.setProperty('display', 'none', 'important');
+        el = el.nextElementSibling;
+      }
+
+      // As a fallback, also collapse the smallest common ancestor that contains
+      // both the heading and #colorKey (if both exist) to catch odd markups.
+      if (heading && key) {
+        let a = heading;
+        while (a && !a.contains(key)) a = a.parentElement;
+        if (a && a !== document.body && a !== settings) {
+          a.style.setProperty('display', 'none', 'important');
+        }
+      }
+
+      // CSS hook (optional defensive rules in planner.css can use this)
+      document.documentElement.dataset.hideColors = '1';
+
+      if (!hidOnce) {
+        console.log('✅ Colours section hidden');
+        hidOnce = true;
+      }
+    } catch (e) {
+      console.warn('hideColorsSection failed:', e);
+    }
   }
-});
+
+  // Run once on load (covers hard/soft reloads)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', hideColorsSection, { once: true });
+  } else {
+    hideColorsSection();
+  }
+
+  // Re-apply if that panel is rebuilt later
+  const host = document.getElementById('settingsBox') || document.body;
+  new MutationObserver(() => {
+    // If the key is visible again, hide the section once more
+    const key = document.getElementById('colorKey');
+    if (key && getComputedStyle(key).display !== 'none') {
+      hideColorsSection();
+    }
+  }).observe(host, { childList: true, subtree: true });
+})();
 })();
