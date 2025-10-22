@@ -1,114 +1,184 @@
-/* === Horizontal Planner (clean, standalone) === */
-:root{
-  --name-col-w: 260px;
+/* src/styles/planner.css
+   Horizontal planner styles for #teamPlanner / #timeHeader / #plannerBody.
+   Uses your existing CSS variables: --line, --paper, etc. */
+
+/* Container */
+.planner {
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line, #e6e6f4);
+  border-radius: 10px;
+  background: var(--paper, #fff);
+  overflow: hidden; /* keep header borders clean */
 }
 
-/* Hide the old colour palette panel from the live view */
-.colours-card,.palette,.color-panel{display:none!important}
-
-.planner{
-  margin-top:16px;
-  border:1px solid var(--line,#e6e6f4);
-  border-radius:8px;
-  background:#fff;
-  overflow:hidden;
+/* Header: left "Name" column + hour scale */
+.planner__header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: var(--name-col-w, 260px) 1fr;
+  align-items: center;
+  gap: 0;
+  background: #f6f8fb;
+  border-bottom: 1px solid var(--line, #e6e6f4);
 }
 
-.planner__header{
-  display:grid;
-  grid-template-columns: var(--name-col-w) 1fr;
-  align-items:center;
-  position:sticky;
-  top:0;
-  background:#f8fafc;
-  z-index:2;
-  border-bottom:1px solid var(--line,#e6e6f4);
-  min-height:44px;
+/* Left column label */
+.planner__col--name {
+  font-weight: 800;
+  padding: 10px 12px;
+  border-right: 1px solid var(--line, #e6e6f4);
+  white-space: nowrap;
 }
 
-.planner__col--name{
-  font-weight:800;
-  padding:8px 10px;
-  border-right:1px solid var(--line,#e6e6f4);
-  white-space:nowrap;
+/* Hours header container */
+#timeHeader {
+  position: relative;
+  height: 32px;
+  overflow: hidden;
 }
 
-#timeHeader{
-  width:100%;
-  position:relative;
-  padding:6px 0;
+/* Hour ticks (06:00–20:00 rendered by JS) */
+.time-scale {
+  position: relative;
+  height: 100%;
+}
+.time-scale .tick {
+  position: absolute;
+  top: 6px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: #68758a;
+  user-select: none;
+  pointer-events: none;
 }
 
-.time-scale{position:relative;height:24px}
-.time-scale .tick{
-  position:absolute;top:0;transform:translateX(-50%);
-  font-size:12px;color:#6b7280;user-select:none
+/* Body rows */
+.planner__body {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;   /* rows are percentage-based */
+  overflow-y: auto;
 }
 
-.planner__body{
-  display:block;
-  overflow:auto;
-  max-height:64vh;
+/* Each row: name cell + timeline */
+.planner__row {
+  display: grid;
+  grid-template-columns: var(--name-col-w, 260px) 1fr;
+  align-items: stretch;
+  min-height: 44px;
+  border-bottom: 1px solid var(--line, #eef1f6);
+}
+.planner__row:nth-child(odd) {
+  background: #fbfdff;
 }
 
-.planner__row{
-  display:grid;
-  grid-template-columns: var(--name-col-w) 1fr;
-  align-items:center;
-  min-height:44px;
-  border-bottom:1px solid #f0f2f7;
-}
-.planner__row:nth-child(odd){ background:#fbfdff; }
-
-.planner__name{
-  padding:10px;
-  border-right:1px solid var(--line,#e6e6f4);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  display:flex;gap:8px;align-items:center
-}
-.planner__badge{
-  font-size:12px;line-height:18px;padding:0 6px;border-radius:6px;
-  background:#eef2f7;color:#374151
+/* Frozen name cell */
+.planner__name {
+  position: sticky;
+  left: 0;
+  z-index: 2; /* above bars */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-weight: 700;
+  background: #f3f7ff; /* subtle to separate from timeline */
+  border-right: 1px solid var(--line, #e6e6f4);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.planner__timeline{
-  position:relative;
-  height:44px;
+/* Optional badge next to name (role, site, etc.) */
+.planner__badge {
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: #eef2f7;
+  color: #374151;
+  font-weight: 600;
+}
+
+/* Timeline lane (grid background per hour) */
+.planner__timeline {
+  position: relative;
+  height: 44px;
+  /* vertical guides: one per hour; JS uses 06:00–20:00 (14 hours) */
   background:
-    linear-gradient(#f6f8fb 1px, transparent 1px) 0 0/60px 44px;
+    linear-gradient(#0000, #0000) 0 0 / 100% 100% no-repeat,
+    repeating-linear-gradient(
+      to right,
+      var(--line, #e6e6f4) 0 0,
+      var(--line, #e6e6f4) 1px,
+      transparent 1px,
+      transparent calc(100% / 14)
+    );
 }
 
-.planner__bar{
-  position:absolute;top:12px;height:20px;border-radius:4px;
-  opacity:.96;cursor:pointer;transition:opacity .15s;
+/* Bars */
+.planner__bar {
+  position: absolute;
+  top: 11px;
+  height: 22px;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.12);
+  opacity: .95;
+  cursor: pointer;
+  transition: transform .06s ease, opacity .12s ease, box-shadow .12s ease;
 }
-.planner__bar:hover{ opacity:1 }
-
-.planner__guide{
-  position:absolute;top:0;bottom:0;width:1px;
-  background:rgba(0,0,0,.25);pointer-events:none;z-index:5
+.planner__bar:hover {
+  opacity: 1;
+  box-shadow: 0 2px 5px rgba(0,0,0,.18);
+}
+.planner__bar:active {
+  transform: translateY(0.5px) scale(0.999);
 }
 
-/* Use your existing color classes (match vertical view) */
-.c-email{background:var(--color-email,#2ecc71);color:#fff}
-.c-mirakl{background:var(--color-mirakl,#b1b51e);color:#111}
-.c-social{background:var(--color-social,#5e35b1);color:#fff}
-.c-break{background:var(--color-break,#cfd8dc);color:#213}
-.c-lunch{background:var(--color-lunch,#b0bec5);color:#213}
-.c-overtime{background:var(--color-overtime,#e53935);color:#fff}
-.c-absence{background:var(--color-absence,#b0c4de);color:#111}
-.c-shrink{background:var(--color-shrink,#ffd166);color:#213}
-.c-meeting{background:#ffd54d;color:#111}
+/* Colour classes (rely on your root variables where possible) */
+.c-email    { background: var(--color-email,    #2ecc71); color: #fff; }
+.c-mirakl   { background: var(--color-mirakl,   #b1b51e); color: #112; }
+.c-social   { background: var(--color-social,   #5e35b1); color: #fff; }
+.c-overtime { background: var(--color-overtime, #e53935); color: #fff; }
+.c-meeting  { background: var(--color-meeting,  #ffd700); color: #222; }
+.c-break    { background: var(--color-break,    #cfd8dc); color: #213; }
+.c-lunch    { background: var(--color-lunch,    #b0bec5); color: #213; }
+.c-absence  { background: var(--color-absence,  #b0c4de); color: #102; }
+.c-shrink   { background: var(--color-shrink,   #ffd166); color: #222; }
 
-/* Remove page-grey margins so planner can go full width if parent allows */
-body{ background:#fff }
+/* Print: keep it tidy */
+@media print {
+  .planner {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .planner__header {
+    position: static;
+  }
+}
 
-/* Ensure Colours palette stays hidden while markup remains */
-#colorPalettePanel{display:none!important}
-[data-hide-colors="1"] #colorKey{display:none!important}
-[data-hide-colors="1"] h2:has(+ #colorKey),
-[data-hide-colors="1"] h3:has(+ #colorKey),
-[data-hide-colors="1"] h4:has(+ #colorKey),
-[data-hide-colors="1"] h2:has(+ :has(#colorKey)),
-[data-hide-colors="1"] h3:has(+ :has(#colorKey)),
-[data-hide-colors="1"] h4:has(+ :has(#colorKey)){display:none!important}
+/* Optional: compact height variant (if you ever toggle it) */
+.planner--compact .planner__timeline { height: 36px; }
+.planner--compact .planner__bar      { top: 7px; height: 18px; }
+
+/* Optional: increase name column on wide screens */
+@media (min-width: 1400px) {
+  :root { --name-col-w: 300px; }
+}
+
+/* Make sure the planner block uses full page width in common wrappers */
+.layout .planner,
+.panel .planner {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Prevent accidental horizontal scrollbars around the container */
+#teamPlanner { overflow: hidden; }
