@@ -187,6 +187,10 @@
       if (!keyEl) return;
 
       keyEl.style.setProperty("display", "none", "important");
+      var keyContainer = keyEl.parentElement;
+      if (keyContainer) {
+        keyContainer.style.setProperty("display", "none", "important");
+      }
       var headingEl = keyEl.previousElementSibling;
       if (headingEl && /^H[2-4]$/.test(headingEl.tagName)) {
         headingEl.style.setProperty("display", "none", "important");
@@ -212,8 +216,8 @@
                 continue;
               }
               if (node.querySelector) {
-                var match = node.querySelector("#colorKey");
-                if (match) hideColorKey(match);
+                var matches = node.querySelectorAll("#colorKey");
+                for (var k = 0; k < matches.length; k++) hideColorKey(matches[k]);
               }
             }
           }
