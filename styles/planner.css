@@ -102,3 +102,13 @@
 
 /* Remove page-grey margins so planner can go full width if parent allows */
 body{ background:#fff }
+
+/* Ensure Colours palette stays hidden while markup remains */
+#colorPalettePanel{display:none!important}
+[data-hide-colors="1"] #colorKey{display:none!important}
+[data-hide-colors="1"] h2:has(+ #colorKey),
+[data-hide-colors="1"] h3:has(+ #colorKey),
+[data-hide-colors="1"] h4:has(+ #colorKey),
+[data-hide-colors="1"] h2:has(+ :has(#colorKey)),
+[data-hide-colors="1"] h3:has(+ :has(#colorKey)),
+[data-hide-colors="1"] h4:has(+ :has(#colorKey)){display:none!important}

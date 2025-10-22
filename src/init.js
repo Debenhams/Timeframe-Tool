@@ -175,6 +175,78 @@
     wireOnce(tree, "click", refreshPlannerUI, "_wired_tree_click");
   }
 
+  // --- hide the Colours palette while keeping markup accessible ---
+  var colorsPanelObserver = null;
+  var colorsPanelLogged = false;
+
+  function flagBodyHideColors() {
+    var body = document.body;
+    if (body && body.dataset) body.dataset.hideColors = "1";
+  }
+
+  function findColorsPanelWrapper() {
+    var wrapper = document.getElementById("colorPalettePanel");
+    if (wrapper) return wrapper;
+
+    var keyEl = document.getElementById("colorKey");
+    if (!keyEl) return null;
+
+    var node = keyEl;
+    while (node && node !== document.body) {
+      if (node.querySelectorAll) {
+        var headings = node.querySelectorAll("h2,h3,h4");
+        for (var i = 0; i < headings.length; i++) {
+          if (/colou/i.test(headings[i].textContent || "")) return node;
+        }
+      }
+      node = node.parentElement;
+    }
+    return keyEl;
+  }
+
+  function hideColorsPanel() {
+    var panel = findColorsPanelWrapper();
+    if (!panel) return false;
+
+    panel.style.setProperty("display", "none", "important");
+    flagBodyHideColors();
+
+    if (!colorsPanelLogged) {
+      console.log("✅ Colours palette hidden (wrapper collapsed).");
+      colorsPanelLogged = true;
+    }
+    return true;
+  }
+
+  function ensureColorsPanelHidden() {
+    hideColorsPanel();
+
+    if (!colorsPanelObserver && typeof MutationObserver === "function") {
+      var root = document.getElementById("settingsBox") || document.body || document.documentElement;
+      if (!root) return;
+
+      colorsPanelObserver = new MutationObserver(function (mutations) {
+        for (var i = 0; i < mutations.length; i++) {
+          var record = mutations[i];
+          if ((record.addedNodes && record.addedNodes.length) ||
+              (record.removedNodes && record.removedNodes.length)) {
+            hideColorsPanel();
+            break;
+          }
+        }
+      });
+
+      colorsPanelObserver.observe(root, { childList: true, subtree: true });
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", ensureColorsPanelHidden);
+  } else {
+    ensureColorsPanelHidden();
+  }
+  window.addEventListener("load", ensureColorsPanelHidden);
+
   // ---------- boot ----------
   async function boot() {
     try {
