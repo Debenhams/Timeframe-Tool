@@ -174,16 +174,55 @@
     wireOnce(tree, "change", refreshPlannerUI, "_wired_tree_change");
     wireOnce(tree, "click", refreshPlannerUI, "_wired_tree_click");
   }
-document.addEventListener('DOMContentLoaded', () => {
-  const key = document.getElementById('colorKey');
-  if (key) {
-    key.style.setProperty('display', 'none', 'important');
-    const prev = key.previousElementSibling;
-    if (prev && /H[2-4]/.test(prev.tagName)) {
-      prev.style.setProperty('display', 'none', 'important');
+  document.addEventListener("DOMContentLoaded", function () {
+    var hidden = false;
+
+    function hideColorKey(node) {
+      if (hidden) return;
+      var keyEl = node || document.getElementById("colorKey");
+      if (!keyEl) return;
+      hidden = true;
+
+      keyEl.style.setProperty("display", "none", "important");
+      var headingEl = keyEl.previousElementSibling;
+      if (headingEl && /^H[2-4]$/.test(headingEl.tagName)) {
+        headingEl.style.setProperty("display", "none", "important");
+      }
+      console.log("Color palette hidden");
     }
-  }
-});
+
+    // Hide immediately if present, otherwise catch asynchronous renders.
+    hideColorKey();
+
+    if (!hidden && typeof MutationObserver === "function") {
+      var observer = new MutationObserver(function (mutations, obs) {
+        for (var i = 0; i < mutations.length; i++) {
+          var added = mutations[i].addedNodes || [];
+          for (var j = 0; j < added.length; j++) {
+            var node = added[j];
+            if (node && node.nodeType === 1) {
+              if (node.id === "colorKey") {
+                hideColorKey(node);
+                obs.disconnect();
+                return;
+              }
+              var match = node.querySelector && node.querySelector("#colorKey");
+              if (match) {
+                hideColorKey(match);
+                obs.disconnect();
+                return;
+              }
+            }
+          }
+        }
+      });
+
+      observer.observe(document.body || document.documentElement, {
+        childList: true,
+        subtree: true
+      });
+    }
+  });
   // ---------- boot ----------
   async function boot() {
     try {
