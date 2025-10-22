@@ -159,3 +159,12 @@
   }
   window.renderAdvisorWeek = renderAdvisorWeek;
 })();
+if (typeof window.refreshPlannerUI !== "function") {
+  window.refreshPlannerUI = function () {
+    const rows = window.computePlannerRowsFromState?.() || [];
+    window.renderPlanner?.(rows);
+    if (typeof window.renderAdvisorWeek === "function") {
+      window.renderAdvisorWeek(rows);
+    }
+  };
+}
