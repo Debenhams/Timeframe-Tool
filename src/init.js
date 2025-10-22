@@ -283,20 +283,16 @@
   } else {
     boot();
   }
-  // --- Force hide color palette and its parent ---
+// --- Force hide the colour palette panel reliably ---
 window.addEventListener("load", () => {
-  const colorKey = document.querySelector("#colorKey");
-  if (colorKey) {
-    const parent = colorKey.closest("div, section, fieldset");
-    if (parent) {
-      parent.style.display = "none";
-      console.log("✅ Color palette hidden (parent collapsed).");
-    } else {
-      colorKey.style.display = "none";
-      console.log("✅ ColorKey hidden directly.");
-    }
+  // Find the specific settings details element that holds the Colours section
+  const settingsPanel = document.querySelector("details#settingsBox.panel.collapsible.no-print");
+  if (settingsPanel) {
+    // Hide the entire panel (including Colours heading and inputs)
+    settingsPanel.style.display = "none";
+    console.log("✅ Full colour palette panel hidden successfully.");
   } else {
-    console.warn("⚠️ No #colorKey found in DOM yet.");
+    console.warn("⚠️ Could not find the Colours settings panel in DOM.");
   }
 });
 })();
