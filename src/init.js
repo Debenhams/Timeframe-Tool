@@ -283,4 +283,20 @@
   } else {
     boot();
   }
+  // --- Force hide color palette and its parent ---
+window.addEventListener("load", () => {
+  const colorKey = document.querySelector("#colorKey");
+  if (colorKey) {
+    const parent = colorKey.closest("div, section, fieldset");
+    if (parent) {
+      parent.style.display = "none";
+      console.log("✅ Color palette hidden (parent collapsed).");
+    } else {
+      colorKey.style.display = "none";
+      console.log("✅ ColorKey hidden directly.");
+    }
+  } else {
+    console.warn("⚠️ No #colorKey found in DOM yet.");
+  }
+});
 })();
