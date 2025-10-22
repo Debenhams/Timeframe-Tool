@@ -1,248 +1,161 @@
 // src/planner.js
-// Horizontal planner + time header (safe, drop-in). Guards prevent overwriting
-// existing app functions. Works with #timeHeader and #plannerBody in your HTML.
-(() => {
-  /**********************
-   * Helpers
-   **********************/
-  const DAY_START = 6 * 60;   // 06:00
-  const DAY_END   = 20 * 60;  // 20:00
-  const SPAN      = DAY_END - DAY_START;
+(function () {
+  "use strict";
 
-  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-  const pad   = (n) => String(n).padStart(2, "0");
-
-  // "09:30" -> minutes; supports null/undefined
-  function toMin(t) {
-    if (!t) return null;
-    if (typeof t === "number") return t;
-    const [h, m] = String(t).split(":").map(Number);
-    if (Number.isNaN(h) || Number.isNaN(m)) return null;
-    return h * 60 + m;
-  }
-  function m2t(mins) {
-    if (mins == null) return "";
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return `${pad(h)}:${pad(m)}`;
-  }
-  function pct(mins) {
-    return ((mins - DAY_START) / SPAN) * 100;
-  }
-  function currentDayName() {
-    return document.getElementById("teamDay")?.value || "Monday";
+  // ----- time utils -----
+  function parseHHMM(s) {
+    if (!s || typeof s !== "string") return null;
+    var m = s.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    var h = parseInt(m[1], 10), mm = parseInt(m[2], 10);
+    return h * 60 + mm;
   }
 
-  // Colour map → your existing CSS classes
-  function classForCode(code) {
-    const k = String(code || "").toLowerCase();
-    if (/\blunch\b/.test(k))     return "c-lunch";
-    if (/\bbreak\b/.test(k))     return "c-break";
-    if (/\bmeeting\b/.test(k))   return "c-meeting";
-    if (/\bovertime\b/.test(k))  return "c-overtime";
-    if (/\bmirakl\b/.test(k))    return "c-mirakl";
-    if (/\bsocial\b/.test(k))    return "c-social";
-    if (/\bemail\b/.test(k))     return "c-email";
-    if (/\bal\b/.test(k) || /\bsick\b/.test(k) || /\brdo\b/.test(k) ||
-        /\bmaternity\b/.test(k) || /\blts\b/.test(k)) return "c-absence";
-    if (/\b121\b/.test(k) || /\batl\b/.test(k) || /\bcoaching\b/.test(k) ||
-        /\bhuddle\b/.test(k) || /\biti\b/.test(k) || /\bprojects\b/.test(k) ||
-        /\bteam\b/.test(k) || /\btraining\b/.test(k)) return "c-shrink";
-    return "c-email";
+  function toPct(min, dayStart, dayEnd) {
+    if (min < dayStart) min = dayStart;
+    if (min > dayEnd) min = dayEnd;
+    var span = dayEnd - dayStart;
+    return span > 0 ? ((min - dayStart) / span) * 100 : 0;
   }
 
-  // Don’t overwrite if app already defined one
-  if (typeof window.classForCode !== "function") {
-    window.classForCode = classForCode;
+  // default window TEMPLATES fallback, only used if page has none
+  function ensureDefaultTemplates() {
+    if (window.TEMPLATES instanceof Map && window.TEMPLATES.size > 0) return;
+    window.TEMPLATES = new Map(Object.entries({
+      Early:  { start: "07:00", end: "16:00", breaks: [{ start: "12:00", end: "12:30" }] },
+      Middle: { start: "11:00", end: "20:00", breaks: [{ start: "15:00", end: "15:15" }] },
+      Late:   { start: "12:00", end: "21:00", breaks: [{ start: "17:30", end: "18:00" }] }
+    }));
   }
 
-  /**********************
-   * Time header
-   **********************/
-  if (typeof window.renderTimeHeader !== "function") {
-    window.renderTimeHeader = function renderTimeHeader(el) {
-      if (!el) return;
-      el.innerHTML = "";
-      const scale = document.createElement("div");
-      scale.className = "time-scale";
-      for (let m = DAY_START; m <= DAY_END; m += 60) {
-        const tick = document.createElement("div");
-        tick.className = "tick";
-        tick.style.left = `${pct(m)}%`;
-        tick.textContent = m2t(m);
-        scale.appendChild(tick);
-      }
-      el.appendChild(scale);
-    };
+  function buildSegmentsFromTemplate(tplName) {
+    ensureDefaultTemplates();
+    if (!(window.TEMPLATES instanceof Map)) return [];
+    var t = window.TEMPLATES.get(tplName);
+    if (!t || !t.start || !t.end) return [];
+    var segs = [{ kind: "shift", start: t.start, end: t.end }];
+    var br = Array.isArray(t.breaks) ? t.breaks : [];
+    br.forEach(function (b) {
+      if (b && b.start && b.end) segs.push({ kind: "break", start: b.start, end: b.end });
+    });
+    return segs;
   }
 
-  /**********************
-   * Compute rows (guarded)
-   * If your app already defines computePlannerRowsFromState(),
-   * we don’t replace it. Otherwise we provide a compatible version.
-   **********************/
-  if (typeof window.computePlannerRowsFromState !== "function") {
-    window.computePlannerRowsFromState = function computePlannerRowsFromState() {
-      try {
-        const ws = document.getElementById("weekStart")?.value;
-        const sel = document.getElementById("advisorSelect")?.value || "__TEAM_SELECTED__";
-        const day = currentDayName();
+  // ----- build rows from current state -----
+  function computePlannerRowsFromState() {
+    var wsEl = document.getElementById("weekStart");
+    var dayEl = document.getElementById("teamDay");
+    var ws = wsEl && wsEl.value ? wsEl.value : "";
+    var dayName = dayEl && dayEl.value ? dayEl.value : "Monday";
 
-        // globals expected on page (from your existing HTML):
-        // ADVISOR_BY_NAME, ADVISOR_BY_ID, ADVISORS_LIST, ROTAS, TEMPLATES
-        const haveGlobals =
-          window.ADVISOR_BY_NAME && window.ADVISORS_LIST && window.ROTAS && window.TEMPLATES;
-        if (!haveGlobals) return [];
+    if (!ws || !(window.ROTAS instanceof Map)) return [];
 
-        // Resolve names set
-        let names = [];
-        if (sel === "__TEAM_SELECTED__") {
-          names = Array.from(window.selectedAdvisors || []);
-        } else if (sel === "__TEAM_ALL__") {
-          names = (window.ADVISORS_LIST || []).map((a) => a.name);
-        } else if (sel?.startsWith?.("advisor::")) {
-          const id = sel.split("::")[1];
-          const n = window.ADVISOR_BY_ID?.get(id);
-          if (n) names = [n];
-        } else if (window.ADVISOR_BY_NAME?.has(sel)) {
-          names = [sel];
-        } else {
-          names = Array.from(window.selectedAdvisors || []);
-        }
+    var rows = [];
+    window.ROTAS.forEach(function (weekObj, key) {
+      var parts = String(key).split("::");
+      var aId = parts[0] || "";
+      var kWs = parts[1] || "";
+      if (kWs !== ws) return;
 
-        const rows = [];
-        names.sort((a, b) => a.localeCompare(b)).forEach((name) => {
-          const aId = window.ADVISOR_BY_NAME.get(name);
-          if (!aId) return;
-          const key = `${aId}::${ws}`;
-          const weekData = window.ROTAS.get(key) || {};
-          const dayVal = weekData[day];
+      var tplName = weekObj && weekObj[dayName];
+      if (!tplName) return;
 
-          let segs = [];
-          if (dayVal && typeof dayVal === "object" && Array.isArray(dayVal.segments)) {
-            segs = dayVal.segments
-              .map((s) => ({
-                code: s.code,
-                start: toMin(s.start),
-                end: toMin(s.end),
-              }))
-              .filter((s) => s.start != null && s.end != null && s.end > s.start)
-              .sort((a, b) => a.start - b.start);
-          } else if (typeof dayVal === "string" && window.TEMPLATES[dayVal]) {
-            const t = window.TEMPLATES[dayVal];
-            const s = toMin(t.start_time);
-            const e = toMin(t.finish_time);
-            if (e != null && s != null && e > s) {
-              const pauses = [];
-              if (t.break1) pauses.push({ code: "Break",  start: toMin(t.break1),  end: toMin(t.break1) + 15 });
-              if (t.lunch)  pauses.push({ code: "Lunch",  start: toMin(t.lunch),   end: toMin(t.lunch) + 30 });
-              if (t.break2) pauses.push({ code: "Break",  start: toMin(t.break2),  end: toMin(t.break2) + 15 });
-              pauses.sort((x, y) => x.start - y.start);
-              let cur = s;
-              const out = [];
-              for (const p of pauses) {
-                if (p.start > cur) out.push({ code: t.work_code || "Admin", start: cur, end: Math.min(p.start, e) });
-                out.push({ code: p.code, start: clamp(p.start, s, e), end: clamp(p.end, s, e) });
-                cur = Math.max(cur, p.end);
-              }
-              if (cur < e) out.push({ code: t.work_code || "Admin", start: cur, end: e });
-              segs = out;
-            }
-          }
+      var segments = buildSegmentsFromTemplate(tplName);
+      if (!segments.length) return;
 
-          rows.push({ name, segments: segs });
-        });
+      var name = (window.ADVISOR_BY_ID instanceof Map && window.ADVISOR_BY_ID.get(aId)) || aId;
+      rows.push({ id: aId, name: name, badge: "", segments: segments });
+    });
 
-        return rows;
-      } catch (e) {
-        console.warn("computePlannerRowsFromState failed", e);
-        return [];
-      }
-    };
+    rows.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    return rows;
   }
+  window.computePlannerRowsFromState = computePlannerRowsFromState;
 
-  /**********************
-   * Horizontal planner renderer
-   **********************/
-  if (typeof window.renderPlanner !== "function") {
-    window.renderPlanner = function renderPlanner(rows) {
-      try {
-        const body   = document.getElementById("plannerBody");
-        const header = document.getElementById("timeHeader");
-        if (!body || !header) return;
-
-        // Clear & ensure header
-        body.innerHTML = "";
-        header.innerHTML = "";
-        if (typeof window.renderTimeHeader === "function") {
-          window.renderTimeHeader(header);
-        }
-
-        const day = currentDayName();
-
-        // Empty state
-        if (!rows || !rows.length) {
-          const empty = document.createElement("div");
-          empty.className = "muted";
-          empty.style.padding = "10px";
-          empty.textContent = "No rows to display. Select advisors or a leader/team.";
-          body.appendChild(empty);
-          return;
-        }
-
-        rows.forEach((r) => {
-          const row = document.createElement("div");
-          row.className = "planner__row";
-
-          const name = document.createElement("div");
-          name.className = "planner__name";
-          name.textContent = r.name || "";
-          row.appendChild(name);
-
-          const tl = document.createElement("div");
-          tl.className = "planner__timeline";
-
-          (r.segments || []).forEach((seg) => {
-            const s = typeof seg.start === "number" ? seg.start : toMin(seg.start);
-            const e = typeof seg.end   === "number" ? seg.end   : toMin(seg.end);
-            if (s == null || e == null || e <= s) return;
-
-            const left  = clamp(pct(s), 0, 100);
-            const right = clamp(pct(e), 0, 100);
-            const width = clamp(right - left, 0, 100);
-
-            const bar = document.createElement("div");
-            bar.className = `planner__bar ${classForCode(seg.code)}`;
-            bar.style.left  = `${left}%`;
-            bar.style.width = `${width}%`;
-            bar.title = `${seg.code || ""} ${m2t(s)}–${m2t(e)}`;
-
-            // Match vertical’s click-to-edit if available
-            bar.dataset.day   = day;
-            bar.dataset.adv   = r.name || "";
-            bar.dataset.start = m2t(s);
-            bar.dataset.end   = m2t(e);
-            bar.dataset.code  = seg.code || "";
-
-            bar.addEventListener("click", (ev) => {
-              if (typeof window.onBlockClick === "function") {
-                // Reuse the existing editor that expects currentTarget.dataset
-                window.onBlockClick({ currentTarget: bar });
-              } else if (typeof window.openAssign === "function") {
-                // Fallback: open day editor
-                window.openAssign(day, r.name || "");
-              }
-            });
-
-            tl.appendChild(bar);
-          });
-
-          row.appendChild(tl);
-          body.appendChild(row);
-        });
-      } catch (e) {
-        console.warn("renderPlanner error", e);
-      }
-    };
+  // ----- render time header (07:00..19:00) -----
+  function renderTimeHeader(el) {
+    if (!el) return;
+    el.innerHTML = "";
+    var start = parseHHMM("07:00");
+    var end = parseHHMM("19:00");
+    for (var h = 7; h <= 19; h++) {
+      var d = document.createElement("div");
+      d.className = "time-tick";
+      d.style.position = "absolute";
+      d.style.left = toPct(h * 60, start, end) + "%";
+      d.style.top = "0";
+      d.style.transform = "translateX(-50%)";
+      d.textContent = (h < 10 ? "0" + h : String(h)) + ":00";
+      el.appendChild(d);
+    }
+    el.style.position = "relative";
+    el.style.height = "18px";
   }
+  window.renderTimeHeader = renderTimeHeader;
+
+  // ----- render horizontal planner -----
+  function renderPlanner(rows) {
+    var body = document.getElementById("plannerBody");
+    if (!body) return;
+
+    var start = parseHHMM("07:00");
+    var end = parseHHMM("19:00");
+
+    body.innerHTML = "";
+
+    rows.forEach(function (row) {
+      var r = document.createElement("div");
+      r.className = "planner-row";
+      r.style.display = "grid";
+      r.style.gridTemplateColumns = "220px 1fr";
+      r.style.alignItems = "center";
+      r.style.gap = "8px";
+      r.style.margin = "6px 0";
+
+      var name = document.createElement("div");
+      name.className = "planner-name";
+      name.textContent = row.name || row.id || "";
+      name.style.fontWeight = "600";
+
+      var track = document.createElement("div");
+      track.className = "planner-track";
+      track.style.position = "relative";
+      track.style.height = "32px";
+      track.style.background = "var(--track-bg, #f7f7fb)";
+      track.style.border = "1px solid #e6e6ef";
+      track.style.borderRadius = "8px";
+      track.style.overflow = "hidden";
+
+      row.segments.forEach(function (seg) {
+        var s = parseHHMM(seg.start);
+        var e = parseHHMM(seg.end);
+        if (s == null || e == null || e <= s) return;
+
+        var left = toPct(s, start, end);
+        var right = toPct(e, start, end);
+        var bar = document.createElement("div");
+        bar.className = "seg " + (seg.kind === "break" ? "seg-break" : "seg-shift");
+        bar.style.position = "absolute";
+        bar.style.left = left + "%";
+        bar.style.width = Math.max(0, right - left) + "%";
+        bar.style.top = seg.kind === "break" ? "8px" : "4px";
+        bar.style.bottom = seg.kind === "break" ? "8px" : "4px";
+        bar.style.borderRadius = "6px";
+        bar.style.background = seg.kind === "break" ? "#ffdb77" : "#57c97b";
+        bar.title = (seg.kind === "break" ? "Break " : "Shift ") + seg.start + " - " + seg.end;
+        track.appendChild(bar);
+      });
+
+      r.appendChild(name);
+      r.appendChild(track);
+      body.appendChild(r);
+    });
+  }
+  window.renderPlanner = renderPlanner;
+
+  // ----- (optional) render vertical week -----
+  function renderAdvisorWeek(/* rows */) {
+    // No-op here; your existing calendar renderer can keep handling the vertical view.
+  }
+  window.renderAdvisorWeek = renderAdvisorWeek;
 })();
