@@ -1,244 +1,161 @@
 // src/planner.js
-// Safe external implementations for the horizontal planner + time header.
-// All exports are guarded (defined only if missing) so we don't clobber
-// anything that already exists elsewhere in your app.
+(function () {
+  "use strict";
 
-(() => {
-  // -----------------------------
-  // Shared cache (ensure exists)
-  // -----------------------------
-  window.ROTAS = window.ROTAS || new Map(); // Map<key, weekJson>
-
-  // -----------------------------
-  // Small helpers (local)
-  // -----------------------------
-  const DAY_START = 6 * 60;   // 06:00
-  const DAY_END   = 20 * 60;  // 20:00
-  const SPAN = DAY_END - DAY_START;
-
-  function m2t(mins) {
-    const h = Math.floor(mins / 60);
-    const m = String(mins % 60).padStart(2, "0");
-    return `${h}:${m}`;
+  // ----- time utils -----
+  function parseHHMM(s) {
+    if (!s || typeof s !== "string") return null;
+    var m = s.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    var h = parseInt(m[1], 10), mm = parseInt(m[2], 10);
+    return h * 60 + mm;
   }
 
-  function toPct(mins) {
-    return ((mins - DAY_START) / SPAN) * 100;
+  function toPct(min, dayStart, dayEnd) {
+    if (min < dayStart) min = dayStart;
+    if (min > dayEnd) min = dayEnd;
+    var span = dayEnd - dayStart;
+    return span > 0 ? ((min - dayStart) / span) * 100 : 0;
   }
 
-  // Fallback minute parser if the app didn't expose toMin()/fmt()
-  function toMinFallback(hhmm) {
-    if (typeof hhmm !== "string") return 0;
-    const m = hhmm.match(/^(\d{1,2}):(\d{2})$/);
-    if (!m) return 0;
-    return (+m[1]) * 60 + (+m[2]);
-  }
-  const toMin = (typeof window.toMin === "function")
-    ? window.toMin
-    : toMinFallback;
-
-  const fmt = (typeof window.fmt === "function")
-    ? window.fmt
-    : (x) => x;
-
-  // -----------------------------
-  // Colour classes
-  // -----------------------------
-  if (typeof window.classForCode !== "function") {
-    window.classForCode = function classForCode(code) {
-      const k = (code || "").toLowerCase();
-      if (/\blunch\b/.test(k))     return "c-lunch";
-      if (/\bbreak\b/.test(k))     return "c-break";
-      if (/\bmeeting\b/.test(k))   return "c-meeting";
-      if (/\bovertime\b/.test(k))  return "c-overtime";
-      if (/\bmirakl?\b/.test(k))   return "c-mirakl";
-      if (/\bsocial\b/.test(k))    return "c-social";
-      if (/\bemail\b/.test(k))     return "c-email";
-      return "c-email";
-    };
-  }
-  const classFor = window.classForCode;
-
-  // -----------------------------
-  // Time header renderer
-  // -----------------------------
-  if (typeof window.renderTimeHeader !== "function") {
-    window.renderTimeHeader = function renderTimeHeader(el) {
-      if (!el) return;
-      el.textContent = "";
-      const scale = document.createElement("div");
-      scale.className = "time-scale";
-      for (let m = DAY_START; m <= DAY_END; m += 60) {
-        const tick = document.createElement("div");
-        tick.className = "tick";
-        tick.style.left = `${toPct(m)}%`;
-        tick.textContent = m2t(m);
-        scale.appendChild(tick);
-      }
-      el.appendChild(scale);
-    };
+  // default window TEMPLATES fallback, only used if page has none
+  function ensureDefaultTemplates() {
+    if (window.TEMPLATES instanceof Map && window.TEMPLATES.size > 0) return;
+    window.TEMPLATES = new Map(Object.entries({
+      Early:  { start: "07:00", end: "16:00", breaks: [{ start: "12:00", end: "12:30" }] },
+      Middle: { start: "11:00", end: "20:00", breaks: [{ start: "15:00", end: "15:15" }] },
+      Late:   { start: "12:00", end: "21:00", breaks: [{ start: "17:30", end: "18:00" }] }
+    }));
   }
 
-  // -----------------------------
-  // Horizontal planner renderer
-  // -----------------------------
-  if (typeof window.renderPlanner !== "function") {
-    window.renderPlanner = function renderPlanner(rows) {
-      const body   = document.getElementById("plannerBody");
-      const header = document.getElementById("timeHeader");
-      if (!body || !header) return;
+  function buildSegmentsFromTemplate(tplName) {
+    ensureDefaultTemplates();
+    if (!(window.TEMPLATES instanceof Map)) return [];
+    var t = window.TEMPLATES.get(tplName);
+    if (!t || !t.start || !t.end) return [];
+    var segs = [{ kind: "shift", start: t.start, end: t.end }];
+    var br = Array.isArray(t.breaks) ? t.breaks : [];
+    br.forEach(function (b) {
+      if (b && b.start && b.end) segs.push({ kind: "break", start: b.start, end: b.end });
+    });
+    return segs;
+  }
 
-      // Clear and rebuild header ticks
-      body.textContent = "";
-      header.textContent = "";
-      window.renderTimeHeader(header);
+  // ----- build rows from current state -----
+  function computePlannerRowsFromState() {
+    var wsEl = document.getElementById("weekStart");
+    var dayEl = document.getElementById("teamDay");
+    var ws = wsEl && wsEl.value ? wsEl.value : "";
+    var dayName = dayEl && dayEl.value ? dayEl.value : "Monday";
 
-      (rows || []).forEach((r) => {
-        const row = document.createElement("div");
-        row.className = "planner__row";
+    if (!ws || !(window.ROTAS instanceof Map)) return [];
 
-        const name = document.createElement("div");
-        name.className = "planner__name";
-        name.innerHTML = `${r.name || ""}${r.badge ? ` <span class="planner__badge">${r.badge}</span>` : ""}`;
+    var rows = [];
+    window.ROTAS.forEach(function (weekObj, key) {
+      var parts = String(key).split("::");
+      var aId = parts[0] || "";
+      var kWs = parts[1] || "";
+      if (kWs !== ws) return;
 
-        const timeline = document.createElement("div");
-        timeline.className = "planner__timeline";
+      var tplName = weekObj && weekObj[dayName];
+      if (!tplName) return;
 
-        (r.segments || []).forEach((seg) => {
-          const leftPct  = toPct(seg.start);
-          const rightPct = toPct(seg.end);
-          const widthPct = Math.max(0, rightPct - leftPct);
+      var segments = buildSegmentsFromTemplate(tplName);
+      if (!segments.length) return;
 
-          const bar = document.createElement("div");
-          bar.className = `planner__bar ${classFor(seg.code)}`;
-          bar.style.left  = `${leftPct}%`;
-          bar.style.width = `${widthPct}%`;
-          bar.title = `${seg.code} ${m2t(seg.start)}–${m2t(seg.end)}`;
+      var name = (window.ADVISOR_BY_ID instanceof Map && window.ADVISOR_BY_ID.get(aId)) || aId;
+      rows.push({ id: aId, name: name, badge: "", segments: segments });
+    });
 
-          timeline.appendChild(bar);
-        });
+    rows.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    return rows;
+  }
+  window.computePlannerRowsFromState = computePlannerRowsFromState;
 
-        row.appendChild(name);
-        row.appendChild(timeline);
-        body.appendChild(row);
+  // ----- render time header (07:00..19:00) -----
+  function renderTimeHeader(el) {
+    if (!el) return;
+    el.innerHTML = "";
+    var start = parseHHMM("07:00");
+    var end = parseHHMM("19:00");
+    for (var h = 7; h <= 19; h++) {
+      var d = document.createElement("div");
+      d.className = "time-tick";
+      d.style.position = "absolute";
+      d.style.left = toPct(h * 60, start, end) + "%";
+      d.style.top = "0";
+      d.style.transform = "translateX(-50%)";
+      d.textContent = (h < 10 ? "0" + h : String(h)) + ":00";
+      el.appendChild(d);
+    }
+    el.style.position = "relative";
+    el.style.height = "18px";
+  }
+  window.renderTimeHeader = renderTimeHeader;
+
+  // ----- render horizontal planner -----
+  function renderPlanner(rows) {
+    var body = document.getElementById("plannerBody");
+    if (!body) return;
+
+    var start = parseHHMM("07:00");
+    var end = parseHHMM("19:00");
+
+    body.innerHTML = "";
+
+    rows.forEach(function (row) {
+      var r = document.createElement("div");
+      r.className = "planner-row";
+      r.style.display = "grid";
+      r.style.gridTemplateColumns = "220px 1fr";
+      r.style.alignItems = "center";
+      r.style.gap = "8px";
+      r.style.margin = "6px 0";
+
+      var name = document.createElement("div");
+      name.className = "planner-name";
+      name.textContent = row.name || row.id || "";
+      name.style.fontWeight = "600";
+
+      var track = document.createElement("div");
+      track.className = "planner-track";
+      track.style.position = "relative";
+      track.style.height = "32px";
+      track.style.background = "var(--track-bg, #f7f7fb)";
+      track.style.border = "1px solid #e6e6ef";
+      track.style.borderRadius = "8px";
+      track.style.overflow = "hidden";
+
+      row.segments.forEach(function (seg) {
+        var s = parseHHMM(seg.start);
+        var e = parseHHMM(seg.end);
+        if (s == null || e == null || e <= s) return;
+
+        var left = toPct(s, start, end);
+        var right = toPct(e, start, end);
+        var bar = document.createElement("div");
+        bar.className = "seg " + (seg.kind === "break" ? "seg-break" : "seg-shift");
+        bar.style.position = "absolute";
+        bar.style.left = left + "%";
+        bar.style.width = Math.max(0, right - left) + "%";
+        bar.style.top = seg.kind === "break" ? "8px" : "4px";
+        bar.style.bottom = seg.kind === "break" ? "8px" : "4px";
+        bar.style.borderRadius = "6px";
+        bar.style.background = seg.kind === "break" ? "#ffdb77" : "#57c97b";
+        bar.title = (seg.kind === "break" ? "Break " : "Shift ") + seg.start + " - " + seg.end;
+        track.appendChild(bar);
       });
-    };
+
+      r.appendChild(name);
+      r.appendChild(track);
+      body.appendChild(r);
+    });
   }
+  window.renderPlanner = renderPlanner;
 
-  // ------------------------------------------------
-  // Compute rows from current UI state (guarded)
-  // ------------------------------------------------
-  if (typeof window.computePlannerRowsFromState !== "function") {
-    window.computePlannerRowsFromState = function computePlannerRowsFromState() {
-      // Inputs
-      const ws      = document.getElementById("weekStart")?.value;
-      const teamSel = document.getElementById("advisorSelect")?.value || "__TEAM_SELECTED__";
-      const dayName = document.getElementById("teamDay")?.value || "Monday";
-
-      // Globals provided elsewhere in the app:
-      // selectedAdvisors : Set<string>
-      // ADVISORS_LIST    : Array<{name: string, ...}>
-      // ADVISOR_BY_ID    : Map<advisorId -> name>
-      // ADVISOR_BY_NAME  : Map<name -> advisorId>
-      // TEMPLATES        : Record<string, Template>
-      // ROTAS (we ensured window.ROTAS exists)
-
-      let names = [];
-      if (teamSel === "__TEAM_SELECTED__") {
-        names = [...(window.selectedAdvisors || [])];
-      } else if (teamSel === "__TEAM_ALL__") {
-        names = (window.ADVISORS_LIST || []).map(a => a.name);
-      } else if (teamSel?.startsWith?.("advisor::")) {
-        const id = teamSel.split("::")[1];
-        const n  = window.ADVISOR_BY_ID?.get?.(id);
-        if (n) names = [n];
-      } else if (window.ADVISOR_BY_NAME?.has?.(teamSel)) {
-        names = [teamSel];
-      } else {
-        names = [...(window.selectedAdvisors || [])];
-      }
-
-      const rows = [];
-
-      for (const name of names.sort((a, b) => a.localeCompare(b))) {
-        const aId = window.ADVISOR_BY_NAME?.get?.(name);
-        if (!aId) continue;
-
-        // tolerate different historical key formats: "<id>::<ws>", "<id>:<ws>", "<id>|<ws>", "<id>"
-        const weekData =
-          (window.ROTAS?.get?.(`${aId}::${ws}`) ||
-           window.ROTAS?.get?.(`${aId}:${ws}`)  ||
-           window.ROTAS?.get?.(`${aId}|${ws}`)  ||
-           window.ROTAS?.get?.(aId)) || {};
-
-        const dayVal = weekData[dayName];
-        let segs = [];
-
-        // Structure 1: explicit segments
-        if (dayVal && typeof dayVal === "object" && Array.isArray(dayVal.segments)) {
-          segs = dayVal.segments
-            .filter(s => s.start && s.end)
-            .map(s => ({
-              type:  "work",
-              code:  s.code,
-              start: toMin(fmt(s.start)),
-              end:   toMin(fmt(s.end))
-            }))
-            .filter(s => s.end > s.start)
-            .sort((a, b) => a.start - b.start);
-
-        // Structure 2: template name -> expand with breaks
-        } else if (typeof dayVal === "string" && window.TEMPLATES && window.TEMPLATES[dayVal]) {
-          const t = window.TEMPLATES[dayVal];
-          const s = toMin(fmt(t.start_time));
-          const e = toMin(fmt(t.finish_time));
-
-          if (e > s) {
-            const pauses = [];
-            if (t.break1) pauses.push({ type: "break", code: "Break", start: toMin(fmt(t.break1)), end: toMin(fmt(t.break1)) + 15 });
-            if (t.lunch)  pauses.push({ type: "lunch", code: "Lunch", start: toMin(fmt(t.lunch)),  end: toMin(fmt(t.lunch)) + 30 });
-            if (t.break2) pauses.push({ type: "break", code: "Break", start: toMin(fmt(t.break2)), end: toMin(fmt(t.break2)) + 15 });
-
-            pauses.sort((a, b) => a.start - b.start);
-
-            let cur = s;
-            const out = [];
-
-            for (const p of pauses) {
-              if (p.start > cur) {
-                out.push({
-                  type:  "work",
-                  code:  t.work_code || "Admin",
-                  start: cur,
-                  end:   Math.min(p.start, e)
-                });
-              }
-              out.push({
-                type:  p.type,
-                code:  p.code,
-                start: Math.max(p.start, s),
-                end:   Math.min(p.end, e)
-              });
-              cur = Math.max(cur, p.end);
-            }
-
-            if (cur < e) {
-              out.push({
-                type:  "work",
-                code:  t.work_code || "Admin",
-                start: cur,
-                end:   e
-              });
-            }
-
-            segs = out;
-          }
-        }
-
-        rows.push({ name, badge: "", segments: segs });
-      }
-
-      return rows;
-    };
+  // ----- (optional) render vertical week -----
+  function renderAdvisorWeek(/* rows */) {
+    // No-op here; your existing calendar renderer can keep handling the vertical view.
   }
+  window.renderAdvisorWeek = renderAdvisorWeek;
 })();
