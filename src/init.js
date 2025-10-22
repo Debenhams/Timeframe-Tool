@@ -174,7 +174,16 @@
     wireOnce(tree, "change", refreshPlannerUI, "_wired_tree_change");
     wireOnce(tree, "click", refreshPlannerUI, "_wired_tree_click");
   }
-
+document.addEventListener('DOMContentLoaded', () => {
+  const key = document.getElementById('colorKey');
+  if (key) {
+    key.style.setProperty('display', 'none', 'important');
+    const prev = key.previousElementSibling;
+    if (prev && /H[2-4]/.test(prev.tagName)) {
+      prev.style.setProperty('display', 'none', 'important');
+    }
+  }
+});
   // ---------- boot ----------
   async function boot() {
     try {
