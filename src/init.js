@@ -174,57 +174,80 @@
     wireOnce(tree, "change", refreshPlannerUI, "_wired_tree_change");
     wireOnce(tree, "click", refreshPlannerUI, "_wired_tree_click");
   }
-  var colorPaletteHiderHooked = false;
+  // --- hide Colours palette without removing markup ---
+  var colorsPanelObserver = null;
+  var colorsPanelLogDone = false;
+  var colorsPanelBodyFlagged = false;
+  var colorsPanelBodyListenerAttached = false;
 
-  function ensureColorPaletteHidden() {
-    if (colorPaletteHiderHooked) return;
-    colorPaletteHiderHooked = true;
-
-    var logged = false;
-
-    function hideColorKey(node) {
-      var keyEl = node || document.getElementById("colorKey");
-      if (!keyEl) return;
-
-      keyEl.style.setProperty("display", "none", "important");
-      var keyContainer = keyEl.parentElement;
-      if (keyContainer) {
-        keyContainer.style.setProperty("display", "none", "important");
-      }
-      var headingEl = keyEl.previousElementSibling;
-      if (headingEl && /^H[2-4]$/.test(headingEl.tagName)) {
-        headingEl.style.setProperty("display", "none", "important");
-      }
-      if (!logged) {
-        console.log("Color palette hidden");
-        logged = true;
-      }
+  function flagBodyForHiddenColors() {
+    if (colorsPanelBodyFlagged) return;
+    var body = document.body;
+    if (body && body.dataset) {
+      body.dataset.hideColors = "1";
+      colorsPanelBodyFlagged = true;
+    } else if (!colorsPanelBodyListenerAttached) {
+      colorsPanelBodyListenerAttached = true;
+      document.addEventListener("DOMContentLoaded", function onBodyReady() {
+        colorsPanelBodyListenerAttached = false;
+        flagBodyForHiddenColors();
+      }, { once: true });
     }
+  }
 
-    // Hide immediately if present, otherwise catch asynchronous renders.
-    hideColorKey();
+  function findColorsPanelWrapper() {
+    var explicit = document.getElementById("colorPalettePanel");
+    if (explicit) return explicit;
 
-    if (typeof MutationObserver === "function") {
-      var observer = new MutationObserver(function (mutations) {
+    var keyEl = document.getElementById("colorKey");
+    if (!keyEl) return null;
+
+    var node = keyEl;
+    while (node && node !== document.body) {
+      var headings = node.querySelectorAll ? node.querySelectorAll("h2,h3,h4") : [];
+      for (var i = 0; i < headings.length; i++) {
+        if (/colou/i.test(headings[i].textContent || "")) {
+          return node;
+        }
+      }
+      node = node.parentElement;
+    }
+    return keyEl;
+  }
+
+  function hideColorsPanel() {
+    var wrapper = findColorsPanelWrapper();
+    if (!wrapper) return false;
+
+    wrapper.style.setProperty("display", "none", "important");
+    flagBodyForHiddenColors();
+
+    if (!colorsPanelLogDone) {
+      console.log("✅ Colours palette hidden (wrapper collapsed).");
+      colorsPanelLogDone = true;
+    }
+    return true;
+  }
+
+  function ensureColorsPanelHidden() {
+    hideColorsPanel();
+
+    if (!colorsPanelObserver && typeof MutationObserver === "function") {
+      var observerRoot = document.getElementById("settingsBox") || document.body || document.documentElement;
+      if (!observerRoot) return;
+
+      colorsPanelObserver = new MutationObserver(function (mutations) {
         for (var i = 0; i < mutations.length; i++) {
-          var added = mutations[i].addedNodes || [];
-          for (var j = 0; j < added.length; j++) {
-            var node = added[j];
-            if (node && node.nodeType === 1) {
-              if (node.id === "colorKey") {
-                hideColorKey(node);
-                continue;
-              }
-              if (node.querySelector) {
-                var matches = node.querySelectorAll("#colorKey");
-                for (var k = 0; k < matches.length; k++) hideColorKey(matches[k]);
-              }
-            }
+          var record = mutations[i];
+          if ((record.addedNodes && record.addedNodes.length) ||
+              (record.removedNodes && record.removedNodes.length)) {
+            hideColorsPanel();
+            break;
           }
         }
       });
 
-      observer.observe(document.body || document.documentElement, {
+      colorsPanelObserver.observe(observerRoot, {
         childList: true,
         subtree: true
       });
@@ -232,9 +255,11 @@
   }
 
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", ensureColorPaletteHidden);
+    document.addEventListener("DOMContentLoaded", ensureColorsPanelHidden, { once: true });
+    window.addEventListener("load", ensureColorsPanelHidden);
   } else {
-    ensureColorPaletteHidden();
+    ensureColorsPanelHidden();
+    window.addEventListener("load", ensureColorsPanelHidden);
   }
   // ---------- boot ----------
   async function boot() {
