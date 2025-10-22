@@ -174,28 +174,34 @@
     wireOnce(tree, "change", refreshPlannerUI, "_wired_tree_change");
     wireOnce(tree, "click", refreshPlannerUI, "_wired_tree_click");
   }
-  document.addEventListener("DOMContentLoaded", function () {
-    var hidden = false;
+  var colorPaletteHiderHooked = false;
+
+  function ensureColorPaletteHidden() {
+    if (colorPaletteHiderHooked) return;
+    colorPaletteHiderHooked = true;
+
+    var logged = false;
 
     function hideColorKey(node) {
-      if (hidden) return;
       var keyEl = node || document.getElementById("colorKey");
       if (!keyEl) return;
-      hidden = true;
 
       keyEl.style.setProperty("display", "none", "important");
       var headingEl = keyEl.previousElementSibling;
       if (headingEl && /^H[2-4]$/.test(headingEl.tagName)) {
         headingEl.style.setProperty("display", "none", "important");
       }
-      console.log("Color palette hidden");
+      if (!logged) {
+        console.log("Color palette hidden");
+        logged = true;
+      }
     }
 
     // Hide immediately if present, otherwise catch asynchronous renders.
     hideColorKey();
 
-    if (!hidden && typeof MutationObserver === "function") {
-      var observer = new MutationObserver(function (mutations, obs) {
+    if (typeof MutationObserver === "function") {
+      var observer = new MutationObserver(function (mutations) {
         for (var i = 0; i < mutations.length; i++) {
           var added = mutations[i].addedNodes || [];
           for (var j = 0; j < added.length; j++) {
@@ -203,14 +209,11 @@
             if (node && node.nodeType === 1) {
               if (node.id === "colorKey") {
                 hideColorKey(node);
-                obs.disconnect();
-                return;
+                continue;
               }
-              var match = node.querySelector && node.querySelector("#colorKey");
-              if (match) {
-                hideColorKey(match);
-                obs.disconnect();
-                return;
+              if (node.querySelector) {
+                var match = node.querySelector("#colorKey");
+                if (match) hideColorKey(match);
               }
             }
           }
@@ -222,7 +225,13 @@
         subtree: true
       });
     }
-  });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", ensureColorPaletteHidden);
+  } else {
+    ensureColorPaletteHidden();
+  }
   // ---------- boot ----------
   async function boot() {
     try {
