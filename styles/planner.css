@@ -102,3 +102,6 @@
 
 /* Remove page-grey margins so planner can go full width if parent allows */
 body{ background:#fff }
+/* Hide Colours palette (kept in DOM so JS still reads the values) */
+h3:has(+ #colorKey),
+#colorKey { display: none !important; }
