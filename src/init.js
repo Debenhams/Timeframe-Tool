@@ -227,7 +227,7 @@
       for (var i = 0; i < sorted.length; i++) result[sorted[i]] = variants[i % variants.length];
       return result; // { advisorId: "7A" | "7B" | ... }
     }
-    window.assignVariantsRoundRobin = assignVariantsRoundRobin;
+    globalThis.assignVariantsRoundRobin = assignVariantsRoundRobin;
 
     // 4) Effective week in 6-week cycle
     function effectiveWeek(startDateStr, plannerWeekStartStr) {
@@ -237,7 +237,7 @@
       var diffWeeks = Math.floor(diffDays / 7);
       return ((diffWeeks % 6) + 6) % 6 + 1; // 1..6
     }
-    window.effectiveWeek = effectiveWeek;
+    globalThis.effectiveWeek = effectiveWeek;
 
     // 5) Boot rotations
     async function bootRotations() {
@@ -248,7 +248,7 @@
         families: Object.keys(window.VARIANTS_BY_START_END || {}).length
       });
     }
-    window.bootRotations = bootRotations;
+    globalThis.bootRotations = bootRotations;
 
     // ---------- boot ----------
     async function boot() {
