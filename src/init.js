@@ -1,6 +1,7 @@
 // src/init.js
 (function () {
   "use strict";
+  console.log("init.js loaded v3");
 
   // --- globals (safe defaults) ---
   if (!(window.ROTAS instanceof Map)) window.ROTAS = new Map();            // key: `${advisorId}::${weekStart}` -> { Monday: 'Early', ... }
