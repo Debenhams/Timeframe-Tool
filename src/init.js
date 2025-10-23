@@ -282,7 +282,7 @@
 
         refreshPlannerUI();
       } catch (e) {
-        console.warn("planner boot skipped", e);
+        console.warn("planer boot skipped", e);
       }
 
       if (typeof window.subscribeRealtime === "function") window.subscribeRealtime();
