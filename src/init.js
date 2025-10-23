@@ -280,8 +280,7 @@
         // Prime from table so ROTAS reflects visible selections
         rebuildAdvisorIndexesFromTable();
         primeRotasFromAssignTable();
-        await window.bootRotations();
-
+        await globalThis.bootRotations();
         refreshPlannerUI();
       } catch (e) {
         console.warn("planner boot skipped", e);
