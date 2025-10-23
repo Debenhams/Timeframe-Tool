@@ -239,18 +239,18 @@
     }
     globalThis.effectiveWeek = effectiveWeek;
 
-    // 5) Boot rotations
-    async function bootRotations() {
-      await loadShiftTemplatesAndVariants();
-      await loadRotationsWithHours();
-      console.log("Rotations booted", {
-        templates: Object.keys(window.SHIFT_BY_CODE || {}).length,
-        families: Object.keys(window.VARIANTS_BY_START_END || {}).length
-      });
-    }
-    globalThis.bootRotations = bootRotations; 
-    
-    console.log("rotations helpers loaded");
+// 5) Boot rotations (define directly on global to avoid scope issues)
+globalThis.bootRotations = async function bootRotations() {
+  await loadShiftTemplatesAndVariants();
+  await loadRotationsWithHours();
+  console.log("Rotations booted", {
+    templates: Object.keys(globalThis.SHIFT_BY_CODE || {}).length,
+    families: Object.keys(globalThis.VARIANTS_BY_START_END || {}).length
+  });
+};
+
+console.log("helpers exported v2", typeof globalThis.bootRotations);
+
 
     // ---------- boot ----------
     async function boot() {
