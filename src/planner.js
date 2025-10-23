@@ -1,6 +1,73 @@
 // src/planner.js
 (function () {
   "use strict";
+// --- rotations helpers (attached to globalThis) ---
+
+async function loadShiftTemplatesAndVariants() {
+  const { data: templates, error } = await supabase
+    .from("shift_templates")
+    .select("code, start_time, break1, lunch, break2, end_time");
+  if (error) { console.error("shift_templates error", error); return; }
+
+  // index by code
+  globalThis.SHIFT_BY_CODE = Object.fromEntries(templates.map(t => [t.code, t]));
+
+  // group variants by start_end (e.g. "07:00x16:00" → ["7A","7B","7C","7D"])
+  const groups = {};
+  const hhmm = x => (x || "").toString().slice(0,5);
+  for (const t of templates) {
+    const key = `${hhmm(t.start_time)}x${hhmm(t.end_time)}`;
+    (groups[key] ||= []).push(t.code);
+  }
+  for (const k of Object.keys(groups)) groups[k].sort();
+  globalThis.VARIANTS_BY_START_END = groups;
+}
+
+async function loadRotationsWithHours() {
+  const { data, error } = await supabase
+    .from("v_rotations_with_hours")
+    .select("name, week, dow, is_rdo, shift_code, start_hhmm, end_hhmm, start_end_key")
+    .order("name").order("week").order("dow");
+  if (error) { console.error("v_rotations_with_hours error", error); return; }
+
+  const idx = {};
+  for (const r of data) {
+    idx[r.name] ||= {};
+    idx[r.name][r.week] ||= {};
+    idx[r.name][r.week][r.dow] = { is_rdo: r.is_rdo, start_end_key: r.start_end_key };
+  }
+  globalThis.ROTATION = idx;  // lookup: ROTATION[name][week][dow]
+}
+
+function assignVariantsRoundRobin(advisorIdsInGroup, startEndKey) {
+  const variants = (globalThis.VARIANTS_BY_START_END && globalThis.VARIANTS_BY_START_END[startEndKey]) || [];
+  if (!variants.length) return {};
+  const sorted = [...advisorIdsInGroup].sort();
+  const result = {};
+  for (let i = 0; i < sorted.length; i++) result[sorted[i]] = variants[i % variants.length];
+  return result;  // { advisorId: "7A" | "7B" | ... }
+}
+globalThis.assignVariantsRoundRobin = assignVariantsRoundRobin;
+
+function effectiveWeek(startDateStr, plannerWeekStartStr) {
+  const start = new Date(startDateStr);
+  const plan  = new Date(plannerWeekStartStr);
+  const diffDays  = Math.floor((plan - start) / 86400000);
+  const diffWeeks = Math.floor(diffDays / 7);
+  return ((diffWeeks % 6) + 6) % 6 + 1; // 1..6
+}
+globalThis.effectiveWeek = effectiveWeek;
+
+globalThis.bootRotations = async function bootRotations() {
+  await loadShiftTemplatesAndVariants();
+  await loadRotationsWithHours();
+  console.log("Rotations booted", {
+    templates: Object.keys(globalThis.SHIFT_BY_CODE || {}).length,
+    families: Object.keys(globalThis.VARIANTS_BY_START_END || {}).length
+  });
+};
+
+console.log("planner.js helpers ready:", typeof globalThis.bootRotations);
 
   // ----- time utils -----
   function parseHHMM(s) {
