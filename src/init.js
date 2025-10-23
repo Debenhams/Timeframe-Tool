@@ -174,120 +174,124 @@
     wireOnce(tree, "change", refreshPlannerUI, "_wired_tree_change");
     wireOnce(tree, "click", refreshPlannerUI, "_wired_tree_click");
   }
-// ===== Rotations boot helpers =====
 
-// 1) Load templates and build variant families (e.g., "07:00x16:00" → ["7A","7B","7C","7D"])
-async function loadShiftTemplatesAndVariants() {
-  const { data: templates, error } = await supabase
-    .from("shift_templates")
-    .select("code, start_time, break1, lunch, break2, end_time");
-  if (error) { console.error("shift_templates error", error); return; }
+  // ===== Rotations boot helpers =====
 
-  window.SHIFT_BY_CODE = Object.fromEntries(templates.map(t => [t.code, t]));
-  const groups = {};
-  const hhmm = x => (x || "").toString().slice(0,5);
-  for (const t of templates) {
-    const key = `${hhmm(t.start_time)}x${hhmm(t.end_time)}`;
-    (groups[key] ||= []).push(t.code);
-  }
-  for (const k of Object.keys(groups)) groups[k].sort();
-  window.VARIANTS_BY_START_END = groups; // { "07:00x16:00": ["7A","7B","7C","7D"], ... }
-}
+    // 1) Load templates and build variant families (e.g., "07:00x16:00" → ["7A","7B","7C","7D"])
+    async function loadShiftTemplatesAndVariants() {
+      const { data: templates, error } = await supabase
+        .from("shift_templates")
+        .select("code, start_time, break1, lunch, break2, end_time");
+      if (error) { console.error("shift_templates error", error); return; }
 
-// 2) Load rotations-with-hours view
-async function loadRotationsWithHours() {
-  const { data, error } = await supabase
-    .from("v_rotations_with_hours")
-    .select("name, week, dow, is_rdo, shift_code, start_hhmm, end_hhmm, start_end_key")
-    .order("name").order("week").order("dow");
-  if (error) { console.error("v_rotations_with_hours error", error); return; }
-
-  const idx = {};
-  for (const r of data) {
-    idx[r.name] ||= {};
-    idx[r.name][r.week] ||= {};
-    idx[r.name][r.week][r.dow] = {
-      is_rdo: r.is_rdo,
-      start_end_key: r.start_end_key
-    };
-  }
-  window.ROTATION = idx;  // lookup: ROTATION[name][week][dow]
-}
-
-// 3) Round-robin assign A/B/C/D etc. within a (site,date,start_end) group
-function assignVariantsRoundRobin(advisorIdsInGroup, startEndKey) {
-  const variants = (window.VARIANTS_BY_START_END && window.VARIANTS_BY_START_END[startEndKey]) || [];
-  if (!variants.length) return {};
-  const sorted = [...advisorIdsInGroup].sort(); // stable
-  const result = {};
-  for (let i = 0; i < sorted.length; i++) result[sorted[i]] = variants[i % variants.length];
-  return result; // { advisorId: "7A" | "7B" | ... }
-}
-window.assignVariantsRoundRobin = assignVariantsRoundRobin;
-
-// 4) Effective week in 6-week cycle
-function effectiveWeek(startDateStr, plannerWeekStartStr) {
-  const start = new Date(startDateStr);
-  const plan  = new Date(plannerWeekStartStr);
-  const diffDays  = Math.floor((plan - start) / 86400000);
-  const diffWeeks = Math.floor(diffDays / 7);
-  return ((diffWeeks % 6) + 6) % 6 + 1; // 1..6
-}
-window.effectiveWeek = effectiveWeek;
-
-// 5) Boot rotations
-async function bootRotations() {
-  await loadShiftTemplatesAndVariants();
-  await loadRotationsWithHours();
-  console.log("Rotations booted", {
-    templates: Object.keys(window.SHIFT_BY_CODE || {}).length,
-    families: Object.keys(window.VARIANTS_BY_START_END || {}).length
-  });
-}
-window.bootRotations = bootRotations;
-
-  // ---------- boot ----------
-  async function boot() {
-    try {
-      if (typeof window.loadOrg === "function") await window.loadOrg();
-      if (typeof window.loadTemplates === "function") await window.loadTemplates();
-      if (typeof window.loadAssignments === "function") await window.loadAssignments();
-
-      var wsEl = document.getElementById("weekStart");
-      if (wsEl && typeof window.fetchRotasForWeek === "function") {
-        var ws = (wsEl.value || "").trim();
-        if (ws) {
-          try { await window.fetchRotasForWeek(ws); } catch (_) {}
-        }
-      }
-
-      if (typeof window.rebuildAdvisorDropdown === "function") window.rebuildAdvisorDropdown();
-      if (typeof window.rebuildTree === "function") window.rebuildTree();
-      if (typeof window.refreshChips === "function") window.refreshChips();
-      if (typeof window.populateTemplateEditor === "function") window.populateTemplateEditor();
-      if (typeof window.populateAssignTable === "function") window.populateAssignTable();
-      if (typeof window.updateRangeLabel === "function") window.updateRangeLabel();
-      if (typeof window.renderCalendar === "function") window.renderCalendar();
-
-      ensureTimeHeader();
-
-      // Prime from table so ROTAS reflects visible selections
-      rebuildAdvisorIndexesFromTable();
-      primeRotasFromAssignTable();
-      await window.bootRotations();
-
-      refreshPlannerUI();
-    } catch (e) {
-      console.warn("planner boot skipped", e);
+      window.SHIFT_BY_CODE = Object.fromEntries(templates.map(function (t) { return [t.code, t]; }));
+      var groups = {};
+      var hhmm = function (x) { return (x || "").toString().slice(0, 5); };
+      templates.forEach(function (t) {
+        var key = hhmm(t.start_time) + "x" + hhmm(t.end_time);
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(t.code);
+      });
+      Object.keys(groups).forEach(function (k) { groups[k].sort(); });
+      window.VARIANTS_BY_START_END = groups; // { "07:00x16:00": ["7A","7B","7C","7D"], ... }
     }
 
-    if (typeof window.subscribeRealtime === "function") window.subscribeRealtime();
+    // 2) Load rotations-with-hours view
+    async function loadRotationsWithHours() {
+      const { data, error } = await supabase
+        .from("v_rotations_with_hours")
+        .select("name, week, dow, is_rdo, shift_code, start_hhmm, end_hhmm, start_end_key")
+        .order("name")
+        .order("week")
+        .order("dow");
+      if (error) { console.error("v_rotations_with_hours error", error); return; }
 
-    wireGenerateButton();
-    wireTopViewDropdown();
-    wirePlannerRefreshSources();
-    watchAssignmentTable();
-  }
+      var idx = {};
+      data.forEach(function (r) {
+        if (!idx[r.name]) idx[r.name] = {};
+        if (!idx[r.name][r.week]) idx[r.name][r.week] = {};
+        idx[r.name][r.week][r.dow] = {
+          is_rdo: r.is_rdo,
+          start_end_key: r.start_end_key
+        };
+      });
+      window.ROTATION = idx;  // lookup: ROTATION[name][week][dow]
+    }
+
+    // 3) Round-robin assign A/B/C/D etc. within a (site,date,start_end) group
+    function assignVariantsRoundRobin(advisorIdsInGroup, startEndKey) {
+      var variants = (window.VARIANTS_BY_START_END && window.VARIANTS_BY_START_END[startEndKey]) || [];
+      if (!variants.length) return {};
+      var sorted = advisorIdsInGroup ? advisorIdsInGroup.slice().sort() : [];
+      var result = {};
+      for (var i = 0; i < sorted.length; i++) result[sorted[i]] = variants[i % variants.length];
+      return result; // { advisorId: "7A" | "7B" | ... }
+    }
+    window.assignVariantsRoundRobin = assignVariantsRoundRobin;
+
+    // 4) Effective week in 6-week cycle
+    function effectiveWeek(startDateStr, plannerWeekStartStr) {
+      var start = new Date(startDateStr);
+      var plan = new Date(plannerWeekStartStr);
+      var diffDays = Math.floor((plan - start) / 86400000);
+      var diffWeeks = Math.floor(diffDays / 7);
+      return ((diffWeeks % 6) + 6) % 6 + 1; // 1..6
+    }
+    window.effectiveWeek = effectiveWeek;
+
+    // 5) Boot rotations
+    async function bootRotations() {
+      await loadShiftTemplatesAndVariants();
+      await loadRotationsWithHours();
+      console.log("Rotations booted", {
+        templates: Object.keys(window.SHIFT_BY_CODE || {}).length,
+        families: Object.keys(window.VARIANTS_BY_START_END || {}).length
+      });
+    }
+    window.bootRotations = bootRotations;
+
+    // ---------- boot ----------
+    async function boot() {
+      try {
+        if (typeof window.loadOrg === "function") await window.loadOrg();
+        if (typeof window.loadTemplates === "function") await window.loadTemplates();
+        if (typeof window.loadAssignments === "function") await window.loadAssignments();
+
+        var wsEl = document.getElementById("weekStart");
+        if (wsEl && typeof window.fetchRotasForWeek === "function") {
+          var ws = (wsEl.value || "").trim();
+          if (ws) {
+            try { await window.fetchRotasForWeek(ws); } catch (_) {}
+          }
+        }
+
+        if (typeof window.rebuildAdvisorDropdown === "function") window.rebuildAdvisorDropdown();
+        if (typeof window.rebuildTree === "function") window.rebuildTree();
+        if (typeof window.refreshChips === "function") window.refreshChips();
+        if (typeof window.populateTemplateEditor === "function") window.populateTemplateEditor();
+        if (typeof window.populateAssignTable === "function") window.populateAssignTable();
+        if (typeof window.updateRangeLabel === "function") window.updateRangeLabel();
+        if (typeof window.renderCalendar === "function") window.renderCalendar();
+
+        ensureTimeHeader();
+
+        // Prime from table so ROTAS reflects visible selections
+        rebuildAdvisorIndexesFromTable();
+        primeRotasFromAssignTable();
+        await window.bootRotations();
+
+        refreshPlannerUI();
+      } catch (e) {
+        console.warn("planner boot skipped", e);
+      }
+
+      if (typeof window.subscribeRealtime === "function") window.subscribeRealtime();
+
+      wireGenerateButton();
+      wireTopViewDropdown();
+      wirePlannerRefreshSources();
+      watchAssignmentTable();
+    }
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot, { once: true });
