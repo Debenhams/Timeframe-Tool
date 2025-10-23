@@ -248,7 +248,9 @@
         families: Object.keys(window.VARIANTS_BY_START_END || {}).length
       });
     }
-    globalThis.bootRotations = bootRotations;
+    globalThis.bootRotations = bootRotations; 
+    
+    console.log("rotations helpers loaded");
 
     // ---------- boot ----------
     async function boot() {
