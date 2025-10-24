@@ -69,6 +69,29 @@ globalThis.bootRotations = async function bootRotations() {
 
 console.log("planner.js helpers ready:", typeof globalThis.bootRotations);
 
+// --- Advisors boot (minimal) ---
+globalThis.bootAdvisors = async function bootAdvisors() {
+  const { data: rows, error } = await supabase.from('advisors').select('*');
+  if (error) { console.error('bootAdvisors error', error); return 0; }
+
+  const sample = rows?.[0] || {};
+  const idKey   = ['id','advisor_id','uuid','pk','user_id'].find(k => k in sample) || 'id';
+  const nameKey = ['name','display_name','full_name','advisor_name'].find(k => k in sample) || null;
+
+  globalThis.ADVISOR_BY_ID = {};
+  globalThis.ADVISOR_BY_NAME = {};
+
+  (rows || []).forEach(r => {
+    const id = r[idKey];
+    const nm = nameKey ? r[nameKey] : (r.email || r.username || String(id));
+    globalThis.ADVISOR_BY_ID[id] = r;
+    globalThis.ADVISOR_BY_NAME[nm] = r;
+  });
+
+  console.log('bootAdvisors ok:', Object.keys(globalThis.ADVISOR_BY_ID).length);
+  return Object.keys(globalThis.ADVISOR_BY_ID).length;
+};
+
   // ----- time utils -----
   function parseHHMM(s) {
     if (!s || typeof s !== "string") return null;
