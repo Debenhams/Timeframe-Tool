@@ -176,6 +176,38 @@ globalThis.applyRotationToWeek = function applyRotationToWeek({
   return { weekNum, advisors: ids.length };
 };
 
+// --- Dev preview: wire the Preview Rotation button ---
+(function wirePreviewButton() {
+  const btn = document.getElementById('previewRotation');
+  if (!btn) return;                // no button found
+  if (btn.dataset._wired) return;  // avoid double-binding
+  btn.dataset._wired = '1';
+
+  btn.addEventListener('click', async () => {
+    try {
+      await globalThis.bootAdvisors?.();
+      await globalThis.bootRotations?.();
+
+      const names = Object.keys(globalThis.ROTATION || {});
+      if (!names.length) return console.warn('No rotations found');
+
+      const rotationName = names[0]; // e.g., "Flex 1"
+      const mondayISO = document.getElementById('weekStart')?.value || '2025-10-20';
+      const advisors = Object.keys(globalThis.ADVISOR_BY_ID || {}).slice(0, 8);
+
+      const startISO = globalThis.ROTATION_META?.[rotationName]?.start_date || null;
+      globalThis.applyRotationToWeek?.({
+        rotationName,
+        mondayISO,
+        advisors,
+        rotationStartISO: startISO
+      });
+    } catch (e) {
+      console.error('Preview Rotation failed', e);
+    }
+  });
+})();
+
   // ----- time utils -----
   function parseHHMM(s) {
     if (!s || typeof s !== "string") return null;
