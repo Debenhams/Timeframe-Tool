@@ -112,6 +112,69 @@ globalThis.bootAdvisors = async function bootAdvisors() {
   console.log('bootAdvisors ok:', Object.keys(globalThis.ADVISOR_BY_ID).length);
   return Object.keys(globalThis.ADVISOR_BY_ID).length;
 };
+// --- Apply a rotation week into ROTAS and re-render ---
+globalThis.applyRotationToWeek = function applyRotationToWeek({
+  rotationName,
+  mondayISO,          // 'YYYY-MM-DD' Monday to materialise
+  advisors,           // array of advisor IDs (or objects with {id})
+  rotationStartISO,   // rotation cycle start (optional; falls back to ROTATION_META)
+}) {
+  const rot = globalThis.ROTATION?.[rotationName];
+  if (!rot) { console.warn('No rotation:', rotationName); return; }
+
+  // Work out which week number this Monday is in the cycle
+  const startISO = rotationStartISO || globalThis.ROTATION_META?.[rotationName]?.start_date;
+  const weekNum = (typeof globalThis.effectiveWeek === 'function' && startISO)
+    ? globalThis.effectiveWeek(startISO, mondayISO)
+    : 1;
+
+  // Use that week (fallback to week 1 if missing)
+  const w = rot[weekNum] || rot[1];
+  if (!w) { console.warn('No week found for', rotationName, 'num:', weekNum); return; }
+
+  // Build Mon..Sun ISO date list for the chosen week
+  const base = new Date(mondayISO + 'T00:00:00');
+  const isoDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(base); d.setDate(base.getDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+
+  // Normalise advisor IDs
+  const ids = advisors.map(a => (typeof a === 'string' ? a : a.id));
+  const nextRotas = {};
+
+  isoDates.forEach((iso, i) => {
+    const dow = i + 1;                           // 1..7
+    const cell = w[dow];
+    if (!cell) return;
+
+    if (cell.is_rdo) {
+      ids.forEach(id => { (nextRotas[id] ||= {})[iso] = { label: 'RDO' }; });
+      return;
+    }
+
+    const sek = cell.start_end_key;              // e.g. "07:00x16:00"
+    const fam = globalThis.VARIANTS_BY_START_END?.[sek] || null;
+    const variants = fam ? Object.keys(fam) : [];
+
+    ids.forEach((id, idx) => {
+      (nextRotas[id] ||= {});
+      if (fam && variants.length) {
+        const key = variants[idx % variants.length]; // round-robin across variants
+        const v = fam[key];
+        nextRotas[id][iso] = { start: v.start_time, end: v.end_time, label: v.name || key };
+      } else if (sek) {
+        const [start, end] = sek.split('x');
+        nextRotas[id][iso] = { start, end, label: sek };
+      }
+    });
+  });
+
+  globalThis.ROTAS = nextRotas;
+  if (typeof globalThis.refreshPlannerUI === 'function') globalThis.refreshPlannerUI();
+  console.log('applyRotationToWeek ok →', rotationName, 'week', weekNum, 'advisors', ids.length);
+  return { weekNum, advisors: ids.length };
+};
 
   // ----- time utils -----
   function parseHHMM(s) {
