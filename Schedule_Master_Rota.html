@@ -1522,6 +1522,29 @@ if (typeof window.renderTimeHeader !== 'function') {
 
 <!-- safety: define bootRotations so any existing calls don’t crash -->
 <script>
+document.addEventListener("DOMContentLoaded", async () => {
+  try {
+    if (typeof window.bootRotations === "function") {
+      await window.bootRotations();
+    }
+  } catch (e) {
+    console.warn("bootRotations failed", e);
+  }
+
+  // Try the known render entry points in order:
+  if (typeof window.refreshPlannerUI === "function") return window.refreshPlannerUI();
+  if (typeof window.renderCalendar === "function") return window.renderCalendar();
+  if (typeof window.renderPlanner === "function") {
+    const rows = (window.ROTAS && Object.values(window.ROTAS)) || [];
+    console.log("renderPlanner rows=", Array.isArray(rows) ? rows.length : rows);
+    return window.renderPlanner(rows || []);
+  }
+  console.warn("No render function available");
+});
+</script>
+
+<!-- safety: define bootRotations so any existing calls don’t crash -->
+<script>
   window.bootRotations = window.bootRotations || (async function bootRotations(){
     console.log("bootRotations stub (page wired)");
   });
