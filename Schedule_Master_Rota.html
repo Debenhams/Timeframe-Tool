@@ -4,8 +4,6 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Professional Team Rota System — Supabase</title>
-<title>Professional Team Rota System — Supabase</title>
-<link rel="stylesheet" href="./styles/planner.css?v=1" />
 <style>
   :root{
     --brand:#0d47a1; --accent:#00c853; --ink:#1f2937; --paper:#ffffff; --wash:#f5f7fb; --line:#e4e9f2;
@@ -1516,70 +1514,5 @@ if (typeof window.renderTimeHeader !== 'function') {
   };
 }
   </script>
-  
-<!-- Project scripts (must be after Supabase and before </body>) -->
- <script>
-  // --- Supabase client init ---
-  // Replace these two with your project's values (Settings → API in Supabase)
-  // Use local names here to avoid redeclaring the top-level constants and ensure values are valid strings.
-  const _SUPABASE_URL  = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
-  const _SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
-
-  // The CDN exposes a global with createClient(...)
-  // Make a single shared client and expose it as window.supabase (what your code uses).
-  if (!window.supabase || typeof window.supabase.from !== "function") {
-    if (window.supabase && typeof window.supabase.createClient === "function") {
-      window.supabase = window.supabase.createClient(_SUPABASE_URL, _SUPABASE_ANON);
-    } else if (window.Supabase && typeof window.Supabase.createClient === "function") {
-      // some builds attach under window.Supabase
-      window.supabase = window.Supabase.createClient(_SUPABASE_URL, _SUPABASE_ANON);
-    }
-  }
-  console.log("supabase client ready:", typeof window.supabase?.from);
-</script>
-
-<script src="./src/planner.js?v=1"></script>
-
-<script>
-document.addEventListener("DOMContentLoaded", async () => {
-  try {
-    if (typeof window.bootRotations === "function") {
-      await window.bootRotations();    // loads templates + rotations
-    }
-  } catch (e) {
-    console.warn("bootRotations failed", e);
-  }
-
-  // prime rows used by the horizontal view and draw its time header
-  if (typeof window.rebuildAdvisorIndexesFromTable === "function") window.rebuildAdvisorIndexesFromTable();
-  if (typeof window.primeRotasFromAssignTable === "function") window.primeRotasFromAssignTable();
-  const _headerHost = document.getElementById("timeHeader") 
-                   || document.querySelector("[data-role='time-header']") 
-                   || document.querySelector(".time-scale-host");
-  if (_headerHost && typeof window.renderTimeHeader === "function") window.renderTimeHeader(_headerHost);
-  
-  // Force the known render entry point (it's present in your console list)
-  if (typeof window.renderCalendar === "function") {
-    return window.renderCalendar();
-  }
-
-  // Fallbacks (just in case)
-  if (typeof window.refreshPlannerUI === "function") return window.refreshPlannerUI();
-  if (typeof window.renderPlanner === "function") {
-    const rows = (window.ROTATION && Object.values(window.ROTATION)) || [];
-    return window.renderPlanner(rows);
-  }
-
-  console.warn("No render function available");
-});
-</script>
-
-<!-- safety: define bootRotations so any existing calls don’t crash -->
-<script>
-  window.bootRotations = window.bootRotations || (async function bootRotations(){
-    console.log("bootRotations stub (page wired)");
-  });
-</script>
-
 </body>
 </html>
