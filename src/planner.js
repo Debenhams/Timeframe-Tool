@@ -1,5 +1,6 @@
 // src/planner.js
-(function () {
+(async function () {
+
   "use strict";
 // --- rotations helpers (attached to globalThis) ---
 
@@ -75,6 +76,7 @@ globalThis.ROTATION_META = {};
 (metaRows || []).forEach(r => {
   globalThis.ROTATION_META[r.name] = { start_date: r.start_date };
 });
+
 
 console.log("planner.js helpers ready:", typeof globalThis.bootRotations);
 
