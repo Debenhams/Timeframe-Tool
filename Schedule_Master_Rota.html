@@ -1525,6 +1525,15 @@ window.bootRotations = async function bootRotations() {
   console.log("Rotations booted (stub)");
 };
 </script>
+<!-- Project scripts (must be after Supabase and before </body>) -->
+<script src="./src/planner.js?v=1"></script>
+
+<!-- safety: define bootRotations so any existing calls don’t crash -->
+<script>
+  window.bootRotations = window.bootRotations || (async function bootRotations(){
+    console.log("bootRotations stub (page wired)");
+  });
+</script>
 
 </body>
 </html>
