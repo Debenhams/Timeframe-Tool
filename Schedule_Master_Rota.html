@@ -1550,6 +1550,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.warn("bootRotations failed", e);
   }
 
+  // prime rows used by the horizontal view and draw its time header
+  if (typeof window.rebuildAdvisorIndexesFromTable === "function") window.rebuildAdvisorIndexesFromTable();
+  if (typeof window.primeRotasFromAssignTable === "function") window.primeRotasFromAssignTable();
+  const _headerHost = document.getElementById("timeHeader") 
+                   || document.querySelector("[data-role='time-header']") 
+                   || document.querySelector(".time-scale-host");
+  if (_headerHost && typeof window.renderTimeHeader === "function") window.renderTimeHeader(_headerHost);
+  
   // Force the known render entry point (it's present in your console list)
   if (typeof window.renderCalendar === "function") {
     return window.renderCalendar();
