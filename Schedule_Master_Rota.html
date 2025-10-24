@@ -1540,25 +1540,28 @@ if (typeof window.renderTimeHeader !== 'function') {
 
 <script src="./src/planner.js?v=1"></script>
 
-<!-- safety: define bootRotations so any existing calls don’t crash -->
 <script>
 document.addEventListener("DOMContentLoaded", async () => {
   try {
     if (typeof window.bootRotations === "function") {
-      await window.bootRotations();
+      await window.bootRotations();    // loads templates + rotations
     }
   } catch (e) {
     console.warn("bootRotations failed", e);
   }
 
-  // Try the known render entry points in order:
-  if (typeof window.refreshPlannerUI === "function") return window.refreshPlannerUI();
-  if (typeof window.renderCalendar === "function") return window.renderCalendar();
-  if (typeof window.renderPlanner === "function") {
-    const rows = (window.ROTAS && Object.values(window.ROTAS)) || [];
-    console.log("renderPlanner rows=", Array.isArray(rows) ? rows.length : rows);
-    return window.renderPlanner(rows || []);
+  // Force the known render entry point (it's present in your console list)
+  if (typeof window.renderCalendar === "function") {
+    return window.renderCalendar();
   }
+
+  // Fallbacks (just in case)
+  if (typeof window.refreshPlannerUI === "function") return window.refreshPlannerUI();
+  if (typeof window.renderPlanner === "function") {
+    const rows = (window.ROTATION && Object.values(window.ROTATION)) || [];
+    return window.renderPlanner(rows);
+  }
+
   console.warn("No render function available");
 });
 </script>
