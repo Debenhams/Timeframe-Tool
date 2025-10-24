@@ -176,15 +176,17 @@ globalThis.applyRotationToWeek = function applyRotationToWeek({
   return { weekNum, advisors: ids.length };
 };
 
-// --- Dev preview: wire the Preview Rotation button ---
-(function wirePreviewButton() {
+// --- Dev preview: wire the Preview Rotation button (after DOM is ready) ---
+document.addEventListener('DOMContentLoaded', () => {
   const btn = document.getElementById('previewRotation');
-  if (!btn) return;                // no button found
+  if (!btn) return;
+
   if (btn.dataset._wired) return;  // avoid double-binding
   btn.dataset._wired = '1';
 
   btn.addEventListener('click', async () => {
     try {
+      console.log('[preview] click');
       await globalThis.bootAdvisors?.();
       await globalThis.bootRotations?.();
 
@@ -196,17 +198,19 @@ globalThis.applyRotationToWeek = function applyRotationToWeek({
       const advisors = Object.keys(globalThis.ADVISOR_BY_ID || {}).slice(0, 8);
 
       const startISO = globalThis.ROTATION_META?.[rotationName]?.start_date || null;
-      globalThis.applyRotationToWeek?.({
+      const res = globalThis.applyRotationToWeek?.({
         rotationName,
         mondayISO,
         advisors,
         rotationStartISO: startISO
       });
+      console.log('[preview] applied', res);
     } catch (e) {
       console.error('Preview Rotation failed', e);
     }
   });
-})();
+});
+
 
   // ----- time utils -----
   function parseHHMM(s) {
