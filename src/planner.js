@@ -68,9 +68,7 @@ globalThis.bootRotations = async function bootRotations() {
   });
 };
 // also load rotation metadata (auto-detect the name and start_date columns)
-const { data: metaRows, error: metaErr } = await supabase
-  .from('rotations')
-  .select('*');
+const { data: metaRows, error: metaErr } = await supabase.from('rotations').select('*');
 if (metaErr) console.warn('rotations meta error', metaErr);
 globalThis.ROTATION_META = {};
 
@@ -81,12 +79,8 @@ const startKey = ['start_date','start','starts_on','cycle_start','startDate'].fi
 (metaRows || []).forEach(r => {
   const n = nameKey  ? r[nameKey]  : undefined;
   const s = startKey ? r[startKey] : undefined;
-  if (n) {
-    globalThis.ROTATION_META[n] = { start_date: s || null };
-  }
+  if (n) globalThis.ROTATION_META[n] = { start_date: s || null };
 });
-
-
 
 console.log("planner.js helpers ready:", typeof globalThis.bootRotations);
 
@@ -112,6 +106,7 @@ globalThis.bootAdvisors = async function bootAdvisors() {
   console.log('bootAdvisors ok:', Object.keys(globalThis.ADVISOR_BY_ID).length);
   return Object.keys(globalThis.ADVISOR_BY_ID).length;
 };
+
 // --- Apply a rotation week into ROTAS and re-render ---
 globalThis.applyRotationToWeek = function applyRotationToWeek({
   rotationName,
@@ -211,6 +206,65 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 
+// --- Apply a rotation week into ROTAS and re-render ---
+globalThis.applyRotationToWeek = function applyRotationToWeek({
+  rotationName,
+  mondayISO,          // 'YYYY-MM-DD' Monday to materialise
+  advisors,           // array of advisor IDs (or objects with {id})
+  rotationStartISO,   // optional; falls back to ROTATION_META
+}) {
+  const rot = globalThis.ROTATION?.[rotationName];
+  if (!rot) { console.warn('No rotation:', rotationName); return; }
+
+  const startISO = rotationStartISO || globalThis.ROTATION_META?.[rotationName]?.start_date;
+  const weekNum = (typeof globalThis.effectiveWeek === 'function' && startISO)
+    ? globalThis.effectiveWeek(startISO, mondayISO)
+    : 1;
+
+  const w = rot[weekNum] || rot[1];
+  if (!w) { console.warn('No week found for', rotationName, 'num:', weekNum); return; }
+
+  const base = new Date(mondayISO + 'T00:00:00');
+  const isoDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(base); d.setDate(base.getDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+
+  const ids = advisors.map(a => (typeof a === 'string' ? a : a.id));
+  const nextRotas = {};
+
+  isoDates.forEach((iso, i) => {
+    const dow = i + 1;
+    const cell = w[dow];
+    if (!cell) return;
+
+    if (cell.is_rdo) {
+      ids.forEach(id => { (nextRotas[id] ||= {})[iso] = { label: 'RDO' }; });
+      return;
+    }
+
+    const sek = cell.start_end_key;
+    const fam = globalThis.VARIANTS_BY_START_END?.[sek] || null;
+    const variants = fam ? Object.keys(fam) : [];
+
+    ids.forEach((id, idx) => {
+      (nextRotas[id] ||= {});
+      if (fam && variants.length) {
+        const key = variants[idx % variants.length];
+        const v = fam[key];
+        nextRotas[id][iso] = { start: v.start_time, end: v.end_time, label: v.name || key };
+      } else if (sek) {
+        const [start, end] = sek.split('x');
+        nextRotas[id][iso] = { start, end, label: sek };
+      }
+    });
+  });
+
+  globalThis.ROTAS = nextRotas;
+  if (typeof globalThis.refreshPlannerUI === 'function') globalThis.refreshPlannerUI();
+  console.log('applyRotationToWeek ok →', rotationName, 'week', weekNum, 'advisors', ids.length);
+  return { weekNum, advisors: ids.length };
+};
 
   // ----- time utils -----
   function parseHHMM(s) {
@@ -368,4 +422,47 @@ document.addEventListener('DOMContentLoaded', () => {
     // No-op here; your existing calendar renderer can keep handling the vertical view.
   }
   window.renderAdvisorWeek = renderAdvisorWeek;
+
+  // --- Dev preview: wire the Preview Rotation button (end-of-file to guarantee DOM exists) ---
+(function () {
+  const wire = () => {
+    const btn = document.getElementById('previewRotation');
+    if (!btn) return;                     // button not present
+    if (btn.dataset._wired) return;       // avoid double-binding
+    btn.dataset._wired = '1';
+
+    btn.addEventListener('click', async () => {
+      try {
+        console.log('[preview] click');
+        await globalThis.bootAdvisors?.();
+        await globalThis.bootRotations?.();
+
+        const names = Object.keys(globalThis.ROTATION || {});
+        if (!names.length) return console.warn('No rotations found');
+
+        const rotationName = names[0]; // e.g., "Flex 1"
+        const mondayISO = document.getElementById('weekStart')?.value || '2025-10-20';
+        const advisors = Object.keys(globalThis.ADVISOR_BY_ID || {}).slice(0, 8);
+        const startISO = globalThis.ROTATION_META?.[rotationName]?.start_date || null;
+
+        const res = globalThis.applyRotationToWeek?.({
+          rotationName,
+          mondayISO,
+          advisors,
+          rotationStartISO: startISO
+        });
+        console.log('[preview] applied', res);
+      } catch (e) {
+        console.error('Preview Rotation failed', e);
+      }
+    });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wire);
+  } else {
+    wire();
+  }
+})();
+
 })();
