@@ -67,15 +67,25 @@ globalThis.bootRotations = async function bootRotations() {
     families: Object.keys(globalThis.VARIANTS_BY_START_END || {}).length
   });
 };
-// also load rotation metadata (start_date per rotation name)
+// also load rotation metadata (auto-detect the name and start_date columns)
 const { data: metaRows, error: metaErr } = await supabase
   .from('rotations')
-  .select('name,start_date');
+  .select('*');
 if (metaErr) console.warn('rotations meta error', metaErr);
 globalThis.ROTATION_META = {};
+
+const sampleMeta = (metaRows && metaRows[0]) || {};
+const nameKey  = ['name','rotation_name','title','label'].find(k => k in sampleMeta) || null;
+const startKey = ['start_date','start','starts_on','cycle_start','startDate'].find(k => k in sampleMeta) || null;
+
 (metaRows || []).forEach(r => {
-  globalThis.ROTATION_META[r.name] = { start_date: r.start_date };
+  const n = nameKey  ? r[nameKey]  : undefined;
+  const s = startKey ? r[startKey] : undefined;
+  if (n) {
+    globalThis.ROTATION_META[n] = { start_date: s || null };
+  }
 });
+
 
 
 console.log("planner.js helpers ready:", typeof globalThis.bootRotations);
