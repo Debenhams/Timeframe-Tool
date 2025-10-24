@@ -1518,6 +1518,25 @@ if (typeof window.renderTimeHeader !== 'function') {
   </script>
   
 <!-- Project scripts (must be after Supabase and before </body>) -->
+ <script>
+  // --- Supabase client init ---
+  // Replace these two with your project's values (Settings → API in Supabase)
+  const SUPABASE_URL  = https://oypdnjxhjpgpwmkltzmk.supabase.co;
+  const SUPABASE_ANON = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is;
+
+  // The CDN exposes a global with createClient(...)
+  // Make a single shared client and expose it as window.supabase (what your code uses).
+  if (!window.supabase || typeof window.supabase.from !== "function") {
+    if (window.supabase && typeof window.supabase.createClient === "function") {
+      window.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    } else if (window.Supabase && typeof window.Supabase.createClient === "function") {
+      // some builds attach under window.Supabase
+      window.supabase = window.Supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    }
+  }
+  console.log("supabase client ready:", typeof window.supabase?.from);
+</script>
+
 <script src="./src/planner.js?v=1"></script>
 
 <!-- safety: define bootRotations so any existing calls don’t crash -->
