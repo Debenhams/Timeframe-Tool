@@ -265,6 +265,23 @@ globalThis.applyRotationToWeek = function applyRotationToWeek({
   console.log('applyRotationToWeek ok →', rotationName, 'week', weekNum, 'advisors', ids.length);
   return { weekNum, advisors: ids.length };
 };
+// Fill the rotation <select> with names from window.ROTATION
+globalThis.populateRotationSelect = function populateRotationSelect() {
+  const sel = document.getElementById('rotationName');
+  if (!sel) return;
+
+  const names = Object.keys(globalThis.ROTATION || {});
+  if (!names.length) {
+    sel.innerHTML = `<option value="">(no rotations)</option>`;
+    return;
+  }
+
+  // Only rebuild if empty or placeholder present
+  if (sel.options.length <= 1 || sel.value === '') {
+    sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
+    sel.value = names[0]; // default to first
+  }
+};
 
   // ----- time utils -----
   function parseHHMM(s) {
@@ -437,10 +454,13 @@ globalThis.applyRotationToWeek = function applyRotationToWeek({
         await globalThis.bootAdvisors?.();
         await globalThis.bootRotations?.();
 
-        const names = Object.keys(globalThis.ROTATION || {});
-        if (!names.length) return console.warn('No rotations found');
+        await globalThis.bootRotations?.();
+globalThis.populateRotationSelect?.();
 
-        const rotationName = names[0]; // e.g., "Flex 1"
+const sel = document.getElementById('rotationName');
+const rotationName = (sel && sel.value) || Object.keys(globalThis.ROTATION || {})[0];
+if (!rotationName) return console.warn('No rotations found');
+
         const mondayISO = document.getElementById('weekStart')?.value || '2025-10-20';
         const advisors = Object.keys(globalThis.ADVISOR_BY_ID || {}).slice(0, 8);
         const startISO = globalThis.ROTATION_META?.[rotationName]?.start_date || null;
