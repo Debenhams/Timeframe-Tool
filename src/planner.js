@@ -66,6 +66,15 @@ globalThis.bootRotations = async function bootRotations() {
     families: Object.keys(globalThis.VARIANTS_BY_START_END || {}).length
   });
 };
+// also load rotation metadata (start_date per rotation name)
+const { data: metaRows, error: metaErr } = await supabase
+  .from('rotations')
+  .select('name,start_date');
+if (metaErr) console.warn('rotations meta error', metaErr);
+globalThis.ROTATION_META = {};
+(metaRows || []).forEach(r => {
+  globalThis.ROTATION_META[r.name] = { start_date: r.start_date };
+});
 
 console.log("planner.js helpers ready:", typeof globalThis.bootRotations);
 
