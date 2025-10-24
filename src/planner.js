@@ -282,6 +282,58 @@ globalThis.populateRotationSelect = function populateRotationSelect() {
     sel.value = names[0]; // default to first
   }
 };
+// --- Compute rows from ROTAS for the chosen day ---
+globalThis.computePlannerRowsFromState = function computePlannerRowsFromState() {
+  try {
+    const hasROTAS = globalThis.ROTAS && Object.keys(globalThis.ROTAS).length > 0;
+    if (!hasROTAS) {
+      console.log('[rows] using legacy source (no ROTAS)');
+      return [];
+    }
+
+    // Read Week start (Monday) + Day selector
+    const weekStartISO = document.getElementById('weekStart')?.value;
+    const dayName = document.getElementById('teamDay')?.value || 'Monday'; // your UI already has this select
+
+    // Map day name -> offset from Monday (0..6)
+    const dayIndexMap = { Monday:0, Tuesday:1, Wednesday:2, Thursday:3, Friday:4, Saturday:5, Sunday:6 };
+    const offset = dayIndexMap[dayName] ?? 0;
+
+    // Resolve the actual ISO date to display
+    const base = weekStartISO ? new Date(weekStartISO + 'T00:00:00') : null;
+    const dayISO = base ? (() => { const d = new Date(base); d.setDate(base.getDate() + offset); return d.toISOString().slice(0,10); })() : null;
+
+    const rows = [];
+    const allAdvisors = globalThis.ADVISOR_BY_ID || {};
+    const selIds = Object.keys(allAdvisors); // simple: show all advisors; we can filter to “selected” later
+
+    selIds.forEach(id => {
+      const dayMap = globalThis.ROTAS[id] || {};
+      const cell = dayISO ? dayMap[dayISO] : null;
+      if (!cell) return;
+
+      const start = cell.start || null;
+      const end   = cell.end   || null;
+      const label = cell.label || '';
+
+      // row format expected by your renderers: { advisorId, advisorName, dateISO, start, end, label }
+      rows.push({
+        advisorId: id,
+        advisorName: allAdvisors[id]?.name || id,
+        dateISO: dayISO,
+        start,
+        end,
+        label
+      });
+    });
+
+    console.log('[rows] from ROTAS →', rows.length, 'for', dayName, dayISO);
+    return rows;
+  } catch (e) {
+    console.warn('[rows] compute from ROTAS failed', e);
+    return [];
+  }
+};
 
   // ----- time utils -----
   function parseHHMM(s) {
