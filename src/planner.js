@@ -447,34 +447,47 @@ console.log('[rows debug]', { ws, dayName, dayISO,
 
   // CASE B: preview rotation shape { [advisorId]: { [YYYY-MM-DD]: { start, end, label } } }
 if (window.ROTAS && typeof window.ROTAS === "object") {
-  const ids = Object.keys(window.ROTAS);
-  // show a snapshot of what we’ll try to render
-  console.log('[rows object-case]', { dayISO, ids: ids.slice(0, 5) });
+ // compute Day ISO for the currently selected week/day
+const wsel = document.getElementById('weekStart');
+const dayEl = document.getElementById('teamDay');
+const rawWs = wsel && wsel.value ? wsel.value : '';
+const wsISO = (typeof normalizeToISO === 'function') ? normalizeToISO(rawWs) : rawWs;
+const mondayISO = (typeof toMondayISO === 'function') ? toMondayISO(wsISO) : wsISO;
 
-  ids.forEach(aId => {
-    const byDate = window.ROTAS[aId] || {};
-    const sample = byDate && Object.keys(byDate).slice(0, 3);
-    // log 2 examples max so we can compare the keys to dayISO
-    if (Math.random() < 0.02) console.log('[rows sample]', { aId, sample, atDay: byDate[dayISO] });
+const dayName = (dayEl && dayEl.value) || 'Monday';
+const DOW = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:7 };
+const dow = DOW[dayName] || 1;
 
-    const cell = byDate[dayISO];
-    if (!cell) return;
+const base = new Date(mondayISO + 'T00:00:00');
+base.setDate(base.getDate() + (dow - 1));
+const yy = base.getFullYear();
+const mm = String(base.getMonth() + 1).padStart(2, '0');
+const dd = String(base.getDate()).padStart(2, '0');
+const dayISO = `${yy}-${mm}-${dd}`;
 
-    // accept RDO or shift; draw only when we have start/end
-        if (cell.is_rdo) return;
-    const st = cell.start || cell.start_time;
-    const en = cell.end   || cell.end_time;
-    if (!st || !en) return;
+// build rows from preview shape: ROTAS[advisorId][YYYY-MM-DD] = { start, end, label, is_rdo }
+const ids = Object.keys(window.ROTAS || {});
+ids.forEach((aId) => {
+  const weekObj = window.ROTAS[aId] || {};
+  const cell = weekObj[dayISO];
+  if (!cell || cell.is_rdo) return;
 
+  const segs = [];
+  if (cell.start && cell.end) {
+    segs.push({ code: cell.label || '', atDay: dayISO, start: cell.start, end: cell.end });
+  }
+  if (!segs.length) return;
 
-   const segs = [{ kind: "shift", start: st, end: en }];
-    const name =
-      (window.ADVISOR_BY_ID instanceof Map && window.ADVISOR_BY_ID.get(aId)) || aId;
-    rows.push({ id: aId, name, badge: "", segments: segs });
-  });
+  const name =
+    (window.ADVISOR_BY_ID instanceof Map && window.ADVISOR_BY_ID.get(aId)) || aId;
 
-  rows.sort((a, b) => a.name.localeCompare(b.name));
-  return rows;
+  rows.push({ id: aId, name, badge: '', segments: segs });
+});
+
+// sort and return
+rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+return rows;
+
 }
 
 
