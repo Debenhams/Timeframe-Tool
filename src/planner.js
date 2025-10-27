@@ -386,12 +386,18 @@ function normalizeToISO(d) {
   // already ISO or browser-parsable → return as-is
   return d;
 }
-// Build YYYY-MM-DD using LOCAL time (no timezone shifts)
-function toISODateLocal(dateObj) {
-  const y = dateObj.getFullYear();
-  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
-  const d = String(dateObj.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
+// Get the Monday of the week for a given ISO date (YYYY-MM-DD), using LOCAL time
+function toMondayISO(iso) {
+  if (!iso) return "";
+  const [y, m, d] = iso.split("-").map(Number);
+  const dt = new Date(y, (m || 1) - 1, d || 1);
+  const dow = dt.getDay();                    // 0=Sun .. 1=Mon .. 6=Sat
+  const delta = (dow === 0 ? -6 : 1 - dow);   // shift to Monday
+  const mon = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + delta);
+  const yy = mon.getFullYear();
+  const mm = String(mon.getMonth() + 1).padStart(2, "0");
+  const dd2 = String(mon.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd2}`;
 }
 
   // ----- build rows from current state -----
@@ -607,7 +613,8 @@ const sel = document.getElementById('rotationName');
 
 
         const rawWs = document.getElementById('weekStart')?.value || '2025-10-20';
-const mondayISO = (typeof normalizeToISO === 'function') ? normalizeToISO(rawWs) : rawWs;
+const wsISO = (typeof normalizeToISO === 'function') ? normalizeToISO(rawWs) : rawWs;
+const mondayISO = (typeof toMondayISO === 'function') ? toMondayISO(wsISO) : wsISO;
 
         const advisors = Object.keys(globalThis.ADVISOR_BY_ID || {}).slice(0, 8);
         const startISO = globalThis.ROTATION_META?.families?.[rotationName]?.start_date || null;
