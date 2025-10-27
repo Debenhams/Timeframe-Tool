@@ -443,10 +443,13 @@ if (window.ROTAS && typeof window.ROTAS === "object") {
     if (!cell) return;
 
     // accept RDO or shift; draw only when we have start/end
-    if (cell.is_rdo) return;
-    if (!cell.start || !cell.end) return;
+        if (cell.is_rdo) return;
+    const st = cell.start || cell.start_time;
+    const en = cell.end   || cell.end_time;
+    if (!st || !en) return;
 
-    const segs = [{ kind: "shift", start: cell.start, end: cell.end }];
+
+   const segs = [{ kind: "shift", start: st, end: en }];
     const name =
       (window.ADVISOR_BY_ID instanceof Map && window.ADVISOR_BY_ID.get(aId)) || aId;
     rows.push({ id: aId, name, badge: "", segments: segs });
