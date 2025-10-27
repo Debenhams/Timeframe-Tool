@@ -72,6 +72,33 @@ if (!sb || typeof sb.from !== 'function') {
 
     await loadShiftTemplatesAndVariants();  // builds SHIFT_BY_CODE / VARIANTS_BY_START_END
     await loadRotationsWithHours();         // builds ROTATION[name][week][dow]
+    // Fallback: if helpers didn’t populate ROTATION, build from the view
+    if (!globalThis.ROTATION || !Object.keys(globalThis.ROTATION).length) {
+      const { data: vhRows, error: vhErr } = await sb
+        .from('v_rotations_with_hours')
+        .select('name,week,dow,is_rdo,start_end_key')
+        .order('name', { ascending: true })
+        .order('week', { ascending: true })
+        .order('dow', { ascending: true });
+
+      if (vhErr) { console.warn('v_rotations_with_hours error', vhErr); }
+
+      const ROT = {};
+      (vhRows || []).forEach(r => {
+        const n = r.name;
+        const w = String(r.week || 1);      // weeks are 1..6
+        const d = Number(r.dow);            // days are 1..7 (Mon..Sun)
+
+        ROT[n] ||= {};
+        ROT[n][w] ||= {};
+        ROT[n][w][d] = r.is_rdo
+          ? { is_rdo: true }
+          : { start_end_key: r.start_end_key };
+      });
+
+      globalThis.ROTATION = ROT;
+      console.log('built ROTATION from view → families:', Object.keys(ROT).length);
+    }
 
     // --- Helpers
     const toNameKey = (s) => (s || "").trim();
