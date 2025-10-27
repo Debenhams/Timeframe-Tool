@@ -436,15 +436,19 @@ window.computePlannerRowsFromState = computePlannerRowsFromState;
 (function patchRefresh() {
   const orig = globalThis.refreshPlannerUI;
   globalThis.refreshPlannerUI = function patchedRefresh() {
+    // 1) Let the legacy UI do whatever it needs first
+    if (typeof orig === 'function') orig();
+
+    // 2) Then override with our computed rows
     const rows = (typeof globalThis.computePlannerRowsFromState === 'function')
       ? globalThis.computePlannerRowsFromState()
       : [];
     if (typeof globalThis.renderPlanner === 'function') {
       globalThis.renderPlanner(rows);
     }
-    if (typeof orig === 'function') orig();
   };
 })();
+
 
   // ----- render time header (07:00..19:00) -----
   function renderTimeHeader(el) {
