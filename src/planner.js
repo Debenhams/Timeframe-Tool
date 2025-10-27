@@ -550,6 +550,8 @@ const sel = document.getElementById('rotationName');
           rotationStartISO: startISO
         });
         console.log('[preview] applied', res);
+        if (typeof refreshPlannerUI === 'function') refreshPlannerUI();
+
       } catch (e) {
         console.error('Preview Rotation failed', e);
       }
