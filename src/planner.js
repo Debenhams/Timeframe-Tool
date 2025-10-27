@@ -436,13 +436,15 @@ window.computePlannerRowsFromState = computePlannerRowsFromState;
 (function patchRefresh() {
   const orig = globalThis.refreshPlannerUI;
   globalThis.refreshPlannerUI = function patchedRefresh() {
-    // 1) Let the legacy UI do whatever it needs first
     if (typeof orig === 'function') orig();
 
-    // 2) Then override with our computed rows
     const rows = (typeof globalThis.computePlannerRowsFromState === 'function')
       ? globalThis.computePlannerRowsFromState()
       : [];
+
+    // Debug: see what we're drawing
+    console.log('[render rows]', rows.length, rows[0] || null);
+
     if (typeof globalThis.renderPlanner === 'function') {
       globalThis.renderPlanner(rows);
     }
