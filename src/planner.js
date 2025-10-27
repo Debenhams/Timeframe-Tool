@@ -2,6 +2,10 @@
 (async function () {
 
   "use strict";
+  // safe shims so any UI code can call these without errors
+globalThis.showError = globalThis.showError || function (msg) { console.warn(String(msg)); };
+globalThis.showInfo  = globalThis.showInfo  || function (msg) { console.log(String(msg));  };
+
   // alias the client used by the helpers below
 const supabase = window.supabase;
 // --- rotations helpers (attached to globalThis) ---
