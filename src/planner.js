@@ -61,11 +61,13 @@ globalThis.effectiveWeek = effectiveWeek;
 
  globalThis.bootRotations = async function bootRotations() {
   try {
-    // --- Singleton supabase client (avoid multiple GoTrueClient warnings)
-    if (!globalThis.supabaseClient) {
-      globalThis.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    }
-    const sb = globalThis.supabaseClient;
+    // --- Use existing Supabase client already created in the HTML
+const sb = window.supabase;
+if (!sb || typeof sb.from !== 'function') {
+  console.error('Supabase client missing: expected window.supabase.from to be a function');
+  return;
+}
+
 
     // --- Helpers
     const toNameKey = (s) => (s || "").trim();
