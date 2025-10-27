@@ -64,6 +64,38 @@ function effectiveWeek(startDateStr, plannerWeekStartStr) {
   return ((diffWeeks % 6) + 6) % 6 + 1; // 1..6
 }
 globalThis.effectiveWeek = effectiveWeek;
+// ---- date helpers (needed by preview + renderer) ----
+function toISODateLocal(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Accepts "YYYY-MM-DD", or "DD/MM/YYYY", or any Date-parsable string
+function normalizeToISO(s) {
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;                // already ISO
+  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);            // DD/MM/YYYY
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  const d = new Date(s);
+  return isNaN(d) ? String(s) : toISODateLocal(d);
+}
+
+// Given an ISO date, return the Monday (ISO) of that week
+function toMondayISO(iso) {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  // JS: 0=Sun..6=Sat  -> make 0=Mon..6=Sun
+  const offset = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - offset);
+  return toISODateLocal(d);
+}
+
+// expose
+globalThis.toISODateLocal = toISODateLocal;
+globalThis.normalizeToISO  = normalizeToISO;
+globalThis.toMondayISO     = toMondayISO;
 
  globalThis.bootRotations = async function bootRotations() {
   try {
