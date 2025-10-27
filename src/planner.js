@@ -225,11 +225,14 @@ globalThis.applyRotationToWeek = function applyRotationToWeek({
   const w = rot[weekNum] || rot[1];
   if (!w) { console.warn('No week found for', rotationName, 'num:', weekNum); return; }
 
-  const base = new Date(mondayISO + 'T00:00:00');
-  const isoDates = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(base); d.setDate(base.getDate() + i);
-    return d.toISOString().slice(0, 10);
-  });
+  // Build week dates in LOCAL time → YYYY-MM-DD (no timezone drift)
+const [yy, mm, dd] = mondayISO.split("-").map(Number);
+const base = new Date(yy, (mm || 1) - 1, dd || 1);
+const isoDates = Array.from({ length: 7 }, (_, i) => {
+  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+  return toISODateLocal(d);
+});
+
 
   const ids = advisors.map(a => (typeof a === 'string' ? a : a.id));
   const nextRotas = {};
@@ -383,6 +386,13 @@ function normalizeToISO(d) {
   // already ISO or browser-parsable → return as-is
   return d;
 }
+// Build YYYY-MM-DD using LOCAL time (no timezone shifts)
+function toISODateLocal(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const d = String(dateObj.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
   // ----- build rows from current state -----
 function computePlannerRowsFromState() {
@@ -398,7 +408,9 @@ function computePlannerRowsFromState() {
   const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
   const dayIdx = Math.max(0, DAYS.indexOf(dayName));
   const base = new Date(ws + "T00:00:00");
-  const dayISO = new Date(base.getTime() + dayIdx * 86400000).toISOString().slice(0, 10);
+  const dayLocal = new Date(base.getFullYear(), base.getMonth(), base.getDate() + dayIdx);
+const dayISO = toISODateLocal(dayLocal);
+
 // DEBUG: see what date & data we’re rendering
 console.log('[rows debug]', { ws, dayName, dayISO,
   rotasType: (window.ROTAS && (window.ROTAS instanceof Map ? 'Map' : typeof window.ROTAS)),
