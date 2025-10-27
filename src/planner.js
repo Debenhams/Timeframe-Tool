@@ -388,6 +388,11 @@ function computePlannerRowsFromState() {
   const dayIdx = Math.max(0, DAYS.indexOf(dayName));
   const base = new Date(ws + "T00:00:00");
   const dayISO = new Date(base.getTime() + dayIdx * 86400000).toISOString().slice(0, 10);
+// DEBUG: see what date & data we’re rendering
+console.log('[rows debug]', { ws, dayName, dayISO,
+  rotasType: (window.ROTAS && (window.ROTAS instanceof Map ? 'Map' : typeof window.ROTAS)),
+  rotasKeys: (window.ROTAS && !(window.ROTAS instanceof Map) ? Object.keys(window.ROTAS).slice(0,5) : []),
+});
 
   const rows = [];
 
