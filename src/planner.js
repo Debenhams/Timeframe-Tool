@@ -186,7 +186,7 @@ globalThis.applyRotationToWeek = function applyRotationToWeek({
   const rot = globalThis.ROTATION?.[rotationName];
   if (!rot) { console.warn('No rotation:', rotationName); return; }
 
-  const startISO = rotationStartISO || globalThis.ROTATION_META?.[rotationName]?.start_date;
+  const startISO = rotationStartISO || globalThis.ROTATION_META?.families?.[rotationName]?.start_date;
   const weekNum = (typeof globalThis.effectiveWeek === 'function' && startISO)
     ? globalThis.effectiveWeek(startISO, mondayISO)
     : 1;
@@ -475,8 +475,6 @@ globalThis.computePlannerRowsFromState = function computePlannerRowsFromState() 
         console.log('[preview] click');
         await globalThis.bootAdvisors?.();
         await globalThis.bootRotations?.();
-
-        await globalThis.bootRotations?.();
 globalThis.populateRotationSelect?.();
 
 const sel = document.getElementById('rotationName');
@@ -485,7 +483,7 @@ if (!rotationName) return console.warn('No rotations found');
 
         const mondayISO = document.getElementById('weekStart')?.value || '2025-10-20';
         const advisors = Object.keys(globalThis.ADVISOR_BY_ID || {}).slice(0, 8);
-        const startISO = globalThis.ROTATION_META?.[rotationName]?.start_date || null;
+        const startISO = globalThis.ROTATION_META?.families?.[rotationName]?.start_date || null;
 
         const res = globalThis.applyRotationToWeek?.({
           rotationName,
