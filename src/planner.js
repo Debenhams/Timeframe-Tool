@@ -59,30 +59,91 @@ function effectiveWeek(startDateStr, plannerWeekStartStr) {
 }
 globalThis.effectiveWeek = effectiveWeek;
 
-globalThis.bootRotations = async function bootRotations() {
-  await loadShiftTemplatesAndVariants();
-  await loadRotationsWithHours();
-  
-  // also load rotation metadata (auto-detect the name and start_date columns)
-const { data: metaRows, error: metaErr } = await supabase.from('rotations').select('*');
-if (metaErr) console.warn('rotations meta error', metaErr);
-globalThis.ROTATION_META = {};
+ globalThis.bootRotations = async function bootRotations() {
+  try {
+    // --- Singleton supabase client (avoid multiple GoTrueClient warnings)
+    if (!globalThis.supabaseClient) {
+      globalThis.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+    const sb = globalThis.supabaseClient;
 
-const sampleMeta = (metaRows && metaRows[0]) || {};
-const nameKey  = ['name','rotation_name','title','label'].find(k => k in sampleMeta) || null;
-const startKey = ['start_date','start','starts_on','cycle_start','startDate'].find(k => k in sampleMeta) || null;
+    // --- Helpers
+    const toNameKey = (s) => (s || "").trim();
 
-(metaRows || []).forEach(r => {
-  const n = nameKey  ? r[nameKey]  : undefined;
-  const s = startKey ? r[startKey] : undefined;
-  if (n) globalThis.ROTATION_META[n] = { start_date: s || null };
-});
+    // --- Fetch shift templates (weekly patterns)
+    // Table expectation:
+    //   shift_templates(name TEXT PRIMARY KEY, pattern JSONB?) OR columns: day_mon..day_sun (or mon..sun)
+    const { data: tmplRows, error: tmplErr } = await sb
+      .from("shift_templates")
+      .select("*");
 
-  console.log("Rotations booted", {
-    templates: Object.keys(globalThis.SHIFT_BY_CODE || {}).length,
-    families: Object.keys(globalThis.VARIANTS_BY_START_END || {}).length
-  });
+    if (tmplErr) throw tmplErr;
+
+    const templatesByName = {};
+    for (const r of tmplRows || []) {
+      const name = toNameKey(r.name);
+      if (!name) continue;
+
+      // Accept either a JSON 'pattern' column or individual day columns
+      let pattern = r.pattern;
+      if (!pattern || typeof pattern !== "object") {
+        pattern = {
+          mon: r.day_mon ?? r.mon ?? null,
+          tue: r.day_tue ?? r.tue ?? null,
+          wed: r.day_wed ?? r.wed ?? null,
+          thu: r.day_thu ?? r.thu ?? null,
+          fri: r.day_fri ?? r.fri ?? null,
+          sat: r.day_sat ?? r.sat ?? null,
+          sun: r.day_sun ?? r.sun ?? null,
+        };
+      }
+      templatesByName[name] = { name, pattern };
+    }
+
+    // --- Fetch rotation families (sequence of templates across weeks)
+    // Table expectation:
+    //   rotations(name TEXT PRIMARY KEY, start_date DATE/NULL, sequence JSONB?)
+    //   or fallback columns week1..week6
+    const { data: famRows, error: famErr } = await sb
+      .from("rotations")
+      .select("*");
+
+    if (famErr) throw famErr;
+
+    const familiesByName = {};
+    for (const r of famRows || []) {
+      const name = toNameKey(r.name);
+      if (!name) continue;
+
+      let sequence = r.sequence;
+      if (!sequence || !Array.isArray(sequence)) {
+        sequence = [r.week1, r.week2, r.week3, r.week4, r.week5, r.week6].filter(
+          (x) => x != null
+        );
+      }
+      familiesByName[name] = {
+        name,
+        start_date: r.start_date ?? null,
+        sequence, // e.g., ["Flex 1","Flex 2",...]
+      };
+    }
+
+    // --- Stable global shape for the UI
+    globalThis.ROTATION_META = {
+      templates: templatesByName,
+      families: familiesByName,
+    };
+
+    console.log("Rotations booted", {
+      templates: Object.keys(templatesByName).length,
+      families: Object.keys(familiesByName).length,
+    });
+  } catch (err) {
+    console.error("bootRotations error:", err);
+    throw err;
+  }
 };
+
 
 console.log("planner.js helpers ready:", typeof globalThis.bootRotations);
 
