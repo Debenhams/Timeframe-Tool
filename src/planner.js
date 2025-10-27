@@ -519,12 +519,8 @@ ids.forEach((aId) => {
 // sort and return
 rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
 return rows;
-
 }
 
-
-  return [];
-}
 window.computePlannerRowsFromState = computePlannerRowsFromState;
 
 // --- Adapter: ensure refreshPlannerUI uses our rows ---
@@ -545,6 +541,7 @@ window.computePlannerRowsFromState = computePlannerRowsFromState;
     }
   };
 })();
+
 
 
   // ----- render time header (07:00..19:00) -----
@@ -684,6 +681,4 @@ const mondayISO = (typeof toMondayISO === 'function') ? toMondayISO(wsISO) : wsI
   } else {
     wire();
   }
-})();
-
 })();
