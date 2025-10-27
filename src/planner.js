@@ -505,8 +505,12 @@ globalThis.computePlannerRowsFromState = function computePlannerRowsFromState() 
 globalThis.populateRotationSelect?.();
 
 const sel = document.getElementById('rotationName');
-const rotationName = (sel && sel.value) || Object.keys(globalThis.ROTATION || {})[0];
-if (!rotationName) return console.warn('No rotations found');
+    const rotationName =
+      (sel && sel.value)
+      || Object.keys(globalThis.ROTATION || {})[0]
+      || Object.keys(globalThis.ROTATION_META?.families || {})[0];
+    if (!rotationName) return console.warn('No rotations found (check ROTATION and ROTATION_META.families)');
+
 
         const mondayISO = document.getElementById('weekStart')?.value || '2025-10-20';
         const advisors = Object.keys(globalThis.ADVISOR_BY_ID || {}).slice(0, 8);
