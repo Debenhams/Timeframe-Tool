@@ -432,6 +432,19 @@ function computePlannerRowsFromState() {
 }
 window.computePlannerRowsFromState = computePlannerRowsFromState;
 
+// --- Adapter: ensure refreshPlannerUI uses our rows ---
+(function patchRefresh() {
+  const orig = globalThis.refreshPlannerUI;
+  globalThis.refreshPlannerUI = function patchedRefresh() {
+    const rows = (typeof globalThis.computePlannerRowsFromState === 'function')
+      ? globalThis.computePlannerRowsFromState()
+      : [];
+    if (typeof globalThis.renderPlanner === 'function') {
+      globalThis.renderPlanner(rows);
+    }
+    if (typeof orig === 'function') orig();
+  };
+})();
 
   // ----- render time header (07:00..19:00) -----
   function renderTimeHeader(el) {
