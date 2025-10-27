@@ -2,6 +2,8 @@
 (async function () {
 
   "use strict";
+  // alias the client used by the helpers below
+const supabase = window.supabase;
 // --- rotations helpers (attached to globalThis) ---
 
 async function loadShiftTemplatesAndVariants() {
@@ -68,6 +70,8 @@ if (!sb || typeof sb.from !== 'function') {
   return;
 }
 
+    await loadShiftTemplatesAndVariants();  // builds SHIFT_BY_CODE / VARIANTS_BY_START_END
+    await loadRotationsWithHours();         // builds ROTATION[name][week][dow]
 
     // --- Helpers
     const toNameKey = (s) => (s || "").trim();
