@@ -428,21 +428,34 @@ console.log('[rows debug]', { ws, dayName, dayISO,
   }
 
   // CASE B: preview rotation shape { [advisorId]: { [YYYY-MM-DD]: { start, end, label } } }
-  if (window.ROTAS && typeof window.ROTAS === "object") {
-    Object.keys(window.ROTAS).forEach(aId => {
-      const byDate = window.ROTAS[aId] || {};
-      const cell = byDate[dayISO];
-      if (!cell || !cell.start || !cell.end) return;
+if (window.ROTAS && typeof window.ROTAS === "object") {
+  const ids = Object.keys(window.ROTAS);
+  // show a snapshot of what we’ll try to render
+  console.log('[rows object-case]', { dayISO, ids: ids.slice(0, 5) });
 
-      const segs = [{ kind: "shift", start: cell.start, end: cell.end }];
-      const name =
-        (window.ADVISOR_BY_ID instanceof Map && window.ADVISOR_BY_ID.get(aId)) || aId;
-      rows.push({ id: aId, name, badge: "", segments: segs });
-    });
+  ids.forEach(aId => {
+    const byDate = window.ROTAS[aId] || {};
+    const sample = byDate && Object.keys(byDate).slice(0, 3);
+    // log 2 examples max so we can compare the keys to dayISO
+    if (Math.random() < 0.02) console.log('[rows sample]', { aId, sample, atDay: byDate[dayISO] });
 
-    rows.sort((a, b) => a.name.localeCompare(b.name));
-    return rows;
-  }
+    const cell = byDate[dayISO];
+    if (!cell) return;
+
+    // accept RDO or shift; draw only when we have start/end
+    if (cell.is_rdo) return;
+    if (!cell.start || !cell.end) return;
+
+    const segs = [{ kind: "shift", start: cell.start, end: cell.end }];
+    const name =
+      (window.ADVISOR_BY_ID instanceof Map && window.ADVISOR_BY_ID.get(aId)) || aId;
+    rows.push({ id: aId, name, badge: "", segments: segs });
+  });
+
+  rows.sort((a, b) => a.name.localeCompare(b.name));
+  return rows;
+}
+
 
   return [];
 }
