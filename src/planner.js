@@ -578,7 +578,9 @@ const sel = document.getElementById('rotationName');
     if (!rotationName) return console.warn('No rotations found (check ROTATION and ROTATION_META.families)');
 
 
-        const mondayISO = document.getElementById('weekStart')?.value || '2025-10-20';
+        const rawWs = document.getElementById('weekStart')?.value || '2025-10-20';
+const mondayISO = (typeof normalizeToISO === 'function') ? normalizeToISO(rawWs) : rawWs;
+
         const advisors = Object.keys(globalThis.ADVISOR_BY_ID || {}).slice(0, 8);
         const startISO = globalThis.ROTATION_META?.families?.[rotationName]?.start_date || null;
 
