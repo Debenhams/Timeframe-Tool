@@ -372,35 +372,62 @@ globalThis.computePlannerRowsFromState = function computePlannerRowsFromState() 
   }
 
   // ----- build rows from current state -----
-  function computePlannerRowsFromState() {
-    var wsEl = document.getElementById("weekStart");
-    var dayEl = document.getElementById("teamDay");
-    var ws = wsEl && wsEl.value ? wsEl.value : "";
-    var dayName = dayEl && dayEl.value ? dayEl.value : "Monday";
+function computePlannerRowsFromState() {
+  const wsEl = document.getElementById("weekStart");
+  const dayEl = document.getElementById("teamDay");
+  const ws = wsEl && wsEl.value ? wsEl.value : "";
+  const dayName = dayEl && dayEl.value ? dayEl.value : "Monday";
+  if (!ws) return [];
 
-    if (!ws || !(window.ROTAS instanceof Map)) return [];
+  // helper: Monday ISO -> ISO for selected day
+  const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const dayIdx = Math.max(0, DAYS.indexOf(dayName));
+  const base = new Date(ws + "T00:00:00");
+  const dayISO = new Date(base.getTime() + dayIdx * 86400000).toISOString().slice(0, 10);
 
-    var rows = [];
-    window.ROTAS.forEach(function (weekObj, key) {
-      var parts = String(key).split("::");
-      var aId = parts[0] || "";
-      var kWs = parts[1] || "";
+  const rows = [];
+
+  // CASE A: legacy Map shape (advisorId::weekStart -> { Monday: 'Early', ... })
+  if (window.ROTAS instanceof Map) {
+    window.ROTAS.forEach((weekObj, key) => {
+      const [aId, kWs] = String(key).split("::");
       if (kWs !== ws) return;
-
-      var tplName = weekObj && weekObj[dayName];
+      const tplName = weekObj && weekObj[dayName];
       if (!tplName) return;
 
-      var segments = buildSegmentsFromTemplate(tplName);
+      const segments = buildSegmentsFromTemplate(tplName);
       if (!segments.length) return;
 
-      var name = (window.ADVISOR_BY_ID instanceof Map && window.ADVISOR_BY_ID.get(aId)) || aId;
-      rows.push({ id: aId, name: name, badge: "", segments: segments });
+      const name =
+        (window.ADVISOR_BY_ID instanceof Map && window.ADVISOR_BY_ID.get(aId)) || aId;
+      rows.push({ id: aId, name, badge: "", segments });
     });
 
-    rows.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    rows.sort((a, b) => a.name.localeCompare(b.name));
     return rows;
   }
-  window.computePlannerRowsFromState = computePlannerRowsFromState;
+
+  // CASE B: preview rotation shape { [advisorId]: { [YYYY-MM-DD]: { start, end, label } } }
+  if (window.ROTAS && typeof window.ROTAS === "object") {
+    Object.keys(window.ROTAS).forEach(aId => {
+      const byDate = window.ROTAS[aId] || {};
+      const cell = byDate[dayISO];
+      if (!cell || !cell.start || !cell.end) return;
+
+      const segs = [{ kind: "shift", start: cell.start, end: cell.end }];
+      const name =
+        (window.ADVISOR_BY_ID instanceof Map && window.ADVISOR_BY_ID.get(aId)) || aId;
+      rows.push({ id: aId, name, badge: "", segments: segs });
+    });
+
+    rows.sort((a, b) => a.name.localeCompare(b.name));
+    return rows;
+  }
+
+  return [];
+}
+window.computePlannerRowsFromState = computePlannerRowsFromState;
+
 
   // ----- render time header (07:00..19:00) -----
   function renderTimeHeader(el) {
