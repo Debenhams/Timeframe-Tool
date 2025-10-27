@@ -374,14 +374,25 @@ globalThis.computePlannerRowsFromState = function computePlannerRowsFromState() 
     });
     return segs;
   }
+// normalize DD/MM/YYYY or MM/DD/YYYY into ISO YYYY-MM-DD
+function normalizeToISO(d) {
+  if (!d) return "";
+  // DD/MM/YYYY → YYYY-MM-DD
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(d);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  // already ISO or browser-parsable → return as-is
+  return d;
+}
 
   // ----- build rows from current state -----
 function computePlannerRowsFromState() {
   const wsEl = document.getElementById("weekStart");
   const dayEl = document.getElementById("teamDay");
-  const ws = wsEl && wsEl.value ? wsEl.value : "";
+    const rawWs = wsEl && wsEl.value ? wsEl.value : "";
+  const ws = normalizeToISO(rawWs);
   const dayName = dayEl && dayEl.value ? dayEl.value : "Monday";
   if (!ws) return [];
+
 
   // helper: Monday ISO -> ISO for selected day
   const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
