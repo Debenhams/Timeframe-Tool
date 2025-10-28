@@ -432,98 +432,98 @@ function toMondayISO(iso) {
 }
 
   // ----- build rows from current state -----
-function computePlannerRowsFromState() {
-  const wsEl = document.getElementById("weekStart");
-  const dayEl = document.getElementById("teamDay");
-    const rawWs = wsEl && wsEl.value ? wsEl.value : "";
-  const ws = normalizeToISO(rawWs);
-  const dayName = dayEl && dayEl.value ? dayEl.value : "Monday";
-  if (!ws) return [];
-
-
-  // helper: Monday ISO -> ISO for selected day
-  const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  const dayIdx = Math.max(0, DAYS.indexOf(dayName));
-  const base = new Date(ws + "T00:00:00");
-  const dayLocal = new Date(base.getFullYear(), base.getMonth(), base.getDate() + dayIdx);
-const dayISO = toISODateLocal(dayLocal);
-
-// DEBUG: see what date & data we’re rendering
-console.log('[rows debug]', { ws, dayName, dayISO,
-  rotasType: (window.ROTAS && (window.ROTAS instanceof Map ? 'Map' : typeof window.ROTAS)),
-  rotasKeys: (window.ROTAS && !(window.ROTAS instanceof Map) ? Object.keys(window.ROTAS).slice(0,5) : []),
-});
-
+function computePlannerRowsFromState(){
   const rows = [];
+  const $ = (sel) => document.querySelector(sel);
 
-  // CASE A: legacy Map shape (advisorId::weekStart -> { Monday: 'Early', ... })
+  // Inputs from the UI
+  const wsISO  = $('#weekStart')?.value || null;                // Monday ISO
+  const daySel = $('#teamDay')?.value || 'Monday';              // day name (assignment table view)
+  const dayISO = (function toDayISO(){
+    if (!wsISO) return null;
+    const base = new Date(wsISO + 'T00:00:00');
+    const DOW = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:7 };
+    const d = (DOW[daySel] || 1) - 1; // 0..6
+    const dt = new Date(base); dt.setDate(base.getDate() + d);
+    const yy = dt.getFullYear(), mm = String(dt.getMonth()+1).padStart(2,'0'), dd = String(dt.getDate()).padStart(2,'0');
+    return `${yy}-${mm}-${dd}`;
+  })();
+
+  // Helpers
+  const parseHHMM = (s)=>{ if(!s) return null; const m=s.match(/^(\d{1,2}):(\d{2})$/); if(!m) return null; return (+m[1])*60+(+m[2]); };
+  const m2t = (m)=>`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+
+  function buildSegmentsFromTemplate(tplName){
+    const t = (window.TEMPLATES instanceof Map)
+      ? window.TEMPLATES.get(tplName)
+      : (window.TEMPLATES||{})[tplName];
+    if (!t) return [];
+    const start = parseHHMM(t.start_time || t.start || '09:00');
+    const end   = parseHHMM(t.finish_time || t.end   || '17:00');
+    const breaks = []
+      .concat(t.break1 ? [{ type:'break', code:'Break', start:parseHHMM(t.break1), end:parseHHMM(t.break1_end||t.break1) }] : [])
+      .concat(t.lunch  ? [{ type:'lunch', code:'Lunch', start:parseHHMM(t.lunch),  end:parseHHMM(t.lunch_end||t.lunch)   }] : [])
+      .concat(t.break2 ? [{ type:'break', code:'Break', start:parseHHMM(t.break2), end:parseHHMM(t.break2_end||t.break2) }] : []);
+    const pauses = breaks.filter(b => b.start != null && b.end != null && b.end > b.start).sort((a,b)=>a.start-b.start);
+    const out = [];
+    let cur = start;
+    for(const p of pauses){
+      if (p.start > cur) out.push({ type:'work', code:t.work_code || 'Admin', start:cur, end:Math.min(p.start, end) });
+      out.push({ type:p.type, code:p.code, start:Math.max(p.start, start), end:Math.min(p.end, end) });
+      cur = Math.max(cur, p.end);
+    }
+    if (cur < end) out.push({ type:'work', code:t.work_code || 'Admin', start:cur, end });
+    return out;
+  }
+
+  // Case A: assignment table snapshot (Map)
   if (window.ROTAS instanceof Map) {
-    window.ROTAS.forEach((weekObj, key) => {
-      const [aId, kWs] = String(key).split("::");
-      if (kWs !== ws) return;
-      const tplName = weekObj && weekObj[dayName];
-      if (!tplName) return;
-
-      const segments = buildSegmentsFromTemplate(tplName);
-      if (!segments.length) return;
-
-      const name =
-        (window.ADVISOR_BY_ID instanceof Map && window.ADVISOR_BY_ID.get(aId)) || aId;
-      rows.push({ id: aId, name, badge: "", segments });
+    const ids = Array.from(window.ADVISOR_BY_ID?.keys?.() || []);
+    ids.forEach(aId => {
+      const name = (window.ADVISOR_BY_ID?.get?.(aId)) || aId;
+      const key  = `${aId}::${wsISO}`;
+      const weekObj = window.ROTAS.get(key) || {};
+      const tplName = weekObj[daySel];
+      let segs = [];
+      if (typeof tplName === 'string') {
+        segs = buildSegmentsFromTemplate(tplName);
+      } else if (tplName && typeof tplName === 'object' && Array.isArray(tplName.segments)) {
+        segs = (tplName.segments || []).map(s => ({
+          type: s.type || 'work',
+          code: s.code || 'Admin',
+          start: parseHHMM(s.start),
+          end:   parseHHMM(s.end)
+        })).filter(s => s.start != null && s.end != null && s.end > s.start);
+      }
+      rows.push({ id:aId, name, badge:'', segments: segs });
     });
-
-    rows.sort((a, b) => a.name.localeCompare(b.name));
-    return rows;
+    return rows.sort((a,b)=>String(a.name).localeCompare(String(b.name)));
   }
 
-  // CASE B: preview rotation shape { [advisorId]: { [YYYY-MM-DD]: { start, end, label } } }
-if (window.ROTAS && typeof window.ROTAS === "object") {
- // compute Day ISO for the currently selected week/day
-const wsel = document.getElementById('weekStart');
-const dayEl = document.getElementById('teamDay');
-const rawWs = wsel && wsel.value ? wsel.value : '';
-const wsISO = (typeof normalizeToISO === 'function') ? normalizeToISO(rawWs) : rawWs;
-const mondayISO = (typeof toMondayISO === 'function') ? toMondayISO(wsISO) : wsISO;
-
-const dayName = (dayEl && dayEl.value) || 'Monday';
-const DOW = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:7 };
-const dow = DOW[dayName] || 1;
-
-const base = new Date(mondayISO + 'T00:00:00');
-base.setDate(base.getDate() + (dow - 1));
-const yy = base.getFullYear();
-const mm = String(base.getMonth() + 1).padStart(2, '0');
-const dd = String(base.getDate()).padStart(2, '0');
-const dayISO = `${yy}-${mm}-${dd}`;
-
-// build rows from preview shape: ROTAS[advisorId][YYYY-MM-DD] = { start, end, label, is_rdo }
-const ids = Object.keys(window.ROTAS || {});
-ids.forEach((aId) => {
-  const weekObj = window.ROTAS[aId] || {};
-  const cell = weekObj[dayISO];
-  if (!cell || cell.is_rdo) return;
-
-  const segs = [];
-  if (cell.start && cell.end) {
-    segs.push({ code: cell.label || '', atDay: dayISO, start: cell.start, end: cell.end });
+  // Case B: rotation preview (object)
+  if (window.ROTAS && typeof window.ROTAS === 'object' && dayISO) {
+    const ids = Object.keys(window.ROTAS || {});
+    ids.forEach(aId => {
+      const name = (window.ADVISOR_BY_ID?.get?.(aId)) || aId;
+      const cell = (window.ROTAS[aId] || {})[dayISO];
+      let segs = [];
+      if (cell?.is_rdo) {
+        segs = [];
+      } else if (cell?.start && cell?.end) {
+        const s = parseHHMM(cell.start), e = parseHHMM(cell.end);
+        if (s != null && e != null && e > s) {
+          segs = [{ type:'work', code: cell.label || 'Admin', start: s, end: e }];
+        }
+      }
+      rows.push({ id:aId, name, badge:'', segments: segs });
+    });
+    return rows.sort((a,b)=>String(a.name).localeCompare(String(b.name)));
   }
-  if (!segs.length) return;
 
-  const name =
-    (window.ADVISOR_BY_ID instanceof Map && window.ADVISOR_BY_ID.get(aId)) || aId;
-
-  rows.push({ id: aId, name, badge: '', segments: segs });
-});
-
-// sort and return
-rows.sort((a, b) => String(a.name).localeCompare(String(b.name)));
-return rows;
-
-}
-
-
+  // Fallback
   return [];
 }
+
 window.computePlannerRowsFromState = computePlannerRowsFromState;
 
 // --- Adapter: ensure refreshPlannerUI uses our rows ---
