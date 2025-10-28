@@ -317,6 +317,54 @@ globalThis.populateRotationSelect = function populateRotationSelect() {
   sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
   if (cur && names.includes(cur)) sel.value = cur;
 };
+// --- Build a robust advisor reverse index (id -> displayName) once ---
+(function () {
+  function buildAdvisorIndex() {
+    const idx = Object.create(null);
+
+    const put = (key, name) => {
+      if (!key) return;
+      const k = String(key);
+      if (!idx[k]) idx[k] = name || k;
+    };
+
+    const bestName = (a) =>
+      a?.name ||
+      a?.display_name ||
+      a?.full_name ||
+      a?.advisor_name ||
+      a?.username ||
+      a?.email ||
+      '';
+
+    const store = globalThis.ADVISOR_BY_ID;
+
+    if (store instanceof Map) {
+      for (const [k, v] of store.entries()) {
+        const name = bestName(v);
+        put(k, name);
+        put(v?.id, name);
+        put(v?.advisor_id, name);
+        put(v?.uuid, name);
+      }
+    } else if (store && typeof store === 'object') {
+      for (const k of Object.keys(store)) {
+        const v = store[k];
+        const name = bestName(v);
+        put(k, name);
+        put(v?.id, name);
+        put(v?.advisor_id, name);
+        put(v?.uuid, name);
+      }
+    }
+    return idx;
+  }
+
+  // expose once
+  if (!globalThis.__ADVISOR_INDEX) {
+    globalThis.__ADVISOR_INDEX = buildAdvisorIndex();
+  }
+})();
 
 // --- Compute rows from ROTAS for the chosen day ---
 globalThis.computePlannerRowsFromState = function computePlannerRowsFromState() {
@@ -495,7 +543,12 @@ function computePlannerRowsFromState(){
   if (window.ROTAS instanceof Map) {
     const ids = Array.from(window.ADVISOR_BY_ID?.keys?.() || []);
     ids.forEach(aId => {
-      const name = (window.ADVISOR_BY_ID?.get?.(aId)) || aId;
+      const name = (
+        window.ADVISOR_BY_ID?.get?.(aId) ||
+        window.ADVISOR_BY_ID?.[aId]?.name ||
+        window.ADVISOR_BY_ID?.[aId] ||
+        aId
+      );
       const key  = `${aId}::${wsISO}`;
       const weekObj = window.ROTAS.get(key) || {};
       const tplName = weekObj[daySel];
@@ -519,7 +572,13 @@ function computePlannerRowsFromState(){
   if (window.ROTAS && typeof window.ROTAS === 'object' && dayISO) {
     const ids = Object.keys(window.ROTAS || {});
     ids.forEach(aId => {
-      const name = (window.ADVISOR_BY_ID?.get?.(aId)) || aId;
+      const name = (
+  window.ADVISOR_BY_ID?.get?.(aId) ||
+  window.ADVISOR_BY_ID?.[aId]?.name ||
+  window.ADVISOR_BY_ID?.[aId] ||
+  aId
+);
+
       const cell = (window.ROTAS[aId] || {})[dayISO];
       let segs = [];
       if (cell?.is_rdo) {
