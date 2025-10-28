@@ -321,42 +321,55 @@ globalThis.populateRotationSelect = function populateRotationSelect() {
 // --- Compute rows from ROTAS for the chosen day ---
 globalThis.computePlannerRowsFromState = function computePlannerRowsFromState() {
   try {
-    // Week start (ISO Monday) + day selector from the UI
+    // Week + day from the UI
     const weekStartISO = document.getElementById('weekStart')?.value;
     const dayName = document.getElementById('teamDay')?.value || 'Monday';
     if (!weekStartISO || !globalThis.ROTAS) return [];
 
-    // Day name -> offset from Monday (0..6)
+    // Map day name -> 0..6 (Mon..Sun)
     const dayIndexMap = { Monday:0, Tuesday:1, Wednesday:2, Thursday:3, Friday:4, Saturday:5, Sunday:6 };
     const offset = dayIndexMap[dayName] ?? 0;
 
-    // Resolve the ISO date for the chosen day (local, no TZ drift)
+    // Resolve YYYY-MM-DD for the chosen day, based on Monday-of-week
     const base = new Date(weekStartISO + 'T00:00:00');
     const d = new Date(base);
     d.setDate(base.getDate() + offset);
     const dayISO = d.toISOString().slice(0, 10);
 
-    const rows = [];
-    const adv = globalThis.ADVISOR_BY_ID || {};   // object or Map-like we created in bootAdvisors
+    // Helper to fetch advisor object by id (works for Map or plain object caches)
+    const getAdvisorById = (id) => {
+      const store = globalThis.ADVISOR_BY_ID;
+      if (!store) return null;
+      if (store instanceof Map) return store.get(id) || null;
+      if (typeof store === 'object') return store[id] || null;
+      return null;
+    };
 
-    // Build the row shape expected by renderPlanner: { id, name, segments:[{start,end,kind}] }
-    Object.keys(adv).forEach((id) => {
-      const dayMap = globalThis.ROTAS?.[id] || {};
+    const rows = [];
+
+    // IMPORTANT: iterate the ROTAS keys (advisor IDs), not the advisor cache
+    Object.keys(globalThis.ROTAS || {}).forEach((id) => {
+      const dayMap = globalThis.ROTAS[id] || {};
       const cell = dayMap[dayISO];
       if (!cell) return;
 
-      // Skip pure RDO rows (no bars). Remove this 'return' if you want a labeled RDO chip later.
+      // Hide pure RDO rows (uncomment to show RDO chips if you want)
       if (cell.label === 'RDO' || cell.is_rdo) return;
 
-      const start = cell.start || null;
-      const end   = cell.end   || null;
       const segs = [];
-      if (start && end) segs.push({ kind: 'shift', start, end });
+      if (cell.start && cell.end) {
+        segs.push({ kind: 'shift', start: cell.start, end: cell.end });
+      }
 
-      // Name fallback chain covers both object + map shaped advisor caches
-      const a = adv[id] || {};
+      const adv = getAdvisorById(id) || {};
       const name =
-        a.name || a.display_name || a.full_name || a.advisor_name || a.username || a.email || id;
+        adv.name ||
+        adv.display_name ||
+        adv.full_name ||
+        adv.advisor_name ||
+        adv.username ||
+        adv.email ||
+        id; // last resort
 
       rows.push({ id, name, badge: '', segments: segs });
     });
@@ -369,6 +382,7 @@ globalThis.computePlannerRowsFromState = function computePlannerRowsFromState() 
     return [];
   }
 };
+
 
 
   // ----- time utils -----
