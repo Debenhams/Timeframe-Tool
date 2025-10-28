@@ -24,7 +24,8 @@ async function loadShiftTemplatesAndVariants() {
   const hhmm = x => (x || "").toString().slice(0,5);
   for (const t of templates) {
     const key = `${hhmm(t.start_time)}x${hhmm(t.end_time)}`;
-    (groups[key] ||= []).push(t.code);
+    (groups[key] ||= {})[t.code] = t;   // map: code -> full template row (with start/end)
+
   }
   for (const k of Object.keys(groups)) groups[k].sort();
   globalThis.VARIANTS_BY_START_END = groups;
@@ -320,55 +321,55 @@ globalThis.populateRotationSelect = function populateRotationSelect() {
 // --- Compute rows from ROTAS for the chosen day ---
 globalThis.computePlannerRowsFromState = function computePlannerRowsFromState() {
   try {
-    const hasROTAS = globalThis.ROTAS && Object.keys(globalThis.ROTAS).length > 0;
-    if (!hasROTAS) {
-      console.log('[rows] using legacy source (no ROTAS)');
-      return [];
-    }
-
-    // Read Week start (Monday) + Day selector
+    // Week start (ISO Monday) + day selector from the UI
     const weekStartISO = document.getElementById('weekStart')?.value;
-    const dayName = document.getElementById('teamDay')?.value || 'Monday'; // your UI already has this select
+    const dayName = document.getElementById('teamDay')?.value || 'Monday';
+    if (!weekStartISO || !globalThis.ROTAS) return [];
 
-    // Map day name -> offset from Monday (0..6)
+    // Day name -> offset from Monday (0..6)
     const dayIndexMap = { Monday:0, Tuesday:1, Wednesday:2, Thursday:3, Friday:4, Saturday:5, Sunday:6 };
     const offset = dayIndexMap[dayName] ?? 0;
 
-    // Resolve the actual ISO date to display
-    const base = weekStartISO ? new Date(weekStartISO + 'T00:00:00') : null;
-    const dayISO = base ? (() => { const d = new Date(base); d.setDate(base.getDate() + offset); return d.toISOString().slice(0,10); })() : null;
+    // Resolve the ISO date for the chosen day (local, no TZ drift)
+    const base = new Date(weekStartISO + 'T00:00:00');
+    const d = new Date(base);
+    d.setDate(base.getDate() + offset);
+    const dayISO = d.toISOString().slice(0, 10);
 
     const rows = [];
-    const allAdvisors = globalThis.ADVISOR_BY_ID || {};
-    const selIds = Object.keys(allAdvisors); // simple: show all advisors; we can filter to “selected” later
+    const adv = globalThis.ADVISOR_BY_ID || {};   // object or Map-like we created in bootAdvisors
 
-    selIds.forEach(id => {
-      const dayMap = globalThis.ROTAS[id] || {};
-      const cell = dayISO ? dayMap[dayISO] : null;
+    // Build the row shape expected by renderPlanner: { id, name, segments:[{start,end,kind}] }
+    Object.keys(adv).forEach((id) => {
+      const dayMap = globalThis.ROTAS?.[id] || {};
+      const cell = dayMap[dayISO];
       if (!cell) return;
+
+      // Skip pure RDO rows (no bars). Remove this 'return' if you want a labeled RDO chip later.
+      if (cell.label === 'RDO' || cell.is_rdo) return;
 
       const start = cell.start || null;
       const end   = cell.end   || null;
-      const label = cell.label || '';
+      const segs = [];
+      if (start && end) segs.push({ kind: 'shift', start, end });
 
-      // row format expected by your renderers: { advisorId, advisorName, dateISO, start, end, label }
-      rows.push({
-        advisorId: id,
-        advisorName: allAdvisors[id]?.name || id,
-        dateISO: dayISO,
-        start,
-        end,
-        label
-      });
+      // Name fallback chain covers both object + map shaped advisor caches
+      const a = adv[id] || {};
+      const name =
+        a.name || a.display_name || a.full_name || a.advisor_name || a.username || a.email || id;
+
+      rows.push({ id, name, badge: '', segments: segs });
     });
 
-    console.log('[rows] from ROTAS →', rows.length, 'for', dayName, dayISO);
+    rows.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    console.log('[rows debug]', { dayISO, count: rows.length });
     return rows;
   } catch (e) {
     console.warn('[rows] compute from ROTAS failed', e);
     return [];
   }
 };
+
 
   // ----- time utils -----
   function parseHHMM(s) {
