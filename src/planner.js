@@ -301,23 +301,22 @@ const isoDates = Array.from({ length: 7 }, (_, i) => {
   console.log('applyRotationToWeek ok →', rotationName, 'week', weekNum, 'advisors', ids.length);
   return { weekNum, advisors: ids.length };
 };
-// Fill the rotation <select> with names from window.ROTATION
+// --- Fill the "Rotation" <select id="rotationName"> from loaded data ---
 globalThis.populateRotationSelect = function populateRotationSelect() {
   const sel = document.getElementById('rotationName');
   if (!sel) return;
+  const names =
+    (globalThis.ROTATION && Object.keys(globalThis.ROTATION)) ||
+    (globalThis.ROTATION_META && Object.keys(globalThis.ROTATION_META.families || {})) ||
+    [];
+  if (!names.length) return;
 
-  const names = Object.keys(globalThis.ROTATION || {});
-  if (!names.length) {
-    sel.innerHTML = `<option value="">(no rotations)</option>`;
-    return;
-  }
-
-  // Only rebuild if empty or placeholder present
-  if (sel.options.length <= 1 || sel.value === '') {
-    sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
-    sel.value = names[0]; // default to first
-  }
+  // Keep the current choice if possible
+  const cur = sel.value;
+  sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
+  if (cur && names.includes(cur)) sel.value = cur;
 };
+
 // --- Compute rows from ROTAS for the chosen day ---
 globalThis.computePlannerRowsFromState = function computePlannerRowsFromState() {
   try {
