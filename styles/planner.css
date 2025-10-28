@@ -1,6 +1,4 @@
 /* === Horizontal Planner (clean, standalone) === */
-* { box-sizing: border-box; }
-
 :root{
   --name-col-w: 260px;
 }
