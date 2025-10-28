@@ -650,6 +650,55 @@ window.computePlannerRowsFromState = computePlannerRowsFromState;
     var end = parseHHMM("19:00");
 
     body.innerHTML = "";
+  // --- preview legend of selected ROTAS (names, not UUIDs) ---
+  (function renderPreviewLegend() {
+    // Build a lookup that resolves any id → best human name
+    const getName = (aId) => {
+      const advStore = globalThis.ADVISOR_BY_ID;
+      if (advStore instanceof Map) {
+        const a = advStore.get(aId) || {};
+        return (
+          a.name || a.display_name || a.full_name ||
+          a.advisor_name || a.username || a.email || String(aId)
+        );
+      } else if (advStore && typeof advStore === "object") {
+        const a = advStore[aId] || {};
+        return (
+          a.name || a.display_name || a.full_name ||
+          a.advisor_name || a.username || a.email || String(aId)
+        );
+      }
+      return String(aId);
+    };
+
+    // Keys of ROTAS are the selected advisors for the preview week
+    const ids = Object.keys(globalThis.ROTAS || {});
+    if (!ids.length) return;
+
+    // Legend strip container (inserted at the top of plannerBody)
+    const strip = document.createElement("div");
+    strip.className = "legend-strip";
+    strip.style.display = "flex";
+    strip.style.flexWrap = "wrap";
+    strip.style.gap = "6px";
+    strip.style.margin = "6px 0 10px 0";
+
+    // Create name chips
+    ids.forEach((id) => {
+      const chip = document.createElement("div");
+      chip.className = "name-chip";
+      chip.textContent = getName(id);
+      chip.style.padding = "6px 10px";
+      chip.style.borderRadius = "999px";
+      chip.style.background = "#f1f3f8";
+      chip.style.border = "1px solid #e6e6ef";
+      chip.style.fontSize = "12px";
+      chip.style.lineHeight = "1";
+      strip.appendChild(chip);
+    });
+
+    body.appendChild(strip);
+  })();
 
     rows.forEach(function (row) {
       var r = document.createElement("div");
