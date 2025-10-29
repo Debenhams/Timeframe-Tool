@@ -1,38 +1,400 @@
-// src/planner.js
-(async function () {
+/* =========================
+   Supabase configuration
+   ========================= */
+const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 
-  "use strict";
-  // safe shims so any UI code can call these without errors
-globalThis.showError = globalThis.showError || function (msg) { console.warn(String(msg)); };
-globalThis.showInfo  = globalThis.showInfo  || function (msg) { console.log(String(msg));  };
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+window.supabase = sb; // Expose for helpers
 
-  // alias the client used by the helpers below
-const supabase = window.supabase;
-// --- rotations helpers (attached to globalThis) ---
+/* =========================
+   App State (Globals)
+   ========================= */
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+let ORG = { sites: {} };
+let TEMPLATES = new Map(); // Use Map for consistency
+let ADVISORS_LIST = [];
+let ADVISOR_BY_NAME = new Map();
+let ADVISOR_BY_ID = new Map();
+let ROTAS = new Map(); // key: `${advisorId}::${weekStart}` -> { Monday: 'Early', ... }
+let ROTATION = {}; // Populated by bootRotations
+let SHIFT_BY_CODE = {}; // Populated by bootRotations
+let VARIANTS_BY_START_END = {}; // Populated by bootRotations
+let selectedAdvisors = new Set(); // Keep track of selected advisors
 
+/* =========================
+   Core Helpers
+   ========================= */
+const $ = s => document.querySelector(s),
+  $$ = s => Array.from(document.querySelectorAll(s));
+window.$ = $; // Expose for init.js
+window.$$ = $$;
+
+const pad = n => String(n).padStart(2, '0');
+const fmt = (t) => t ? t.slice(0, 5) : ''; // HH:MM from HH:MM:SS
+
+window.setToMonday = function(d) {
+  const day = d.getDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function toMin(t) {
+  if (!t) return null;
+  const [h, m] = String(t).split(':').map(Number);
+  return (h * 60) + m;
+}
+
+function m2t(m) {
+  if (m === null || m === undefined) return '';
+  return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+}
+
+// Wire-once helper
+function wireOnce(el, evt, fn, tag) {
+    if (!el) return;
+    var key = tag || ("_wired_" + evt);
+    if (el.dataset && el.dataset[key]) return;
+    el.addEventListener(evt, fn);
+    if (el.dataset) el.dataset[key] = "1";
+}
+
+// Date helpers
+function toISODateLocal(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function normalizeToISO(s) {
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s; // already ISO
+  const m = String(s).match(/^(\d{2})\/(\d{2})\/(\d{4})$/); // DD/MM/YYYY
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
+  const d = new Date(s);
+  return isNaN(d) ? String(s) : toISODateLocal(d);
+}
+function toMondayISO(iso) {
+  if (!iso) return "";
+  const d = new Date(iso + "T00:00:00");
+  const offset = (d.getDay() + 6) % 7; // 0=Mon..6=Sun
+  d.setDate(d.getDate() - offset);
+  return toISODateLocal(d);
+}
+
+
+/* =========================
+   Vertical Calendar Config
+   ========================= */
+const css = getComputedStyle(document.documentElement);
+const START = +css.getPropertyValue('--timeline-start') || 7;
+const END = +css.getPropertyValue('--timeline-end') || 20;
+const HEIGHT = +css.getPropertyValue('--timeline-height').replace('px', '') || 800;
+const PX_PER_MIN = HEIGHT / ((END - START) * 60);
+
+/* =========================
+   Horizontal Planner Config
+   ========================= */
+const DAY_START = 6 * 60,
+  DAY_END = 20 * 60; // 6am to 8pm
+const DAY_SPAN = DAY_END - DAY_START;
+function m2hmm(m) {
+  const h = Math.floor(m / 60),
+    mm = String(m % 60).padStart(2, '0');
+  return `${h}:${mm}`;
+}
+
+/**
+ * Renders the time header ticks for the horizontal planner.
+ */
+window.renderTimeHeader = function(el) {
+  if (!el) return;
+  el.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'time-scale';
+  for (let m = DAY_START; m <= DAY_END; m += 60) {
+    const t = document.createElement('div');
+    t.className = 'tick';
+    t.style.left = `${((m - DAY_START) / DAY_SPAN) * 100}%`;
+    t.textContent = m2hmm(m);
+    wrap.appendChild(t);
+  }
+  el.appendChild(wrap);
+}
+
+
+/* =========================
+   Colours UI
+   ========================= */
+window.buildColorKey = function() {
+  const defs = [
+    ['email', 'Email', '--color-email'],
+    ['mirakl', 'Mirakl', '--color-mirakl'],
+    ['social', 'Social', '--color-social'],
+    ['overtime', 'Overtime', '--color-overtime'],
+    ['break', 'Break', '--color-break'],
+    ['lunch', 'Lunch', '--color-lunch'],
+    ['absence', 'Absence', '--color-absence'],
+    ['shrink', 'Shrinkage', '--color-shrink']
+  ];
+  const el = $('#colorKey');
+  if(!el) return;
+  el.innerHTML = defs.map(([k, l, cssVar]) => {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
+    return `<div class="key-row"><span class="swatch" style="background:${v}"></span><strong>${l}</strong><input type="text" data-k="${cssVar}" value="${v}"></div>`;
+  }).join('');
+  $$('#colorKey input').forEach(inp => inp.addEventListener('input', () => {
+    document.documentElement.style.setProperty(inp.dataset.k, inp.value);
+  }));
+}
+
+/* =========================
+   Code Groups & Classifiers
+   ========================= */
+const CODE_GROUPS = {
+  "Activity": [
+    "2nd Line", "Admin", "BH Email", "BH Social", "BH WhatsApp", "DEB Email", "DEB Social", "DEB WhatsApp", "Ebay",
+    "KM Email", "KM Social", "KM WhatsApp", "Mirakl", "Mixing", "PayPlus", "PLT Email", "PLT Social", "PLT WhatsApp",
+    "QA", "Overtime"
+  ],
+  "Absence": ["AL", "Break", "Lunch", "Sick", "Split Shift", "RDO", "Maternity", "LTS"],
+  "Shrinkage": ["121", "ATL", "Coaching", "Huddle", "ITI", "Projects", "Team Meeting", "Training"]
+};
+
+function codeSelectGroupedHTML(val = '') {
+  return Object.entries(CODE_GROUPS).map(([grp, codes]) =>
+    `<optgroup label="${grp}">${codes.map(c=>`<option ${val===c?'selected':''}>${c}</option>`).join('')}</optgroup>`
+  ).join('');
+}
+
+function classForCode(code) {
+  const k = (code || '').toLowerCase();
+  if (/\blunch\b/.test(k)) return 'c-lunch';
+  if (/\bbreak\b/.test(k)) return 'c-break';
+  if (/\bovertime\b/.test(k)) return 'c-overtime';
+  if (/\bmirakl\b/.test(k)) return 'c-mirakl';
+  if (/\bsocial\b/.test(k)) return 'c-social';
+  if (/\bemail\b/.test(k)) return 'c-email';
+  if (['al', 'sick', 'rdo', 'maternity', 'lts', 'split shift'].some(w => k.includes(w))) return 'c-absence';
+  if (['121', 'atl', 'coaching', 'huddle', 'iti', 'projects', 'team meeting', 'training'].some(w => k.includes(w))) return 'c-shrink';
+  return 'c-email'; // Default
+}
+
+/* =========================
+   Templates UI
+   ========================= */
+function templateRow(t) {
+  return `<div class="template-row" data-name="${t.name}">
+    <label>Name</label>
+    <input data-f="name" type="text" value="${t.name}" style="width:140px">
+    <label>New code</label>
+    <select data-f="work_code">${codeSelectGroupedHTML(t.work_code||'Admin')}</select>
+    <label>Start / Finish</label>
+    <div class="inline"><input data-f="start_time" type="time" value="${fmt(t.start_time)||''}">
+      <input data-f="finish_time" type="time" value="${fmt(t.finish_time)||''}"></div>
+    <label>Breaks</label>
+    <div class="inline">
+      <input data-f="break1" type="time" value="${fmt(t.break1)||''}"  title="Break 1 (15m)">
+      <input data-f="lunch"  type="time" value="${fmt(t.lunch)||''}"   title="Lunch (30m)">
+      <input data-f="break2" type="time" value="${fmt(t.break2)||''}"  title="Break 2 (15m)">
+    </div>
+    <div class="full" style="display:flex;justify-content:flex-end">
+      <button class="danger" data-act="del">Delete</button>
+    </div>
+  </div>`;
+}
+
+window.populateTemplateEditor = function() {
+  const ed = $('#templateEditor');
+  const list = Array.from(TEMPLATES.values()).sort((a, b) => a.name.localeCompare(b.name));
+  ed.innerHTML = list.length ? list.map(templateRow).join('') : '<div class="muted">No templates. Add or load samples.</div>';
+  
+  $$('#templateEditor .template-row').forEach(row => {
+    const origName = row.dataset.name;
+    $$('input,select', row).forEach(inp => {
+      const f = inp.dataset.f;
+      if (!f) return;
+      inp.addEventListener('input', async () => {
+        const updated = Object.assign({}, TEMPLATES.get(origName), {
+          [f]: inp.value || null
+        });
+        if (f === 'name' && inp.value.trim() !== origName) {
+          await sb.from('templates').delete().eq('name', origName);
+          const { error } = await sb.from('templates').insert([{
+            name: (updated.name || '').trim(),
+            work_code: updated.work_code || 'Admin',
+            start_time: updated.start_time,
+            finish_time: updated.finish_time,
+            break1: updated.break1,
+            lunch: updated.lunch,
+            break2: updated.break2
+          }]);
+          if (error) console.error('Template rename failed: ' + error.message);
+        } else {
+          const { error } = await sb.from('templates').update({
+            work_code: updated.work_code || 'Admin',
+            start_time: updated.start_time,
+            finish_time: updated.finish_time,
+            break1: updated.break1,
+            lunch: updated.lunch,
+            break2: updated.break2
+          }).eq('name', origName);
+          if (error) console.error('Template update failed: ' + error.message);
+        }
+      });
+    });
+    row.querySelector('[data-act="del"]').onclick = async () => {
+      if (!confirm(`Delete template "${origName}"?`)) return;
+      const { error } = await sb.from('templates').delete().eq('name', origName);
+      if (error) console.error('Delete failed: ' + error.message);
+    };
+  });
+}
+
+async function addTemplateHandler() {
+  const name = 'Shift ' + (TEMPLATES.size + 1);
+  const { error } = await sb.from('templates').insert([{
+    name,
+    work_code: 'Admin',
+    start_time: '09:00',
+    finish_time: '17:00',
+    break1: null,
+    lunch: '12:30',
+    break2: null
+  }]);
+  if (error) console.error('Add failed: ' + error.message);
+}
+
+async function loadDefaultsHandler() {
+  const defaults = [{
+    name: 'Early',
+    work_code: 'DEB Email',
+    start_time: '07:00',
+    finish_time: '16:00',
+    break1: '09:15',
+    lunch: '12:00',
+    break2: '15:15'
+  }, {
+    name: 'Middle',
+    work_code: 'Mirakl',
+    start_time: '11:00',
+    finish_time: '20:00',
+    break1: '11:30',
+    lunch: '15:30',
+    break2: '17:45'
+  }, {
+    name: 'Late',
+    work_code: 'PLT Social',
+    start_time: '12:00',
+    finish_time: '21:00',
+    break1: '13:15',
+    lunch: '17:00',
+    break2: '19:15'
+  }, ];
+  for (const t of defaults) {
+    await sb.from('templates').upsert(t, {
+      onConflict: 'name'
+    });
+  }
+}
+
+/* =========================
+   Data Loading (Supabase)
+   ========================= */
+
+/**
+ * Loads Sites, Leaders, and Advisors from Supabase
+ */
+window.loadOrg = async function() {
+  const [sitesRes, leadersRes, advisorsRes] = await Promise.all([
+    sb.from('sites').select('*').order('name', {
+      ascending: true
+    }),
+    sb.from('leaders').select('*'),
+    sb.from('advisors').select('*')
+  ]);
+  ORG = { sites: {} };
+  (sitesRes.data || []).forEach(s => ORG.sites[s.name] = {
+    id: s.id,
+    leaders: {}
+  });
+  (leadersRes.data || []).forEach(l => {
+    const siteEntry = Object.values(ORG.sites).find(x => x.id === l.site_id);
+    if (siteEntry) siteEntry.leaders[l.name] = {
+      id: l.id,
+      advisors: []
+    };
+  });
+  (advisorsRes.data || []).forEach(a => {
+    const leaderNode = Object.values(ORG.sites).flatMap(s => Object.values(s.leaders)).find(l => l.id === a.leader_id);
+    if (leaderNode) {
+      leaderNode.advisors.push({
+        id: a.id,
+        name: a.name,
+        email: a.email || ''
+      });
+    }
+  });
+
+  ADVISORS_LIST = (advisorsRes.data || []).map(a => ({
+    id: a.id,
+    name: a.name,
+    leader_id: a.leader_id
+  }));
+  ADVISOR_BY_NAME = new Map(ADVISORS_LIST.map(a => [a.name, a.id]));
+  ADVISOR_BY_ID = new Map(ADVISORS_LIST.map(a => [a.id, a.name]));
+}
+
+/**
+ * Loads shift templates from Supabase
+ */
+window.loadTemplates = async function() {
+  const { data } = await sb.from('templates').select('*');
+  TEMPLATES.clear();
+  (data || []).forEach(t => TEMPLATES.set(t.name, {
+    name: t.name,
+    work_code: t.work_code,
+    start_time: t.start_time,
+    finish_time: t.finish_time,
+    break1: t.break1,
+    lunch: t.lunch,
+    break2: t.break2
+  }));
+}
+
+/**
+ * Loads Rota data for a specific week
+ */
+window.fetchRotasForWeek = async function(weekStartISO) {
+  if (!weekStartISO) return;
+  const { data } = await sb.from('rotas').select('advisor_id,week_start,data').eq('week_start', weekStartISO);
+  ROTAS.clear();
+  (data || []).forEach(r => ROTAS.set(`${r.advisor_id}::${weekStartISO}`, r.data || {}));
+}
+
+/**
+ * Loads data for the new Rotation Preview feature
+ */
 async function loadShiftTemplatesAndVariants() {
-  const { data: templates, error } = await supabase
+  const { data: templates, error } = await sb
     .from("shift_templates")
     .select("code, start_time, break1, lunch, break2, end_time");
   if (error) { console.error("shift_templates error", error); return; }
 
-  // index by code
-  globalThis.SHIFT_BY_CODE = Object.fromEntries(templates.map(t => [t.code, t]));
-
-  // group variants by start_end (e.g. "07:00x16:00" → ["7A","7B","7C","7D"])
+  SHIFT_BY_CODE = Object.fromEntries(templates.map(t => [t.code, t]));
   const groups = {};
   const hhmm = x => (x || "").toString().slice(0,5);
   for (const t of templates) {
     const key = `${hhmm(t.start_time)}x${hhmm(t.end_time)}`;
-    (groups[key] ||= {})[t.code] = t;   // map: code -> full template row (with start/end)
-
+    (groups[key] ||= {})[t.code] = t;
   }
   for (const k of Object.keys(groups)) groups[k].sort();
-  globalThis.VARIANTS_BY_START_END = groups;
+  VARIANTS_BY_START_END = groups;
 }
 
 async function loadRotationsWithHours() {
-  const { data, error } = await supabase
+  const { data, error } = await sb
     .from("v_rotations_with_hours")
     .select("name, week, dow, is_rdo, shift_code, start_hhmm, end_hhmm, start_end_key")
     .order("name").order("week").order("dow");
@@ -44,875 +406,1409 @@ async function loadRotationsWithHours() {
     idx[r.name][r.week] ||= {};
     idx[r.name][r.week][r.dow] = { is_rdo: r.is_rdo, start_end_key: r.start_end_key };
   }
-  globalThis.ROTATION = idx;  // lookup: ROTATION[name][week][dow]
+  ROTATION = idx;
 }
 
-function assignVariantsRoundRobin(advisorIdsInGroup, startEndKey) {
-  const variants = (globalThis.VARIANTS_BY_START_END && globalThis.VARIANTS_BY_START_END[startEndKey]) || [];
-  if (!variants.length) return {};
-  const sorted = [...advisorIdsInGroup].sort();
-  const result = {};
-  for (let i = 0; i < sorted.length; i++) result[sorted[i]] = variants[i % variants.length];
-  return result;  // { advisorId: "7A" | "7B" | ... }
-}
-globalThis.assignVariantsRoundRobin = assignVariantsRoundRobin;
-
-function effectiveWeek(startDateStr, plannerWeekStartStr) {
-  const start = new Date(startDateStr);
-  const plan  = new Date(plannerWeekStartStr);
-  const diffDays  = Math.floor((plan - start) / 86400000);
-  const diffWeeks = Math.floor(diffDays / 7);
-  return ((diffWeeks % 6) + 6) % 6 + 1; // 1..6
-}
-globalThis.effectiveWeek = effectiveWeek;
-// ---- date helpers (needed by preview + renderer) ----
-function toISODateLocal(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-// Accepts "YYYY-MM-DD", or "DD/MM/YYYY", or any Date-parsable string
-function normalizeToISO(s) {
-  if (!s) return "";
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;                // already ISO
-  const m = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);            // DD/MM/YYYY
-  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
-  const d = new Date(s);
-  return isNaN(d) ? String(s) : toISODateLocal(d);
-}
-
-// Given an ISO date, return the Monday (ISO) of that week
-function toMondayISO(iso) {
-  if (!iso) return "";
-  const d = new Date(iso + "T00:00:00");
-  // JS: 0=Sun..6=Sat  -> make 0=Mon..6=Sun
-  const offset = (d.getDay() + 6) % 7;
-  d.setDate(d.getDate() - offset);
-  return toISODateLocal(d);
-}
-
-// expose
-globalThis.toISODateLocal = toISODateLocal;
-globalThis.normalizeToISO  = normalizeToISO;
-globalThis.toMondayISO     = toMondayISO;
-
- globalThis.bootRotations = async function bootRotations() {
-  try {
-    // --- Use existing Supabase client already created in the HTML
-const sb = window.supabase;
-if (!sb || typeof sb.from !== 'function') {
-  console.error('Supabase client missing: expected window.supabase.from to be a function');
-  return;
-}
-
-    await loadShiftTemplatesAndVariants();  // builds SHIFT_BY_CODE / VARIANTS_BY_START_END
-    await loadRotationsWithHours();         // builds ROTATION[name][week][dow]
-    // Fallback: if helpers didn’t populate ROTATION, build from the view
-    if (!globalThis.ROTATION || !Object.keys(globalThis.ROTATION).length) {
-      const { data: vhRows, error: vhErr } = await sb
-        .from('v_rotations_with_hours')
-        .select('name,week,dow,is_rdo,start_end_key')
-        .order('name', { ascending: true })
-        .order('week', { ascending: true })
-        .order('dow', { ascending: true });
-
-      if (vhErr) { console.warn('v_rotations_with_hours error', vhErr); }
-
-      const ROT = {};
-      (vhRows || []).forEach(r => {
-        const n = r.name;
-        const w = String(r.week || 1);      // weeks are 1..6
-        const d = Number(r.dow);            // days are 1..7 (Mon..Sun)
-
-        ROT[n] ||= {};
-        ROT[n][w] ||= {};
-        ROT[n][w][d] = r.is_rdo
-          ? { is_rdo: true }
-          : { start_end_key: r.start_end_key };
-      });
-
-      globalThis.ROTATION = ROT;
-      console.log('built ROTATION from view → families:', Object.keys(ROT).length);
-    }
-
-    // --- Helpers
-    const toNameKey = (s) => (s || "").trim();
-
-    // --- Fetch shift templates (weekly patterns)
-    // Table expectation:
-    //   shift_templates(name TEXT PRIMARY KEY, pattern JSONB?) OR columns: day_mon..day_sun (or mon..sun)
-    const { data: tmplRows, error: tmplErr } = await sb
-      .from("shift_templates")
-      .select("*");
-
-    if (tmplErr) throw tmplErr;
-
-    const templatesByName = {};
-    for (const r of tmplRows || []) {
-      const name = toNameKey(r.name);
-      if (!name) continue;
-
-      // Accept either a JSON 'pattern' column or individual day columns
-      let pattern = r.pattern;
-      if (!pattern || typeof pattern !== "object") {
-        pattern = {
-          mon: r.day_mon ?? r.mon ?? null,
-          tue: r.day_tue ?? r.tue ?? null,
-          wed: r.day_wed ?? r.wed ?? null,
-          thu: r.day_thu ?? r.thu ?? null,
-          fri: r.day_fri ?? r.fri ?? null,
-          sat: r.day_sat ?? r.sat ?? null,
-          sun: r.day_sun ?? r.sun ?? null,
-        };
-      }
-      templatesByName[name] = { name, pattern };
-    }
-
-    // --- Fetch rotation families (sequence of templates across weeks)
-    // Table expectation:
-    //   rotations(name TEXT PRIMARY KEY, start_date DATE/NULL, sequence JSONB?)
-    //   or fallback columns week1..week6
-    const { data: famRows, error: famErr } = await sb
-      .from("rotations")
-      .select("*");
-
-    if (famErr) throw famErr;
-
-    const familiesByName = {};
-    for (const r of famRows || []) {
-      const name = toNameKey(r.name);
-      if (!name) continue;
-
-      let sequence = r.sequence;
-      if (!sequence || !Array.isArray(sequence)) {
-        sequence = [r.week1, r.week2, r.week3, r.week4, r.week5, r.week6].filter(
-          (x) => x != null
-        );
-      }
-      familiesByName[name] = {
-        name,
-        start_date: r.start_date ?? null,
-        sequence, // e.g., ["Flex 1","Flex 2",...]
-      };
-    }
-
-    // --- Stable global shape for the UI
-    globalThis.ROTATION_META = {
-      templates: templatesByName,
-      families: familiesByName,
-    };
-
-    console.log("Rotations booted", {
-      templates: Object.keys(templatesByName).length,
-      families: Object.keys(familiesByName).length,
-    });
-  } catch (err) {
-    console.error("bootRotations error:", err);
-    throw err;
-  }
+// Make bootRotations a global function
+window.bootRotations = async function() {
+  await loadShiftTemplatesAndVariants();
+  await loadRotationsWithHours();
+  console.log("Rotations booted", {
+    templates: Object.keys(SHIFT_BY_CODE || {}).length,
+    families: Object.keys(VARIANTS_BY_START_END || {}).length,
+    rotations: Object.keys(ROTATION || {}).length
+  });
 };
 
 
-console.log("planner.js helpers ready:", typeof globalThis.bootRotations);
+/* =========================
+   Schedules Tree (Right Sidebar)
+   ========================= */
+window.rebuildTree = function() {
+  const t = $('#tree');
+  const q = $('#treeSearch').value.trim().toLowerCase();
 
-// --- Advisors boot (minimal) ---
-globalThis.bootAdvisors = async function bootAdvisors() {
-  const { data: rows, error } = await supabase.from('advisors').select('*');
-  if (error) { console.error('bootAdvisors error', error); return 0; }
+  function advisorNode(obj) {
+    const checked = selectedAdvisors.has(obj.name) ? 'checked' : '';
+    return `<div class="node">
+      <input type="checkbox" data-adv-id="${obj.id}" data-adv-name="${obj.name}" ${checked}/>
+      <span>${obj.name}</span>
+      <div class="node-actions" style="margin-left:auto;display:flex;gap:6px">
+        <button data-rename-adv="${obj.id}">✎</button>
+        <button data-remove-adv="${obj.id}">🗑</button>
+      </div>
+    </div>`;
+  }
 
-  const sample = rows?.[0] || {};
-  const idKey   = ['id','advisor_id','uuid','pk','user_id'].find(k => k in sample) || 'id';
-  const nameKey = ['name','display_name','full_name','advisor_name'].find(k => k in sample) || null;
+  function leaderBlock(leaderName, leaderObj) {
+    const team = leaderObj.advisors || [];
+    const match = (str) => !q || str.toLowerCase().includes(q);
+    if (q && !match(leaderName) && !team.some(a => match(a.name))) return '';
+    const allSelected = team.length > 0 && team.every(a => selectedAdvisors.has(a.name));
+    return `<details open data-leader-id="${leaderObj.id}">
+      <summary>
+        <span class="twisty" data-twisty>−</span>
+        <label style="display:flex;align-items:center;gap:6px;margin-left:4px">
+          <input type="checkbox" data-leader="${leaderObj.id}" ${allSelected?'checked':''}/>
+          <span>👤 ${leaderName}</span>
+        </label>
+        <div class="node-actions" style="margin-left:auto;display:flex;gap:6px">
+          <button data-add-adv="${leaderObj.id}">+ Advisor</button>
+          <button data-rename-lead="${leaderObj.id}">✎</button>
+          <button data-remove-lead="${leaderObj.id}">🗑</button>
+        </div>
+      </summary>
+      <div class="advisor-list">
+        ${team.sort((a,b)=>a.name.localeCompare(b.name)).map(advisorNode).join('')}
+      </div>
+    </details>`;
+  }
 
-  globalThis.ADVISOR_BY_ID = {};
-  globalThis.ADVISOR_BY_NAME = {};
+  function siteBlock(siteName, siteObj) {
+    const leaders = siteObj.leaders || {};
+    const blocks = Object.entries(leaders).map(([ln, lobj]) => leaderBlock(ln, lobj)).filter(Boolean);
+    const match = (str) => !q || str.toLowerCase().includes(q);
+    if (q && !match(siteName) && blocks.join('') === '') return '';
+    return `<details open data-site-id="${siteObj.id}">
+      <summary>
+        <span class="twisty" data-twisty>−</span>
+        <strong>📁 ${siteName}</strong>
+        <div class="node-actions" style="margin-left:auto;display:flex;gap:6px">
+          <button data-add-lead="${siteObj.id}">+ Leader</button>
+          <button data-rename-site="${siteObj.id}">✎</button>
+          <button data-remove-site="${siteObj.id}">🗑</button>
+        </div>
+      </summary>
+      ${blocks.join('')}
+    </details>`;
+  }
 
-  (rows || []).forEach(r => {
-    const id = r[idKey];
-    const nm = nameKey ? r[nameKey] : (r.email || r.username || String(id));
-    globalThis.ADVISOR_BY_ID[id] = r;
-    globalThis.ADVISOR_BY_NAME[nm] = r;
+  t.innerHTML = Object.entries(ORG.sites).sort((a, b) => a[0].localeCompare(b[0])).map(([sn, so]) => siteBlock(sn, so)).join('') || '<div class="muted">No sites yet.</div>';
+
+  // Twisties update
+  $$('#tree details').forEach(d => {
+    const twisty = d.querySelector('[data-twisty]');
+    const update = () => {
+      twisty.textContent = d.open ? '−' : '+';
+    };
+    d.addEventListener('toggle', update);
+    update();
   });
 
-  console.log('bootAdvisors ok:', Object.keys(globalThis.ADVISOR_BY_ID).length);
-  return Object.keys(globalThis.ADVISOR_BY_ID).length;
-};
+  // Leader select-all
+  $$('#tree [data-leader]').forEach(cb => {
+    cb.onchange = () => {
+      const leaderId = cb.dataset.leader;
+      const leaderNode = Object.values(ORG.sites).flatMap(s => Object.values(s.leaders)).find(l => l.id === leaderId);
+      (leaderNode?.advisors || []).forEach(a => cb.checked ? selectedAdvisors.add(a.name) : selectedAdvisors.delete(a.name));
+      refreshUI(); // Full refresh
+    };
+  });
 
-// --- Apply a rotation week into ROTAS and re-render ---
-globalThis.applyRotationToWeek = function applyRotationToWeek({
-  rotationName,
-  mondayISO,          // 'YYYY-MM-DD' Monday to materialise
-  advisors,           // array of advisor IDs (or objects with {id})
-  rotationStartISO,   // optional; falls back to ROTATION_META
-}) {
-  const rot = globalThis.ROTATION?.[rotationName];
+  // Advisor select
+  $$('#tree [data-adv-id]').forEach(ch => {
+    ch.onchange = () => {
+      const name = ch.dataset.advName;
+      ch.checked ? selectedAdvisors.add(name) : selectedAdvisors.delete(name);
+      refreshUI(); // Full refresh
+    };
+  });
+
+  // Site actions
+  $$('#tree [data-add-lead]').forEach(b => b.onclick = async () => {
+    const siteId = b.dataset.addLead;
+    const name = prompt('Leader name');
+    if (!name) return;
+    const { error } = await sb.from('leaders').insert([{
+      site_id: siteId,
+      name
+    }]);
+    if (error) console.error(error.message);
+  });
+  $$('#tree [data-rename-site]').forEach(b => b.onclick = async () => {
+    const siteId = b.dataset.renameSite;
+    const current = Object.entries(ORG.sites).find(([n, s]) => s.id === siteId) ?.[0] || '';
+    const nn = prompt('Rename site', current);
+    if (!nn || nn === current) return;
+    const { error } = await sb.from('sites').update({
+      name: nn
+    }).eq('id', siteId);
+    if (error) console.error(error.message);
+  });
+  $$('#tree [data-remove-site]').forEach(b => b.onclick = async () => {
+    const siteId = b.dataset.removeSite;
+    if (!confirm('Delete site and its leaders/advisors?')) return;
+    const { error } = await sb.from('sites').delete().eq('id', siteId);
+    if (error) console.error(error.message);
+  });
+
+  // Leader actions
+  $$('#tree [data-rename-lead]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.renameLead;
+    const current = Object.values(ORG.sites).flatMap(s => Object.entries(s.leaders)).find(([n, l]) => l.id === id) ?.[0] || '';
+    const nn = prompt('Rename leader', current);
+    if (!nn || nn === current) return;
+    const { error } = await sb.from('leaders').update({
+      name: nn
+    }).eq('id', id);
+    if (error) console.error(error.message);
+  });
+  $$('#tree [data-remove-lead]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.removeLead;
+    if (!confirm('Remove leader and their advisors?')) return;
+    const { error } = await sb.from('leaders').delete().eq('id', id);
+    if (error) console.error(error.message);
+  });
+
+  // Advisor actions
+  $$('#tree [data-add-adv]').forEach(b => b.onclick = async () => {
+    const leaderId = b.dataset.addAdv;
+    const n = prompt('Advisor name');
+    if (!n) return;
+    const { error } = await sb.from('advisors').insert([{
+      leader_id: leaderId,
+      name: n
+    }]);
+    if (error) console.error(error.message);
+  });
+  $$('#tree [data-rename-adv]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.renameAdv;
+    const current = ADVISORS_LIST.find(a => a.id === id) ?.name || '';
+    const nn = prompt('Rename advisor', current);
+    if (!nn || nn === current) return;
+    const { error } = await sb.from('advisors').update({
+      name: nn
+    }).eq('id', id);
+    if (error) console.error(error.message);
+  });
+  $$('#tree [data-remove-adv]').forEach(b => b.onclick = async () => {
+    const id = b.dataset.removeAdv;
+    if (!confirm('Remove advisor?')) return;
+    const { error } = await sb.from('advisors').delete().eq('id', id);
+    if (error) console.error(error.message);
+  });
+}
+
+function getLeaderTeamNames(leaderId) {
+  const leader = Object.values(ORG.sites)
+    .flatMap(s => Object.values(s.leaders || {}))
+    .find(l => l.id === leaderId);
+  if (!leader) return [];
+  return (leader.advisors || []).map(a => a.name).sort((a, b) => a.localeCompare(b));
+}
+
+window.refreshChips = function() {
+  const box = $('#activeChips');
+  box.innerHTML = '';
+  if (!selectedAdvisors.size) {
+    box.innerHTML = '<span class="muted">No advisors selected.</span>';
+    return;
+  }
+  [...selectedAdvisors].sort((a, b) => a.localeCompare(b)).forEach(n => {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.textContent = n;
+    const x = document.createElement('button');
+    x.textContent = '×';
+    x.style.border = 'none';
+    x.style.background = 'transparent';
+    x.style.cursor = 'pointer';
+    x.onclick = () => {
+      selectedAdvisors.delete(n);
+      refreshUI(); // Full refresh
+    };
+    chip.appendChild(x);
+    box.appendChild(chip);
+  });
+}
+
+/* =========================
+   Top Controls UI
+   ========================= */
+
+window.rebuildAdvisorDropdown = function() {
+  const sel = $('#advisorSelect');
+  const leaders = [];
+  Object.values(ORG.sites).forEach(site => {
+    Object.entries(site.leaders || {}).forEach(([lname, lobj]) => {
+      leaders.push({
+        id: lobj.id,
+        name: lname,
+        advisors: lobj.advisors || []
+      });
+    });
+  });
+  leaders.sort((a, b) => a.name.localeCompare(b.name));
+
+  const advisors = ADVISORS_LIST
+    .map(a => ({
+      id: a.id,
+      name: a.name
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const leaderOpts = leaders.map(l => `<option value="leader::${l.id}">${l.name} — Team</option>`).join('');
+  const advisorOpts = advisors.map(a => `<option value="advisor::${a.id}">${a.name}</option>`).join('');
+
+  sel.innerHTML = `
+    <option value="__TEAM_SELECTED__">Team (Selected)</option>
+    <option value="__TEAM_ALL__">Team (All)</option>
+    ${leaders.length ? `<optgroup label="Team Leaders">${leaderOpts}</optgroup>` : ''}
+    ${advisors.length ? `<optgroup label="Advisors">${advisorOpts}</optgroup>` : ''}
+  `;
+}
+
+function updateViewSelector() {
+  const team = $('#advisorSelect').value;
+  const showTeam = team === '__TEAM_SELECTED__' || team === '__TEAM_ALL__';
+  $('#lblTeamDay').style.display = showTeam ? 'inline' : 'none';
+  $('#teamDay').style.display = showTeam ? 'inline' : 'none';
+}
+
+window.updateRangeLabel = function() {
+  const ws = $('#weekStart').value;
+  const adv = $('#advisorSelect').value;
+  if (!ws) {
+    $('#rangeLabel').textContent = '';
+    return;
+  }
+  const s = new Date(ws + 'T00:00:00');
+  const e = new Date(s);
+  e.setDate(e.getDate() + 6);
+  const f = d => d.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+  if (adv === '__TEAM_SELECTED__' || adv === '__TEAM_ALL__') {
+    const idx = DAYS.indexOf($('#teamDay').value || 'Monday');
+    const d = new Date(s);
+    d.setDate(d.getDate() + idx);
+    $('#rangeLabel').textContent = d.toLocaleDateString('en-GB', {
+      weekday: 'long',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+    $('#calTitle').textContent = (adv === '__TEAM_ALL__' ? 'Team (All)' : 'Team (Selected)') + ' – Single Day';
+  } else {
+    $('#rangeLabel').textContent = `${f(s)} – ${f(e)}`;
+    $('#calTitle').textContent = 'Advisor Week (Calendar)';
+  }
+  $$('#dateHeaders [data-date]').forEach((span, i) => {
+    const d = new Date(s);
+    d.setDate(d.getDate() + i);
+    span.textContent = d.toLocaleDateString('en-GB', {
+      month: 'short',
+      day: 'numeric'
+    });
+  });
+}
+
+/* =========================
+   Master Assignment Table
+   ========================= */
+window.populateAssignTable = function() {
+  const head = $('#dateHeaders'),
+    body = $('#assignTable tbody');
+  head.innerHTML = DAYS.map(d => `<th>${d.slice(0,3)}<br><span class="muted" data-date></span></th>`).join('');
+  const list = selectedAdvisors.size ? [...selectedAdvisors] : [];
+  if (list.length === 0) {
+    body.innerHTML = '<tr><td colspan="8" class="muted" style="text-align:left;padding:10px">Select a Team Leader (or advisors) in <strong>Schedules</strong> to populate this table.</td></tr>';
+    return;
+  }
+  const opts = Array.from(TEMPLATES.keys()).sort().map(n => `<option value="${n}">${n}</option>`).join('');
+  body.innerHTML = '';
+  list.sort((a, b) => a.localeCompare(b)).forEach(name => {
+    const tr = document.createElement('tr');
+    const tdName = document.createElement('td');
+    tdName.className = 'name';
+    tdName.textContent = name;
+    tr.appendChild(tdName);
+    DAYS.forEach(day => {
+      const td = document.createElement('td');
+      const sel = document.createElement('select');
+      sel.innerHTML = `<option value="">-- Day Off --</option>${opts}`;
+      const aId = ADVISOR_BY_NAME.get(name);
+      const ws = $('#weekStart').value;
+      const key = `${aId}::${ws}`;
+      const data = ROTAS.get(key) || {};
+      const current = data[day];
+      const currentVal = (typeof current === 'string') ? current : '';
+      sel.value = currentVal;
+
+      sel.onchange = async () => {
+        const newVal = sel.value;
+        const fresh = Object.assign({}, ROTAS.get(key) || {});
+        
+        if (newVal) fresh[day] = newVal;
+        else delete fresh[day];
+        
+        await upsertRota(aId, ws, fresh);
+        refreshUI(); // Refresh both schedules
+      };
+
+      td.appendChild(sel);
+      tr.appendChild(td);
+    });
+    body.appendChild(tr);
+  });
+}
+
+/* =========================
+   Rota Data Helpers
+   ========================= */
+async function upsertRota(advisorId, weekStartISO, dataObj) {
+  const { data, error } = await sb.from('rotas').upsert({
+    advisor_id: advisorId,
+    week_start: weekStartISO,
+    data: dataObj
+  }, {
+    onConflict: 'advisor_id,week_start'
+  }).select('*').single();
+  if (!error) {
+    ROTAS.set(`${advisorId}::${weekStartISO}`, data.data || {});
+  } else {
+    console.error("Upsert Rota error:", error);
+  }
+}
+
+function processTemplateToSegments(t) {
+  if (!t || !t.start_time || !t.finish_time) return [];
+  const s = toMin(fmt(t.start_time)),
+    e = toMin(fmt(t.finish_time));
+  if (e <= s) return [];
+  const ev = [{
+    t: s,
+    type: 'start'
+  }, {
+    t: e,
+    type: 'end'
+  }];
+  [['break1', 15, 'Break'], ['lunch', 30, 'Lunch'], ['break2', 15, 'Break']].forEach(([k, d, label]) => {
+    if (t[k]) ev.push({
+      t: toMin(fmt(t[k])),
+      type: 'pause',
+      d,
+      label
+    });
+  });
+  ev.sort((a, b) => a.t - b.t || ((a.type === 'end') - (b.type === 'end')));
+  const out = [];
+  let cur = s;
+  for (const evn of ev) {
+    if (evn.t > cur) out.push({
+      code: t.work_code || 'Admin',
+      start: m2t(cur),
+      end: m2t(evn.t)
+    });
+    if (evn.type === 'pause') {
+      out.push({
+        code: evn.label,
+        start: m2t(evn.t),
+        end: m2t(evn.t + evn.d)
+      });
+      cur = evn.t + evn.d;
+    }
+  }
+  return out;
+}
+
+function toEditableSegments(dayVal) {
+  if (dayVal && typeof dayVal === 'object' && Array.isArray(dayVal.segments)) return JSON.parse(JSON.stringify(dayVal.segments));
+  if (typeof dayVal === 'string' && TEMPLATES.has(dayVal)) return processTemplateToSegments(TEMPLATES.get(dayVal));
+  return [];
+}
+
+function mergeAdjacent(segs) {
+  const s = [...segs].sort((a, b) => toMin(a.start) - toMin(b.start));
+  const out = [];
+  for (const x of s) {
+    if (!out.length) {
+      out.push({ ...x
+      });
+      continue;
+    }
+    const p = out[out.length - 1];
+    if (p.code === x.code && toMin(p.end) === toMin(x.start)) {
+      p.end = x.end;
+    } else out.push({ ...x
+    });
+  }
+  return out;
+}
+
+/**
+ * Processes a day's value (template name or segment object) into renderable blocks.
+ */
+function processDayValue(dayValue) {
+  if (dayValue && typeof dayValue === 'object' && Array.isArray(dayValue.segments)) {
+    return dayValue.segments.map(s => ({
+      label: s.code,
+      start: toMin(s.start),
+      end: toMin(s.end)
+    })).filter(b => b.end > b.start).sort((a, b) => a.start - b.start);
+  }
+  if (typeof dayValue === 'string' && TEMPLATES.has(dayValue)) {
+    return processTemplateToSegments(TEMPLATES.get(dayValue)).map(s => ({
+      label: s.code,
+      start: toMin(s.start),
+      end: toMin(s.end)
+    }));
+  }
+  return [];
+}
+
+
+/* =========================
+   Vertical Calendar UI
+   ========================= */
+function hoursHTML() {
+  let h = '';
+  const START = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-start')) || 7;
+  const END = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-end')) || 20;
+  for (let i = START; i <= END; i++) {
+    h += `<div class="hour"><span>${String(i).padStart(2,'0')}:00</span></div>`;
+  }
+  return h;
+}
+window.setHours = function() {
+  const el = $('#hours');
+  if (el) el.innerHTML = hoursHTML();
+}
+
+function resetGrid() {
+  $('#calGrid').innerHTML = '<div class="hour-col"><div id="hours"></div></div>';
+  $('#hours').innerHTML = hoursHTML();
+}
+
+window.renderCalendar = function() {
+  resetGrid();
+  const advVal = $('#advisorSelect').value;
+
+  // Team views
+  if (advVal === '__TEAM_SELECTED__' || advVal === '__TEAM_ALL__') {
+    renderTeamDayCalendar(advVal === '__TEAM_ALL__');
+    return;
+  }
+
+  // Single advisor view
+  let aId = null,
+    advName = null;
+  if (advVal.startsWith && advVal.startsWith('advisor::')) {
+    aId = advVal.split('::')[1];
+    advName = ADVISOR_BY_ID.get(aId) || '';
+  } else {
+    advName = advVal;
+    aId = ADVISOR_BY_NAME.get(advName);
+  }
+  if (!aId) return;
+
+  const ws = $('#weekStart').value;
+  const key = `${aId}::${ws}`;
+  const data = ROTAS.get(key) || {};
+  const grid = $('#calGrid');
+  const s = ws ? new Date(ws + 'T00:00:00') : null;
+
+  DAYS.forEach((day, idx) => {
+    const col = document.createElement('div');
+    col.className = 'day-col';
+    let month = '—',
+      num = '';
+    if (s) {
+      const d = new Date(s);
+      d.setDate(d.getDate() + idx);
+      month = d.toLocaleDateString('en-GB', {
+        month: 'long'
+      });
+      num = d.getDate();
+    }
+    col.insertAdjacentHTML('beforeend', `<div class="day-head"><small>${month}</small>${day}<span style="float:right">${num}</span></div>`);
+
+    const dayVal = data[day];
+    if (dayVal && typeof dayVal === 'object' && Array.isArray(dayVal.segments)) {
+      const totalMins = processDayValue(dayVal).reduce((acc, b) => acc + (b.end - b.start), 0);
+      col.insertAdjacentHTML('beforeend', `<div class="day-summary"><span class="muted">Custom segments</span><span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
+    } else {
+      const tplName = (typeof dayVal === 'string') ? dayVal : '';
+      const tpl = TEMPLATES.get(tplName);
+      if (!tplName || !tpl) {
+        col.insertAdjacentHTML('beforeend', `<div class="off">Roster Day Off</div>`);
+      } else {
+        col.insertAdjacentHTML('beforeend', `<div class="day-summary"><span class="muted">${tplName}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${((toMin(fmt(tpl.finish_time))-toMin(fmt(tpl.start_time)))/60)}h</span></div>`);
+      }
+    }
+
+    col.insertAdjacentHTML('beforeend', `<div class="day-actions"><button class="iconbtn" data-day="${day}">＋</button><button class="iconbtn" data-day="${day}" data-edit>✎</button></div>`);
+    const cell = document.createElement('div');
+    cell.className = 'timeline-cell';
+
+    const blocks = processDayValue(dayVal);
+    blocks.forEach(b => {
+      const top = (b.start - START * 60) * PX_PER_MIN;
+      const h = (b.end - b.start) * PX_PER_MIN;
+      const el = document.createElement('div');
+      el.className = `block ${classForCode(b.label)}`;
+      el.style.top = top + 'px';
+      el.style.height = Math.max(16, h) + 'px';
+      el.innerHTML = `<div>${b.label}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span></div>`;
+      el.dataset.day = day;
+      el.dataset.adv = advName;
+      el.dataset.start = m2t(b.start);
+      el.dataset.end = m2t(b.end);
+      el.dataset.code = b.label;
+      el.addEventListener('click', onBlockClick);
+      cell.appendChild(el);
+    });
+
+    col.appendChild(cell);
+    grid.appendChild(col);
+  });
+
+  $$('.day-actions .iconbtn').forEach(b => b.onclick = () => openAssign(b.dataset.day, advName));
+}
+
+function renderTeamDayCalendar(showAll) {
+  resetGrid();
+  const grid = $('#calGrid');
+  const ws = $('#weekStart').value;
+  const day = $('#teamDay').value || 'Monday';
+  const names = showAll ? ADVISORS_LIST.map(a => a.name) : [...selectedAdvisors];
+  const s = new Date(ws + 'T00:00:00');
+  const idx = DAYS.indexOf(day);
+  s.setDate(s.getDate() + idx);
+
+  const head = document.createElement('div');
+  head.className = 'day-head';
+  head.style.gridColumn = `1 / span ${1+names.length}`;
+  head.style.height = '56px';
+  head.innerHTML = `<small>${s.toLocaleDateString('en-GB',{month:'long'})}</small>${day}<span style="float:right">${s.getDate()}</span>`;
+  grid.appendChild(head);
+
+  names.sort((a, b) => a.localeCompare(b)).forEach(advName => {
+    const aId = ADVISOR_BY_NAME.get(advName);
+    if (!aId) return;
+    const key = `${aId}::${ws}`;
+    const data = ROTAS.get(key) || {};
+    const col = document.createElement('div');
+    col.className = 'day-col';
+    col.insertAdjacentHTML('beforeend', `<div class="day-head" style="height:56px">${advName}</div>`);
+    const dayVal = data[day];
+    if (dayVal && typeof dayVal === 'object' && Array.isArray(dayVal.segments)) {
+      const totalMins = processDayValue(dayVal).reduce((acc, b) => acc + (b.end - b.start), 0);
+      col.insertAdjacentHTML('beforeend', `<div class="day-summary"><span class="muted">Custom segments</span><span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
+    } else {
+      const tplName = (typeof dayVal === 'string') ? dayVal : '';
+      const tpl = TEMPLATES.get(tplName);
+      if (!tplName || !tpl) {
+        col.insertAdjacentHTML('beforeend', `<div class="off">Roster Day Off</div>`);
+      } else {
+        col.insertAdjacentHTML('beforeend', `<div class="day-summary"><span class="muted">${tplName}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${((toMin(fmt(tpl.finish_time))-toMin(fmt(tpl.start_time)))/60)}h</span></div>`);
+      }
+    }
+    col.insertAdjacentHTML('beforeend', `<div class="day-actions"><button class="iconbtn" data-day="${day}" data-adv="${advName}">＋</button><button class="iconbtn" data-day="${day}" data-adv="${advName}" data-edit>✎</button></div>`);
+    const cell = document.createElement('div');
+    cell.className = 'timeline-cell';
+    const blocks = processDayValue(dayVal);
+    blocks.forEach(b => {
+      const top = (b.start - START * 60) * PX_PER_MIN;
+      const h = (b.end - b.start) * PX_PER_MIN;
+      const el = document.createElement('div');
+      el.className = `block ${classForCode(b.label)}`;
+      el.style.top = top + 'px';
+      el.style.height = Math.max(16, h) + 'px';
+      el.innerHTML = `<div>${b.label}<span class="time">${m2t(b.start)} – ${m2t(b.end)}</span></div>`;
+      el.dataset.day = day;
+      el.dataset.adv = advName;
+      el.dataset.start = m2t(b.start);
+      el.dataset.end = m2t(b.end);
+      el.dataset.code = b.label;
+      el.addEventListener('click', onBlockClick);
+      cell.appendChild(el);
+    });
+    col.appendChild(cell);
+    grid.appendChild(col);
+  });
+
+  $$('.day-actions .iconbtn').forEach(b => b.onclick = () => openAssign(b.dataset.day, b.dataset.adv));
+}
+
+/* =========================
+   Dialogs: Assign / Split
+   ========================= */
+const assignDlg = $('#assignDlg'),
+  assignSelect = $('#assignSelect'),
+  assignTitle = $('#assignTitle');
+const modeTemplate = $('#modeTemplate'),
+  modeSplit = $('#modeSplit'),
+  modeHint = $('#modeHint');
+const segmentsWrap = $('#segmentsWrap');
+
+function segmentRowHTML(s, idx) {
+  return `<div class="row" data-i="${idx}">
+    <select class="seg-code">${codeSelectGroupedHTML(s.code||'')}</select>
+    <input type="time" class="seg-start" value="${s.start||''}"> <span>–</span>
+    <input type="time" class="seg-end" value="${s.end||''}">
+    <button class="del">Delete</button>
+  </div>`;
+}
+
+function loadSegmentsUI(arr) {
+  segmentsWrap.innerHTML = (arr && arr.length) ? arr.map((s, i) => segmentRowHTML(s, i)).join('') : '<div class="muted">No segments yet. Add one.</div>';
+  $$('#segmentsWrap .row .del').forEach(btn => btn.onclick = () => {
+    btn.parentElement.remove();
+    if ($$('#segmentsWrap .row').length === 0) segmentsWrap.innerHTML = '<div class="muted">No segments yet. Add one.</div>';
+  });
+}
+
+function readSegmentsUI() {
+  const rows = $$('#segmentsWrap .row');
+  const list = rows.map(r => ({
+      code: r.querySelector('.seg-code').value,
+      start: r.querySelector('.seg-start').value,
+      end: r.querySelector('.seg-end').value
+    }))
+    .filter(s => s.code && s.start && s.end && toMin(s.end) > toMin(s.start))
+    .sort((a, b) => toMin(a.start) - toMin(b.start));
+  for (let i = 1; i < list.length; i++) {
+    if (toMin(list[i].start) < toMin(list[i - 1].end)) {
+      alert('Segments overlap.');
+      return null;
+    }
+  }
+  return list;
+}
+
+function openAssign(day, advisorName) {
+  const advName = advisorName || $('#advisorSelect').value;
+  const aId = ADVISOR_BY_NAME.get(advName);
+  if (!aId) return;
+  const ws = $('#weekStart').value;
+  const key = `${aId}::${ws}`;
+  const data = ROTAS.get(key) || {};
+  assignTitle.textContent = `${day} for ${advName}`;
+  assignSelect.innerHTML = `<option value="">— Day Off —</option>` + Array.from(TEMPLATES.keys()).sort().map(n => `<option>${n}</option>`).join('');
+
+  if (data[day] && typeof data[day] === 'object' && Array.isArray(data[day].segments)) {
+    modeSplit.checked = true;
+    modeTemplate.checked = false;
+    $('#templateMode').style.display = 'none';
+    $('#splitMode').style.display = 'block';
+    loadSegmentsUI(data[day].segments);
+  } else {
+    modeTemplate.checked = true;
+    modeSplit.checked = false;
+    $('#templateMode').style.display = 'block';
+    $('#splitMode').style.display = 'none';
+    assignSelect.value = (typeof data[day] === 'string') ? data[day] : '';
+    const tplName = assignSelect.value;
+    modeHint.textContent = tplName ? `Current: ${tplName}. Convert to editable segments to tweak a small part.` : '';
+  }
+
+  $('#btnConvertToSplit').onclick = () => {
+    const base = assignSelect.value || '';
+    const segs = toEditableSegments(base);
+    modeSplit.checked = true;
+    modeTemplate.checked = false;
+    $('#templateMode').style.display = 'none';
+    $('#splitMode').style.display = 'block';
+    loadSegmentsUI(segs);
+  };
+  $('#addSegment').onclick = () => {
+    if ($('#segmentsWrap .muted')) $('#segmentsWrap .muted').remove();
+    const div = document.createElement('div');
+    div.className = 'row';
+    div.innerHTML = `${'<select class="seg-code">'+codeSelectGroupedHTML('Admin')+'</select>'}
+      <input type="time" class="seg-start" value="08:00"> <span>–</span> <input type="time" class="seg-end" value="12:00">
+      <button class="del">Delete</button>`;
+    div.querySelector('.del').onclick = () => {
+      div.remove();
+      if ($$('#segmentsWrap .row').length === 0) $('#segmentsWrap').innerHTML = '<div class="muted">No segments yet. Add one.</div>';
+    };
+    segmentsWrap.appendChild(div);
+  };
+
+  $('#assignOK').onclick = async () => {
+    const fresh = Object.assign({}, data);
+    if (modeTemplate.checked) {
+      const tplName = assignSelect.value;
+      if (tplName) fresh[day] = tplName;
+      else delete fresh[day];
+    } else {
+      const segs = readSegmentsUI();
+      if (!segs) return;
+      fresh[day] = {
+        segments: segs
+      };
+    }
+    await upsertRota(aId, ws, fresh);
+    assignDlg.close();
+    refreshUI(); // Full refresh
+  };
+
+  assignDlg.showModal();
+}
+
+/* =========================
+   Dialogs: Block Editor
+   ========================= */
+const blockDlg = $('#blockDlg');
+const bmWhole = $('#bmWhole'),
+  bmSub = $('#bmSub');
+const bwStart = $('#bwStart'),
+  bwEnd = $('#bwEnd'),
+  bwCode = $('#bwCode');
+const bsStart = $('#bsStart'),
+  bsEnd = $('#bsEnd'),
+  bsCode = $('#bsCode');
+
+function buildBlockSelects() {
+  const codes = codeSelectGroupedHTML();
+  [bwCode, bsCode].forEach(sel => sel.innerHTML = codes);
+}
+
+function onBlockClick(e) {
+  const el = e.currentTarget;
+  const advName = el.dataset.adv;
+  const day = el.dataset.day;
+  const aId = ADVISOR_BY_NAME.get(advName);
+  const ws = $('#weekStart').value;
+  const key = `${aId}::${ws}`;
+  const data = ROTAS.get(key) || {};
+  const origCode = el.dataset.code,
+    origStart = el.dataset.start,
+    origEnd = el.dataset.end;
+  $('#blockTitle').textContent = `Edit ${day} for ${advName}`;
+  $('#blockHint').textContent = `Block: ${origCode} ${origStart}–${origEnd}`;
+  buildBlockSelects();
+  bmSub.checked = true;
+  $('#blockSub').style.display = 'block';
+  $('#blockWhole').style.display = 'none';
+  bwCode.value = origCode;
+  bwStart.value = origStart;
+  bwEnd.value = origEnd;
+  bsCode.value = origCode;
+  bsStart.value = origStart;
+  bsEnd.value = origEnd;
+
+  bmWhole.onchange = bmSub.onchange = () => {
+    const whole = bmWhole.checked;
+    $('#blockWhole').style.display = whole ? 'block' : 'none';
+    $('#blockSub').style.display = whole ? 'none' : 'block';
+  };
+
+  $('#blockOK').onclick = async () => {
+    const baseSegs = toEditableSegments(data[day] || '');
+    const oS = toMin(origStart),
+      oE = toMin(origEnd);
+    const idx = baseSegs.findIndex(s => s.start === origStart && s.end === origEnd && (s.code || '') === origCode);
+    if (idx === -1) {
+      alert('Could not find block.');
+      return;
+    }
+
+    let segs = [...baseSegs];
+    if (bmWhole.checked) {
+      const c = bwCode.value,
+        s = bwStart.value,
+        e = bwEnd.value;
+      if (!s || !e || toMin(e) <= toMin(s) || toMin(s) < oS || toMin(e) > oE) {
+        alert('Invalid range.');
+        return;
+      }
+      segs.splice(idx, 1);
+      if (toMin(s) > oS) segs.splice(idx, 0, {
+        code: origCode,
+        start: m2t(oS),
+        end: s
+      });
+      segs.splice(idx + (toMin(s) > oS ? 1 : 0), 0, {
+        code: c,
+        start: s,
+        end: e
+      });
+      if (toMin(e) < oE) segs.splice(idx + (toMin(s) > oS ? 1 : 0) + 1, 0, {
+        code: origCode,
+        start: e,
+        end: m2t(oE)
+      });
+    } else {
+      const c = bsCode.value,
+        s = bsStart.value,
+        e = bsEnd.value;
+      if (!s || !e || toMin(e) <= toMin(s) || toMin(s) < oS || toMin(e) > oE) {
+        alert('Invalid sub-range.');
+        return;
+      }
+      segs.splice(idx, 1);
+      if (toMin(s) > oS) segs.splice(idx, 0, {
+        code: origCode,
+        start: m2t(oS),
+        end: s
+      });
+      segs.splice(idx + (toMin(s) > oS ? 1 : 0), 0, {
+        code: c,
+        start: s,
+        end: e
+      });
+      if (toMin(e) < oE) segs.splice(idx + (toMin(s) > oS ? 1 : 0) + 1, 0, {
+        code: origCode,
+        start: e,
+        end: m2t(oE)
+      });
+    }
+    const fresh = Object.assign({}, data, {
+      [day]: {
+        segments: mergeAdjacent(segs)
+      }
+    });
+    await upsertRota(aId, ws, fresh);
+    blockDlg.close();
+    refreshUI(); // Full refresh
+  };
+
+  blockDlg.showModal();
+}
+
+/* =========================
+   Dialogs: Publish
+   ========================= */
+async function confirmOverwriteDay(advisorId, ws, day, newValue) {
+  const key = `${advisorId}::${ws}`;
+  const existing = ROTAS.get(key) || {};
+  const had = existing[day] !== undefined && existing[day] !== null && existing[day] !== '';
+  const same = JSON.stringify(existing[day] || null) === JSON.stringify(newValue || null);
+  if (!had || same) return true;
+  return confirm(`You're about to overwrite ${ADVISOR_BY_ID.get(advisorId) || 'this advisor'} on ${day} for week ${ws}. Continue?`);
+}
+
+function collectPublishTargets() {
+  const ws = $('#weekStart').value;
+  const selVal = $('#advisorSelect').value;
+
+  if (selVal === '__TEAM_SELECTED__') {
+    return [...selectedAdvisors].map(name => ({
+      id: ADVISOR_BY_NAME.get(name),
+      name,
+      ws
+    }));
+  }
+  if (selVal === '__TEAM_ALL__') {
+    return ADVISORS_LIST.map(a => ({
+      id: a.id,
+      name: a.name,
+      ws
+    }));
+  }
+  if (selVal && selVal.startsWith && selVal.startsWith('advisor::')) {
+    const id = selVal.split('::')[1];
+    return [{
+      id,
+      name: ADVISOR_BY_ID.get(id) || '',
+      ws
+    }];
+  }
+  return [];
+}
+
+function openPublishDialog() {
+  const targets = collectPublishTargets();
+  if (!targets.length) {
+    alert('Select an advisor or team to publish.');
+    return;
+  }
+  const ws = $('#weekStart').value;
+  const dayMode = ($('#advisorSelect').value === '__TEAM_SELECTED__' || $('#advisorSelect').value === '__TEAM_ALL__');
+
+  $('#publishSummary').textContent = dayMode ?
+    `Publishing the selected day (${ $('#teamDay').value }) for ${targets.length} advisor(s), week starting ${ws}.` :
+    `Publishing the full week for ${targets.length} advisor(s), week starting ${ws}.`;
+
+  const ul = document.createElement('ul');
+  ul.style.margin = '6px 0 0 18px';
+  ul.style.padding = '0';
+  targets.forEach(t => {
+    const li = document.createElement('li');
+    li.textContent = t.name || t.id;
+    ul.appendChild(li);
+  });
+  const listBox = $('#publishList');
+  listBox.innerHTML = '';
+  listBox.appendChild(ul);
+
+  publishDlg.showModal();
+}
+
+async function doPublish() {
+  const targets = collectPublishTargets();
+  if (!targets.length) {
+    publishDlg.close();
+    return;
+  }
+
+  const ws = $('#weekStart').value;
+  const teamMode = ($('#advisorSelect').value === '__TEAM_SELECTED__' || $('#advisorSelect').value === '__TEAM_ALL__');
+  const teamDay = $('#teamDay').value;
+
+  let published = 0,
+    skipped = 0;
+
+  for (const t of targets) {
+    const key = `${t.id}::${ws}`;
+    const data = ROTAS.get(key) || {};
+
+    if (teamMode) {
+      const newVal = data[teamDay] || null;
+      const ok = await confirmOverwriteDay(t.id, ws, teamDay, newVal);
+      if (!ok) {
+        skipped++;
+        continue;
+      }
+      const fresh = Object.assign({}, data);
+      if (newVal === null || newVal === undefined) delete fresh[teamDay];
+      else fresh[teamDay] = newVal;
+      await upsertRota(t.id, ws, fresh);
+      published++;
+    } else {
+      let proceed = true;
+      for (const d of DAYS) {
+        const ok = await confirmOverwriteDay(t.id, ws, d, data[d] || null);
+        if (!ok) {
+          proceed = false;
+          break;
+        }
+      }
+      if (!proceed) {
+        skipped++;
+        continue;
+      }
+      await upsertRota(t.id, ws, data);
+      published++;
+    }
+  }
+
+  publishDlg.close();
+  alert(`Publish complete. Updated: ${published}. Skipped: ${skipped}.`);
+}
+
+
+/* =========================
+   Rotation Preview Logic
+   ========================= */
+
+function effectiveWeek(startDateStr, plannerWeekStartStr) {
+  try {
+    const start = new Date(startDateStr);
+    const plan = new Date(plannerWeekStartStr);
+    const diffDays = Math.floor((plan - start) / 86400000);
+    const diffWeeks = Math.floor(diffDays / 7);
+    return ((diffWeeks % 6) + 6) % 6 + 1; // 1..6
+  } catch(e) {
+    return 1; // Fallback
+  }
+}
+
+function applyRotationToWeek({ rotationName, mondayISO, advisors }) {
+  const rot = ROTATION[rotationName];
   if (!rot) { console.warn('No rotation:', rotationName); return; }
 
-  const startISO = rotationStartISO || globalThis.ROTATION_META?.families?.[rotationName]?.start_date;
-  const weekNum = (typeof globalThis.effectiveWeek === 'function' && startISO)
-    ? globalThis.effectiveWeek(startISO, mondayISO)
-    : 1;
-
+  // Note: This simplified logic assumes week 1. 
+  // A full implementation would need the rotation's start_date from the DB.
+  const weekNum = 1; 
+  
   const w = rot[weekNum] || rot[1];
   if (!w) { console.warn('No week found for', rotationName, 'num:', weekNum); return; }
 
-  // Build week dates in LOCAL time → YYYY-MM-DD (no timezone drift)
-const [yy, mm, dd] = mondayISO.split("-").map(Number);
-const base = new Date(yy, (mm || 1) - 1, dd || 1);
-const isoDates = Array.from({ length: 7 }, (_, i) => {
-  const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
-  return toISODateLocal(d);
-});
-
-
+  const [yy, mm, dd] = mondayISO.split("-").map(Number);
+  const base = new Date(yy, (mm || 1) - 1, dd || 1);
+  const isoDates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate() + i);
+    return toISODateLocal(d);
+  });
+  
   const ids = advisors.map(a => (typeof a === 'string' ? a : a.id));
-  const nextRotas = {};
 
+  // This function *modifies the main ROTAS map* directly
   isoDates.forEach((iso, i) => {
+    const dayName = DAYS[i];
     const dow = i + 1;
     const cell = w[dow];
     if (!cell) return;
 
     if (cell.is_rdo) {
-      ids.forEach(id => { (nextRotas[id] ||= {})[iso] = { label: 'RDO' }; });
+      ids.forEach(id => {
+        const key = `${id}::${mondayISO}`;
+        const weekData = ROTAS.get(key) || {};
+        weekData[dayName] = ""; // Set as Day Off
+        ROTAS.set(key, weekData);
+      });
       return;
     }
 
-    const sek = cell.start_end_key;
-    const fam = globalThis.VARIANTS_BY_START_END?.[sek] || null;
-    const variants = fam ? Object.keys(fam) : [];
+    const sek = cell.start_end_key; // "07:00x16:00"
+    const fam = VARIANTS_BY_START_END[sek] || null;
+    const variants = fam ? Object.keys(fam) : []; // ["7A", "7B"]
 
     ids.forEach((id, idx) => {
-      (nextRotas[id] ||= {});
+      const key = `${id}::${mondayISO}`;
+      const weekData = ROTAS.get(key) || {};
+      
+      let tplName = ""; // Default to Day Off
       if (fam && variants.length) {
-        const key = variants[idx % variants.length];
-        const v = fam[key];
-        nextRotas[id][iso] = { start: v.start_time, end: v.end_time, label: v.name || key };
-      } else if (sek) {
-        const [start, end] = sek.split('x');
-        nextRotas[id][iso] = { start, end, label: sek };
-      }
-    });
-  });
-
-  globalThis.ROTAS = nextRotas;
-  if (typeof globalThis.refreshPlannerUI === 'function') globalThis.refreshPlannerUI();
-  console.log('applyRotationToWeek ok →', rotationName, 'week', weekNum, 'advisors', ids.length);
-  return { weekNum, advisors: ids.length };
-};
-// --- Fill the "Rotation" <select id="rotationName"> from loaded data ---
-globalThis.populateRotationSelect = function populateRotationSelect() {
-  const sel = document.getElementById('rotationName');
-  if (!sel) return;
-  const names =
-    (globalThis.ROTATION && Object.keys(globalThis.ROTATION)) ||
-    (globalThis.ROTATION_META && Object.keys(globalThis.ROTATION_META.families || {})) ||
-    [];
-  if (!names.length) return;
-  const cur = sel.value;
-  sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
-  if (cur && names.includes(cur)) sel.value = cur;
-};
-
-// --- Build a robust advisor reverse index (id -> displayName) once ---
-(function () {
-  function buildAdvisorIndex() {
-    const idx = Object.create(null);
-
-    const put = (key, name) => {
-      if (!key) return;
-      const k = String(key);
-      if (!idx[k]) idx[k] = name || k;
-    };
-
-    const bestName = (a) =>
-      a?.name ||
-      a?.display_name ||
-      a?.full_name ||
-      a?.advisor_name ||
-      a?.username ||
-      a?.email ||
-      '';
-
-    const store = globalThis.ADVISOR_BY_ID;
-
-    if (store instanceof Map) {
-      for (const [k, v] of store.entries()) {
-        const name = bestName(v);
-        put(k, name);
-        put(v?.id, name);
-        put(v?.advisor_id, name);
-        put(v?.uuid, name);
-      }
-    } else if (store && typeof store === 'object') {
-      for (const k of Object.keys(store)) {
-        const v = store[k];
-        const name = bestName(v);
-        put(k, name);
-        put(v?.id, name);
-        put(v?.advisor_id, name);
-        put(v?.uuid, name);
-      }
-    }
-    return idx;
-  }
-
-  // expose once
-  if (!globalThis.__ADVISOR_INDEX) {
-    globalThis.__ADVISOR_INDEX = buildAdvisorIndex();
-  }
-})();
-
-// --- Compute rows from ROTAS for the chosen day ---
-// (build segments in MINUTES for the horizontal renderer)
-globalThis.computePlannerRowsFromState = function computePlannerRowsFromState() {
-  try {
-    const hasROTAS = globalThis.ROTAS && Object.keys(globalThis.ROTAS).length > 0;
-    if (!hasROTAS) {
-      console.log('[rows] using legacy source (no ROTAS)');
-      return [];
-    }
-
-    // A1) week/day context
-    const weekStartISO = document.getElementById('weekStart')?.value;
-    const dayName = document.getElementById('teamDay')?.value || 'Monday';
-    const dayIndexMap = { Monday:0, Tuesday:1, Wednesday:2, Thursday:3, Friday:4, Saturday:5, Sunday:6 };
-    const offset = dayIndexMap[dayName] ?? 0;
-    const base = weekStartISO ? new Date(weekStartISO + 'T00:00:00') : null;
-    const dayISO = base ? (() => { const d = new Date(base); d.setDate(base.getDate() + offset); return d.toISOString().slice(0,10); })() : null;
-
-    // A2) selected advisors from the right-hand tree (fallback: all)
-    const checked = Array.from(
-      document.querySelectorAll('#advisorTree input[type="checkbox"][data-role="advisor"]:checked')
-    ).map(el => el.value || el.dataset.id).filter(Boolean);
-
-    const allAdvisors = globalThis.ADVISOR_BY_ID || {};
-    const candidateIds = (checked.length ? checked : Object.keys(allAdvisors));
-
-    // helper: "HH:MM" -> minutes
-    const hhmmToMin = (hhmm) => {
-      const [h, m] = String(hhmm || '').split(':').map(n => parseInt(n, 10));
-      if (Number.isFinite(h) && Number.isFinite(m)) return h * 60 + m;
-      return null;
-    };
-
-    const rows = [];
-    candidateIds.forEach(id => {
-      const dayMap = globalThis.ROTAS[id] || {};
-      const cell = dayISO ? dayMap[dayISO] : null;
-      if (!cell) return;
-
-      // RDO: show as an empty track but keep the row so planners see the person
-      if (cell.is_rdo || cell.label === 'RDO') {
-        rows.push({
-          id,
-          name: allAdvisors[id]?.name || id,
-          segments: []         // no bars on RDO
-        });
-        return;
-      }
-
-      // accept either explicit start/end or the compact key
-      let startHHMM = (typeof cell.start === 'string' && cell.start.includes(':')) ? cell.start : null;
-      let endHHMM   = (typeof cell.end   === 'string' && cell.end.includes(':'))   ? cell.end   : null;
-
-      if (!startHHMM || !endHHMM) {
-        const key = cell.start_end_key;   // e.g. "07:00x16:00"
-        if (typeof key === 'string' && key.includes('x')) {
-          const [s, e] = key.split('x');
-          startHHMM = startHHMM || s;
-          endHHMM   = endHHMM   || e;
+        const templateCode = variants[idx % variants.length]; // "7A"
+        const tpl = SHIFT_BY_CODE[templateCode];
+        
+        // Find the *Template Name* (e.g., "Early") that matches the code.
+        // This is a bit of a guess, but we look for a template with that code.
+        const found = Array.from(TEMPLATES.values()).find(t => t.work_code === templateCode || t.name === templateCode);
+        if(found) {
+            tplName = found.name;
+        } else if (tpl) {
+            tplName = tpl.name || templateCode; // Fallback
         }
       }
+      
+      weekData[dayName] = tplName;
+      ROTAS.set(key, weekData);
+    });
+  });
+  
+  console.log('applyRotationToWeek ok →', rotationName, 'week', weekNum, 'advisors', ids.length);
+  return { weekNum, advisors: ids.length };
+}
 
-      const s = hhmmToMin(startHHMM);
-      const e = hhmmToMin(endHHMM);
-      if (s == null || e == null || e <= s) {
-        // bad data — skip bars but keep a row
-        rows.push({
-          id,
-          name: allAdvisors[id]?.name || id,
-          segments: []
-        });
+window.populateRotationSelect = function() {
+  const sel = document.getElementById('rotationName');
+  if (!sel) return;
+  const names = Object.keys(ROTATION || {});
+  if (!names.length) {
+    sel.innerHTML = '<option value="">(no rotations found)</option>';
+    return;
+  }
+  const cur = sel.value;
+  sel.innerHTML = names.sort().map(n => `<option value="${n}">${n}</option>`).join('');
+  if (cur && names.includes(cur)) sel.value = cur;
+}
+
+
+/* =========================
+   Horizontal Planner UI
+   ========================= */
+
+/**
+ * Calculates the segments for the horizontal planner from the central ROTAS map.
+ */
+window.computePlannerRowsFromState = function() {
+  try {
+    const ws = $('#weekStart')?.value;
+    const teamSel = $('#advisorSelect')?.value || '__TEAM_SELECTED__';
+    const dayName = $('#teamDay')?.value || 'Monday';
+    
+    let names = [];
+    if (teamSel === '__TEAM_SELECTED__') names = [...selectedAdvisors];
+    else if (teamSel === '__TEAM_ALL__') names = ADVISORS_LIST.map(a => a.name);
+    else if (teamSel?.startsWith?.('advisor::')) {
+      const id = teamSel.split('::')[1];
+      const n = ADVISOR_BY_ID.get(id);
+      if (n) names = [n];
+    } else if (ADVISOR_BY_NAME.has(teamSel)) {
+      names = [teamSel];
+    }
+    
+    const rows = [];
+    for (const name of names.sort((a, b) => a.localeCompare(b))) {
+      const aId = ADVISOR_BY_NAME.get(name);
+      if (!aId) continue;
+      
+      const key = `${aId}::${ws}`;
+      const weekData = ROTAS.get(key) || {};
+      const dayVal = weekData[dayName]; // e.g., "Early" or { segments: [...] }
+      
+      const segs = processDayValue(dayVal); // Returns [{ label, start, end }] in minutes
+      
+      rows.push({
+        name,
+        badge: '',
+        segments: segs.map(s => ({
+          type: s.label.toLowerCase(), // Use label for type
+          code: s.label,
+          start: s.start, // minutes
+          end: s.end // minutes
+        }))
+      });
+    }
+    return rows;
+  } catch (e) {
+    console.warn('computePlannerRowsFromState failed', e);
+    return [];
+  }
+}
+
+/**
+ * Renders the horizontal planner bars.
+ */
+window.renderPlanner = function(rows) {
+  try {
+    const body = document.getElementById('plannerBody');
+    if (!body) return;
+    body.innerHTML = '';
+    
+    rows.forEach(r => {
+      const row = document.createElement('div');
+      row.className = 'planner__row';
+      const left = document.createElement('div');
+      left.className = 'planner__name';
+      left.textContent = r.name;
+      row.appendChild(left);
+      
+      const tl = document.createElement('div');
+      tl.className = 'planner__timeline';
+      
+      r.segments.forEach(s => {
+        // s.start and s.end are already in minutes
+        if (s.start == null || s.end == null || s.end <= s.start) return;
+        
+        const bar = document.createElement('div');
+        bar.className = `planner__bar ${classForCode(s.code)}`;
+        
+        const pct = m => (m - DAY_START) / DAY_SPAN * 100;
+        bar.style.left = Math.max(0, pct(s.start)) + '%';
+        bar.style.width = Math.max(0, pct(s.end) - pct(s.start)) + '%';
+        bar.title = `${s.code} ${m2t(s.start)}–${m2t(s.end)}`;
+        
+        // Only add text if the bar is wide enough
+        if (pct(s.end) - pct(s.start) > 5) {
+            bar.textContent = `${s.code} ${m2t(s.start)}–${m2t(s.end)}`;
+        }
+        
+        tl.appendChild(bar);
+      });
+      row.appendChild(tl);
+      body.appendChild(row);
+    });
+  } catch (e) {
+    console.warn('renderPlanner error', e);
+  }
+}
+
+
+/* =========================
+   Unified UI Refresh
+   ========================= */
+
+/**
+ * Single function to refresh all visible schedules.
+ */
+window.refreshPlannerUI = function() {
+  const rows = window.computePlannerRowsFromState() || [];
+  window.renderPlanner(rows);
+}
+
+/**
+ * Refreshes all data-driven UI components.
+ */
+window.refreshUI = function() {
+  window.refreshChips();
+  window.rebuildTree();
+  window.populateAssignTable();
+  window.updateRangeLabel();
+  window.renderCalendar(); // Refresh vertical
+  window.refreshPlannerUI(); // Refresh horizontal
+}
+
+
+/* =========================
+   Event Wiring
+   ========================= */
+window.wire = function() {
+  // Publish
+  wireOnce($('#btnPublish'), 'click', openPublishDialog);
+  wireOnce($('#publishOK'), 'click', doPublish);
+  
+  // Printing
+  wireOnce($('#btnPrint'), 'click', () => window.print());
+  
+  // Refresh Button (formerly Generate)
+  wireOnce($('#btnGenerate'), 'click', refreshUI);
+  
+  // Week navigation
+  wireOnce($('#btnToday'), 'click', () => {
+    const t = window.setToMonday(new Date());
+    $('#weekStart').value = t.toISOString().slice(0, 10);
+    window.fetchRotasForWeek($('#weekStart').value).then(refreshUI);
+  });
+  wireOnce($('#prevWeek'), 'click', () => {
+    const d = new Date($('#weekStart').value || new Date());
+    d.setDate(d.getDate() - 7);
+    $('#weekStart').value = d.toISOString().slice(0, 10);
+    window.fetchRotasForWeek($('#weekStart').value).then(refreshUI);
+  });
+  wireOnce($('#nextWeek'), 'click', () => {
+    const d = new Date($('#weekStart').value || new Date());
+    d.setDate(d.getDate() + 7);
+    $('#weekStart').value = d.toISOString().slice(0, 10);
+    window.fetchRotasForWeek($('#weekStart').value).then(refreshUI);
+  });
+
+  // Top Controls
+  wireOnce($('#advisorSelect'), 'change', () => {
+    const v = $('#advisorSelect').value;
+    if (v.startsWith && v.startsWith('leader::')) {
+      const leaderId = v.split('::')[1];
+      const names = getLeaderTeamNames(leaderId);
+      selectedAdvisors = new Set(names);
+      $('#advisorSelect').value = '__TEAM_SELECTED__'; // switch to Team view
+    }
+    updateViewSelector();
+    refreshUI();
+  });
+  wireOnce($('#teamDay'), 'change', refreshUI);
+  wireOnce($('#weekStart'), 'change', () => {
+    window.fetchRotasForWeek($('#weekStart').value).then(refreshUI);
+  });
+
+  // Tree
+  wireOnce($('#treeSearch'), 'input', window.rebuildTree);
+  wireOnce($('#btnClearSel'), 'click', () => {
+    selectedAdvisors.clear();
+    refreshUI();
+  });
+
+  // Settings: Templates
+  wireOnce($('#btnAddTemplate'), 'click', addTemplateHandler);
+  wireOnce($('#btnLoadDefaults'), 'click', loadDefaultsHandler);
+
+  // Settings: JSON
+  wireOnce($('#btnSave'), 'click', () => {
+    const exportObj = {
+      org: ORG,
+      templates: Object.fromEntries(TEMPLATES),
+      weekStart: $('#weekStart').value
+    };
+    const blob = new Blob([JSON.stringify(exportObj, null, 2)], {
+      type: 'application/json'
+    });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'rota-export.json';
+    a.click();
+  });
+  wireOnce($('#btnLoad'), 'click', () => $('#file').click());
+  wireOnce($('#file'), 'change', async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = async ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        alert('Loaded JSON. This importer restores Templates locally; manage Sites/Leaders/Advisors in the Schedules panel.');
+        if (data.templates) {
+          for (const t of Object.values(data.templates)) {
+            await sb.from('templates').upsert({
+              name: t.name,
+              work_code: t.work_code || 'Admin',
+              start_time: t.start_time || null,
+              finish_time: t.finish_time || null,
+              break1: t.break1 || null,
+              lunch: t.lunch || null,
+              break2: t.break2 || null
+            }, {
+              onConflict: 'name'
+            });
+          }
+        }
+      } catch {
+        alert('Invalid JSON');
+      }
+    };
+    r.readText(f);
+  });
+  wireOnce($('#btnReset'), 'click', () => {
+    if (!confirm('Clear only local cache (does not delete Supabase data)?')) return;
+    ROTAS.clear();
+    sessionStorage.clear();
+    localStorage.clear();
+    location.reload();
+  });
+  
+  // Rotation Preview
+  wireOnce($('#previewRotation'), 'click', async () => {
+    try {
+      const rotationName = $('#rotationName').value;
+      if (!rotationName) {
+        alert('Please select a rotation to preview.');
+        return;
+      }
+      const mondayISO = toMondayISO($('#weekStart').value || new Date().toISOString().slice(0,10));
+      
+      const advisors = [...selectedAdvisors].map(name => ADVISOR_BY_NAME.get(name)).filter(Boolean);
+      if (!advisors.length) {
+        alert('Please select advisors from the "Schedules" tree to preview.');
         return;
       }
 
-      // IMPORTANT: segments in MINUTES for the horizontal renderer
-      rows.push({
-        id,
-        name: allAdvisors[id]?.name || id,
-        segments: [
-          { type: 'work', code: cell.label || 'Admin', start: s, end: e }
-        ]
-      });
-    });
-
-    console.log('[rows] from ROTAS →', rows.length, 'for', dayName, dayISO);
-    return rows;
-  } catch (e) {
-    console.warn('[rows] compute from ROTAS failed', e);
-    return [];
-  }
-};
-
-
-
-  // ----- time utils -----
-  function parseHHMM(s) {
-  // Accept minutes as a number, "HH:MM", or "HH:MM:SS"
-  if (typeof s === "number" && isFinite(s)) return s;
-  if (!s) return null;
-  const str = String(s).trim();
-  // Trim seconds if present (HH:MM:SS → HH:MM)
-  const hhmm = str.length >= 5 ? str.slice(0, 5) : str;
-  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
-  if (!m) return null;
-  const h = parseInt(m[1], 10);
-  const mm = parseInt(m[2], 10);
-  return h * 60 + mm;
-}
-
-
-  function toPct(min, dayStart, dayEnd) {
-    if (min < dayStart) min = dayStart;
-    if (min > dayEnd) min = dayEnd;
-    var span = dayEnd - dayStart;
-    return span > 0 ? ((min - dayStart) / span) * 100 : 0;
-  }
-
-  // default window TEMPLATES fallback, only used if page has none
-  function ensureDefaultTemplates() {
-    if (window.TEMPLATES instanceof Map && window.TEMPLATES.size > 0) return;
-    window.TEMPLATES = new Map(Object.entries({
-      Early:  { start: "07:00", end: "16:00", breaks: [{ start: "12:00", end: "12:30" }] },
-      Middle: { start: "11:00", end: "20:00", breaks: [{ start: "15:00", end: "15:15" }] },
-      Late:   { start: "12:00", end: "21:00", breaks: [{ start: "17:30", end: "18:00" }] }
-    }));
-  }
-
-  function buildSegmentsFromTemplate(tplName) {
-    ensureDefaultTemplates();
-    if (!(window.TEMPLATES instanceof Map)) return [];
-    var t = window.TEMPLATES.get(tplName);
-    if (!t || !t.start || !t.end) return [];
-    var segs = [{ kind: "shift", start: t.start, end: t.end }];
-    var br = Array.isArray(t.breaks) ? t.breaks : [];
-    br.forEach(function (b) {
-      if (b && b.start && b.end) segs.push({ kind: "break", start: b.start, end: b.end });
-    });
-    return segs;
-  }
-// normalize DD/MM/YYYY or MM/DD/YYYY into ISO YYYY-MM-DD
-function normalizeToISO(d) {
-  if (!d) return "";
-  // DD/MM/YYYY → YYYY-MM-DD
-  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(d);
-  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
-  // already ISO or browser-parsable → return as-is
-  return d;
-}
-// Get the Monday of the week for a given ISO date (YYYY-MM-DD), using LOCAL time
-function toMondayISO(iso) {
-  if (!iso) return "";
-  const [y, m, d] = iso.split("-").map(Number);
-  const dt = new Date(y, (m || 1) - 1, d || 1);
-  const dow = dt.getDay();                    // 0=Sun .. 1=Mon .. 6=Sat
-  const delta = (dow === 0 ? -6 : 1 - dow);   // shift to Monday
-  const mon = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate() + delta);
-  const yy = mon.getFullYear();
-  const mm = String(mon.getMonth() + 1).padStart(2, "0");
-  const dd2 = String(mon.getDate()).padStart(2, "0");
-  return `${yy}-${mm}-${dd2}`;
-}
-
-  // ----- build rows from current state -----
-function computePlannerRowsFromState(){
-  const rows = [];
-  const $ = (sel) => document.querySelector(sel);
-
-  // Inputs from the UI
-  const wsISO  = $('#weekStart')?.value || null;                // Monday ISO
-  const daySel = $('#teamDay')?.value || 'Monday';              // day name (assignment table view)
-  const dayISO = (function toDayISO(){
-    if (!wsISO) return null;
-    const base = new Date(wsISO + 'T00:00:00');
-    const DOW = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:7 };
-    const d = (DOW[daySel] || 1) - 1; // 0..6
-    const dt = new Date(base); dt.setDate(base.getDate() + d);
-    const yy = dt.getFullYear(), mm = String(dt.getMonth()+1).padStart(2,'0'), dd = String(dt.getDate()).padStart(2,'0');
-    return `${yy}-${mm}-${dd}`;
-  })();
-
-  // Helpers
-  const parseHHMM = (s)=>{ if(!s) return null; const m=s.match(/^(\d{1,2}):(\d{2})$/); if(!m) return null; return (+m[1])*60+(+m[2]); };
-  const m2t = (m)=>`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
-
-  function buildSegmentsFromTemplate(tplName){
-    const t = (window.TEMPLATES instanceof Map)
-      ? window.TEMPLATES.get(tplName)
-      : (window.TEMPLATES||{})[tplName];
-    if (!t) return [];
-    const start = parseHHMM(t.start_time || t.start || '09:00');
-    const end   = parseHHMM(t.finish_time || t.end   || '17:00');
-    const breaks = []
-      .concat(t.break1 ? [{ type:'break', code:'Break', start:parseHHMM(t.break1), end:parseHHMM(t.break1_end||t.break1) }] : [])
-      .concat(t.lunch  ? [{ type:'lunch', code:'Lunch', start:parseHHMM(t.lunch),  end:parseHHMM(t.lunch_end||t.lunch)   }] : [])
-      .concat(t.break2 ? [{ type:'break', code:'Break', start:parseHHMM(t.break2), end:parseHHMM(t.break2_end||t.break2) }] : []);
-    const pauses = breaks.filter(b => b.start != null && b.end != null && b.end > b.start).sort((a,b)=>a.start-b.start);
-    const out = [];
-    let cur = start;
-    for(const p of pauses){
-      if (p.start > cur) out.push({ type:'work', code:t.work_code || 'Admin', start:cur, end:Math.min(p.start, end) });
-      out.push({ type:p.type, code:p.code, start:Math.max(p.start, start), end:Math.min(p.end, end) });
-      cur = Math.max(cur, p.end);
-    }
-    if (cur < end) out.push({ type:'work', code:t.work_code || 'Admin', start:cur, end });
-    return out;
-  }
-
-  // Case A: assignment table snapshot (Map)
-  if (window.ROTAS instanceof Map) {
-    const ids = Array.from(window.ADVISOR_BY_ID?.keys?.() || []);
-    ids.forEach(aId => {
-      const name = (
-        window.ADVISOR_BY_ID?.get?.(aId) ||
-        window.ADVISOR_BY_ID?.[aId]?.name ||
-        window.ADVISOR_BY_ID?.[aId] ||
-        aId
-      );
-      const key  = `${aId}::${wsISO}`;
-      const weekObj = window.ROTAS.get(key) || {};
-      const tplName = weekObj[daySel];
-      let segs = [];
-      if (typeof tplName === 'string') {
-        segs = buildSegmentsFromTemplate(tplName);
-      } else if (tplName && typeof tplName === 'object' && Array.isArray(tplName.segments)) {
-        segs = (tplName.segments || []).map(s => ({
-          type: s.type || 'work',
-          code: s.code || 'Admin',
-          start: parseHHMM(s.start),
-          end:   parseHHMM(s.end)
-        })).filter(s => s.start != null && s.end != null && s.end > s.start);
-      }
-      rows.push({ id:aId, name, badge:'', segments: segs });
-    });
-    return rows.sort((a,b)=>String(a.name).localeCompare(String(b.name)));
-  }
-
-  // Case B: rotation preview (object)
-if (window.ROTAS && typeof window.ROTAS === 'object' && dayISO) {
-  const ids = Object.keys(window.ROTAS || {});
-  ids.forEach((aId) => {
-    // Resolve human name from either Map or plain object caches
-    const name =
-      (window.ADVISOR_BY_ID?.get?.(aId)) ||
-      (window.ADVISOR_BY_ID?.[aId]?.name) ||
-      (window.ADVISOR_BY_ID?.[aId]) ||
-      aId;
-
-    const cell = (window.ROTAS[aId] || {})[dayISO];
-    let segs = [];
-
-    if (cell?.is_rdo) {
-      // Show an explicit RDO badge so planners have visibility
-      segs = [{
-        type: 'tag',
-        code: 'RDO',
-        atDay: dayISO,
-        start: null,
-        end: null,
-        label: 'Roster Day Off'
-      }];
-    } else if (cell?.start_hhmm && cell?.end_hhmm) {
-      const s = parseHHMM(cell.start_hhmm);
-      const e = parseHHMM(cell.end_hhmm);
-      if (s != null && e != null && e > s) {
-        segs = [{
-  // canonical fields used by old + new renderers
-  type: 'work',
-  code: cell.work_code || 'Admin',
-  start: s,         // minutes from 00:00
-  end: e,           // minutes from 00:00
-  // legacy-friendly mirrors
-  startMin: s,
-  endMin: e,
-  // nice to have
-  label: cell.label || '',
-  atDay: dayISO
-}];
-
-      }
-    }
-
-    // Always push a row for the selected advisors; empty segs means blank lane
-    rows.push({ id: aId, name, badge: '', segments: segs });
-  });
-
-  // keep the list stable and human-friendly
-  return rows.sort((a,b)=>String(a.name).localeCompare(String(b.name)));
-}
-
-
-
-  // Fallback
-  return [];
-}
-
-window.computePlannerRowsFromState = computePlannerRowsFromState;
-
-// --- Adapter: ensure refreshPlannerUI uses our rows ---
-(function patchRefresh() {
-  const orig = globalThis.refreshPlannerUI;
-  globalThis.refreshPlannerUI = function patchedRefresh() {
-    if (typeof orig === 'function') orig();
-
-    const rows = (typeof globalThis.computePlannerRowsFromState === 'function')
-      ? globalThis.computePlannerRowsFromState()
-      : [];
-
-    // Debug: see what we're drawing
-    console.log('[render rows]', rows.length, rows[0] || null);
-
-    if (typeof globalThis.renderPlanner === 'function') {
-      globalThis.renderPlanner(rows);
-    }
-  };
-})();
-
-
-  // ----- render time header (07:00..19:00) -----
-  function renderTimeHeader(el) {
-    if (!el) return;
-    el.innerHTML = "";
-    var start = parseHHMM("07:00");
-    var end = parseHHMM("19:00");
-    for (var h = 7; h <= 19; h++) {
-      var d = document.createElement("div");
-      d.className = "time-tick";
-      d.style.position = "absolute";
-      d.style.left = toPct(h * 60, start, end) + "%";
-      d.style.top = "0";
-      d.style.transform = "translateX(-50%)";
-      d.textContent = (h < 10 ? "0" + h : String(h)) + ":00";
-      el.appendChild(d);
-    }
-    el.style.position = "relative";
-    el.style.height = "18px";
-  }
-  window.renderTimeHeader = renderTimeHeader;
-
-  // ----- render horizontal planner -----
-  function renderPlanner(rows) {
-    var body = document.getElementById("plannerBody");
-    if (!body) return;
-
-    var start = parseHHMM("07:00");
-    var end = parseHHMM("19:00");
-
-    body.innerHTML = "";
-  // --- preview legend of selected ROTAS (names, not UUIDs) ---
- 
-  // --- preview legend of selected ROTAS (names, not UUIDs) ---
-(function renderPreviewLegend() {
-  // Only show chips if explicitly enabled
-  if (window.SHOW_PREVIEW_LEGEND !== true) {
-    // If a previous strip exists, remove it and bail
-    const old = document.getElementById('previewLegendStrip');
-    if (old && old.parentNode) old.parentNode.removeChild(old);
-    return;
-  }
-
-    // Build a lookup that resolves any id → best human name
-    const getName = (aId) => {
-      const advStore = globalThis.ADVISOR_BY_ID;
-      if (advStore instanceof Map) {
-        const a = advStore.get(aId) || {};
-        return (
-          a.name || a.display_name || a.full_name ||
-          a.advisor_name || a.username || a.email || String(aId)
-        );
-      } else if (advStore && typeof advStore === "object") {
-        const a = advStore[aId] || {};
-        return (
-          a.name || a.display_name || a.full_name ||
-          a.advisor_name || a.username || a.email || String(aId)
-        );
-      }
-      return String(aId);
-    };
-
-    // Keys of ROTAS are the selected advisors for the preview week
-    const ids = Object.keys(globalThis.ROTAS || {});
-    if (!ids.length) return;
-
-    // Legend strip container (inserted at the top of plannerBody)
-    const strip = document.createElement('div');
-strip.id = 'previewLegendStrip';
-    strip.className = "legend-strip";
-    strip.style.display = "flex";
-    strip.style.flexWrap = "wrap";
-    strip.style.gap = "6px";
-    strip.style.margin = "6px 0 10px 0";
-
-    // Create name chips
-    ids.forEach((id) => {
-      const chip = document.createElement("div");
-      chip.className = "name-chip";
-      chip.textContent = getName(id);
-      chip.style.padding = "6px 10px";
-      chip.style.borderRadius = "999px";
-      chip.style.background = "#f1f3f8";
-      chip.style.border = "1px solid #e6e6ef";
-      chip.style.fontSize = "12px";
-      chip.style.lineHeight = "1";
-      strip.appendChild(chip);
-    });
-
-    body.appendChild(strip);
-  })();
-
-    rows.forEach(function (row) {
-      var r = document.createElement("div");
-      r.className = "planner-row";
-      r.style.display = "grid";
-      r.style.gridTemplateColumns = "220px 1fr";
-      r.style.alignItems = "center";
-      r.style.gap = "8px";
-      r.style.margin = "6px 0";
-
-      var name = document.createElement("div");
-      name.className = "planner-name";
-      name.textContent = row.name || row.id || "";
-      name.style.fontWeight = "600";
-
-      var track = document.createElement("div");
-      track.className = "planner-track";
-      track.style.position = "relative";
-      track.style.height = "32px";
-      track.style.background = "var(--track-bg, #f7f7fb)";
-      track.style.border = "1px solid #e6e6ef";
-      track.style.borderRadius = "8px";
-      track.style.overflow = "hidden";
-
-      row.segments.forEach(function (seg) {
-      var s = (typeof seg.start === 'number') ? seg.start : parseHHMM(seg.start);
-      var e = (typeof seg.end   === 'number') ? seg.end   : parseHHMM(seg.end);
-
-
-        if (s == null || e == null || e <= s) return;
-
-        var left = toPct(s, start, end);
-        var right = toPct(e, start, end);
-        var bar = document.createElement("div");
-        bar.className = "seg " + (seg.kind === "break" ? "seg-break" : "seg-shift");
-        bar.style.position = "absolute";
-        bar.style.left = left + "%";
-        bar.style.width = Math.max(0, right - left) + "%";
-        bar.style.top = seg.kind === "break" ? "8px" : "4px";
-        bar.style.bottom = seg.kind === "break" ? "8px" : "4px";
-        bar.style.borderRadius = "6px";
-        bar.style.background = seg.kind === "break" ? "#ffdb77" : "#57c97b";
-        bar.title = (seg.kind === "break" ? "Break " : "Shift ") + seg.start + " - " + seg.end;
-        track.appendChild(bar);
+      applyRotationToWeek({
+        rotationName,
+        mondayISO,
+        advisors,
       });
 
-      r.appendChild(name);
-      r.appendChild(track);
-      body.appendChild(r);
-    });
-  }
-  window.renderPlanner = renderPlanner;
-
-  // ----- (optional) render vertical week -----
-  function renderAdvisorWeek(/* rows */) {
-    // No-op here; your existing calendar renderer can keep handling the vertical view.
-  }
-  window.renderAdvisorWeek = renderAdvisorWeek;
-
-  // --- Dev preview: wire the Preview Rotation button (end-of-file to guarantee DOM exists) ---
-(function () {
-  const wire = () => {
-    const btn = document.getElementById('previewRotation');
-    if (!btn) return;                     // button not present
-    if (btn.dataset._wired) return;       // avoid double-binding
-    btn.dataset._wired = '1';
-
-    btn.addEventListener('click', async () => {
-      try {
-        console.log('[preview] click');
-        await globalThis.bootAdvisors?.();
-        await globalThis.bootRotations?.();
-globalThis.populateRotationSelect?.();
-
-const sel = document.getElementById('rotationName');
-    const rotationName =
-      (sel && sel.value)
-      || Object.keys(globalThis.ROTATION || {})[0]
-      || Object.keys(globalThis.ROTATION_META?.families || {})[0];
-    if (!rotationName) return console.warn('No rotations found (check ROTATION and ROTATION_META.families)');
-
-
-        const rawWs = document.getElementById('weekStart')?.value || '2025-10-20';
-const wsISO = (typeof normalizeToISO === 'function') ? normalizeToISO(rawWs) : rawWs;
-const mondayISO = (typeof toMondayISO === 'function') ? toMondayISO(wsISO) : wsISO;
-
-        // prefer currently-checked advisors in the Schedules tree
-const checked = Array.from(
-  document.querySelectorAll('#advisorTree input[type="checkbox"][data-role="advisor"]:checked')
-).map(el => el.value || el.dataset.id).filter(Boolean);
-
-// fall back to “first 8” if nothing is checked
-const advisors = (checked.length ? checked : Object.keys(globalThis.ADVISOR_BY_ID || {})).slice(0, 8);
-
-        const startISO = globalThis.ROTATION_META?.families?.[rotationName]?.start_date || null;
-
-        const res = globalThis.applyRotationToWeek?.({
-          rotationName,
-          mondayISO,
-          advisors,
-          rotationStartISO: startISO
-        });
-            console.log('[preview] applied', res);
-
-    // 🔄 force repaint of the horizontal planner
-    if (typeof window.refreshPlannerUI === 'function') {
-      window.refreshPlannerUI();
-    } else if (typeof window.renderPlanner === 'function' &&
-               typeof window.computePlannerRowsFromState === 'function') {
-      window.renderPlanner(window.computePlannerRowsFromState());
-    }
-
-
-      } catch (e) {
-        console.error('Preview Rotation failed', e);
-      }
-    });
-  };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', wire);
-  } else {
-    wire();
-  }
-})();
-// --- light boot to populate rotation dropdown on page load ---
-(function () {
-  async function onReady() {
-    try {
-      await globalThis.bootAdvisors?.();
-      await globalThis.bootRotations?.();
-      globalThis.populateRotationSelect?.(); // fill #rotationName
+      // Force a full UI refresh
+      refreshUI();
+      
     } catch (e) {
-      console.warn('initial boot failed', e);
+      console.error('Preview Rotation failed', e);
     }
-  }
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', onReady);
-  } else {
-    onReady();
-  }
-})();
+  });
+  
+  // Populate rotation select on focus
+  wireOnce($('#rotationName'), 'focus', window.populateRotationSelect);
+}
 
-})();
+/* =========================
+   Realtime Subscriptions
+   ========================= */
+window.subscribeRealtime = function() {
+  sb.channel('any-changes')
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'sites'
+    }, () => window.loadOrg().then(() => {
+      window.rebuildTree();
+      window.rebuildAdvisorDropdown();
+    }))
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'leaders'
+    }, () => window.loadOrg().then(() => {
+      window.rebuildTree();
+      window.rebuildAdvisorDropdown();
+    }))
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'advisors'
+    }, () => window.loadOrg().then(() => {
+      window.rebuildTree();
+      window.rebuildAdvisorDropdown();
+    }))
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'templates'
+    }, () => window.loadTemplates().then(() => {
+      window.populateTemplateEditor();
+      window.renderCalendar();
+    }))
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'rotas'
+    }, () => {
+      const ws = $('#weekStart').value;
+      window.fetchRotasForWeek(ws).then(refreshUI);
+    })
+    .subscribe();
+}
