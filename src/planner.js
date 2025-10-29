@@ -399,9 +399,22 @@ async function loadShiftTemplatesAndVariants() {
   const hhmm = x => (x || "").toString().slice(0,5);
   for (const t of templates) {
     const key = `${hhmm(t.start_time)}x${hhmm(t.end_time)}`;
+    
+    // --- THIS WAS THE BUG ---
+    // This line creates an OBJECT: groups[key] = { "7A": {...} }
     (groups[key] ||= {})[t.code] = t;
   }
-  for (const k of Object.keys(groups)) groups[k].sort();
+  
+  // --- THIS WAS THE ERROR ---
+  // You cannot call .sort() on an OBJECT.
+  // This conflicting code came from merging two different files.
+  // By removing it, the code will now run.
+  /*
+  for (const k of Object.keys(groups)) {
+      groups[k].sort(); // <--- REMOVED THIS LINE
+  }
+  */
+  
   VARIANTS_BY_START_END = groups;
 }
 
@@ -1466,8 +1479,8 @@ function applyRotationToWeek({ rotationName, mondayISO, advisors }) {
     }
 
     const sek = cell.start_end_key; // "07:00x16:00"
-    const fam = VARIANTS_BY_START_END[sek] || null;
-    const variants = fam ? Object.keys(fam) : []; // ["7A", "7B"]
+    const fam = VARIANTS_BY_START_END[sek] || null; // This is an OBJECT: { "7A":{...}, "7B":{...} }
+    const variants = fam ? Object.keys(fam) : []; // This is now CORRECT: ["7A", "7B"]
 
     ids.forEach((id, idx) => {
       const key = `${id}::${mondayISO}`;
@@ -1478,13 +1491,12 @@ function applyRotationToWeek({ rotationName, mondayISO, advisors }) {
         const templateCode = variants[idx % variants.length]; // "7A"
         
         // Find a Template Name (e.g., "Early") that has this code
-        const found = Array.from(TEMPLATES.values()).find(t => t.work_code === templateCode);
-        
-        if(found) {
-            tplName = found.name;
-        } else if (TEMPLATES.has(templateCode)) {
-            // Fallback: check if a template is named "7A"
+        // This logic assumes a template in the main `templates` table
+        // is NAMED "7A" or whatever the code is.
+        if (TEMPLATES.has(templateCode)) {
             tplName = templateCode;
+        } else {
+            console.warn(`Rotation code "${templateCode}" not found in Master Templates list.`);
         }
       }
       
@@ -1833,3 +1845,4 @@ window.subscribeRealtime = function() {
     })
     .subscribe();
 }
+
