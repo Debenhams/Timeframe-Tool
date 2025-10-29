@@ -2,6 +2,19 @@
 (function () {
   "use strict";
   console.log("init.js loaded v3");
+  // Ensure rotation select is populated on load and when week changes
+(function wireRotationSelectAutofill(){
+  const wk = document.getElementById("weekStart");
+  const doPopulate = () => (typeof window.populateRotationSelect === "function") && window.populateRotationSelect();
+  // run once on boot
+  doPopulate();
+  // run whenever weekStart changes
+  if (wk && !wk.dataset.rotSelWired) {
+    wk.addEventListener("change", doPopulate);
+    wk.dataset.rotSelWired = "1";
+  }
+})();
+
 
   // --- globals (safe defaults) ---
   if (!(window.ROTAS instanceof Map)) window.ROTAS = new Map();            // key: `${advisorId}::${weekStart}` -> { Monday: 'Early', ... }

@@ -578,73 +578,49 @@ function computePlannerRowsFromState(){
   // Case B: rotation preview (object)
 if (window.ROTAS && typeof window.ROTAS === 'object' && dayISO) {
   const ids = Object.keys(window.ROTAS || {});
-
-  // helper: best-effort name from Map OR plain object OR fallback to id
-  const toName = (aId) =>
-    (window.ADVISOR_BY_ID?.get?.(aId)) ||
-    (window.ADVISOR_BY_ID?.[aId]?.name) ||
-    (window.ADVISOR_BY_ID?.[aId]) ||
-    aId;
-
-  // helper: "HH:MM" -> minutes
-  const hhmmToMin = (hhmm) => {
-    const [h, m] = String(hhmm || '').split(':').map(n => parseInt(n, 10));
-    if (Number.isFinite(h) && Number.isFinite(m)) return h * 60 + m;
-    return null;
-  };
-
   ids.forEach((aId) => {
-    const name = toName(aId);
-    const cell = (window.ROTAS[aId] || {})[dayISO];
+    // Resolve human name from either Map or plain object caches
+    const name =
+      (window.ADVISOR_BY_ID?.get?.(aId)) ||
+      (window.ADVISOR_BY_ID?.[aId]?.name) ||
+      (window.ADVISOR_BY_ID?.[aId]) ||
+      aId;
 
+    const cell = (window.ROTAS[aId] || {})[dayISO];
     let segs = [];
 
-    if (!cell) {
-      // no data for this advisor/day
-      segs = [];
-    } else if (cell.is_rdo) {
-      // Rest Day Off: keep row (so planners still see RDO) but no bars
-      segs = [];
-    } else {
-      // accept start/end as either "HH:MM" fields OR via a compact key like "07:00x16:00"
-      let startHHMM = (typeof cell.start === 'string' && cell.start.includes(':')) ? cell.start : null;
-      let endHHMM   = (typeof cell.end   === 'string' && cell.end.includes(':'))   ? cell.end   : null;
-
-      if (!startHHMM || !endHHMM) {
-        const key = cell.start_end_key; // e.g. "07:00x16:00"
-        if (typeof key === 'string' && key.includes('x')) {
-          const [s, e] = key.split('x');
-          startHHMM = startHHMM || s;
-          endHHMM   = endHHMM   || e;
-        }
-      }
-
-      // also accept alt fields start_hhmm / end_hhmm if provided
-      startHHMM = startHHMM || cell.start_hhmm || null;
-      endHHMM   = endHHMM   || cell.end_hhmm   || null;
-
-      const s = hhmmToMin(startHHMM);
-      const e = hhmmToMin(endHHMM);
-
+    if (cell?.is_rdo) {
+      // Show an explicit RDO badge so planners have visibility
+      segs = [{
+        type: 'tag',
+        code: 'RDO',
+        atDay: dayISO,
+        start: null,
+        end: null,
+        label: 'Roster Day Off'
+      }];
+    } else if (cell?.start_hhmm && cell?.end_hhmm) {
+      const s = parseHHMM(cell.start_hhmm);
+      const e = parseHHMM(cell.end_hhmm);
       if (s != null && e != null && e > s) {
-        segs.push({
-          atDay: dayISO,
+        segs = [{
           type: 'work',
-          code: cell.work_code || cell.label || 'Work',
-          start: s,
-          end: e,
-        });
+          code: cell.work_code || 'Admin',
+          atDay: dayISO,
+          start: s,         // minutes-from-midnight number
+          end: e            // minutes-from-midnight number
+        }];
       }
     }
 
-    // Always push the row so the advisor name appears in the timeline,
-    // even if it's an RDO (segments = [])
+    // Always push a row for the selected advisors; empty segs means blank lane
     rows.push({ id: aId, name, badge: '', segments: segs });
   });
 
-  rows.sort((a,b) => String(a.name).localeCompare(String(b.name)));
-  return rows;
+  // keep the list stable and human-friendly
+  return rows.sort((a,b)=>String(a.name).localeCompare(String(b.name)));
 }
+
 
 
   // Fallback
