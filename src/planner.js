@@ -311,12 +311,11 @@ globalThis.populateRotationSelect = function populateRotationSelect() {
     (globalThis.ROTATION_META && Object.keys(globalThis.ROTATION_META.families || {})) ||
     [];
   if (!names.length) return;
-
-  // Keep the current choice if possible
   const cur = sel.value;
   sel.innerHTML = names.map(n => `<option value="${n}">${n}</option>`).join('');
   if (cur && names.includes(cur)) sel.value = cur;
 };
+
 // --- Build a robust advisor reverse index (id -> displayName) once ---
 (function () {
   function buildAdvisorIndex() {
@@ -367,63 +366,90 @@ globalThis.populateRotationSelect = function populateRotationSelect() {
 })();
 
 // --- Compute rows from ROTAS for the chosen day ---
+// (build segments in MINUTES for the horizontal renderer)
 globalThis.computePlannerRowsFromState = function computePlannerRowsFromState() {
   try {
-    // Week + day from the UI
+    const hasROTAS = globalThis.ROTAS && Object.keys(globalThis.ROTAS).length > 0;
+    if (!hasROTAS) {
+      console.log('[rows] using legacy source (no ROTAS)');
+      return [];
+    }
+
+    // A1) week/day context
     const weekStartISO = document.getElementById('weekStart')?.value;
     const dayName = document.getElementById('teamDay')?.value || 'Monday';
-    if (!weekStartISO || !globalThis.ROTAS) return [];
-
-    // Map day name -> 0..6 (Mon..Sun)
     const dayIndexMap = { Monday:0, Tuesday:1, Wednesday:2, Thursday:3, Friday:4, Saturday:5, Sunday:6 };
     const offset = dayIndexMap[dayName] ?? 0;
+    const base = weekStartISO ? new Date(weekStartISO + 'T00:00:00') : null;
+    const dayISO = base ? (() => { const d = new Date(base); d.setDate(base.getDate() + offset); return d.toISOString().slice(0,10); })() : null;
 
-    // Resolve YYYY-MM-DD for the chosen day, based on Monday-of-week
-    const base = new Date(weekStartISO + 'T00:00:00');
-    const d = new Date(base);
-    d.setDate(base.getDate() + offset);
-    const dayISO = d.toISOString().slice(0, 10);
+    // A2) selected advisors from the right-hand tree (fallback: all)
+    const checked = Array.from(
+      document.querySelectorAll('#advisorTree input[type="checkbox"][data-role="advisor"]:checked')
+    ).map(el => el.value || el.dataset.id).filter(Boolean);
 
-    // Helper to fetch advisor object by id (works for Map or plain object caches)
-    const getAdvisorById = (id) => {
-      const store = globalThis.ADVISOR_BY_ID;
-      if (!store) return null;
-      if (store instanceof Map) return store.get(id) || null;
-      if (typeof store === 'object') return store[id] || null;
+    const allAdvisors = globalThis.ADVISOR_BY_ID || {};
+    const candidateIds = (checked.length ? checked : Object.keys(allAdvisors));
+
+    // helper: "HH:MM" -> minutes
+    const hhmmToMin = (hhmm) => {
+      const [h, m] = String(hhmm || '').split(':').map(n => parseInt(n, 10));
+      if (Number.isFinite(h) && Number.isFinite(m)) return h * 60 + m;
       return null;
     };
 
     const rows = [];
-
-    // IMPORTANT: iterate the ROTAS keys (advisor IDs), not the advisor cache
-    Object.keys(globalThis.ROTAS || {}).forEach((id) => {
+    candidateIds.forEach(id => {
       const dayMap = globalThis.ROTAS[id] || {};
-      const cell = dayMap[dayISO];
+      const cell = dayISO ? dayMap[dayISO] : null;
       if (!cell) return;
 
-      // Hide pure RDO rows (uncomment to show RDO chips if you want)
-      if (cell.label === 'RDO' || cell.is_rdo) return;
-
-      const segs = [];
-      if (cell.start && cell.end) {
-        segs.push({ kind: 'shift', start: cell.start, end: cell.end });
+      // RDO: show as an empty track but keep the row so planners see the person
+      if (cell.is_rdo || cell.label === 'RDO') {
+        rows.push({
+          id,
+          name: allAdvisors[id]?.name || id,
+          segments: []         // no bars on RDO
+        });
+        return;
       }
 
-      const adv = getAdvisorById(id) || {};
-      const name =
-        adv.name ||
-        adv.display_name ||
-        adv.full_name ||
-        adv.advisor_name ||
-        adv.username ||
-        adv.email ||
-        id; // last resort
+      // accept either explicit start/end or the compact key
+      let startHHMM = (typeof cell.start === 'string' && cell.start.includes(':')) ? cell.start : null;
+      let endHHMM   = (typeof cell.end   === 'string' && cell.end.includes(':'))   ? cell.end   : null;
 
-      rows.push({ id, name, badge: '', segments: segs });
+      if (!startHHMM || !endHHMM) {
+        const key = cell.start_end_key;   // e.g. "07:00x16:00"
+        if (typeof key === 'string' && key.includes('x')) {
+          const [s, e] = key.split('x');
+          startHHMM = startHHMM || s;
+          endHHMM   = endHHMM   || e;
+        }
+      }
+
+      const s = hhmmToMin(startHHMM);
+      const e = hhmmToMin(endHHMM);
+      if (s == null || e == null || e <= s) {
+        // bad data — skip bars but keep a row
+        rows.push({
+          id,
+          name: allAdvisors[id]?.name || id,
+          segments: []
+        });
+        return;
+      }
+
+      // IMPORTANT: segments in MINUTES for the horizontal renderer
+      rows.push({
+        id,
+        name: allAdvisors[id]?.name || id,
+        segments: [
+          { type: 'work', code: cell.label || 'Admin', start: s, end: e }
+        ]
+      });
     });
 
-    rows.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
-    console.log('[rows debug]', { dayISO, count: rows.length });
+    console.log('[rows] from ROTAS →', rows.length, 'for', dayName, dayISO);
     return rows;
   } catch (e) {
     console.warn('[rows] compute from ROTAS failed', e);
