@@ -630,12 +630,19 @@ if (window.ROTAS && typeof window.ROTAS === 'object' && dayISO) {
       const e = parseHHMM(cell.end_hhmm);
       if (s != null && e != null && e > s) {
         segs = [{
-          type: 'work',
-          code: cell.work_code || 'Admin',
-          atDay: dayISO,
-          start: s,         // minutes-from-midnight number
-          end: e            // minutes-from-midnight number
-        }];
+  // canonical fields used by old + new renderers
+  type: 'work',
+  code: cell.work_code || 'Admin',
+  start: s,         // minutes from 00:00
+  end: e,           // minutes from 00:00
+  // legacy-friendly mirrors
+  startMin: s,
+  endMin: e,
+  // nice to have
+  label: cell.label || '',
+  atDay: dayISO
+}];
+
       }
     }
 
@@ -867,8 +874,16 @@ const advisors = (checked.length ? checked : Object.keys(globalThis.ADVISOR_BY_I
           advisors,
           rotationStartISO: startISO
         });
-        console.log('[preview] applied', res);
-        if (typeof refreshPlannerUI === 'function') refreshPlannerUI();
+            console.log('[preview] applied', res);
+
+    // 🔄 force repaint of the horizontal planner
+    if (typeof window.refreshPlannerUI === 'function') {
+      window.refreshPlannerUI();
+    } else if (typeof window.renderPlanner === 'function' &&
+               typeof window.computePlannerRowsFromState === 'function') {
+      window.renderPlanner(window.computePlannerRowsFromState());
+    }
+
 
       } catch (e) {
         console.error('Preview Rotation failed', e);
