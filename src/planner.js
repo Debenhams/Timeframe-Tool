@@ -435,12 +435,19 @@ globalThis.computePlannerRowsFromState = function computePlannerRowsFromState() 
 
   // ----- time utils -----
   function parseHHMM(s) {
-    if (!s || typeof s !== "string") return null;
-    var m = s.match(/^(\d{1,2}):(\d{2})$/);
-    if (!m) return null;
-    var h = parseInt(m[1], 10), mm = parseInt(m[2], 10);
-    return h * 60 + mm;
-  }
+  // Accept minutes as a number, "HH:MM", or "HH:MM:SS"
+  if (typeof s === "number" && isFinite(s)) return s;
+  if (!s) return null;
+  const str = String(s).trim();
+  // Trim seconds if present (HH:MM:SS → HH:MM)
+  const hhmm = str.length >= 5 ? str.slice(0, 5) : str;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm);
+  if (!m) return null;
+  const h = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  return h * 60 + mm;
+}
+
 
   function toPct(min, dayStart, dayEnd) {
     if (min < dayStart) min = dayStart;
@@ -651,7 +658,17 @@ window.computePlannerRowsFromState = computePlannerRowsFromState;
 
     body.innerHTML = "";
   // --- preview legend of selected ROTAS (names, not UUIDs) ---
-  (function renderPreviewLegend() {
+  
+  // --- preview legend of selected ROTAS (names, not UUIDs) ---
+(function renderPreviewLegend() {
+  // Only show chips if explicitly enabled
+  if (window.SHOW_PREVIEW_LEGEND !== true) {
+    // If a previous strip exists, remove it and bail
+    const old = document.getElementById('previewLegendStrip');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    return;
+  }
+
     // Build a lookup that resolves any id → best human name
     const getName = (aId) => {
       const advStore = globalThis.ADVISOR_BY_ID;
@@ -676,7 +693,8 @@ window.computePlannerRowsFromState = computePlannerRowsFromState;
     if (!ids.length) return;
 
     // Legend strip container (inserted at the top of plannerBody)
-    const strip = document.createElement("div");
+    const strip = document.createElement('div');
+strip.id = 'previewLegendStrip';
     strip.className = "legend-strip";
     strip.style.display = "flex";
     strip.style.flexWrap = "wrap";
@@ -724,8 +742,9 @@ window.computePlannerRowsFromState = computePlannerRowsFromState;
       track.style.overflow = "hidden";
 
       row.segments.forEach(function (seg) {
-        var s = parseHHMM(seg.start);
-        var e = parseHHMM(seg.end);
+      var s = parseHHMM(seg.start);
+      var e = parseHHMM(seg.end);
+
         if (s == null || e == null || e <= s) return;
 
         var left = toPct(s, start, end);
@@ -783,7 +802,14 @@ const sel = document.getElementById('rotationName');
 const wsISO = (typeof normalizeToISO === 'function') ? normalizeToISO(rawWs) : rawWs;
 const mondayISO = (typeof toMondayISO === 'function') ? toMondayISO(wsISO) : wsISO;
 
-        const advisors = Object.keys(globalThis.ADVISOR_BY_ID || {}).slice(0, 8);
+        // prefer currently-checked advisors in the Schedules tree
+const checked = Array.from(
+  document.querySelectorAll('#advisorTree input[type="checkbox"][data-role="advisor"]:checked')
+).map(el => el.value || el.dataset.id).filter(Boolean);
+
+// fall back to “first 8” if nothing is checked
+const advisors = (checked.length ? checked : Object.keys(globalThis.ADVISOR_BY_ID || {})).slice(0, 8);
+
         const startISO = globalThis.ROTATION_META?.families?.[rotationName]?.start_date || null;
 
         const res = globalThis.applyRotationToWeek?.({
