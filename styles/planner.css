@@ -1,3 +1,7 @@
+/* This file should be placed in a 'styles' folder.
+  It merges all styles from your plannercss.css and the inline styles.
+*/
+
 /* =========================
    ROOT VARIABLES & DEFAULTS
    ========================= */
@@ -372,7 +376,6 @@ td.name {
 
 /* =========================
    HORIZONTAL TEAM PLANNER
-   (Merged from plannercss.css)
    ========================= */
 .planner {
   margin-top: 16px;
@@ -527,7 +530,9 @@ td.name {
 .c-shrink { background: var(--color-shrink); color: #213; }
 .c-meeting { background: var(--color-meeting); color: #111; }
 
-/* =Hiding old/unused elements= */
+/* =========================
+   Hiding old/unused elements
+   ========================= */
 .colours-card,
 .palette,
 .color-panel {

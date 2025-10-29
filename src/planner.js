@@ -1,3 +1,7 @@
+/* This file should be placed in a 'src' folder.
+  It contains all the application logic, helpers, and renderers.
+*/
+
 /* =========================
    Supabase configuration
    ========================= */
@@ -41,8 +45,9 @@ window.setToMonday = function(d) {
 }
 
 function toMin(t) {
-  if (!t) return null;
+  if (t === null || t === undefined) return null;
   const [h, m] = String(t).split(':').map(Number);
+  if (isNaN(h) || isNaN(m)) return null;
   return (h * 60) + m;
 }
 
@@ -77,10 +82,15 @@ function normalizeToISO(s) {
 }
 function toMondayISO(iso) {
   if (!iso) return "";
-  const d = new Date(iso + "T00:00:00");
-  const offset = (d.getDay() + 6) % 7; // 0=Mon..6=Sun
-  d.setDate(d.getDate() - offset);
-  return toISODateLocal(d);
+  try {
+    const d = new Date(iso + "T00:00:00"); // Use local time
+    const offset = (d.getDay() + 6) % 7; // 0=Mon..6=Sun
+    d.setDate(d.getDate() - offset);
+    return toISODateLocal(d);
+  } catch (e) {
+    console.error("Invalid date for toMondayISO:", iso, e);
+    return "";
+  }
 }
 
 
@@ -97,7 +107,7 @@ const PX_PER_MIN = HEIGHT / ((END - START) * 60);
    Horizontal Planner Config
    ========================= */
 const DAY_START = 6 * 60,
-  DAY_END = 20 * 60; // 6am to 8pm
+  DAY_END = 20 * 60; // 6am to 8pm (14 hours)
 const DAY_SPAN = DAY_END - DAY_START;
 function m2hmm(m) {
   const h = Math.floor(m / 60),
@@ -113,6 +123,7 @@ window.renderTimeHeader = function(el) {
   el.innerHTML = '';
   const wrap = document.createElement('div');
   wrap.className = 'time-scale';
+  // Create ticks every hour from DAY_START to DAY_END
   for (let m = DAY_START; m <= DAY_END; m += 60) {
     const t = document.createElement('div');
     t.className = 'tick';
@@ -207,6 +218,7 @@ function templateRow(t) {
 
 window.populateTemplateEditor = function() {
   const ed = $('#templateEditor');
+  if(!ed) return;
   const list = Array.from(TEMPLATES.values()).sort((a, b) => a.name.localeCompare(b.name));
   ed.innerHTML = list.length ? list.map(templateRow).join('') : '<div class="muted">No templates. Add or load samples.</div>';
   
@@ -426,12 +438,13 @@ window.bootRotations = async function() {
    ========================= */
 window.rebuildTree = function() {
   const t = $('#tree');
+  if(!t) return;
   const q = $('#treeSearch').value.trim().toLowerCase();
 
   function advisorNode(obj) {
     const checked = selectedAdvisors.has(obj.name) ? 'checked' : '';
     return `<div class="node">
-      <input type="checkbox" data-adv-id="${obj.id}" data-adv-name="${obj.name}" ${checked}/>
+      <input type="checkbox" data-adv-id="${obj.id}" data-adv-name="${obj.name}" ${checked} data-role="advisor"/>
       <span>${obj.name}</span>
       <div class="node-actions" style="margin-left:auto;display:flex;gap:6px">
         <button data-rename-adv="${obj.id}">✎</button>
@@ -489,7 +502,7 @@ window.rebuildTree = function() {
   $$('#tree details').forEach(d => {
     const twisty = d.querySelector('[data-twisty]');
     const update = () => {
-      twisty.textContent = d.open ? '−' : '+';
+      if(twisty) twisty.textContent = d.open ? '−' : '+';
     };
     d.addEventListener('toggle', update);
     update();
@@ -599,6 +612,7 @@ function getLeaderTeamNames(leaderId) {
 
 window.refreshChips = function() {
   const box = $('#activeChips');
+  if(!box) return;
   box.innerHTML = '';
   if (!selectedAdvisors.size) {
     box.innerHTML = '<span class="muted">No advisors selected.</span>';
@@ -628,6 +642,7 @@ window.refreshChips = function() {
 
 window.rebuildAdvisorDropdown = function() {
   const sel = $('#advisorSelect');
+  if(!sel) return;
   const leaders = [];
   Object.values(ORG.sites).forEach(site => {
     Object.entries(site.leaders || {}).forEach(([lname, lobj]) => {
@@ -666,7 +681,9 @@ function updateViewSelector() {
 }
 
 window.updateRangeLabel = function() {
-  const ws = $('#weekStart').value;
+  const wsEl = $('#weekStart');
+  if (!wsEl) return;
+  const ws = wsEl.value;
   const adv = $('#advisorSelect').value;
   if (!ws) {
     $('#rangeLabel').textContent = '';
@@ -711,6 +728,8 @@ window.updateRangeLabel = function() {
 window.populateAssignTable = function() {
   const head = $('#dateHeaders'),
     body = $('#assignTable tbody');
+  if(!head || !body) return;
+    
   head.innerHTML = DAYS.map(d => `<th>${d.slice(0,3)}<br><span class="muted" data-date></span></th>`).join('');
   const list = selectedAdvisors.size ? [...selectedAdvisors] : [];
   if (list.length === 0) {
@@ -777,23 +796,19 @@ function processTemplateToSegments(t) {
   if (!t || !t.start_time || !t.finish_time) return [];
   const s = toMin(fmt(t.start_time)),
     e = toMin(fmt(t.finish_time));
-  if (e <= s) return [];
-  const ev = [{
-    t: s,
-    type: 'start'
-  }, {
-    t: e,
-    type: 'end'
-  }];
+  if (e === null || s === null || e <= s) return [];
+  
+  const ev = [{ t: s, type: 'start' }, { t: e, type: 'end' }];
+  
   [['break1', 15, 'Break'], ['lunch', 30, 'Lunch'], ['break2', 15, 'Break']].forEach(([k, d, label]) => {
-    if (t[k]) ev.push({
-      t: toMin(fmt(t[k])),
-      type: 'pause',
-      d,
-      label
-    });
+    const breakTime = toMin(fmt(t[k]));
+    if (breakTime !== null) {
+        ev.push({ t: breakTime, type: 'pause', d, label });
+    }
   });
+  
   ev.sort((a, b) => a.t - b.t || ((a.type === 'end') - (b.type === 'end')));
+  
   const out = [];
   let cur = s;
   for (const evn of ev) {
@@ -825,21 +840,20 @@ function mergeAdjacent(segs) {
   const out = [];
   for (const x of s) {
     if (!out.length) {
-      out.push({ ...x
-      });
+      out.push({ ...x });
       continue;
     }
     const p = out[out.length - 1];
     if (p.code === x.code && toMin(p.end) === toMin(x.start)) {
       p.end = x.end;
-    } else out.push({ ...x
-    });
+    } else out.push({ ...x });
   }
   return out;
 }
 
 /**
  * Processes a day's value (template name or segment object) into renderable blocks.
+ * Returns: [{ label, start, end }] where start/end are in minutes.
  */
 function processDayValue(dayValue) {
   if (dayValue && typeof dayValue === 'object' && Array.isArray(dayValue.segments)) {
@@ -847,14 +861,14 @@ function processDayValue(dayValue) {
       label: s.code,
       start: toMin(s.start),
       end: toMin(s.end)
-    })).filter(b => b.end > b.start).sort((a, b) => a.start - b.start);
+    })).filter(b => b.start !== null && b.end !== null && b.end > b.start).sort((a, b) => a.start - b.start);
   }
   if (typeof dayValue === 'string' && TEMPLATES.has(dayValue)) {
     return processTemplateToSegments(TEMPLATES.get(dayValue)).map(s => ({
       label: s.code,
       start: toMin(s.start),
       end: toMin(s.end)
-    }));
+    })).filter(b => b.start !== null && b.end !== null);
   }
   return [];
 }
@@ -865,9 +879,9 @@ function processDayValue(dayValue) {
    ========================= */
 function hoursHTML() {
   let h = '';
-  const START = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-start')) || 7;
-  const END = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-end')) || 20;
-  for (let i = START; i <= END; i++) {
+  const START_HOUR = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-start')) || 7;
+  const END_HOUR = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-end')) || 20;
+  for (let i = START_HOUR; i <= END_HOUR; i++) {
     h += `<div class="hour"><span>${String(i).padStart(2,'0')}:00</span></div>`;
   }
   return h;
@@ -878,8 +892,11 @@ window.setHours = function() {
 }
 
 function resetGrid() {
-  $('#calGrid').innerHTML = '<div class="hour-col"><div id="hours"></div></div>';
-  $('#hours').innerHTML = hoursHTML();
+  const grid = $('#calGrid');
+  if(grid) {
+    grid.innerHTML = '<div class="hour-col"><div id="hours"></div></div>';
+    $('#hours').innerHTML = hoursHTML();
+  }
 }
 
 window.renderCalendar = function() {
@@ -926,24 +943,24 @@ window.renderCalendar = function() {
     col.insertAdjacentHTML('beforeend', `<div class="day-head"><small>${month}</small>${day}<span style="float:right">${num}</span></div>`);
 
     const dayVal = data[day];
-    if (dayVal && typeof dayVal === 'object' && Array.isArray(dayVal.segments)) {
-      const totalMins = processDayValue(dayVal).reduce((acc, b) => acc + (b.end - b.start), 0);
-      col.insertAdjacentHTML('beforeend', `<div class="day-summary"><span class="muted">Custom segments</span><span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
-    } else {
-      const tplName = (typeof dayVal === 'string') ? dayVal : '';
-      const tpl = TEMPLATES.get(tplName);
-      if (!tplName || !tpl) {
-        col.insertAdjacentHTML('beforeend', `<div class="off">Roster Day Off</div>`);
+    const blocks = processDayValue(dayVal); // Get segments in minutes
+
+    if (blocks.length > 0) {
+      const totalMins = blocks.reduce((acc, b) => acc + (b.end - b.start), 0);
+      const tpl = (typeof dayVal === 'string') ? TEMPLATES.get(dayVal) : null;
+      if (tpl) {
+         col.insertAdjacentHTML('beforeend', `<div class="day-summary"><span class="muted">${dayVal}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
       } else {
-        col.insertAdjacentHTML('beforeend', `<div class="day-summary"><span class="muted">${tplName}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${((toMin(fmt(tpl.finish_time))-toMin(fmt(tpl.start_time)))/60)}h</span></div>`);
+         col.insertAdjacentHTML('beforeend', `<div class="day-summary"><span class="muted">Custom segments</span><span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
       }
+    } else {
+       col.insertAdjacentHTML('beforeend', `<div class="off">Roster Day Off</div>`);
     }
 
     col.insertAdjacentHTML('beforeend', `<div class="day-actions"><button class="iconbtn" data-day="${day}">＋</button><button class="iconbtn" data-day="${day}" data-edit>✎</button></div>`);
     const cell = document.createElement('div');
     cell.className = 'timeline-cell';
 
-    const blocks = processDayValue(dayVal);
     blocks.forEach(b => {
       const top = (b.start - START * 60) * PX_PER_MIN;
       const h = (b.end - b.start) * PX_PER_MIN;
@@ -993,23 +1010,26 @@ function renderTeamDayCalendar(showAll) {
     const col = document.createElement('div');
     col.className = 'day-col';
     col.insertAdjacentHTML('beforeend', `<div class="day-head" style="height:56px">${advName}</div>`);
+    
     const dayVal = data[day];
-    if (dayVal && typeof dayVal === 'object' && Array.isArray(dayVal.segments)) {
-      const totalMins = processDayValue(dayVal).reduce((acc, b) => acc + (b.end - b.start), 0);
-      col.insertAdjacentHTML('beforeend', `<div class="day-summary"><span class="muted">Custom segments</span><span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
-    } else {
-      const tplName = (typeof dayVal === 'string') ? dayVal : '';
-      const tpl = TEMPLATES.get(tplName);
-      if (!tplName || !tpl) {
-        col.insertAdjacentHTML('beforeend', `<div class="off">Roster Day Off</div>`);
+    const blocks = processDayValue(dayVal); // Get segments in minutes
+
+    if (blocks.length > 0) {
+      const totalMins = blocks.reduce((acc, b) => acc + (b.end - b.start), 0);
+      const tpl = (typeof dayVal === 'string') ? TEMPLATES.get(dayVal) : null;
+      if (tpl) {
+         col.insertAdjacentHTML('beforeend', `<div class="day-summary"><span class="muted">${dayVal}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
       } else {
-        col.insertAdjacentHTML('beforeend', `<div class="day-summary"><span class="muted">${tplName}</span> ${fmt(tpl.start_time)} – ${fmt(tpl.finish_time)}<span class="summary-right">${((toMin(fmt(tpl.finish_time))-toMin(fmt(tpl.start_time)))/60)}h</span></div>`);
+         col.insertAdjacentHTML('beforeend', `<div class="day-summary"><span class="muted">Custom segments</span><span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
       }
+    } else {
+       col.insertAdjacentHTML('beforeend', `<div class="off">Roster Day Off</div>`);
     }
+
     col.insertAdjacentHTML('beforeend', `<div class="day-actions"><button class="iconbtn" data-day="${day}" data-adv="${advName}">＋</button><button class="iconbtn" data-day="${day}" data-adv="${advName}" data-edit>✎</button></div>`);
     const cell = document.createElement('div');
     cell.className = 'timeline-cell';
-    const blocks = processDayValue(dayVal);
+    
     blocks.forEach(b => {
       const top = (b.start - START * 60) * PX_PER_MIN;
       const h = (b.end - b.start) * PX_PER_MIN;
@@ -1456,15 +1476,15 @@ function applyRotationToWeek({ rotationName, mondayISO, advisors }) {
       let tplName = ""; // Default to Day Off
       if (fam && variants.length) {
         const templateCode = variants[idx % variants.length]; // "7A"
-        const tpl = SHIFT_BY_CODE[templateCode];
         
-        // Find the *Template Name* (e.g., "Early") that matches the code.
-        // This is a bit of a guess, but we look for a template with that code.
-        const found = Array.from(TEMPLATES.values()).find(t => t.work_code === templateCode || t.name === templateCode);
+        // Find a Template Name (e.g., "Early") that has this code
+        const found = Array.from(TEMPLATES.values()).find(t => t.work_code === templateCode);
+        
         if(found) {
             tplName = found.name;
-        } else if (tpl) {
-            tplName = tpl.name || templateCode; // Fallback
+        } else if (TEMPLATES.has(templateCode)) {
+            // Fallback: check if a template is named "7A"
+            tplName = templateCode;
         }
       }
       
@@ -1511,8 +1531,6 @@ window.computePlannerRowsFromState = function() {
       const id = teamSel.split('::')[1];
       const n = ADVISOR_BY_ID.get(id);
       if (n) names = [n];
-    } else if (ADVISOR_BY_NAME.has(teamSel)) {
-      names = [teamSel];
     }
     
     const rows = [];
@@ -1572,12 +1590,15 @@ window.renderPlanner = function(rows) {
         bar.className = `planner__bar ${classForCode(s.code)}`;
         
         const pct = m => (m - DAY_START) / DAY_SPAN * 100;
-        bar.style.left = Math.max(0, pct(s.start)) + '%';
-        bar.style.width = Math.max(0, pct(s.end) - pct(s.start)) + '%';
+        const leftPct = Math.max(0, pct(s.start));
+        const widthPct = Math.max(0, pct(s.end) - leftPct);
+
+        bar.style.left = leftPct + '%';
+        bar.style.width = widthPct + '%';
         bar.title = `${s.code} ${m2t(s.start)}–${m2t(s.end)}`;
         
         // Only add text if the bar is wide enough
-        if (pct(s.end) - pct(s.start) > 5) {
+        if (widthPct > 5) { // 5% width threshold for text
             bar.textContent = `${s.code} ${m2t(s.start)}–${m2t(s.end)}`;
         }
         
