@@ -6,10 +6,11 @@
 <title>Professional Team Rota System — Supabase</title>
 
 <!-- 
-  CORRECTED LINK:
-  This now points to the 'styles' folder.
+  PROACTIVE FIX:
+  The version numbers are updated to ?v=2.
+  This forces all browsers to re-download the new CSS and JS files.
 -->
-<link rel="stylesheet" href="./styles/planner.css" />
+<link rel="stylesheet" href="./styles/planner.css?v=2" />
 
 <!-- Supabase client library -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -161,7 +162,7 @@
       <select id="assignSelect" style="width:100%"></select>
       <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
         <button class="btn subtle" id="btnConvertToSplit">Convert this template to editable segments</button>
-        <span class="muted">Fast way to tweak just part of the shift.</span>
+        <span class="muted">Fast way to tweak a small part of the shift.</span>
       </div>
     </div>
     <div id="splitMode" style="display:none">
@@ -190,7 +191,7 @@
     </div>
     <div id="blockSub" style="display:none">
       <div class="row"><label style="min-width:90px">New code</label><select id="bsCode"></select></div>
-      <div class="row"><label style="min-width:90px">Sub-range</label><input type="time" id="bsStart"> <span>–</span> <input type="time" id="bsEnd"></div>
+      <div class="row"><label style="min-width:9gipx">Sub-range</label><input type="time" id="bsStart"> <span>–</span> <input type="time" id="bsEnd"></div>
       <div class="muted">We split into left remainder + your new code + right remainder. Neighbours stay the same.</div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
@@ -200,11 +201,11 @@
   </dialog>
   
   <!-- 
-  CORRECTED SCRIPT LINKS:
-  These now point to the 'src' folder.
+  PROACTIVE FIX:
+  The version numbers are updated to ?v=2.
   -->
-  <script src="./src/planner.js"></script>
-  <script src="./src/init.js"></script>
+  <script src="./src/planner.js?v=2"></script>
+  <script src="./src/init.js?v=2"></script>
 
 </body>
 </html>
