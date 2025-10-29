@@ -1,87 +1,144 @@
 // src/init.js
 (function () {
   "use strict";
-  console.log("init.js loaded (wiring only)");
-
-  // --- expose refresh so console checks work
-  function refreshPlannerUI() {
+  console.log("init.js loaded v3");
+  // ---- rotations boot & UI wiring (idempotent) ----
+(function () {
+  const bootOnce = async () => {
     try {
-      const rows = (typeof window.computePlannerRowsFromState === "function")
-        ? (window.computePlannerRowsFromState() || [])
-        : [];
-      if (typeof window.renderPlanner === "function") window.renderPlanner(rows);
-      if (typeof window.renderAdvisorWeek === "function") window.renderAdvisorWeek(rows);
+      // Make sure we have rotations and the dropdown is populated on load
+      if (typeof window.bootRotations === 'function') {
+        await window.bootRotations();
+      }
+      if (typeof window.populateRotationSelect === 'function') {
+        window.populateRotationSelect();
+      }
+      if (typeof window.refreshPlannerUI === 'function') {
+        window.refreshPlannerUI();
+      }
     } catch (e) {
-      console.warn("refreshPlannerUI error", e);
+      console.warn('bootOnce error', e);
     }
+  };
+
+  // Run at DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootOnce, { once: true });
+  } else {
+    bootOnce();
   }
-  window.refreshPlannerUI = refreshPlannerUI;
+
+  // Re-populate the rotation select whenever the user focuses it
+  const rotSel = document.getElementById('rotationName');
+  if (rotSel && typeof window.populateRotationSelect === 'function') {
+    rotSel.addEventListener('focus', () => window.populateRotationSelect());
+  }
+
+  // Rebuild rows whenever core inputs change (week/day/view)
+  const rerun = () => {
+    if (typeof window.refreshPlannerUI === 'function') window.refreshPlannerUI();
+  };
+  ['weekStart', 'teamDay', 'view'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', rerun);
+  });
+})();
+
+  // Ensure rotation select is populated on load and when week changes
+(function wireRotationSelectAutofill(){
+  const wk = document.getElementById("weekStart");
+  const doPopulate = () => (typeof window.populateRotationSelect === "function") && window.populateRotationSelect();
+  // run once on boot
+  doPopulate();
+  // run whenever weekStart changes
+  if (wk && !wk.dataset.rotSelWired) {
+    wk.addEventListener("change", doPopulate);
+    wk.dataset.rotSelWired = "1";
+  }
+})();
+
+
+  // --- globals (safe defaults) ---
+  if (!(window.ROTAS instanceof Map)) window.ROTAS = new Map();            // key: `${advisorId}::${weekStart}` -> { Monday: 'Early', ... }
+  if (!(window.TEMPLATES instanceof Map)) window.TEMPLATES = new Map();    // 'Early' -> {start:'07:00', end:'16:00', breaks:[{start,end}]}
+  if (!(window.ADVISOR_BY_NAME instanceof Map)) window.ADVISOR_BY_NAME = new Map(); // name -> id
+  if (!(window.ADVISOR_BY_ID instanceof Map)) window.ADVISOR_BY_ID = new Map();     // id   -> name
 
   // ---------- helpers ----------
   function wireOnce(el, evt, fn, tag) {
     if (!el) return;
-    const key = tag || ("_wired_" + evt);
+    var key = tag || ("_wired_" + evt);
     if (el.dataset && el.dataset[key]) return;
     el.addEventListener(evt, fn);
     if (el.dataset) el.dataset[key] = "1";
   }
 
   function ensureTimeHeader() {
-    const headerEl = document.getElementById("timeHeader");
+    var headerEl = document.getElementById("timeHeader");
     if (headerEl && typeof window.renderTimeHeader === "function") {
       window.renderTimeHeader(headerEl);
     }
   }
 
+  function refreshPlannerUI() {
+    var rows = [];
+    if (typeof window.computePlannerRowsFromState === "function") {
+      rows = window.computePlannerRowsFromState() || [];
+    }
+    if (typeof window.renderPlanner === "function") window.renderPlanner(rows);
+    if (typeof window.renderAdvisorWeek === "function") window.renderAdvisorWeek(rows);
+  }
+  window.refreshPlannerUI = refreshPlannerUI; // handy in console
+
   // ---------- prime from Master Assignment table ----------
   function rebuildAdvisorIndexesFromTable() {
-    const table = document.getElementById("assignTable");
+    var table = document.getElementById("assignTable");
     if (!table) return 0;
 
-    const names = Array.prototype.slice
+    var names = Array.prototype.slice
       .call(table.querySelectorAll("tbody tr"))
-      .map(tr => {
-        const h = tr.querySelector("th,td");
+      .map(function (tr) {
+        var h = tr.querySelector("th,td");
         return (h && h.textContent ? h.textContent : "").trim();
       })
       .filter(Boolean);
 
-    window.ADVISOR_BY_NAME = new Map(names.map(n => [n, n]));
-    window.ADVISOR_BY_ID   = new Map(names.map(n => [n, n]));
+    window.ADVISOR_BY_NAME = new Map(names.map(function (n) { return [n, n]; }));
+    window.ADVISOR_BY_ID = new Map(names.map(function (n) { return [n, n]; }));
     return names.length;
   }
 
   function primeRotasFromAssignTable() {
-    const table = document.getElementById("assignTable");
-    const wsEl  = document.getElementById("weekStart");
-    const dayEl = document.getElementById("teamDay");
+    var table = document.getElementById("assignTable");
+    var wsEl = document.getElementById("weekStart");
+    var dayEl = document.getElementById("teamDay");
 
     if (!table || !wsEl || !(window.ADVISOR_BY_NAME instanceof Map)) return 0;
 
-    const ws = (wsEl.value || "").trim();
+    var ws = (wsEl.value || "").trim();
     if (!ws) return 0;
 
-    const dayName = (dayEl && dayEl.value ? dayEl.value : "Monday");
-    const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-    const dayIdx = DAYS.indexOf(dayName);
+    var dayName = (dayEl && dayEl.value ? dayEl.value : "Monday");
+    var DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    var dayIdx = DAYS.indexOf(dayName);
     if (dayIdx < 0) return 0;
 
     if (!(window.ROTAS instanceof Map)) window.ROTAS = new Map();
-    let primed = 0;
+    var primed = 0;
 
-    Array.prototype.slice.call(table.querySelectorAll("tbody tr")).forEach(tr => {
-      const nameCell = tr.querySelector("th,td");
-      const name = (nameCell && nameCell.textContent ? nameCell.textContent : "").trim();
+    Array.prototype.slice.call(table.querySelectorAll("tbody tr")).forEach(function (tr) {
+      var nameCell = tr.querySelector("th,td");
+      var name = (nameCell && nameCell.textContent ? nameCell.textContent : "").trim();
       if (!name) return;
 
-      const aId = window.ADVISOR_BY_NAME.get(name) || name;
+      var aId = window.ADVISOR_BY_NAME.get(name) || name;
 
-      const tds = tr.querySelectorAll("td");
-      const cell = tds && tds[dayIdx];
+      var tds = tr.querySelectorAll("td");
+      var cell = tds && tds[dayIdx];
       if (!cell) return;
 
-      const sel = cell.querySelector("select,[data-template],[data-value]");
-      let tpl = "";
+      var sel = cell.querySelector("select,[data-template],[data-value]");
+      var tpl = "";
       if (sel) {
         if ("value" in sel) tpl = sel.value || "";
         if (!tpl) tpl = sel.getAttribute("data-template") || "";
@@ -92,8 +149,8 @@
       tpl = tpl.replace(/[\r\n]/g, " ").replace(/\s+/g, " ").trim();
       if (!tpl || /^day\s*off$/i.test(tpl)) return;
 
-      const key = aId + "::" + ws;
-      const weekObj = window.ROTAS.get(key) || {};
+      var key = aId + "::" + ws;
+      var weekObj = window.ROTAS.get(key) || {};
       weekObj[dayName] = tpl;
       window.ROTAS.set(key, weekObj);
       primed++;
@@ -103,15 +160,18 @@
   }
 
   function watchAssignmentTable() {
-    const table = document.getElementById("assignTable");
+    var table = document.getElementById("assignTable");
     if (!table) return;
     if (table.dataset && table.dataset._primeWired) return;
 
     table.addEventListener("change", function () {
       rebuildAdvisorIndexesFromTable();
-      const n = primeRotasFromAssignTable();
-      const rows = (typeof window.computePlannerRowsFromState === "function") ? (window.computePlannerRowsFromState() || []) : [];
-      if (rows.length || n) window.renderPlanner?.(rows);
+      var n = primeRotasFromAssignTable();
+      if (typeof window.computePlannerRowsFromState === "function" &&
+          typeof window.renderPlanner === "function") {
+        var rows = window.computePlannerRowsFromState() || [];
+        if (rows.length || n) window.renderPlanner(rows);
+      }
     });
 
     if (table.dataset) table.dataset._primeWired = "1";
@@ -119,7 +179,7 @@
 
   // ---------- wiring ----------
   function wireGenerateButton() {
-    const btn = document.getElementById("btnGenerate");
+    var btn = document.getElementById("btnGenerate");
     if (!btn) return;
     wireOnce(btn, "click", function () {
       try {
@@ -132,85 +192,163 @@
   }
 
   function wireTopViewDropdown() {
-    const view = document.getElementById("advisorSelect");
+    var view = document.getElementById("advisorSelect");
     if (!view) return;
     wireOnce(view, "change", function () {
-      window.updateRangeLabel?.();
-      window.renderCalendar?.();
-      window.populateAssignTable?.();
+      if (typeof window.updateRangeLabel === "function") window.updateRangeLabel();
+      if (typeof window.renderCalendar === "function") window.renderCalendar();
+      if (typeof window.populateAssignTable === "function") window.populateAssignTable();
       refreshPlannerUI();
     }, "_wired_change_advisorSelect");
   }
 
   function wirePlannerRefreshSources() {
-    const weekStart = document.getElementById("weekStart");
-    const teamDay   = document.getElementById("teamDay");
-    const tree      = document.getElementById("tree");
+    var weekStart = document.getElementById("weekStart");
+    var teamDay = document.getElementById("teamDay");
+    var tree = document.getElementById("tree");
 
-    wireOnce(weekStart, "change", async function () {
-      window.updateRangeLabel?.();
+    wireOnce(weekStart, "change", function () {
+      if (typeof window.updateRangeLabel === "function") window.updateRangeLabel();
       if (typeof window.fetchRotasForWeek === "function" && weekStart) {
-        try { await window.fetchRotasForWeek(weekStart.value); } catch (_) {}
-        window.populateAssignTable?.();
-        window.renderCalendar?.();
+        window.fetchRotasForWeek(weekStart.value).then(function () {
+          if (typeof window.populateAssignTable === "function") window.populateAssignTable();
+          if (typeof window.renderCalendar === "function") window.renderCalendar();
+          refreshPlannerUI();
+        });
       } else {
-        window.renderCalendar?.();
+        if (typeof window.renderCalendar === "function") window.renderCalendar();
+        refreshPlannerUI();
       }
-      refreshPlannerUI();
     });
 
     wireOnce(teamDay, "change", function () {
-      window.updateRangeLabel?.();
-      window.renderCalendar?.();
+      if (typeof window.updateRangeLabel === "function") window.updateRangeLabel();
+      if (typeof window.renderCalendar === "function") window.renderCalendar();
       refreshPlannerUI();
     });
 
     wireOnce(tree, "change", refreshPlannerUI, "_wired_tree_change");
-    wireOnce(tree, "click",  refreshPlannerUI, "_wired_tree_click");
+    wireOnce(tree, "click", refreshPlannerUI, "_wired_tree_click");
   }
 
-  // ---------- boot ----------
-  async function boot() {
-    try {
-      // Load any org/templates/assignments you already have in your page scripts
-      try { await window.loadOrg?.(); } catch(_) {}
-      try { await window.loadTemplates?.(); } catch(_) {}
-      try { await window.loadAssignments?.(); } catch(_) {}
+  // ===== Rotations boot helpers =====
 
-      const wsEl = document.getElementById("weekStart");
-      if (wsEl && typeof window.fetchRotasForWeek === "function") {
-        const ws = (wsEl.value || "").trim();
-        if (ws) { try { await window.fetchRotasForWeek(ws); } catch (_) {} }
-      }
+    // 1) Load templates and build variant families (e.g., "07:00x16:00" → ["7A","7B","7C","7D"])
+    async function loadShiftTemplatesAndVariants() {
+      const { data: templates, error } = await supabase
+        .from("shift_templates")
+        .select("code, start_time, break1, lunch, break2, end_time");
+      if (error) { console.error("shift_templates error", error); return; }
 
-      // Build UI
-      window.rebuildAdvisorDropdown?.();
-      window.rebuildTree?.();
-      window.refreshChips?.();
-      window.populateTemplateEditor?.();
-      window.populateAssignTable?.();
-      window.updateRangeLabel?.();
-      window.renderCalendar?.();
-
-      ensureTimeHeader();
-      rebuildAdvisorIndexesFromTable();
-      primeRotasFromAssignTable();
-
-      // Boot rotations + advisors and draw
-      await window.bootAdvisors?.();
-      await window.bootRotations?.();
-      window.populateRotationSelect?.();
-      refreshPlannerUI();
-    } catch (e) {
-      console.warn("planner boot skipped", e);
+      window.SHIFT_BY_CODE = Object.fromEntries(templates.map(function (t) { return [t.code, t]; }));
+      var groups = {};
+      var hhmm = function (x) { return (x || "").toString().slice(0, 5); };
+      templates.forEach(function (t) {
+        var key = hhmm(t.start_time) + "x" + hhmm(t.end_time);
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(t.code);
+      });
+      Object.keys(groups).forEach(function (k) { groups[k].sort(); });
+      window.VARIANTS_BY_START_END = groups; // { "07:00x16:00": ["7A","7B","7C","7D"], ... }
     }
 
-    window.subscribeRealtime?.();
-    wireGenerateButton();
-    wireTopViewDropdown();
-    wirePlannerRefreshSources();
-    watchAssignmentTable();
-  }
+    // 2) Load rotations-with-hours view
+    async function loadRotationsWithHours() {
+      const { data, error } = await supabase
+        .from("v_rotations_with_hours")
+        .select("name, week, dow, is_rdo, shift_code, start_hhmm, end_hhmm, start_end_key")
+        .order("name")
+        .order("week")
+        .order("dow");
+      if (error) { console.error("v_rotations_with_hours error", error); return; }
+
+      var idx = {};
+      data.forEach(function (r) {
+        if (!idx[r.name]) idx[r.name] = {};
+        if (!idx[r.name][r.week]) idx[r.name][r.week] = {};
+        idx[r.name][r.week][r.dow] = {
+          is_rdo: r.is_rdo,
+          start_end_key: r.start_end_key
+        };
+      });
+      window.ROTATION = idx;  // lookup: ROTATION[name][week][dow]
+    }
+
+    // 3) Round-robin assign A/B/C/D etc. within a (site,date,start_end) group
+    function assignVariantsRoundRobin(advisorIdsInGroup, startEndKey) {
+      var variants = (window.VARIANTS_BY_START_END && window.VARIANTS_BY_START_END[startEndKey]) || [];
+      if (!variants.length) return {};
+      var sorted = advisorIdsInGroup ? advisorIdsInGroup.slice().sort() : [];
+      var result = {};
+      for (var i = 0; i < sorted.length; i++) result[sorted[i]] = variants[i % variants.length];
+      return result; // { advisorId: "7A" | "7B" | ... }
+    }
+    globalThis.assignVariantsRoundRobin = assignVariantsRoundRobin;
+
+    // 4) Effective week in 6-week cycle
+    function effectiveWeek(startDateStr, plannerWeekStartStr) {
+      var start = new Date(startDateStr);
+      var plan = new Date(plannerWeekStartStr);
+      var diffDays = Math.floor((plan - start) / 86400000);
+      var diffWeeks = Math.floor(diffDays / 7);
+      return ((diffWeeks % 6) + 6) % 6 + 1; // 1..6
+    }
+    globalThis.effectiveWeek = effectiveWeek;
+
+// 5) Boot rotations (define directly on global to avoid scope issues)
+globalThis.bootRotations = async function bootRotations() {
+  await loadShiftTemplatesAndVariants();
+  await loadRotationsWithHours();
+  console.log("Rotations booted", {
+    templates: Object.keys(globalThis.SHIFT_BY_CODE || {}).length,
+    families: Object.keys(globalThis.VARIANTS_BY_START_END || {}).length
+  });
+};
+
+console.log("helpers exported v2", typeof globalThis.bootRotations);
+
+
+    // ---------- boot ----------
+    async function boot() {
+      try {
+        if (typeof window.loadOrg === "function") await window.loadOrg();
+        if (typeof window.loadTemplates === "function") await window.loadTemplates();
+        if (typeof window.loadAssignments === "function") await window.loadAssignments();
+
+        var wsEl = document.getElementById("weekStart");
+        if (wsEl && typeof window.fetchRotasForWeek === "function") {
+          var ws = (wsEl.value || "").trim();
+          if (ws) {
+            try { await window.fetchRotasForWeek(ws); } catch (_) {}
+          }
+        }
+
+        if (typeof window.rebuildAdvisorDropdown === "function") window.rebuildAdvisorDropdown();
+        if (typeof window.rebuildTree === "function") window.rebuildTree();
+        if (typeof window.refreshChips === "function") window.refreshChips();
+        if (typeof window.populateTemplateEditor === "function") window.populateTemplateEditor();
+        if (typeof window.populateAssignTable === "function") window.populateAssignTable();
+        if (typeof window.updateRangeLabel === "function") window.updateRangeLabel();
+        if (typeof window.renderCalendar === "function") window.renderCalendar();
+
+        ensureTimeHeader();
+
+        // Prime from table so ROTAS reflects visible selections
+        rebuildAdvisorIndexesFromTable();
+        primeRotasFromAssignTable();
+        await globalThis.bootRotations();
+        refreshPlannerUI();
+      } catch (e) {
+        console.warn("planner boot skipped", e);
+      }
+
+      if (typeof window.subscribeRealtime === "function") window.subscribeRealtime();
+
+      wireGenerateButton();
+      wireTopViewDropdown();
+      wirePlannerRefreshSources();
+      watchAssignmentTable();
+    }
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot, { once: true });
