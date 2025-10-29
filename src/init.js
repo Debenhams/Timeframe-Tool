@@ -2,6 +2,48 @@
 (function () {
   "use strict";
   console.log("init.js loaded v3");
+  // ---- rotations boot & UI wiring (idempotent) ----
+(function () {
+  const bootOnce = async () => {
+    try {
+      // Make sure we have rotations and the dropdown is populated on load
+      if (typeof window.bootRotations === 'function') {
+        await window.bootRotations();
+      }
+      if (typeof window.populateRotationSelect === 'function') {
+        window.populateRotationSelect();
+      }
+      if (typeof window.refreshPlannerUI === 'function') {
+        window.refreshPlannerUI();
+      }
+    } catch (e) {
+      console.warn('bootOnce error', e);
+    }
+  };
+
+  // Run at DOM ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', bootOnce, { once: true });
+  } else {
+    bootOnce();
+  }
+
+  // Re-populate the rotation select whenever the user focuses it
+  const rotSel = document.getElementById('rotationName');
+  if (rotSel && typeof window.populateRotationSelect === 'function') {
+    rotSel.addEventListener('focus', () => window.populateRotationSelect());
+  }
+
+  // Rebuild rows whenever core inputs change (week/day/view)
+  const rerun = () => {
+    if (typeof window.refreshPlannerUI === 'function') window.refreshPlannerUI();
+  };
+  ['weekStart', 'teamDay', 'view'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', rerun);
+  });
+})();
+
   // Ensure rotation select is populated on load and when week changes
 (function wireRotationSelectAutofill(){
   const wk = document.getElementById("weekStart");
