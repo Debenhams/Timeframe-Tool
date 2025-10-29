@@ -1,7 +1,5 @@
 /* === Horizontal Planner (clean, standalone) === */
-:root{
-  --name-col-w: 260px;
-}
+:root{ --name-col-w: 260px; }
 
 /* Hide the old colour palette panel from the live view */
 .colours-card,.palette,.color-panel{display:none!important}
@@ -18,10 +16,8 @@
   display:grid;
   grid-template-columns: var(--name-col-w) 1fr;
   align-items:center;
-  position:sticky;
-  top:0;
-  background:#f8fafc;
-  z-index:2;
+  position:sticky; top:0;
+  background:#f8fafc; z-index:2;
   border-bottom:1px solid var(--line,#e6e6f4);
   min-height:44px;
 }
@@ -33,11 +29,7 @@
   white-space:nowrap;
 }
 
-#timeHeader{
-  width:100%;
-  position:relative;
-  padding:6px 0;
-}
+#timeHeader{ width:100%; position:relative; padding:6px 0; }
 
 .time-scale{position:relative;height:24px}
 .time-scale .tick{
@@ -45,11 +37,7 @@
   font-size:12px;color:#6b7280;user-select:none
 }
 
-.planner__body{
-  display:block;
-  overflow:auto;
-  max-height:64vh;
-}
+.planner__body{ display:block; overflow:auto; max-height:64vh; }
 
 .planner__row{
   display:grid;
@@ -74,8 +62,7 @@
 .planner__timeline{
   position:relative;
   height:44px;
-  background:
-    linear-gradient(#f6f8fb 1px, transparent 1px) 0 0/60px 44px;
+  background: linear-gradient(#f6f8fb 1px, transparent 1px) 0 0/60px 44px;
 }
 
 .planner__bar{
@@ -89,7 +76,7 @@
   background:rgba(0,0,0,.25);pointer-events:none;z-index:5
 }
 
-/* Use your existing color classes (match vertical view) */
+/* Keep your existing color classes aligned with vertical view */
 .c-email{background:var(--color-email,#2ecc71);color:#fff}
 .c-mirakl{background:var(--color-mirakl,#b1b51e);color:#111}
 .c-social{background:var(--color-social,#5e35b1);color:#fff}
@@ -100,5 +87,5 @@
 .c-shrink{background:var(--color-shrink,#ffd166);color:#213}
 .c-meeting{background:#ffd54d;color:#111}
 
-/* Remove page-grey margins so planner can go full width if parent allows */
+/* Page background neutral so planner can go full width */
 body{ background:#fff }
