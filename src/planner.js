@@ -790,8 +790,9 @@ strip.id = 'previewLegendStrip';
       track.style.overflow = "hidden";
 
       row.segments.forEach(function (seg) {
-      var s = parseHHMM(seg.start);
-      var e = parseHHMM(seg.end);
+      var s = (typeof seg.start === 'number') ? seg.start : parseHHMM(seg.start);
+      var e = (typeof seg.end   === 'number') ? seg.end   : parseHHMM(seg.end);
+
 
         if (s == null || e == null || e <= s) return;
 
@@ -879,6 +880,23 @@ const advisors = (checked.length ? checked : Object.keys(globalThis.ADVISOR_BY_I
     document.addEventListener('DOMContentLoaded', wire);
   } else {
     wire();
+  }
+})();
+// --- light boot to populate rotation dropdown on page load ---
+(function () {
+  async function onReady() {
+    try {
+      await globalThis.bootAdvisors?.();
+      await globalThis.bootRotations?.();
+      globalThis.populateRotationSelect?.(); // fill #rotationName
+    } catch (e) {
+      console.warn('initial boot failed', e);
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', onReady);
+  } else {
+    onReady();
   }
 })();
 
