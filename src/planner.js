@@ -1034,7 +1034,7 @@ function timeToPercentage(min) {
 /**
  * Gets the appropriate CSS color class for a shift code.
  * @param {string} code - The shift code.
- * @returns {string} - The CSS class name
+ * @returns {string} - The CSS class name.
  */
 function getBarColorClass(code) {
   if (!code) return "bar-color-default";
