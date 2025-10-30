@@ -1,11 +1,11 @@
 /**
- * Professional Team Rota System - Main Application Logic (v10.0 - HYBRID PLAN START)
+ * Professional Team Rota System - Main Application Logic (v10.1 - Day Editor UI)
  *
  * This file contains the core logic for the new "Hybrid Adherence" planner.
  *
  * PLAN:
  * 1. (DONE) Load core data: sites, leaders, advisors, rotation_patterns, rotation_assignments.
- * 2. (NEW) Load the new 'schedule_components' table.
+ * 2. (DONE) Load the new 'schedule_components' table.
  * 3. (NEW) Build the "Advanced Day Editor" (Step 3 of Hybrid Plan).
  * 4. (NEW) Re-build the Rotation Editor tab to use the Advanced Day Editor.
  * 5. (NEW) Re-build the main schedule as a "Master Week View" (Step 4 of Hybrid Plan).
@@ -179,6 +179,16 @@
 
     // Planner section (to be replaced)
     ELS.plannerSection = document.querySelector('.planner-section');
+    
+    // NEW MODAL ELEMENTS
+    ELS.modal = document.getElementById('dayEditorModal');
+    ELS.modalTitle = document.getElementById('dayEditorTitle');
+    ELS.modalClose = document.getElementById('dayEditorClose');
+    ELS.modalComponents = document.getElementById('dayEditorComponents');
+    ELS.modalTimeTicks = document.getElementById('dayEditorTimeTicks');
+    ELS.modalTrack = document.getElementById('dayEditorTrack');
+    ELS.modalClear = document.getElementById('dayEditorClear');
+    ELS.modalSave = document.getElementById('dayEditorSave');
 
     ELS.schedulesTree = document.getElementById('schedulesTree');
     ELS.treeSearch = document.getElementById('treeSearch');
@@ -328,7 +338,7 @@
             const last = dayData[dayData.length - 1];
             cellContent = `
               <button class="btn btn-secondary btn-day-editor" data-week="${w}" data-dow="${dow}">
-                ${first.start_time} - ${last.end_time}
+                ${minutesToTime(first.start_min)} - ${minutesToTime(last.end_min)}
               </button>`;
           } else {
             // Day is empty (RDO)
@@ -348,8 +358,6 @@
     });
     html += '</tbody></table>';
     ELS.rotationGrid.innerHTML = html;
-
-    // TODO: Add event listener for '.btn-day-editor' to launch the modal
   }
 
   /**
@@ -368,7 +376,18 @@
     advisors.forEach(adv => {
       const assignment = getAssignmentForAdvisor(adv.id);
       const rotationName = (assignment && assignment.rotation_name) ? assignment.rotation_name : '';
-      const startDate = (assignment && assignment.start_date) ? assignment.start_date : '';
+      const startDate = (assignment && assignment.start_date) ? assignment.start_date : ''; // This is YYYY-MM-DD
+      
+      // Convert YYYY-MM-DD to d/m/Y for flatpickr
+      let displayDate = '';
+      if (startDate) {
+        try {
+          const parts = startDate.split('-');
+          if (parts.length === 3) {
+            displayDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+          }
+        } catch(e) { console.warn('Invalid start_date format', startDate); }
+      }
 
       html += `
         <tr data-advisor-id="${adv.id}">
@@ -380,7 +399,7 @@
             </select>
           </td>
           <td>
-            <input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${startDate}" placeholder="dd/mm/yyyy" />
+            <input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${displayDate}" placeholder="dd/mm/yyyy" />
           </td>
         </tr>`;
     });
@@ -401,7 +420,8 @@
       const dateInput = row.querySelector('.assign-start-date');
       if (dateInput) {
         flatpickr(dateInput, {
-          dateFormat: "d/m/Y", // Note: Supabase needs YYYY-MM-DD, but flatpickr can show d/m/Y
+          dateFormat: "d/m/Y",
+          defaultDate: dateInput.value,
           allowInput: true,
           onChange: function (selectedDates, dateStr, instance) {
             // Convert "d/m/Y" to "YYYY-MM-DD" for Supabase
@@ -431,10 +451,215 @@
     // All old logic (renderTimeHeader, renderSegmentsForAdvisor) is now GONE.
   }
 
-  // --- 4. CORE LOGIC (Calculations) ---
-  // All old calculation functions (calculateSegmentsForAdvisor, getEffectiveWeek,
-  // sliceTemplateIntoSegments, getClassForCode) are DELETED.
-  // We will add new logic here for the Advanced Day Editor.
+  // --- 4. CORE LOGIC (Advanced Day Editor) ---
+
+  // Store the state of the day being edited
+  const EDITOR_STATE = {
+    week: null,
+    dow: null,
+    segments: [] // Array of { name, type, color, start_min, end_min }
+  };
+  
+  const EDITOR_CONFIG = {
+    startHour: 6, // 6 AM
+    endHour: 22,  // 10 PM
+    totalHours: 16,
+    totalMinutes: 16 * 60
+  };
+
+  /**
+   * Opens the Advanced Day Editor modal.
+   * @param {string} week - The week number (e.g., "1")
+   * @param {string} dow - The day of week (e.g., "1" for Mon)
+   */
+  function openDayEditor(week, dow) {
+    console.log(`Opening editor for Week ${week}, DOW ${dow}`);
+    EDITOR_STATE.week = week;
+    EDITOR_STATE.dow = dow;
+    
+    const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dow - 1];
+    ELS.modalTitle.textContent = `Build Shift: Week ${week}, ${dayName}`;
+    
+    // 1. Populate the component "bricks"
+    renderComponentBricks();
+    
+    // 2. Render the timeline ticks
+    renderTimeTicks();
+    
+    // 3. Load existing data (if any)
+    loadDaySegments();
+    
+    // 4. Show the modal
+    ELS.modal.style.display = 'flex';
+  }
+
+  /**
+   * Closes the Advanced Day Editor modal and clears its state.
+   */
+  function closeDayEditor() {
+    ELS.modal.style.display = 'none';
+    EDITOR_STATE.week = null;
+    EDITOR_STATE.dow = null;
+    EDITOR_STATE.segments = [];
+    ELS.modalTrack.innerHTML = ''; // Clear the track
+  }
+
+  /**
+   * Fills the sidebar with draggable component bricks.
+   */
+  function renderComponentBricks() {
+    let html = '';
+    const types = ['Work', 'Break', 'Exception']; // Sort order
+    
+    types.forEach(type => {
+      html += `<h4 class="component-type-header">${type}s</h4>`;
+      STATE.scheduleComponents
+        .filter(c => c.type === type)
+        .sort((a,b) => a.name.localeCompare(b.name))
+        .forEach(c => {
+          html += `
+            <div class="component-brick" 
+                 style="background-color: ${c.color}; color: ${isColorDark(c.color) ? '#fff' : '#111'}"
+                 draggable="true"
+                 data-name="${c.name}"
+                 data-type="${c.type}"
+                 data-color="${c.color}">
+              ${c.name}
+            </div>
+          `;
+        });
+    });
+    ELS.modalComponents.innerHTML = html;
+    // We will add drag-and-drop listeners for these bricks next.
+  }
+
+  /**
+   * Renders the time ticks (06:00, 07:00...) in the modal header.
+   */
+  function renderTimeTicks() {
+    const { startHour, endHour, totalHours } = EDITOR_CONFIG;
+    const tickContainer = ELS.modalTimeTicks;
+    const track = ELS.modalTrack;
+    
+    // Set total width (e.g., 100px per hour)
+    const totalWidth = totalHours * 100; // 1600px
+    tickContainer.style.width = `${totalWidth}px`;
+    track.style.width = `${totalWidth}px`;
+    
+    // Set grid background size (15-min intervals)
+    const pixelsPer15Min = 100 / 4; // 25px
+    track.style.backgroundSize = `${pixelsPer15Min}px 100%`;
+
+    let html = '';
+    for (let h = startHour; h <= endHour; h++) {
+      const pct = (h - startHour) / totalHours * 100;
+      const label = h.toString().padStart(2, '0') + ':00';
+      html += `<div class="time-tick" style="left: ${pct}%;">${label}</div>`;
+    }
+    tickContainer.innerHTML = html;
+  }
+
+  /**
+   * Loads existing segments for the day (if any) from the state.
+   */
+  function loadDaySegments() {
+    const pattern = getPatternByName(STATE.currentRotation);
+    if (!pattern) return;
+    
+    const weekKey = `Week ${EDITOR_STATE.week}`;
+    const dayData = (pattern.pattern && pattern.pattern[weekKey] && pattern.pattern[weekKey][EDITOR_STATE.dow]) 
+      ? pattern.pattern[weekKey][EDITOR_STATE.dow] 
+      : []; // dayData is our array of segments
+
+    // Deep copy the segments into the editor state
+    EDITOR_STATE.segments = JSON.parse(JSON.stringify(dayData));
+    
+    renderDaySegments();
+  }
+  
+  /**
+   * Renders all segments in EDITOR_STATE.segments onto the timeline track.
+   * This is the main "draw" function for the timeline.
+   */
+  function renderDaySegments() {
+    ELS.modalTrack.innerHTML = ''; // Clear track
+    let html = '';
+    
+    EDITOR_STATE.segments.sort((a,b) => a.start_min - b.start_min);
+    
+    EDITOR_STATE.segments.forEach((seg, index) => {
+      const startPct = (seg.start_min - (EDITOR_CONFIG.startHour * 60)) / EDITOR_CONFIG.totalMinutes * 100;
+      const widthPct = (seg.end_min - seg.start_min) / EDITOR_CONFIG.totalMinutes * 100;
+      
+      const startTime = minutesToTime(seg.start_min);
+      const endTime = minutesToTime(seg.end_min);
+      const label = `${seg.name} (${startTime} - ${endTime})`;
+      const color = seg.color || '#333';
+      
+      // Check for overlap with the *next* segment
+      let overlapClass = '';
+      if (index < EDITOR_STATE.segments.length - 1) {
+        if (seg.end_min > EDITOR_STATE.segments[index + 1].start_min) {
+          overlapClass = 'is-overlap';
+        }
+      }
+      
+      html += `
+        <div class="track-segment ${overlapClass}" 
+             style="left: ${startPct}%; width: ${widthPct}%; background-color: ${color}; color: ${isColorDark(color) ? '#fff' : '#111'}"
+             data-index="${index}">
+          <span class="segment-label">${label}</span>
+          <button class="segment-delete" data-index="${index}">&times;</button>
+        </div>
+      `;
+    });
+    
+    ELS.modalTrack.innerHTML = html;
+    
+    // TODO: Add click listener for '.segment-delete'
+  }
+
+  /**
+   * Saves the current day's segments (from EDITOR_STATE) back into the main app STATE.
+   */
+  function handleSaveDay() {
+    const pattern = getPatternByName(STATE.currentRotation);
+    if (!pattern) {
+      showToast("Error: No rotation selected.", "danger");
+      return;
+    }
+    
+    // Get the final, sorted segments
+    const finalSegments = EDITOR_STATE.segments.sort((a,b) => a.start_min - b.start_min);
+    
+    // Update the main STATE object
+    const weekKey = `Week ${EDITOR_STATE.week}`;
+    if (!pattern.pattern) pattern.pattern = {};
+    if (!pattern.pattern[weekKey]) pattern.pattern[weekKey] = {};
+    
+    // Save the array of segments as the day's data
+    pattern.pattern[weekKey][EDITOR_STATE.dow] = finalSegments;
+    
+    console.log(`Saved ${finalSegments.length} segments to ${weekKey}, DOW ${EDITOR_STATE.dow}`);
+    
+    closeDayEditor();
+    renderRotationGrid(); // Re-render the grid to show the new summary
+    
+    // We still need to click the main "Save Rotation" button
+    showToast("Day saved locally. Click 'Save' to commit to database.", "success");
+  }
+
+  /**
+   * Clears all segments for the day (sets as RDO).
+   */
+  function handleClearDay() {
+    if (!confirm("Are you sure you want to clear this day and set it as RDO?")) {
+      return;
+    }
+    
+    EDITOR_STATE.segments = []; // Empty the array
+    handleSaveDay(); // Run the save logic to store the empty array
+  }
 
 
   // --- 5. EVENT HANDLERS ---
@@ -473,8 +698,14 @@
     ELS.btnNewRotation.addEventListener('click', handleNewRotation);
     ELS.btnSaveRotation.addEventListener('click', handleSaveRotation);
     ELS.btnDeleteRotation.addEventListener('click', handleDeleteRotation);
-    // ELS.rotationGrid.addEventListener('change', ...); // OLD logic removed
-    // TODO: Add click listener for '.btn-day-editor'
+    
+    // NEW: Open the modal when a day button is clicked
+    ELS.rotationGrid.addEventListener('click', (e) => {
+      if (e.target.classList.contains('btn-day-editor')) {
+        const { week, dow } = e.target.dataset;
+        openDayEditor(week, dow);
+      }
+    });
 
     // Advisor Assignments
     ELS.assignmentGrid.addEventListener('change', (e) => {
@@ -495,6 +726,13 @@
 
     // Planner
     // ELS.plannerDay.addEventListener('change', ...); // OLD logic removed
+    
+    // NEW: Modal Listeners
+    ELS.modalClose.addEventListener('click', closeDayEditor);
+    ELS.modalSave.addEventListener('click', handleSaveDay);
+    ELS.modalClear.addEventListener('click', handleClearDay);
+    
+    // We will add drag-and-drop listeners later
   }
 
   /**
@@ -735,6 +973,55 @@
       setTimeout(() => toast.remove(), 300);
     }, duration);
   }
+  
+  /**
+   * Converts a 24-hour time string (e.g., "14:30") to minutes from midnight.
+   * @param {string} timeStr - "HH:mm"
+   * @returns {number}
+   */
+  function timeToMinutes(timeStr) {
+    const [h, m] = timeStr.split(':').map(Number);
+    return h * 60 + m;
+  }
+
+  /**
+   * Converts minutes from midnight to a 24-hour time string (e.g., "14:30").
+   * @param {number} totalMinutes
+   * @returns {string} - "HH:mm"
+   */
+  function minutesToTime(totalMinutes) {
+    if (typeof totalMinutes !== 'number' || isNaN(totalMinutes)) {
+      console.warn("Invalid input to minutesToTime:", totalMinutes);
+      return "00:00";
+    }
+    const h = Math.floor(totalMinutes / 60).toString().padStart(2, '0');
+    const m = (totalMinutes % 60).toString().padStart(2, '0');
+    return `${h}:${m}`;
+  }
+
+  /**
+   * Checks if a hex color is "dark" to decide if text on it should be white or black.
+   * @param {string} hexColor - e.g., "#FF0000" or "#F00"
+   * @returns {boolean} - true if dark, false if light
+   */
+  function isColorDark(hexColor) {
+    if (!hexColor) return true;
+    try {
+      let hex = hexColor.replace('#', '');
+      if (hex.length === 3) {
+        hex = hex.split('').map(c => c + c).join('');
+      }
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      // Standard luminance formula
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      return luminance < 0.5;
+    } catch (e) {
+      return true; // Default to dark (white text) on error
+    }
+  }
+
 
   // --- 7. APPLICATION BOOT ---
 
