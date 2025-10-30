@@ -1,879 +1,1053 @@
-/* ========================================================================
-    APPLICATION LOGIC (src/planner.js)
-    - Fetches data from Supabase
-    - Contains all business logic for rotations
-    - Contains all rendering functions for the UI
-======================================================================== */
+/* --- Professional Rota System - Main Logic (v5) --- */
+/*
+  This file contains all application state, data fetching,
+  business logic, and rendering functions.
+*/
 
-// --- Globals & App State ---
-(function (global) {
-    "use strict";
+// --- App State ---
+const STATE = {
+  org: {}, // { "Leader Name": [{id, name, leader_id}, ...], ... }
+  advisors: new Map(), // { id => {id, name, leader_id} }
+  leaders: new Map(), // { id => {id, name, site_id} }
+  shiftTemplates: new Map(), // { "7A" => {code, start_time, ...} }
+  rotationPatterns: new Map(), // { "Flex 1" => { "Week 1": { "MON": "7A", ... } } }
+  rotationAssignments: new Map(), // { advisor_id => {rotation_name, start_date} }
+  selectedAdvisors: new Set(), // { advisor_id, ... }
+  isLoading: true,
+  history: [], // For Undo/Redo
+  historyIndex: -1,
+};
 
-    // Globals to hold our database state
-    global.APP_STATE = {
-        advisors: new Map(), // (id -> {id, name, ...})
-        leaders: new Map(),  // (id -> {id, name, site_id, ...})
-        sites: new Map(),    // (id -> {id, name, ...})
-        
-        shiftTemplates: new Map(), // (code -> {code, start_time, ...})
-        
-        rotationPatterns: new Map(), // (name -> {name, pattern: {week1: {...}, ...}})
-        rotationAssignments: new Map(), // (advisor_id -> {advisor_id, rotation_name, start_date})
+// --- UI Element Cache ---
+// Caching elements we use often for performance
+const UI = {
+  loadingOverlay: null,
+  toast: null,
+  weekStart: null,
+  teamDay: null,
+  plannerTitle: null,
+  plannerHeader: null,
+  plannerBody: null,
+  treeContainer: null,
+  checkSelectAll: null,
+  tabButtons: null,
+  tabContents: null,
+  rotationSelect: null,
+  rotationEditorGrid: null,
+  assignmentTableBody: null,
+  btnNewRotation: null,
+  btnSaveRotation: null,
+  btnDeleteRotation: null,
+};
 
-        selectedAdvisors: new Set(), // Set of advisor IDs
-        
-        // Undo/Redo buffer for advisor assignments
-        history: [],
-        historyIndex: -1,
-        isUndoing: false, // Flag to prevent re-triggering history save
+// --- Constants ---
+const DAYS_OF_WEEK = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+const PLANNER_START_HOUR = 6;
+const PLANNER_END_HOUR = 20; // 6am to 8pm (14 hours)
+const PLANNER_HOUR_SPAN = PLANNER_END_HOUR - PLANNER_START_HOUR;
 
-        // Caches
-        advisorSelectOptions: '', // HTML for advisor dropdowns
-    };
+/**
+ * Main function to initialize the application.
+ * Fetches all data, builds initial state, and renders the UI.
+ * @returns {Promise<void>}
+ */
+async function bootApplication() {
+  console.log("Booting application...");
+  setLoading(true);
+  try {
+    // Cache all UI elements
+    cacheUIElements();
+    
+    // Fetch all core data from Supabase in parallel
+    const [
+      leadersData,
+      advisorsData,
+      templatesData,
+      patternsData,
+      assignmentsData,
+    ] = await Promise.all([
+      supabase.from("leaders").select("*"),
+      supabase.from("advisors").select("*"),
+      supabase.from("shift_templates").select("*"),
+      supabase.from("rotation_patterns").select("*"),
+      supabase.from("rotation_assignments").select("*"),
+    ]);
 
-    // --- Utility Functions ---
-    const $ = (s) => document.querySelector(s);
-    const $$ = (s) => Array.from(document.querySelectorAll(s));
+    // Process and store data in STATE
+    processOrgData(leadersData.data || [], advisorsData.data || []);
+    processTemplates(templatesData.data || []);
+    processRotationPatterns(patternsData.data || []);
+    processRotationAssignments(assignmentsData.data || []);
 
-    /**
-     * Sets the Monday of a given date.
-     * @param {Date} d - The input date.
-     * @returns {Date} A new Date object set to the Monday of that week.
-     */
-    function setToMonday(d) {
-        const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
-        return new Date(d.setDate(diff));
+    // Render all UI components with the new data
+    renderSchedulesTree();
+    renderRotationEditor();
+    renderAssignmentTable();
+    renderPlannerHeader();
+    renderPlanner();
+    
+    // Set default week start to today
+    const today = new Date();
+    const monday = getMonday(today);
+    UI.weekStart.value = formatDate(monday);
+    
+    // Save initial state for Undo
+    saveHistory();
+
+    console.log("Boot complete. State:", STATE);
+    showToast("Application loaded successfully.", "success");
+  } catch (error) {
+    console.error("Boot failed:", error);
+    showToast(`Error loading application: ${error.message}`, "error");
+  } finally {
+    setLoading(false);
+  }
+}
+
+/**
+ * Caches frequently accessed DOM elements into the UI object.
+ */
+function cacheUIElements() {
+  UI.loadingOverlay = document.getElementById("loadingOverlay");
+  UI.toast = document.getElementById("toastNotification");
+  UI.weekStart = document.getElementById("weekStart");
+  UI.teamDay = document.getElementById("teamDay");
+  UI.plannerTitle = document.getElementById("plannerTitle");
+  UI.plannerHeader = document.getElementById("plannerTimelineHeader");
+  UI.plannerBody = document.getElementById("plannerBody");
+  UI.treeContainer = document.getElementById("tree-container");
+  UI.checkSelectAll = document.getElementById("checkSelectAllAdvisors");
+  UI.tabButtons = document.querySelectorAll(".tab-btn");
+  UI.tabContents = document.querySelectorAll(".tab-content");
+  UI.rotationSelect = document.getElementById("rotationSelect");
+  UI.rotationEditorGrid = document.getElementById("rotationEditorGrid");
+  UI.assignmentTableBody = document.getElementById("assignmentTableBody");
+  UI.btnNewRotation = document.getElementById("btnNewRotation");
+  UI.btnSaveRotation = document.getElementById("btnSaveRotation");
+  UI.btnDeleteRotation = document.getElementById("btnDeleteRotation");
+}
+
+// --- Data Processing Functions ---
+
+/**
+ * Processes leaders and advisors into a hierarchical org structure
+ * and populates the Map caches.
+ * @param {Array} leaders - Array of leader objects from Supabase.
+ * @param {Array} advisors - Array of advisor objects from Supabase.
+ */
+function processOrgData(leaders, advisors) {
+  STATE.org = {};
+  STATE.leaders.clear();
+  STATE.advisors.clear();
+
+  leaders.forEach((leader) => {
+    STATE.leaders.set(leader.id, leader);
+    STATE.org[leader.name] = [];
+  });
+
+  advisors.forEach((advisor) => {
+    STATE.advisors.set(advisor.id, advisor);
+    const leader = STATE.leaders.get(advisor.leader_id);
+    if (leader && STATE.org[leader.name]) {
+      STATE.org[leader.name].push(advisor);
+    } else {
+      // Handle advisors with no leader
+      if (!STATE.org["Unassigned"]) {
+        STATE.org["Unassigned"] = [];
+      }
+      STATE.org["Unassigned"].push(advisor);
     }
-    global.setToMonday = setToMonday;
-
-    /**
-     * Formats a Date object to "YYYY-MM-DD" string.
-     * @param {Date} d - The input date.
-     * @returns {string} The formatted date string.
-     */
-    function toISODate(d) {
-        return d.toISOString().split('T')[0];
-    }
-    global.toISODate = toISODate;
-
-    /**
-     * Converts "HH:MM:SS" or "HH:MM" to total minutes from midnight.
-     * @param {string} timeStr - The time string.
-     * @returns {number | null} Total minutes or null if invalid.
-     */
-    function timeToMinutes(timeStr) {
-        if (!timeStr) return null;
-        const [hours, minutes] = String(timeStr).split(':').map(Number);
-        if (isNaN(hours) || isNaN(minutes)) return null;
-        return hours * 60 + minutes;
-    }
-    global.timeToMinutes = timeToMinutes;
-
-    /**
-     * Converts total minutes from midnight to "HH:MM" format.
-     * @param {number} minutes - The total minutes.
-     * @returns {string} The formatted "HH:MM" string.
-     */
-    function minutesToTime(minutes) {
-        if (minutes === null || isNaN(minutes)) return "--:--";
-        const hours = Math.floor(minutes / 60).toString().padStart(2, '0');
-        const mins = (minutes % 60).toString().padStart(2, '0');
-        return `${hours}:${mins}`;
-    }
-    global.minutesToTime = minutesToTime;
-
-    /**
-     * Calculates the effective week number (1-6) of a rotation.
-     * @param {string} rotationStartDateISO - The "Week 1" start date (YYYY-MM-DD).
-     * @param {string} plannerDateISO - The date to check (YYYY-MM-DD).
-     * @returns {number} The effective week number (1 to 6).
-     */
-    function getEffectiveWeek(rotationStartDateISO, plannerDateISO) {
-        const start = new Date(rotationStartDateISO + 'T00:00:00');
-        const plan = new Date(plannerDateISO + 'T00:00:00');
-        
-        // Get the Monday of the planner date
-        const planMonday = setToMonday(plan);
-        
-        // Get the Monday of the rotation start date
-        const startMonday = setToMonday(start);
-
-        const diffTime = planMonday.getTime() - startMonday.getTime();
-        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-        const diffWeeks = Math.floor(diffDays / 7);
-
-        // Use a 6-week cycle
-        const weekNum = (diffWeeks % 6);
-        // Ensure result is 1-6, handling negative mods
-        return (weekNum < 0 ? weekNum + 6 : weekNum) + 1;
-    }
-    global.getEffectiveWeek = getEffectiveWeek;
-
-    /**
-     * Shows a status message next to the save button.
-     * @param {string} text - The message to display.
-     * @param {'saving' | 'saved' | 'error' | 'idle'} type - The message type.
-     */
-    function showRotationStatus(text, type = 'idle') {
-        const el = $('#rotationStatus');
-        if (!el) return;
-        el.textContent = text;
-        el.className = 'form-status-label'; // Reset
-        if (type !== 'idle') {
-            el.classList.add(type);
-        }
-        // Clear "saved" message after a delay
-        if (type === 'saved') {
-            setTimeout(() => {
-                if (el.textContent === text) {
-                    el.textContent = '';
-                    el.className = 'form-status-label';
-                }
-            }, 2000);
-        }
-    }
-
-    // ========================================================================
-    //      DATABASE: LOADERS (Called by init.js)
-    // ========================================================================
-
-    /**
-     * Loads all foundational data from Supabase in parallel.
-     */
-    async function loadAllData() {
-        console.log("Loading data from Supabase...");
-        showRotationStatus("Loading data...", "saving");
-        try {
-            const [orgData, templates, patterns, assignments] = await Promise.all([
-                loadOrgData(),
-                loadShiftTemplates(),
-                loadRotationPatterns(),
-                loadRotationAssignments()
-            ]);
-            console.log("Data Loaded.", {
-                org: orgData,
-                templates: templates.size,
-                patterns: patterns.size,
-                assignments: assignments.size
-            });
-            showRotationStatus("Data Loaded", "saved");
-        } catch (error) {
-            console.error("Error loading all data:", error);
-            showRotationStatus("Error loading data!", "error");
-        }
-    }
-    global.loadAllData = loadAllData;
-
-    /**
-     * Loads sites, leaders, and advisors.
-     */
-    async function loadOrgData() {
-        const { data, error } = await supabase
-            .from('sites')
-            .select(`
-                id, name,
-                leaders ( id, name, site_id,
-                    advisors ( id, name, leader_id, email )
-                )
-            `);
-        
-        if (error) throw error;
-
-        // Clear old maps
-        APP_STATE.sites.clear();
-        APP_STATE.leaders.clear();
-        APP_STATE.advisors.clear();
-
-        // Populate new maps
-        for (const site of data) {
-            APP_STATE.sites.set(site.id, site);
-            for (const leader of site.leaders) {
-                APP_STATE.leaders.set(leader.id, leader);
-                for (const advisor of leader.advisors) {
-                    APP_STATE.advisors.set(advisor.id, advisor);
-                }
-            }
-        }
-        return { sites: APP_STATE.sites.size, leaders: APP_STATE.leaders.size, advisors: APP_STATE.advisors.size };
-    }
-    global.loadOrgData = loadOrgData;
-
-    /**
-     * Loads all shift templates (e.g., "7A", "RDO").
-     */
-    async function loadShiftTemplates() {
-        const { data, error } = await supabase
-            .from('shift_templates')
-            .select('code, start_time, end_time, break1, lunch, break2')
-            .order('code');
-
-        if (error) throw error;
-
-        APP_STATE.shiftTemplates.clear();
-        data.forEach(t => APP_STATE.shiftTemplates.set(t.code, t));
-        
-        // Cache the <option> HTML for all dropdowns
-        APP_STATE.advisorSelectOptions = '<option value="">--</option>';
-        APP_STATE.advisorSelectOptions += data.map(t => 
-            `<option value="${t.code}">${t.code}</option>`
-        ).join('');
-
-        return APP_STATE.shiftTemplates;
-    }
-    global.loadShiftTemplates = loadShiftTemplates;
-
-    /**
-     * Loads all saved rotation patterns from the new `rotation_patterns` table.
-     */
-    async function loadRotationPatterns() {
-        // Use the new, unique table name
-        const { data, error } = await supabase
-            .from('rotation_patterns')
-            .select('name, pattern');
-
-        if (error) throw error;
-
-        APP_STATE.rotationPatterns.clear();
-        data.forEach(p => APP_STATE.rotationPatterns.set(p.name, p));
-        return APP_STATE.rotationPatterns;
-    }
-    global.loadRotationPatterns = loadRotationPatterns;
-
-    /**
-     * Loads all advisor assignments from the new `rotation_assignments` table.
-     */
-    async function loadRotationAssignments() {
-        // Use the new, unique table name
-        const { data, error } = await supabase
-            .from('rotation_assignments')
-            .select('advisor_id, rotation_name, start_date');
-
-        if (error) throw error;
-
-        APP_STATE.rotationAssignments.clear();
-        data.forEach(a => APP_STATE.rotationAssignments.set(a.advisor_id, a));
-        return APP_STATE.rotationAssignments;
-    }
-    global.loadRotationAssignments = loadRotationAssignments;
-
-    // ========================================================================
-    //      DATABASE: SAVERS (Called by UI events)
-    // ========================================================================
-
-    /**
-     * Saves (upserts) the currently displayed rotation pattern.
-     */
-    async function saveRotationPattern() {
-        const select = $('#rotationNameSelect');
-        const rotationName = select.value;
-        if (!rotationName) return;
-
-        showRotationStatus("Saving...", "saving");
-        const pattern = {};
-        let hasData = false;
-
-        // Read the 6x7 grid
-        for (let week = 1; week <= 6; week++) {
-            const weekKey = `week${week}`;
-            pattern[weekKey] = {};
-            const weekRow = $(`#rotationEditorGrid tr[data-week="${weekKey}"]`);
-            if (weekRow) {
-                const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-                days.forEach(day => {
-                    const sel = weekRow.querySelector(`select[data-day="${day}"]`);
-                    if (sel && sel.value) {
-                        pattern[weekKey][day] = sel.value;
-                        hasData = true;
-                    } else {
-                        pattern[weekKey][day] = null;
-                    }
-                });
-            }
-        }
-
-        if (!hasData) {
-            showRotationStatus("Cannot save an empty rotation.", "error");
-            return;
-        }
-
-        // Use the new, unique table name
-        const { error } = await supabase
-            .from('rotation_patterns')
-            .upsert({ name: rotationName, pattern: pattern }, { onConflict: 'name' });
-
-        if (error) {
-            console.error("Error saving rotation:", error);
-            showRotationStatus(error.message, "error");
-        } else {
-            APP_STATE.rotationPatterns.set(rotationName, { name: rotationName, pattern });
-            showRotationStatus("Saved!", "saved");
-            $('#btnSaveRotation').disabled = true;
-        }
-    }
-    global.saveRotationPattern = saveRotationPattern;
-
-    /**
-     * Deletes the currently selected rotation pattern.
-     */
-    async function deleteRotationPattern() {
-        const select = $('#rotationNameSelect');
-        const rotationName = select.value;
-        if (!rotationName) return;
-
-        if (!confirm(`Are you sure you want to delete the "${rotationName}" rotation pattern? This cannot be undone.`)) {
-            return;
-        }
-
-        showRotationStatus("Deleting...", "saving");
-
-        // Use the new, unique table name
-        const { error } = await supabase
-            .from('rotation_patterns')
-            .delete()
-            .eq('name', rotationName);
-        
-        if (error) {
-            console.error("Error deleting rotation:", error);
-            showRotationStatus(error.message, "error");
-        } else {
-            APP_STATE.rotationPatterns.delete(rotationName);
-            showRotationStatus("Deleted!", "saved");
-            populateRotationFamilySelect(); // Re-populate the main dropdown
-            displayRotationPattern(null); // Clear the grid
-        }
-    }
-    global.deleteRotationPattern = deleteRotationPattern;
-
-    /**
-     * Saves a single advisor's rotation assignment.
-     * @param {string} advisorId - The UUID of the advisor.
-     * @param {string} rotationName - The name of the rotation family.
-     * @param {string} startDate - The "Week 1" start date (YYYY-MM-DD).
-     */
-    async function saveAdvisorAssignment(advisorId, rotationName, startDate) {
-        if (!advisorId) return;
-
-        // Find the row and show a saving indicator
-        const row = $(`#advisorAssignmentBody tr[data-advisor-id="${advisorId}"]`);
-        if (row) row.classList.add('saving');
-
-        const assignment = {
-            advisor_id: advisorId,
-            rotation_name: rotationName || null,
-            start_date: startDate || null
-        };
-        
-        // Use the new, unique table name
-        const { error } = await supabase
-            .from('rotation_assignments')
-            .upsert(assignment, { onConflict: 'advisor_id' });
-
-        if (row) row.classList.remove('saving');
-
-        if (error) {
-            console.error("Error saving assignment:", error);
-            if (row) row.classList.add('error');
-        } else {
-            console.log("Saved assignment for", advisorId);
-            APP_STATE.rotationAssignments.set(advisorId, assignment);
-            if (row) {
-                row.classList.add('saved');
-                setTimeout(() => row.classList.remove('saved'), 1500);
-            }
-            // Re-render the planners
-            refreshAllUI();
-        }
-    }
-    global.saveAdvisorAssignment = saveAdvisorAssignment;
-
-    // ========================================================================
-    //      UI: RENDERERS (Populate the page)
-    // ========================================================================
-
-    /**
-     * Re-draws all UI components that depend on data.
-     */
-    function refreshAllUI() {
-        rebuildAdvisorTree();
-        populateRotationFamilySelect();
-        populateRotationEditorGrid();
-        populateAdvisorAssignmentTable();
-        renderTimeHeader();
-        renderPlanner();
-        // NOTE: Vertical calendar is not part of this "v3" build
-    }
-    global.refreshAllUI = refreshAllUI;
-
-    /**
-     * Rebuilds the Advisor "Schedules" tree on the right.
-     * This version ONLY shows advisors, as requested by the "Big Leap" plan.
-     */
-    function rebuildAdvisorTree() {
-        const treeEl = $('#tree');
-        if (!treeEl) return;
-
-        const advisors = Array.from(APP_STATE.advisors.values());
-        advisors.sort((a, b) => a.name.localeCompare(b.name));
-
-        const filter = ($('#treeSearch').value || '').toLowerCase();
-
-        const advisorNodes = advisors
-            .filter(a => a.name.toLowerCase().includes(filter))
-            .map(a => `
-                <div class="node">
-                    <label>
-                        <input type="checkbox" class="advisor-tree-checkbox" value="${a.id}" ${APP_STATE.selectedAdvisors.has(a.id) ? 'checked' : ''}>
-                        <span>${a.name}</span>
-                    </label>
-                </div>
-            `);
-
-        treeEl.innerHTML = `
-            <details class="tree" open>
-                <summary>
-                    <span class="twisty">▼</span>
-                    <strong>All Advisors</strong>
-                </summary>
-                ${advisorNodes.join('') || '<div class="node-muted">No advisors found.</div>'}
-            </details>
-        `;
-    }
-    global.rebuildAdvisorTree = rebuildAdvisorTree;
-
-    /**
-     * Updates the "Selected Advisors" chips below the tree.
-     */
-    function refreshAdvisorChips() {
-        const chipsEl = $('#activeChips');
-        if (!chipsEl) return;
-
-        const selected = Array.from(APP_STATE.selectedAdvisors);
-        selected.sort((a, b) => {
-            const nameA = APP_STATE.advisors.get(a)?.name || '';
-            const nameB = APP_STATE.advisors.get(b)?.name || '';
-            return nameA.localeCompare(nameB);
-        });
-
-        chipsEl.innerHTML = selected.map(id => {
-            const advisor = APP_STATE.advisors.get(id);
-            if (!advisor) return '';
-            return `
-                <span class="chip" data-advisor-id="${id}">
-                    ${advisor.name}
-                    <button class="chip-remove" data-id="${id}">&times;</button>
-                </span>
-            `;
-        }).join('');
-    }
-    global.refreshAdvisorChips = refreshAdvisorChips;
-
-    /**
-     * Populates the "Rotation Family" <select> dropdown.
-     */
-    function populateRotationFamilySelect() {
-        const select = $('#rotationNameSelect');
-        if (!select) return;
-
-        const currentVal = select.value;
-        const families = Array.from(APP_STATE.rotationPatterns.keys());
-        families.sort();
-
-        select.innerHTML = '<option value="">-- Select a Rotation --</option>';
-        select.innerHTML += families.map(name =>
-            `<option value="${name}">${name}</option>`
-        ).join('');
-        
-        // Try to re-select the previous value
-        if (APP_STATE.rotationPatterns.has(currentVal)) {
-            select.value = currentVal;
-        }
-    }
-    global.populateRotationFamilySelect = populateRotationFamilySelect;
-
-    /**
-     * Populates the 6x7 "Rotation Editor" grid with dropdowns.
-     */
-    function populateRotationEditorGrid() {
-        const gridBody = $('#rotationEditorGrid');
-        if (!gridBody) return;
-
-        gridBody.innerHTML = ''; // Clear it
-        for (let week = 1; week <= 6; week++) {
-            const row = document.createElement('tr');
-            row.dataset.week = `week${week}`;
-            row.innerHTML = `
-                <td>Week ${week}</td>
-                <td><select class="form-select" data-day="mon">${APP_STATE.advisorSelectOptions}</select></td>
-                <td><select class="form-select" data-day="tue">${APP_STATE.advisorSelectOptions}</select></td>
-                <td><select class="form-select" data-day="wed">${APP_STATE.advisorSelectOptions}</select></td>
-                <td><select class="form-select" data-day="thu">${APP_STATE.advisorSelectOptions}</select></td>
-                <td><select class="form-select" data-day="fri">${APP_STATE.advisorSelectOptions}</select></td>
-                <td><select class="form-select" data-day="sat">${APP_STATE.advisorSelectOptions}</select></td>
-                <td><select class="form-select" data-day="sun">${APP_STATE.advisorSelectOptions}</select></td>
-                <td>
-                    <button class="form-button subtle form-button-sm btn-copy-week" title="Copy this week's pattern down">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/></svg>
-                    </button>
-                </td>
-            `;
-            gridBody.appendChild(row);
-        }
-    }
-    global.populateRotationEditorGrid = populateRotationEditorGrid;
-
-    /**
-     * Fills the "Rotation Editor" grid with a pattern's data.
-     * @param {string | null} rotationName - The name of the rotation to display.
-     */
-    function displayRotationPattern(rotationName) {
-        const pattern = rotationName ? APP_STATE.rotationPatterns.get(rotationName)?.pattern : null;
-
-        for (let week = 1; week <= 6; week++) {
-            const weekKey = `week${week}`;
-            const weekRow = $(`#rotationEditorGrid tr[data-week="${weekKey}"]`);
-            if (weekRow) {
-                const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-                days.forEach(day => {
-                    const sel = weekRow.querySelector(`select[data-day="${day}"]`);
-                    if (sel) {
-                        sel.value = pattern?.[weekKey]?.[day] || '';
-                    }
-                });
-            }
-        }
-        
-        // Enable/disable buttons based on selection
-        $('#btnSaveRotation').disabled = !rotationName;
-        $('#btnDeleteRotation').disabled = !rotationName;
-        // Mark as "un-dirty"
-        showRotationStatus(rotationName ? "Loaded pattern" : "Select or create a pattern");
-    }
-    global.displayRotationPattern = displayRotationPattern;
-
-    /**
-     * Populates the "Advisor Assignments" table.
-     */
-    function populateAdvisorAssignmentTable() {
-        const tableBody = $('#advisorAssignmentBody');
-        if (!tableBody) return;
-
-        const advisors = Array.from(APP_STATE.advisors.values());
-        advisors.sort((a, b) => a.name.localeCompare(b.name));
-
-        const rotationNames = ['<option value="">-- No Rotation --</option>'];
-        rotationNames.push(
-            ...Array.from(APP_STATE.rotationPatterns.keys()).sort().map(name =>
-                `<option value="${name}">${name}</option>`
-            )
-        );
-
-        tableBody.innerHTML = ''; // Clear old data
-        advisors.forEach(a => {
-            const assignment = APP_STATE.rotationAssignments.get(a.id);
-            const tr = document.createElement('tr');
-            tr.dataset.advisorId = a.id;
-            tr.innerHTML = `
-                <td>${a.name}</td>
-                <td>
-                    <select class="form-select assign-rotation-name" data-advisor-id="${a.id}">
-                        ${rotationNames.join('')}
-                    </select>
-                </td>
-                <td>
-                    <input type="date" class="form-input assign-start-date" data-advisor-id="${a.id}" />
-                </td>
-            `;
-            // Set current values
-            if (assignment) {
-                tr.querySelector('.assign-rotation-name').value = assignment.rotation_name || '';
-                tr.querySelector('.assign-start-date').value = assignment.start_date || '';
-            }
-            tableBody.appendChild(tr);
-        });
-        
-        // Save to history for undo/redo
-        saveHistory();
-    }
-    global.populateAdvisorAssignmentTable = populateAdvisorAssignmentTable;
-
-
-    // ========================================================================
-    //      UI: HORIZONTAL PLANNER (Main Schedule)
-    // ========================================================================
-
-    /**
-     * Renders the hour ticks (e.g., "06:00", "07:00") in the header.
-     */
-    function renderTimeHeader() {
-        const el = $('#timeHeader');
-        if (!el) return;
-
-        const startHour = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-start-hour') || '6', 10);
-        const endHour = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-end-hour') || '20', 10);
-        const hourWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-hour-width') || '60', 10);
-
-        el.innerHTML = '';
-        for (let h = startHour; h <= endHour; h++) {
-            const tick = document.createElement('div');
-            tick.className = 'tick';
-            tick.textContent = `${h.toString().padStart(2, '0')}:00`;
-            tick.style.left = `${(h - startHour) * hourWidth}px`;
-            el.appendChild(tick);
-        }
-    }
-    global.renderTimeHeader = renderTimeHeader;
-
-    /**
-     * Main function to calculate and render the horizontal planner.
-     */
-    function renderPlanner() {
-        const body = $('#plannerBody');
-        if (!body) return;
-
-        const rows = computeScheduleRows();
-        
-        body.innerHTML = ''; // Clear old rows
-        if (!rows.length) {
-            body.innerHTML = '<div class="planner-row-empty">No advisors selected or no shifts scheduled for this day.</div>';
-            return;
-        }
-
-        const startHour = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-start-hour') || '6', 10);
-        const hourWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-hour-width') || '60', 10);
-        const startMinutes = startHour * 60;
-        const pxPerMinute = hourWidth / 60;
-
-        rows.forEach(row => {
-            const rowEl = document.createElement('div');
-            rowEl.className = 'planner-row';
-            
-            // Name Column
-            const nameEl = document.createElement('div');
-            nameEl.className = 'planner-name';
-            nameEl.textContent = row.name;
-            nameEl.title = row.name;
-            rowEl.appendChild(nameEl);
-
-            // Timeline Column
-            const timelineEl = document.createElement('div');
-            timelineEl.className = 'planner-timeline';
-
-            row.segments.forEach(seg => {
-                const bar = document.createElement('div');
-                bar.className = `planner-bar ${seg.cssClass || 'c-email'}`;
-                
-                const left = (seg.start - startMinutes) * pxPerMinute;
-                const width = (seg.end - seg.start) * pxPerMinute;
-
-                bar.style.left = `${left}px`;
-                bar.style.width = `${width}px`;
-
-                bar.innerHTML = `
-                    <span class="planner-bar-label">${seg.code}</span>
-                    <span class="planner-bar-time">${minutesToTime(seg.start)} - ${minutesToTime(seg.end)}</span>
-                `;
-                
-                // Add tooltip data
-                bar.dataset.tooltip = `
-                    ${row.name}<br>
-                    <span>${seg.code}</span>
-                    <span>${minutesToTime(seg.start)} - ${minutesToTime(seg.end)}</span>
-                `;
-                timelineEl.appendChild(bar);
-            });
-            rowEl.appendChild(timelineEl);
-            body.appendChild(rowEl);
-        });
-    }
-    global.renderPlanner = renderPlanner;
-
-    /**
-     * Calculates the schedule rows for the selected advisors and day.
-     * This is the "brains" of the auto-scheduler.
-     * @returns {Array<object>} An array of row objects for the renderer.
-     */
-    function computeScheduleRows() {
-        const weekStartISO = $('#weekStart').value;
-        const dayName = $('#teamDay').value; // "Monday", "Tuesday", ...
-        if (!weekStartISO || !dayName) return [];
-        
-        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        const dayIndex = days.indexOf(dayName);
-        const dayKey = dayName.toLowerCase().substring(0, 3); // "mon", "tue", ...
-
-        // Get the specific date for the selected day
-        const plannerDate = new Date(weekStartISO + 'T00:00:00');
-        plannerDate.setDate(plannerDate.getDate() + dayIndex);
-        const plannerDateISO = toISODate(plannerDate);
-
-        const scheduledRows = [];
-
-        // Loop over only the selected advisors
-        for (const advisorId of APP_STATE.selectedAdvisors) {
-            const advisor = APP_STATE.advisors.get(advisorId);
-            if (!advisor) continue;
-
-            const assignment = APP_STATE.rotationAssignments.get(advisorId);
-            
-            // If no assignment, add a blank row
-            if (!assignment || !assignment.rotation_name || !assignment.start_date) {
-                scheduledRows.push({ name: advisor.name, segments: [] });
-                continue;
-            }
-
-            // 1. Get the rotation pattern
-            const pattern = APP_STATE.rotationPatterns.get(assignment.rotation_name);
-            if (!pattern) {
-                scheduledRows.push({ name: advisor.name, segments: [] }); // Pattern deleted?
-                continue;
-            }
-
-            // 2. Find the effective week (1-6)
-            const weekNum = getEffectiveWeek(assignment.start_date, plannerDateISO);
-            const weekKey = `week${weekNum}`;
-            
-            // 3. Get the shift code for that day (e.g., "7A")
-            const shiftCode = pattern.pattern?.[weekKey]?.[dayKey];
-            if (!shiftCode || shiftCode === "RDO") {
-                scheduledRows.push({ name: advisor.name, segments: [] }); // Day off
-                continue;
-            }
-
-            // 4. Get the shift template details
-            const template = APP_STATE.shiftTemplates.get(shiftCode);
-            if (!template) {
-                scheduledRows.push({ name: advisor.name, segments: [] }); // Unknown code
-                continue;
-            }
-
-            // 5. Build segments (shift, breaks, lunch)
-            const segments = [];
-            const workStart = timeToMinutes(template.start_time);
-            const workEnd = timeToMinutes(template.end_time);
-
-            if (workStart === null || workEnd === null || workEnd <= workStart) {
-                scheduledRows.push({ name: advisor.name, segments: [] }); // Invalid template
-                continue;
-            }
-            
-            // Add work segment
-            segments.push({
-                code: shiftCode,
-                start: workStart,
-                end: workEnd,
-                cssClass: 'c-email' // Default class, can be improved
-            });
-            
-            // Add breaks/lunch
-            if (template.break1) {
-                const start = timeToMinutes(template.break1);
-                if (start) segments.push({ code: 'Break', start, end: start + 15, cssClass: 'c-break' });
-            }
-            if (template.lunch) {
-                const start = timeToMinutes(template.lunch);
-                if (start) segments.push({ code: 'Lunch', start, end: start + 30, cssClass: 'c-lunch' });
-            }
-            if (template.break2) {
-                const start = timeToMinutes(template.break2);
-                if (start) segments.push({ code: 'Break', start, end: start + 15, cssClass: 'c-break' });
-            }
-
-            scheduledRows.push({ name: advisor.name, segments });
-        }
-
-        // Sort rows by name
-        scheduledRows.sort((a, b) => a.name.localeCompare(b.name));
-        return scheduledRows;
+  });
+
+  // Sort leaders and advisors alphabetically
+  const sortedOrg = {};
+  Object.keys(STATE.org)
+    .sort()
+    .forEach((leaderName) => {
+      sortedOrg[leaderName] = STATE.org[leaderName].sort((a, b) =>
+        a.name.localeCompare(b.name)
+      );
+    });
+  STATE.org = sortedOrg;
+}
+
+/**
+ * Processes shift templates into a Map.
+ * @param {Array} templates - Array of template objects from Supabase.
+ */
+function processTemplates(templates) {
+  STATE.shiftTemplates.clear();
+  // Add a "blank" template for empty slots
+  STATE.shiftTemplates.set("--", { code: "--", name: "None" });
+  templates.sort((a, b) => a.code.localeCompare(b.code));
+  templates.forEach((t) => STATE.shiftTemplates.set(t.code, t));
+}
+
+/**
+ * Processes rotation patterns into a Map.
+ * Data is stored in Supabase as: { name: "Flex 1", pattern: { "Week 1": { "MON": "7A", ... } } }
+ * @param {Array} patterns - Array of pattern objects from Supabase.
+ */
+function processRotationPatterns(patterns) {
+  STATE.rotationPatterns.clear();
+  patterns.forEach((p) => {
+    STATE.rotationPatterns.set(p.name, p.pattern || {});
+  });
+}
+
+/**
+ * Processes advisor assignments into a Map.
+ * @param {Array} assignments - Array of assignment objects from Supabase.
+ */
+function processRotationAssignments(assignments) {
+  STATE.rotationAssignments.clear();
+  assignments.forEach((a) => {
+    STATE.rotationAssignments.set(a.advisor_id, {
+      rotation_name: a.rotation_name,
+      start_date: a.start_date,
+    });
+  });
+}
+
+// --- UI Rendering Functions ---
+
+/**
+ * Renders the hierarchical Schedules tree with leaders and advisors.
+ */
+function renderSchedulesTree() {
+  if (!UI.treeContainer) return;
+  
+  const treeHTML = Object.entries(STATE.org)
+    .map(([leaderName, advisors]) => {
+      const leaderId = advisors[0]?.leader_id || leaderName; // Use name as fallback ID
+      const advisorNodes = advisors
+        .map(
+          (adv) => `
+        <div class="advisor-node">
+          <input type="checkbox" id="adv-${adv.id}" data-id="${adv.id}" class="adv-check" />
+          <label for="adv-${adv.id}">${adv.name}</label>
+        </div>`
+        )
+        .join("");
+
+      return `
+      <details open>
+        <summary>
+          <span class="twisty">▼</span>
+          <input type="checkbox" id="lead-${leaderId}" data-leader-id="${leaderId}" class="lead-check" />
+          <label for="lead-${leaderId}">${leaderName}</label>
+        </summary>
+        ${advisorNodes}
+      </details>`;
+    })
+    .join("");
+  
+  UI.treeContainer.innerHTML = treeHTML;
+}
+
+/**
+ * Renders the Rotation Editor tab, filling the dropdown and the grid.
+ */
+function renderRotationEditor() {
+  if (!UI.rotationSelect) return;
+
+  // 1. Populate the "Rotation Family" dropdown
+  const rotationNames = ["", ...STATE.rotationPatterns.keys()].sort();
+  UI.rotationSelect.innerHTML = rotationNames
+    .map((name) => `<option value="${name}">${name || "-- Select Rotation --"}</option>`)
+    .join("");
+
+  // 2. Build the 6-week grid
+  let gridHTML = `<div class="grid-header"></div>`;
+  DAYS_OF_WEEK.forEach(
+    (day) => (gridHTML += `<div class="grid-header">${day}</div>`)
+  );
+
+  const shiftOptions = [...STATE.shiftTemplates.keys()]
+    .map((code) => `<option value="${code}">${code}</option>`)
+    .join("");
+
+  for (let w = 1; w <= 6; w++) {
+    gridHTML += `<div class="week-label">Week ${w}</div>`;
+    DAYS_OF_WEEK.forEach((day) => {
+      gridHTML += `
+        <div>
+          <select class="input" data-week="${w}" data-day="${day}">
+            ${shiftOptions}
+          </select>
+        </div>`;
+    });
+  }
+  UI.rotationEditorGrid.innerHTML = gridHTML;
+
+  // 3. Load the selected rotation pattern into the grid
+  loadRotationPatternIntoGrid();
+}
+
+/**
+ * Renders the Advisor Assignments table.
+ */
+function renderAssignmentTable() {
+  if (!UI.assignmentTableBody) return;
+  
+  const rotationOptions = ["", ...STATE.rotationPatterns.keys()]
+    .sort()
+    .map((name) => `<option value="${name}">${name || "-- None --"}</option>`)
+    .join("");
+
+  let tableHTML = "";
+  // Iterate over advisors in the same order as the tree
+  Object.values(STATE.org).forEach(advisors => {
+    advisors.forEach(adv => {
+      const assignment = STATE.rotationAssignments.get(adv.id) || {};
+      const rotationName = assignment.rotation_name || "";
+      const startDate = assignment.start_date || "";
+
+      tableHTML += `
+        <tr data-advisor-id="${adv.id}">
+          <td>${adv.name}</td>
+          <td>
+            <select class="input rotation-assign-select" data-advisor-id="${adv.id}">
+              ${rotationOptions}
+            </select>
+          </td>
+          <td>
+            <input type="text" class="input rotation-start-date" data-advisor-id="${adv.id}" value="${startDate}" placeholder="YYYY-MM-DD" />
+          </td>
+        </tr>`;
+    });
+  });
+
+  UI.assignmentTableBody.innerHTML = tableHTML;
+
+  // Now that rows exist, populate values and attach pickers
+  UI.assignmentTableBody.querySelectorAll("tr").forEach(row => {
+    const advId = row.dataset.advisorId;
+    const assignment = STATE.rotationAssignments.get(advId) || {};
+    
+    // Set selected rotation
+    const select = row.querySelector(".rotation-assign-select");
+    if (select) {
+      select.value = assignment.rotation_name || "";
     }
 
-    // ========================================================================
-    //      UI: HISTORY (Undo/Redo)
-    // ========================================================================
-
-    /**
-     * Saves the current state of `rotationAssignments` to the history buffer.
-     */
-    function saveHistory() {
-        if (APP_STATE.isUndoing) return; // Don't save history *while* undoing
-
-        const currentState = JSON.stringify(Array.from(APP_STATE.rotationAssignments.entries()));
-
-        // If current state is same as last state, do nothing
-        if (APP_STATE.historyIndex > -1 && APP_STATE.history[APP_STATE.historyIndex] === currentState) {
-            return;
-        }
-        
-        // Truncate history if we've undone
-        APP_STATE.history = APP_STATE.history.slice(0, APP_STATE.historyIndex + 1);
-        
-        // Add new state
-        APP_STATE.history.push(currentState);
-        
-        // Limit history size
-        if (APP_STATE.history.length > 20) {
-            APP_STATE.history.shift();
-        }
-        
-        APP_STATE.historyIndex = APP_STATE.history.length - 1;
-        
-        updateUndoRedoButtons();
+    // Attach Flatpickr
+    const dateInput = row.querySelector(".rotation-start-date");
+    if (dateInput) {
+      flatpickr(dateInput, {
+        dateFormat: "Y-m-d",
+        allowInput: true,
+        onChange: function (selectedDates, dateStr, instance) {
+          handleAssignmentChange(advId, "start_date", dateStr);
+        },
+      });
     }
-    global.saveHistory = saveHistory;
+  });
+}
 
-    /**
-     * Restores the previous state from history.
-     */
-    function undo() {
-        if (APP_STATE.historyIndex <= 0) return; // Nothing to undo
+/**
+ * Renders the header (ticks) for the horizontal planner.
+ */
+function renderPlannerHeader() {
+  if (!UI.plannerHeader) return;
+  
+  let headerHTML = "";
+  for (let h = PLANNER_START_HOUR; h < PLANNER_END_HOUR; h++) {
+    const left = ((h - PLANNER_START_HOUR) / PLANNER_HOUR_SPAN) * 100;
+    headerHTML += `<div class="tick" style="left: ${left}%;">${h}:00</div>`;
+  }
+  // Add final tick
+  headerHTML += `<div class="tick" style="left: 100%;">${PLANNER_END_HOUR}:00</div>`;
+  UI.plannerHeader.innerHTML = headerHTML;
+  
+  // Set the background-size for the grid lines
+  const tickPercentage = (1 / PLANNER_HOUR_SPAN) * 100;
+  UI.plannerBody.style.backgroundSize = `${tickPercentage}% 100%`;
+}
 
-        APP_STATE.isUndoing = true;
-        APP_STATE.historyIndex--;
-        
-        const oldState = JSON.parse(APP_STATE.history[APP_STATE.historyIndex]);
-        APP_STATE.rotationAssignments = new Map(oldState);
-        
-        // Re-render the assignment table (which triggers planner render)
-        populateAdvisorAssignmentTable();
-        refreshAllUI();
-        
-        updateUndoRedoButtons();
-        APP_STATE.isUndoing = false;
+/**
+ * Renders the main horizontal planner body with advisor schedules.
+ */
+function renderPlanner() {
+  if (!UI.plannerBody) return;
+  
+  const plannerDate = new Date(UI.weekStart.value + "T00:00:00");
+  const dayIndex = DAYS_OF_WEEK.indexOf(UI.teamDay.value.toUpperCase().slice(0, 3));
+  if (dayIndex === -1) {
+    UI.plannerBody.innerHTML = "Invalid day selected.";
+    return;
+  }
+  
+  plannerDate.setDate(plannerDate.getDate() + dayIndex);
+  const targetDateStr = formatDate(plannerDate);
+  UI.plannerTitle.textContent = `Team Schedule - ${targetDateStr}`;
+
+  let plannerHTML = "";
+  const selectedAdvArray = [...STATE.selectedAdvisors].sort((aId, bId) => {
+    const aName = STATE.advisors.get(aId)?.name || "";
+    const bName = STATE.advisors.get(bId)?.name || "";
+    return aName.localeCompare(bName);
+  });
+
+  if (selectedAdvArray.length === 0) {
+    UI.plannerBody.innerHTML = `<div class="planner-row-name" style="grid-column: 1 / -1; text-align: center; padding: 20px;">No advisors selected. Check boxes in the 'Schedules' panel.</div>`;
+    return;
+  }
+
+  selectedAdvArray.forEach((advId) => {
+    const advisor = STATE.advisors.get(advId);
+    if (!advisor) return;
+
+    const segments = calculateSegmentsForAdvisor(advId, targetDateStr);
+    
+    let barsHTML = "";
+    segments.forEach(seg => {
+      const left = timeToPercentage(seg.start_min);
+      const right = timeToPercentage(seg.end_min);
+      const width = right - left;
+      const colorClass = getBarColorClass(seg.code);
+      const isShort = width < 8;
+
+      barsHTML += `
+        <div class="planner-bar ${colorClass} ${isShort ? 'short' : ''}" 
+             style="left: ${left}%; width: ${width}%;"
+             title="${seg.code} (${formatTime(seg.start_min)} - ${formatTime(seg.end_min)})">
+          <span class="planner-bar-label">${seg.code}</span>
+          <span class="planner-bar-time">
+            ${formatTime(seg.start_min)} - ${formatTime(seg.end_min)}
+          </span>
+        </div>`;
+    });
+
+    plannerHTML += `
+      <div class="planner-row">
+        <div class="planner-row-name">${advisor.name}</div>
+        <div class="planner-row-timeline">${barsHTML}</div>
+      </div>`;
+  });
+
+  UI.plannerBody.innerHTML = plannerHTML;
+}
+
+// --- Business Logic & Data Calculation ---
+
+/**
+ * Calculates the final schedule segments for an advisor on a specific date.
+ * This is the core logic engine.
+ * @param {string} advId - The advisor's ID.
+ * @param {string} targetDateStr - The target date in "YYYY-MM-DD" format.
+ * @returns {Array} - An array of segment objects: { code, start_min, end_min }.
+ */
+function calculateSegmentsForAdvisor(advId, targetDateStr) {
+  const assignment = STATE.rotationAssignments.get(advId);
+  if (!assignment || !assignment.rotation_name || !assignment.start_date) {
+    return []; // No rotation assigned
+  }
+
+  const pattern = STATE.rotationPatterns.get(assignment.rotation_name);
+  if (!pattern) {
+    console.warn(`Pattern "${assignment.rotation_name}" not found.`);
+    return []; // Rotation pattern doesn't exist
+  }
+  
+  // 1. Calculate effective week
+  const effectiveWeekNum = getEffectiveWeek(assignment.start_date, targetDateStr);
+  const weekKey = `Week ${effectiveWeekNum}`;
+  const weekPattern = pattern[weekKey];
+  if (!weekPattern) {
+    console.warn(`Week ${effectiveWeekNum} not found in pattern "${assignment.rotation_name}".`);
+    return []; // Week not defined in pattern
+  }
+
+  // 2. Get shift code for the target day
+  const targetDay = new Date(targetDateStr + "T00:00:00");
+  const dayKey = DAYS_OF_WEEK[targetDay.getUTCDay() - 1] || DAYS_OF_WEEK[6]; // 1 (Mon) - 6 (Sat), 0 (Sun)
+  const shiftCode = weekPattern[dayKey];
+  if (!shiftCode || shiftCode === "--" || shiftCode === "RDO") {
+    return []; // Day off or no shift
+  }
+
+  // 3. Get shift template details
+  const template = STATE.shiftTemplates.get(shiftCode);
+  if (!template) {
+    console.warn(`Shift template "${shiftCode}" not found.`);
+    return []; // Template doesn't exist
+  }
+
+  // 4. Build segments (shift + breaks)
+  const segments = [];
+  const shiftStart = timeToMinutes(template.start_time);
+  const shiftEnd = timeToMinutes(template.end_time);
+
+  if (shiftStart === null || shiftEnd === null || shiftEnd <= shiftStart) {
+    return []; // Invalid shift times
+  }
+
+  const breaks = [
+    { code: "Break", start: timeToMinutes(template.break1), duration: 15 },
+    { code: "Lunch", start: timeToMinutes(template.lunch), duration: 30 },
+    { code: "Break", start: timeToMinutes(template.break2), duration: 15 },
+  ]
+    .filter(b => b.start !== null && b.start >= shiftStart && b.start < shiftEnd)
+    .sort((a, b) => a.start - b.start);
+
+  let currentMin = shiftStart;
+  
+  // Add work segments around breaks
+  for (const br of breaks) {
+    if (br.start > currentMin) {
+      segments.push({
+        code: template.code,
+        start_min: currentMin,
+        end_min: br.start,
+      });
     }
-    global.undo = undo;
+    segments.push({
+      code: br.code,
+      start_min: br.start,
+      end_min: br.start + br.duration,
+    });
+    currentMin = br.start + br.duration;
+  }
 
-    /**
-     * Restores the next state from history.
-     */
-    function redo() {
-        if (APP_STATE.historyIndex >= APP_STATE.history.length - 1) return; // Nothing to redo
-        
-        APP_STATE.isUndoing = true;
-        APP_STATE.historyIndex++;
+  // Add final work segment
+  if (currentMin < shiftEnd) {
+    segments.push({
+      code: template.code,
+      start_min: currentMin,
+      end_min: shiftEnd,
+    });
+  }
 
-        const newState = JSON.parse(APP_STATE.history[APP_STATE.historyIndex]);
-        APP_STATE.rotationAssignments = new Map(newState);
+  return segments;
+}
 
-        // Re-render
-        populateAdvisorAssignmentTable();
-        refreshAllUI();
-        
-        updateUndoRedoButtons();
-        APP_STATE.isUndoing = false;
+/**
+ * Calculates the effective week number (1-6) of a rotation.
+ * @param {string} startDateStr - The "Week 1" start date ("YYYY-MM-DD").
+ * @param {string} targetDateStr - The date to check ("YYYY-MM-DD").
+ * @returns {number} - The week number (1-6).
+ */
+function getEffectiveWeek(startDateStr, targetDateStr) {
+  const startDate = new Date(startDateStr + "T00:00:00");
+  const targetDate = new Date(targetDateStr + "T00:00:00");
+  
+  const diffTime = targetDate.getTime() - startDate.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  const diffWeeks = Math.floor(diffDays / 7);
+  
+  const numWeeksInPattern = STATE.rotationPatterns.size > 0 ? 
+    Object.keys(STATE.rotationPatterns.values().next().value).length : 6;
+
+  return (diffWeeks % numWeeksInPattern + numWeeksInPattern) % numWeeksInPattern + 1;
+}
+
+/**
+ * Loads the selected rotation pattern from STATE into the editor grid.
+ */
+function loadRotationPatternIntoGrid() {
+  const rotationName = UI.rotationSelect.value;
+  const pattern = STATE.rotationPatterns.get(rotationName) || {};
+
+  for (let w = 1; w <= 6; w++) {
+    const weekPattern = pattern[`Week ${w}`] || {};
+    DAYS_OF_WEEK.forEach((day) => {
+      const code = weekPattern[day] || "--";
+      const sel = UI.rotationEditorGrid.querySelector(
+        `select[data-week="${w}"][data-day="${day}"]`
+      );
+      if (sel) {
+        sel.value = code;
+      }
+    });
+  }
+}
+
+// --- Event Handlers ---
+
+/**
+ * Handles all clicks on the main document using event delegation.
+ * @param {Event} e - The click event.
+ */
+function handleDocumentClick(e) {
+  const target = e.target;
+
+  // Tab switching
+  if (target.matches(".tab-btn")) {
+    const tabId = target.dataset.tab;
+    UI.tabButtons.forEach((btn) => btn.classList.remove("active"));
+    UI.tabContents.forEach((content) => content.classList.remove("active"));
+    target.classList.add("active");
+    document.getElementById(tabId).classList.add("active");
+  }
+
+  // Rotation Editor: New
+  if (target.id === "btnNewRotation") {
+    const name = prompt("Enter new rotation family name:");
+    if (name && !STATE.rotationPatterns.has(name)) {
+      STATE.rotationPatterns.set(name, {});
+      renderRotationEditor();
+      UI.rotationSelect.value = name;
+      loadRotationPatternIntoGrid();
+      showToast(`Rotation "${name}" created.`, "success");
+    } else if (name) {
+      alert(`Rotation name "${name}" already exists.`);
     }
-    global.redo = redo;
+  }
 
-    /**
-     * Updates the disabled state of the Undo/Redo buttons.
-     */
-    function updateUndoRedoButtons() {
-        const btnUndo = $('#btnUndo');
-        const btnRedo = $('#btnRedo');
-        if (btnUndo) btnUndo.disabled = APP_STATE.historyIndex <= 0;
-        if (btnRedo) btnRedo.disabled = APP_STATE.historyIndex >= APP_STATE.history.length - 1;
+  // Rotation Editor: Save
+  if (target.id === "btnSaveRotation") {
+    handleSaveRotation();
+  }
+
+  // Rotation Editor: Delete
+  if (target.id === "btnDeleteRotation") {
+    handleDeleteRotation();
+  }
+
+  // Schedules Tree: Clear Selection
+  if (target.id === "btnClearSelection") {
+    STATE.selectedAdvisors.clear();
+    document.querySelectorAll('.adv-check, .lead-check, #checkSelectAllAdvisors')
+      .forEach(cb => cb.checked = false);
+    renderPlanner();
+  }
+
+  // Top Bar Controls
+  if (target.id === "btnToday") {
+    UI.weekStart.value = formatDate(getMonday(new Date()));
+    renderPlanner();
+  }
+  if (target.id === "prevWeek") {
+    const d = new Date(UI.weekStart.value + "T00:00:00");
+    d.setDate(d.getDate() - 7);
+    UI.weekStart.value = formatDate(d);
+    renderPlanner();
+  }
+  if (target.id === "nextWeek") {
+    const d = new Date(UI.weekStart.value + "T00:00:00");
+    d.setDate(d.getDate() + 7);
+    UI.weekStart.value = formatDate(d);
+    renderPlanner();
+  }
+  
+  // Undo/Redo
+  if (target.id === "btnUndo") handleUndo();
+  if (target.id === "btnRedo") handleRedo();
+
+  // Commit Week
+  if (target.id === "btnCommitWeek") {
+    // Placeholder for commit logic
+    showToast("Commit Week function not yet implemented.", "success");
+  }
+
+  // Print
+  if (target.id === "btnPrint") {
+    window.print();
+  }
+}
+
+/**
+ * Handles all change events on the main document using event delegation.
+ * @param {Event} e - The change event.
+ */
+function handleChange(e) {
+  const target = e.target;
+
+  // Week Start or Team Day changed
+  if (target.id === "weekStart" || target.id === "teamDay") {
+    renderPlanner();
+  }
+
+  // Rotation Editor: Dropdown changed
+  if (target.id === "rotationSelect") {
+    loadRotationPatternIntoGrid();
+  }
+
+  // Advisor Assignments: Rotation assigned
+  if (target.matches(".rotation-assign-select")) {
+    handleAssignmentChange(
+      target.dataset.advisorId,
+      "rotation_name",
+      target.value
+    );
+  }
+
+  // Schedules Tree: Checkboxes
+  if (target.matches("#checkSelectAllAdvisors")) {
+    const isChecked = target.checked;
+    document.querySelectorAll('.adv-check, .lead-check').forEach(cb => cb.checked = isChecked);
+    if (isChecked) {
+      STATE.selectedAdvisors = new Set(STATE.advisors.keys());
+    } else {
+      STATE.selectedAdvisors.clear();
     }
-    global.updateUndoRedoButtons = updateUndoRedoButtons;
+    renderPlanner();
+  }
+  
+  if (target.matches(".lead-check")) {
+    const isChecked = target.checked;
+    const details = target.closest('details');
+    details.querySelectorAll('.adv-check').forEach(cb => {
+      cb.checked = isChecked;
+      const advId = cb.dataset.id;
+      if (isChecked) {
+        STATE.selectedAdvisors.add(advId);
+      } else {
+        STATE.selectedAdvisors.delete(advId);
+      }
+    });
+    renderPlanner();
+  }
+
+  if (target.matches(".adv-check")) {
+    const advId = target.dataset.id;
+    if (target.checked) {
+      STATE.selectedAdvisors.add(advId);
+    } else {
+      STATE.selectedAdvisors.delete(advId);
+    }
+    renderPlanner();
+  }
+}
+
+/**
+ * Handles saving the currently edited rotation pattern to state and Supabase.
+ */
+async function handleSaveRotation() {
+  const rotationName = UI.rotationSelect.value;
+  if (!rotationName) {
+    alert("Please select a rotation to save.");
+    return;
+  }
+
+  setLoading(true);
+  const pattern = {};
+  for (let w = 1; w <= 6; w++) {
+    const weekKey = `Week ${w}`;
+    pattern[weekKey] = {};
+    DAYS_OF_WEEK.forEach((day) => {
+      const sel = UI.rotationEditorGrid.querySelector(
+        `select[data-week="${w}"][data-day="${day}"]`
+      );
+      if (sel.value !== "--") {
+        pattern[weekKey][day] = sel.value;
+      }
+    });
+  }
+
+  // Save to state
+  STATE.rotationPatterns.set(rotationName, pattern);
+
+  // Save to Supabase
+  try {
+    const { error } = await supabase
+      .from("rotation_patterns")
+      .upsert({ name: rotationName, pattern: pattern }, { onConflict: "name" });
+    
+    if (error) throw error;
+    
+    saveHistory(); // Save state on successful save
+    showToast(`Rotation "${rotationName}" saved successfully.`, "success");
+    renderPlanner(); // Re-render planner in case assignments depend on this
+  } catch (error) {
+    console.error("Error saving rotation:", error);
+    showToast(`Error saving rotation: ${error.message}`, "error");
+  } finally {
+    setLoading(false);
+  }
+}
+
+/**
+ * Handles deleting a rotation pattern.
+ */
+async function handleDeleteRotation() {
+  const rotationName = UI.rotationSelect.value;
+  if (!rotationName) {
+    alert("Please select a rotation to delete.");
+    return;
+  }
+  
+  if (!confirm(`Are you sure you want to delete the rotation "${rotationName}"? This cannot be undone.`)) {
+    return;
+  }
+
+  setLoading(true);
+  try {
+    // Delete from Supabase
+    const { error } = await supabase
+      .from("rotation_patterns")
+      .delete()
+      .eq("name", rotationName);
+      
+    if (error) throw error;
+
+    // Delete from state
+    STATE.rotationPatterns.delete(rotationName);
+    
+    // Clear any assignments that used this rotation
+    // (This is a choice - we could also just leave them stale)
+    STATE.rotationAssignments.forEach((assign, advId) => {
+      if (assign.rotation_name === rotationName) {
+        STATE.rotationAssignments.delete(advId);
+        // Also clear from Supabase
+        supabase.from("rotation_assignments").delete().eq("advisor_id", advId);
+      }
+    });
+
+    saveHistory();
+    showToast(`Rotation "${rotationName}" deleted.`, "success");
+    
+    // Re-render UI
+    renderRotationEditor();
+    renderAssignmentTable();
+    renderPlanner();
+  } catch (error) {
+    console.error("Error deleting rotation:", error);
+    showToast(`Error deleting rotation: ${error.message}`, "error");
+  } finally {
+    setLoading(false);
+  }
+}
 
 
-})(window);
+/**
+ * Handles changes in the Advisor Assignments table and saves to Supabase.
+ * @param {string} advId - The advisor ID.
+ *key {string} - The field being changed ("rotation_name" or "start_date").
+ * @param {string} value - The new value.
+ */
+async function handleAssignmentChange(advId, key, value) {
+  if (!advId) return;
+
+  // 1. Update local state
+  const assignment = STATE.rotationAssignments.get(advId) || {};
+  assignment[key] = value;
+  STATE.rotationAssignments.set(advId, assignment);
+
+  // 2. Debounce the save to Supabase
+  // Create a unique key for this advisor's save operation
+  const debounceKey = `assign_${advId}`;
+  
+  if (window[debounceKey]) {
+    clearTimeout(window[debounceKey]);
+  }
+
+  window[debounceKey] = setTimeout(async () => {
+    setLoading(true);
+    try {
+      const { error } = await supabase.from("rotation_assignments").upsert(
+        {
+          advisor_id: advId,
+          rotation_name: assignment.rotation_name,
+          start_date: assignment.start_date,
+        },
+        { onConflict: "advisor_id" }
+      );
+      if (error) throw error;
+      
+      saveHistory(); // Save state on successful assignment
+      showToast(
+        `Assignment for ${STATE.advisors.get(advId)?.name} saved.`,
+        "success"
+      );
+      renderPlanner(); // Re-render the planner with new data
+    } catch (error) {
+      console.error("Error saving assignment:", error);
+      showToast(`Error saving assignment: ${error.message}`, "error");
+    } finally {
+      setLoading(false);
+      window[debounceKey] = null;
+    }
+  }, 1000); // Wait 1 second after last change to save
+}
+
+// --- History (Undo/Redo) Functions ---
+
+/**
+ * Saves a deep copy of the current state to the history buffer.
+ */
+function saveHistory() {
+  // Prune future states if we are undoing
+  if (STATE.historyIndex < STATE.history.length - 1) {
+    STATE.history = STATE.history.slice(0, STATE.historyIndex + 1);
+  }
+  
+  // Create a snapshot of the parts of state we want to undo
+  const snapshot = {
+    rotationPatterns: new Map(STATE.rotationPatterns),
+    rotationAssignments: new Map(STATE.rotationAssignments),
+  };
+  
+  STATE.history.push(snapshot);
+  
+  // Limit history to 20 steps
+  if (STATE.history.length > 20) {
+    STATE.history.shift();
+  }
+  
+  STATE.historyIndex = STATE.history.length - 1;
+}
+
+/**
+ * Restores the state to the previous point in history.
+ */
+function handleUndo() {
+  if (STATE.historyIndex <= 0) {
+    showToast("Nothing more to undo.", "success");
+    return;
+  }
+  STATE.historyIndex--;
+  restoreState(STATE.history[STATE.historyIndex]);
+  showToast("Undo successful.", "success");
+}
+
+/**
+ * Restores the state to the next point in history (Redo).
+ */
+function handleRedo() {
+  if (STATE.historyIndex >= STATE.history.length - 1) {
+    showToast("Nothing to redo.", "success");
+    return;
+  }
+  STATE.historyIndex++;
+  restoreState(STATE.history[STATE.historyIndex]);
+  showToast("Redo successful.", "success");
+}
+
+/**
+ * Restores the application state from a history snapshot.
+ * @param {object} snapshot - The state snapshot to restore.
+ */
+function restoreState(snapshot) {
+  STATE.rotationPatterns = new Map(snapshot.rotationPatterns);
+  STATE.rotationAssignments = new Map(snapshot.rotationAssignments);
+
+  // Re-render all components that depend on this state
+  renderRotationEditor();
+  renderAssignmentTable();
+  renderPlanner();
+}
+
+// --- Helper & Utility Functions ---
+
+/**
+ * Shows or hides the global loading overlay.
+ * @param {boolean} isLoading - Whether to show the loader.
+ */
+function setLoading(isLoading) {
+  STATE.isLoading = isLoading;
+  if (UI.loadingOverlay) {
+    UI.loadingOverlay.classList.toggle("hidden", !isLoading);
+  }
+}
+
+/**
+ * Shows a toast notification.
+ * @param {string} message - The text to display.
+ * @param {string} type - "success" or "error".
+ */
+let toastTimer;
+function showToast(message, type = "success") {
+  if (!UI.toast) return;
+  
+  clearTimeout(toastTimer);
+  
+  UI.toast.textContent = message;
+  UI.toast.className = type;
+  UI.toast.classList.add("show");
+
+  toastTimer = setTimeout(() => {
+    UI.toast.classList.remove("show");
+  }, 3000);
+}
+
+/**
+ * Gets the Monday of a given date.
+ * @param {Date} d - The input date.
+ * @returns {Date} - The Monday of that week.
+ */
+function getMonday(d) {
+  d = new Date(d);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+  return new Date(d.setDate(diff));
+}
+
+/**
+ * Formats a Date object as "YYYY-MM-DD".
+ * @param {Date} date - The input date.
+ * @returns {string} - The formatted date string.
+ */
+function formatDate(date) {
+  return date.toISOString().split("T")[0];
+}
+
+/**
+ * Converts "HH:MM:SS" or "HH:MM" to minutes from midnight.
+ * @param {string} timeStr - The time string.
+ * @returns {number|null} - Minutes from midnight or null.
+ */
+function timeToMinutes(timeStr) {
+  if (!timeStr) return null;
+  const parts = timeStr.split(":");
+  if (parts.length < 2) return null;
+  const hours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  if (isNaN(hours) || isNaN(minutes)) return null;
+  return hours * 60 + minutes;
+}
+
+/**
+ * Formats minutes from midnight as "HH:MM".
+ * @param {number} min - Minutes from midnight.
+ * @returns {string} - The formatted time string.
+ */
+function formatTime(min) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/**
+ * Converts minutes from midnight to a CSS percentage for the planner.
+ * @param {number} min - Minutes from midnight.
+ * @returns {number} - The CSS `left` or `width` percentage.
+ */
+function timeToPercentage(min) {
+  const startMin = PLANNER_START_HOUR * 60;
+  const endMin = PLANNER_END_HOUR * 60;
+  const spanMin = endMin - startMin;
+  
+  const clampedMin = Math.max(startMin, Math.min(endMin, min));
+  return ((clampedMin - startMin) / spanMin) * 100;
+}
+
+/**
+ * Gets the appropriate CSS color class for a shift code.
+ * @param {string} code - The shift code.
+ * @returns {string} - The CSS class name.
+ */
+function getBarColorClass(code) {
+  if (!code) return "bar-color-default";
+  const k = code.toLowerCase();
+  if (k === "rdo") return "bar-color-rdo";
+  if (k === "lunch") return "bar-color-lunch";
+  if (k === "break") return "bar-color-break";
+  if (k.includes("email")) return "bar-color-email";
+  if (k.includes("mirakl")) return "bar-color-mirakl";
+  if (k.includes("social")) return "bar-color-social";
+  if (k.includes("overtime")) return "bar-color-overtime";
+  if (k.includes("meeting")) return "bar-color-meeting";
+  if (k.includes("absence")) return "bar-color-absence";
+  if (k.includes("shrink")) return "bar-color-shrink";
+  return "bar-color-default";
+}
+
+// --- Expose key functions to the init script ---
+window.App = {
+  bootApplication,
+  handleDocumentClick,
+  handleChange,
+};
 
