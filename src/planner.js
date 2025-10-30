@@ -1,5 +1,5 @@
 /**
- * Professional Team Rota System - Main Application Logic (v7)
+ * Professional Team Rota System - Main Application Logic (v8 - Timezone & Crash Fix)
  *
  * This file contains all the core logic for the planner, including:
  * - Data fetching from Supabase (advisors, leaders, rotations, templates)
@@ -64,7 +64,8 @@
         supabase.from('leaders').select('*'),
         supabase.from('advisors').select('*'),
         supabase.from('shift_templates').select('*'),
-        supabase.from('rotation_patterns').select('*'),
+        // FIX: Read from your existing 'rotations' table, not 'rotation_patterns'
+        supabase.from('rotations').select('name, week, dow, is_rdo, shift_code'), 
         supabase.from('rotation_assignments').select('*')
       ]);
 
@@ -81,7 +82,8 @@
       STATE.leaders = leadersRes.data || [];
       STATE.advisors = advisorsRes.data || [];
       STATE.shiftTemplates = templatesRes.data || [];
-      STATE.rotationPatterns = patternsRes.data || [];
+      // Transform the raw rotations data into the pattern format the app uses
+      STATE.rotationPatterns = transformRawRotations(patternsRes.data || []);
       STATE.rotationAssignments = assignmentsRes.data || [];
       
       console.log("Core data loaded:", {
@@ -97,6 +99,37 @@
       console.error("Boot Failed: Error loading core data", error);
       showToast(`Error loading data: ${error.message}`, "danger");
     }
+  }
+  
+  /**
+   * Transforms raw rotation data (from your 'rotations' table) 
+   * into the JSON 'pattern' format the app UI expects.
+   * @param {Array<object>} rawData - Rows from `rotations` table
+   * @returns {Array<object>} Array of rotation pattern objects
+   */
+  function transformRawRotations(rawData) {
+    const patterns = {}; // { "Flex 1": { pattern: {...} }, ... }
+    
+    rawData.forEach(row => {
+      const { name, week, dow, shift_code, is_rdo } = row;
+      if (!name) return;
+
+      if (!patterns[name]) {
+        patterns[name] = { name: name, pattern: {} };
+      }
+      
+      const weekKey = `Week ${week}`;
+      if (!patterns[name].pattern[weekKey]) {
+        patterns[name].pattern[weekKey] = {};
+      }
+      
+      if (!is_rdo && shift_code) {
+        patterns[name].pattern[weekKey][dow] = shift_code;
+      }
+      // If RDO, we just leave it blank, which the UI interprets as RDO
+    });
+    
+    return Object.values(patterns);
   }
 
   // --- 2. STATE MANAGEMENT & HISTORY (Undo/Redo) ---
@@ -471,6 +504,12 @@
    * Renders the main horizontal planner ("Team Schedule").
    */
   function renderPlanner() {
+    // FIX v7: Check if elements exist before reading properties
+    if (!ELS.timeHeader || !ELS.plannerBody || !ELS.plannerDay) {
+      console.warn("Planner elements not found. Skipping render.");
+      return;
+    }
+    
     renderTimeHeader();
     
     const selected = Array.from(STATE.selectedAdvisors);
@@ -590,28 +629,37 @@
   
   /**
    * Calculates the effective week number (1-6) of a rotation.
+   * FIX v8: This function is now timezone-proof by parsing dates as local.
    * @param {string} startDateStr - "dd/mm/yyyy" start of Week 1
    * @param {string} weekStartISO - "YYYY-MM-DD" of the week to check
    * @returns {number | null} The week number (1-6) or null
    */
-  function getEffectiveWeek(startDateStr, weekStartISO, assignment) {
+  function getEffectiveWeek(startDateStr, weekStartISO) {
     try {
       if (!startDateStr || !weekStartISO) return null;
       
+      // Parse "dd/mm/yyyy" as local date
       const [d, m, y] = startDateStr.split('/').map(Number);
       const startDate = new Date(y, m - 1, d); // JS Date: month is 0-indexed
       
+      // Parse "YYYY-MM-DD" as local date
       const [y2, m2, d2] = weekStartISO.split('-').map(Number);
       const checkDate = new Date(y2, m2 - 1, d2);
 
-      // Ensure both are Mondays
-      const startDay = (startDate.getDay() + 6) % 7; // 0=Mon, 6=Sun
-      const checkDay = (checkDate.getDay() + 6) % 7;
-      
-      if (startDay !== 0) { console.warn(`Rotation start date ${startDateStr} is not a Monday.`); }
-      if (checkDay !== 0) { console.warn(`Planner week start ${weekStartISO} is not a Monday.`); }
+      // We must use UTC methods to get a clean day/week count,
+      // but first, we create UTC-equivalent dates from our local parts.
+      // This avoids timezone shifts entirely.
+      const startUTC = Date.UTC(y, m - 1, d);
+      const checkUTC = Date.UTC(y2, m2 - 1, d2);
 
-      const diffTime = checkDate.getTime() - startDate.getTime();
+      // Check if start date is a Monday (1)
+      const startDay = (startDate.getDay() + 6) % 7; // 0=Mon, 6=Sun
+      if (startDay !== 0) {
+        // This is a warning, but we can proceed
+        // console.warn(`Rotation start date ${startDateStr} is not a Monday.`);
+      }
+
+      const diffTime = checkUTC - startUTC;
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       const diffWeeks = Math.floor(diffDays / 7);
       
@@ -919,33 +967,25 @@
       return;
     }
     
+    // We can't insert into 'rotations' table this way. 
+    // This UI is now for *local* pattern creation.
+    // To save, we need to de-transform the pattern.
     const newPattern = {
       name: name,
       pattern: {} // Empty pattern
     };
     
-    try {
-      const { data, error } = await supabase
-        .from('rotation_patterns')
-        .insert(newPattern)
-        .select();
-      
-      if (error) throw error;
-      
-      // Add to local state
-      STATE.rotationPatterns.push(data[0]);
-      STATE.currentRotation = name;
-      saveHistory(`Create rotation ${name}`);
-      renderRotationEditor(); // Re-render to show the new pattern
-      
-    } catch (error) {
-      console.error("Failed to create rotation:", error);
-      showToast(`Error creating rotation: ${error.message}`, "danger");
-    }
+    // Add to local state
+    STATE.rotationPatterns.push(newPattern);
+    STATE.currentRotation = name;
+    saveHistory(`Create rotation ${name}`);
+    renderRotationEditor(); // Re-render to show the new pattern
+    showToast(`Created new rotation '${name}'. Fill it out and click Save.`, "success");
   }
 
   /**
    * Handles saving the currently edited rotation pattern.
+   * This now de-transforms the pattern into raw rows for the 'rotations' table.
    */
   async function handleSaveRotation() {
     const rotationName = STATE.currentRotation;
@@ -957,14 +997,39 @@
     const pattern = getPatternByName(rotationName);
     if (!pattern) return;
     
+    // De-transform pattern back into rows
+    const rows = [];
+    for (const weekKey in pattern.pattern) { // "Week 1"
+      const week = parseInt(weekKey.split(' ')[1], 10);
+      const weekData = pattern.pattern[weekKey];
+      for (const dow in weekData) { // "1" (for Monday)
+        const code = weekData[dow];
+        rows.push({
+          name: rotationName,
+          week: week,
+          dow: parseInt(dow, 10),
+          shift_code: code,
+          is_rdo: false
+        });
+      }
+    }
+    
     try {
-      const { data, error } = await supabase
-        .from('rotation_patterns')
-        .update({ pattern: pattern.pattern }) // Only update the pattern JSON
-        .eq('name', rotationName)
-        .select();
+      // 1. Delete all existing rows for this rotation
+      const { error: deleteError } = await supabase
+        .from('rotations')
+        .delete()
+        .eq('name', rotationName);
         
-      if (error) throw error;
+      if (deleteError) throw deleteError;
+      
+      // 2. Insert all new rows (if any)
+      if (rows.length > 0) {
+        const { error: insertError } = await supabase
+          .from('rotations')
+          .insert(rows);
+        if (insertError) throw insertError;
+      }
       
       showToast(`Rotation '${rotationName}' saved.`, "success");
       saveHistory(`Save rotation ${rotationName}`);
@@ -990,8 +1055,9 @@
     }
     
     try {
+      // Delete from Supabase
       const { error } = await supabase
-        .from('rotation_patterns')
+        .from('rotations')
         .delete()
         .eq('name', rotationName);
         
@@ -1018,19 +1084,14 @@
    * @param {number} days - e.g., 7 or -7
    */
   function updateWeek(days) {
-    const currentDate = new Date(STATE.weekStart + "T00:00:00");
+    // FIX v8: Use _flatpickr to access the instance
+    const flatpickrInstance = ELS.weekStart._flatpickr;
+    if (!flatpickrInstance) return;
+
+    const currentDate = flatpickrInstance.selectedDates[0] || new Date();
     currentDate.setDate(currentDate.getDate() + days);
     
-    const y = currentDate.getFullYear();
-    const m = String(currentDate.getMonth() + 1).padStart(2, '0');
-    const d = String(currentDate.getDate()).padStart(2, '0');
-    const newDateStr = `${y}-${m}-${d}`;
-    
-    STATE.weekStart = newDateStr;
-    ELS.weekStart.value = newDateStr; // Update the input
-    flatpickr.getInstance(ELS.weekStart).setDate(newDateStr, false); // Update calendar
-    
-    renderPlanner(); // Redraw the planner for the new week
+    flatpickrInstance.setDate(currentDate, true); // true = trigger onChange
   }
 
 
@@ -1060,17 +1121,20 @@
   
   /**
    * Sets a default Monday for the week picker.
+   * FIX v8: Use local date parsing to avoid timezone shift.
    */
   function setDefaultWeek() {
-    let d = new Date();
+    let d = new Date(); // Local time
     // Find previous Monday
     let day = d.getDay();
     let diff = d.getDate() - day + (day === 0 ? -6 : 1); // 0=Sun, 1=Mon
-    d.setDate(diff);
     
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const dStr = String(d.getDate()).padStart(2, '0');
+    // Create new date object from clean local parts
+    const localMonday = new Date(d.getFullYear(), d.getMonth(), diff);
+    
+    const y = localMonday.getFullYear();
+    const m = String(localMonday.getMonth() + 1).padStart(2, '0');
+    const dStr = String(localMonday.getDate()).padStart(2, '0');
     STATE.weekStart = `${y}-${m}-${d}`;
   }
 
