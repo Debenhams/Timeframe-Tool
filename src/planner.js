@@ -1,5 +1,5 @@
 /**
- * Professional Team Rota System - Main Application Logic (v9.2 - Final Logic Fix)
+ * Professional Team Rota System - Main Application Logic (v9.3 - Final Render Fix)
  *
  * This file contains all the core logic for the planner, including:
  * - Data fetching from Supabase (advisors, leaders, rotations, templates)
@@ -558,45 +558,56 @@
    * @returns {Array<object>} Array of segment objects
    */
   function calculateSegmentsForAdvisor(advisorId) {
+    console.log(`[calc] 1. Calculating segments for advisor: ${advisorId}`);
+    
     const assignment = getAssignmentForAdvisor(advisorId);
     if (!assignment || !assignment.rotation_name || !assignment.start_date || !STATE.weekStart) {
+      console.log("[calc] 2. No assignment found or missing data.");
       return []; // No rotation assigned
     }
 
-    // FIX v9.2: Pass assignment to getEffectiveWeek
     const effectiveWeek = getEffectiveWeek(assignment.start_date, STATE.weekStart, assignment);
     if (effectiveWeek === null) {
+      console.log("[calc] 3. Effective week is null (invalid date).");
       return []; // Invalid date
     }
+    console.log(`[calc] 3. Effective week is: ${effectiveWeek}`);
     
     const dayOfWeek = ELS.plannerDay.value; // "Monday", "Tuesday", etc.
-    const dayIndex = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(dayOfWeek) + 1; // 1-7
+    // FIX v9.3: This must be a STRING to match the JSONB key.
+    const dayIndex = (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(dayOfWeek) + 1).toString(); // "1" - "7"
+    console.log(`[calc] 4. Day of week: ${dayOfWeek} (Index: ${dayIndex})`);
 
     const pattern = getPatternByName(assignment.rotation_name);
     if (!pattern || !pattern.pattern) {
+      console.log(`[calc] 5. Rotation pattern '${assignment.rotation_name}' not found or is empty.`);
       return []; // Rotation pattern not found
     }
     
     // Get the shift code (e.g., "7A")
     const weekPattern = pattern.pattern[`Week ${effectiveWeek}`] || {};
-    const shiftCode = weekPattern[dayIndex]; // Get code for e.g., "Monday" (1)
+    // FIX v9.3: Use the string key `dayIndex`
+    const shiftCode = weekPattern[dayIndex];
+    console.log(`[calc] 6. Shift code for Week ${effectiveWeek}, Day ${dayIndex} is: ${shiftCode}`);
     
     if (!shiftCode) {
+      console.log("[calc] 7. No shift code. RDO.");
       return []; // RDO
     }
     
     const template = getTemplateByCode(shiftCode);
     if (!template) {
+      console.log(`[calc] 8. Shift template '${shiftCode}' not found in shift_templates.`);
       return []; // Shift code (e.g., "7A") doesn't map to a template
     }
     
     // Now we have a full template, slice it into segments
+    console.log(`[calc] 9. Slicing template '${shiftCode}'...`);
     return sliceTemplateIntoSegments(template);
   }
   
   /**
    * Calculates the effective week number (1-6) of a rotation.
-   * FIX v8: This function is now timezone-proof by parsing dates as local.
    * @param {string} startDateStr - "dd/mm/yyyy" start of Week 1
    * @param {string} weekStartISO - "YYYY-MM-DD" of the week to check
    * @param {object} assignment - The assignment object (for getting pattern)
@@ -635,7 +646,6 @@
       const diffWeeks = Math.floor(diffDays / 7);
       
       const pattern = getPatternByName(assignment.rotation_name);
-      // FIX v9.2: Check if pattern.pattern exists before getting keys
       const numWeeksInRotation = (pattern && pattern.pattern && Object.keys(pattern.pattern).length > 0) 
         ? Object.keys(pattern.pattern).length 
         : 6; // Default to 6 if pattern is malformed or empty
@@ -950,7 +960,6 @@
     };
     
     try {
-      // FIX v9: Save to 'rotation_patterns'
       const { data, error } = await supabase
         .from('rotation_patterns')
         .insert(newPattern)
@@ -984,7 +993,6 @@
     if (!pattern) return;
     
     try {
-      // FIX v9: Update 'rotation_patterns'
       const { data, error } = await supabase
         .from('rotation_patterns')
         .update({ pattern: pattern.pattern }) // Only update the pattern JSON
@@ -1017,7 +1025,6 @@
     }
     
     try {
-      // FIX v9: Delete from 'rotation_patterns'
       const { error } = await supabase
         .from('rotation_patterns')
         .delete()
@@ -1046,7 +1053,6 @@
    * @param {number} days - e.g., 7 or -7
    */
   function updateWeek(days) {
-    // FIX v8: Use _flatpickr to access the instance
     const flatpickrInstance = ELS.weekStart._flatpickr;
     if (!flatpickrInstance) return;
 
@@ -1083,7 +1089,6 @@
   
   /**
    * Sets a default Monday for the week picker.
-   * FIX v9.1: Correctly use the string date of the Monday.
    */
   function setDefaultWeek() {
     let d = new Date(); // Local time
@@ -1097,7 +1102,6 @@
     const y = localMonday.getFullYear();
     const m = String(localMonday.getMonth() + 1).padStart(2, '0');
     const dStr = String(localMonday.getDate()).padStart(2, '0');
-    // FIX was: `${y}-${m}-${d}` (d was Date object)
     STATE.weekStart = `${y}-${m}-${dStr}`;
   }
 
