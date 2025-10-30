@@ -1,5 +1,5 @@
 /**
- * Professional Team Rota System - Main Application Logic (v8 - Timezone & Crash Fix)
+ * Professional Team Rota System - Main Application Logic (v9 - DB Table Fix)
  *
  * This file contains all the core logic for the planner, including:
  * - Data fetching from Supabase (advisors, leaders, rotations, templates)
@@ -64,8 +64,8 @@
         supabase.from('leaders').select('*'),
         supabase.from('advisors').select('*'),
         supabase.from('shift_templates').select('*'),
-        // FIX: Read from your existing 'rotations' table, not 'rotation_patterns'
-        supabase.from('rotations').select('name, week, dow, is_rdo, shift_code'), 
+        // FIX v9: Read from 'rotation_patterns' table
+        supabase.from('rotation_patterns').select('*'), 
         supabase.from('rotation_assignments').select('*')
       ]);
 
@@ -82,8 +82,8 @@
       STATE.leaders = leadersRes.data || [];
       STATE.advisors = advisorsRes.data || [];
       STATE.shiftTemplates = templatesRes.data || [];
-      // Transform the raw rotations data into the pattern format the app uses
-      STATE.rotationPatterns = transformRawRotations(patternsRes.data || []);
+      // FIX v9: Data is already in the correct format, no transform needed
+      STATE.rotationPatterns = patternsRes.data || [];
       STATE.rotationAssignments = assignmentsRes.data || [];
       
       console.log("Core data loaded:", {
@@ -99,37 +99,6 @@
       console.error("Boot Failed: Error loading core data", error);
       showToast(`Error loading data: ${error.message}`, "danger");
     }
-  }
-  
-  /**
-   * Transforms raw rotation data (from your 'rotations' table) 
-   * into the JSON 'pattern' format the app UI expects.
-   * @param {Array<object>} rawData - Rows from `rotations` table
-   * @returns {Array<object>} Array of rotation pattern objects
-   */
-  function transformRawRotations(rawData) {
-    const patterns = {}; // { "Flex 1": { pattern: {...} }, ... }
-    
-    rawData.forEach(row => {
-      const { name, week, dow, shift_code, is_rdo } = row;
-      if (!name) return;
-
-      if (!patterns[name]) {
-        patterns[name] = { name: name, pattern: {} };
-      }
-      
-      const weekKey = `Week ${week}`;
-      if (!patterns[name].pattern[weekKey]) {
-        patterns[name].pattern[weekKey] = {};
-      }
-      
-      if (!is_rdo && shift_code) {
-        patterns[name].pattern[weekKey][dow] = shift_code;
-      }
-      // If RDO, we just leave it blank, which the UI interprets as RDO
-    });
-    
-    return Object.values(patterns);
   }
 
   // --- 2. STATE MANAGEMENT & HISTORY (Undo/Redo) ---
@@ -967,25 +936,34 @@
       return;
     }
     
-    // We can't insert into 'rotations' table this way. 
-    // This UI is now for *local* pattern creation.
-    // To save, we need to de-transform the pattern.
     const newPattern = {
       name: name,
       pattern: {} // Empty pattern
     };
     
-    // Add to local state
-    STATE.rotationPatterns.push(newPattern);
-    STATE.currentRotation = name;
-    saveHistory(`Create rotation ${name}`);
-    renderRotationEditor(); // Re-render to show the new pattern
-    showToast(`Created new rotation '${name}'. Fill it out and click Save.`, "success");
+    try {
+      // FIX v9: Save to 'rotation_patterns'
+      const { data, error } = await supabase
+        .from('rotation_patterns')
+        .insert(newPattern)
+        .select();
+        
+      if (error) throw error;
+      
+      // Add to local state
+      STATE.rotationPatterns.push(data[0]);
+      STATE.currentRotation = name;
+      saveHistory(`Create rotation ${name}`);
+      renderRotationEditor(); // Re-render to show the new pattern
+      
+    } catch (error) {
+      console.error("Failed to create rotation:", error);
+      showToast(`Error creating rotation: ${error.message}`, "danger");
+    }
   }
 
   /**
    * Handles saving the currently edited rotation pattern.
-   * This now de-transforms the pattern into raw rows for the 'rotations' table.
    */
   async function handleSaveRotation() {
     const rotationName = STATE.currentRotation;
@@ -997,39 +975,15 @@
     const pattern = getPatternByName(rotationName);
     if (!pattern) return;
     
-    // De-transform pattern back into rows
-    const rows = [];
-    for (const weekKey in pattern.pattern) { // "Week 1"
-      const week = parseInt(weekKey.split(' ')[1], 10);
-      const weekData = pattern.pattern[weekKey];
-      for (const dow in weekData) { // "1" (for Monday)
-        const code = weekData[dow];
-        rows.push({
-          name: rotationName,
-          week: week,
-          dow: parseInt(dow, 10),
-          shift_code: code,
-          is_rdo: false
-        });
-      }
-    }
-    
     try {
-      // 1. Delete all existing rows for this rotation
-      const { error: deleteError } = await supabase
-        .from('rotations')
-        .delete()
-        .eq('name', rotationName);
+      // FIX v9: Update 'rotation_patterns'
+      const { data, error } = await supabase
+        .from('rotation_patterns')
+        .update({ pattern: pattern.pattern }) // Only update the pattern JSON
+        .eq('name', rotationName)
+        .select();
         
-      if (deleteError) throw deleteError;
-      
-      // 2. Insert all new rows (if any)
-      if (rows.length > 0) {
-        const { error: insertError } = await supabase
-          .from('rotations')
-          .insert(rows);
-        if (insertError) throw insertError;
-      }
+      if (error) throw error;
       
       showToast(`Rotation '${rotationName}' saved.`, "success");
       saveHistory(`Save rotation ${rotationName}`);
@@ -1055,9 +1009,9 @@
     }
     
     try {
-      // Delete from Supabase
+      // FIX v9: Delete from 'rotation_patterns'
       const { error } = await supabase
-        .from('rotations')
+        .from('rotation_patterns')
         .delete()
         .eq('name', rotationName);
         
