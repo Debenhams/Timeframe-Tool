@@ -2,6 +2,7 @@
  * Professional Team Rota System - Main Application Logic (v10.3 - Event Delegation FIX)
  *
  * This file contains the core logic for the new "Hybrid Adherence" planner.
+ * This version is designed to be called by 'init.js'.
  *
  * FIX v10.3: The click listener for '.btn-day-editor' was not firing because
  * the buttons are dynamically created.
@@ -19,10 +20,11 @@
   "use strict";
 
   // --- GLOBALS ---
+  // Expose the APP namespace for init.js
   if (!window.APP) {
     window.APP = {};
   }
-
+  
   // App state
   const STATE = {
     sites: [],
@@ -78,7 +80,8 @@
   }
   
   function showToast(message, type = "success", duration = 3000) {
-    // Check if container exists first
+    // This check is now safe because bootApplication()
+    // isn't called until AFTER DOM load.
     if (!ELS.notificationContainer) {
       console.warn("Notification container not found. Toast:", message);
       return;
@@ -99,9 +102,7 @@
 
   async function loadCoreData() {
     if (!window.supabase) {
-      console.error("Supabase client not found");
-      // Don't show toast yet, ELS may not be cached
-      return;
+      throw new Error("Supabase client not found. Check HTML script tag.");
     }
 
     try {
@@ -145,13 +146,12 @@
       });
 
       if (STATE.scheduleComponents.length === 0) {
-        throw new Error("'schedule_components' table is empty. Did you run the SQL script?");
+        throw new Error("'schedule_components' table is empty. Please run the SQL script to populate it.");
       }
 
     } catch (error) {
       console.error("Boot Failed: Error loading core data", error);
-      // Use showToast here, as ELS will be cached by the time boot fails
-      showToast(`Error loading data: ${error.message}`, "danger");
+      throw error;
     }
   }
 
@@ -206,6 +206,7 @@
   // --- 3. RENDERING ---
 
   function cacheDOMElements() {
+    console.log("Caching DOM elements...");
     ELS.weekStart = document.getElementById('weekStart');
     ELS.prevWeek = document.getElementById('prevWeek');
     ELS.nextWeek = document.getElementById('nextWeek');
@@ -227,7 +228,7 @@
 
     ELS.plannerSection = document.querySelector('.planner-section');
     
-    // NEW MODAL ELEMENTS
+    // MODAL ELEMENTS
     ELS.modal = document.getElementById('dayEditorModal');
     ELS.modalTitle = document.getElementById('dayEditorTitle');
     ELS.modalClose = document.getElementById('dayEditorClose');
@@ -237,23 +238,32 @@
     ELS.modalClear = document.getElementById('dayEditorClear');
     ELS.modalSave = document.getElementById('dayEditorSave');
 
+    // SIDEBAR
     ELS.schedulesTree = document.getElementById('schedulesTree');
     ELS.treeSearch = document.getElementById('treeSearch');
     ELS.btnClearSelection = document.getElementById('btnClearSelection');
+    
+    // NOTIFICATION
     ELS.notificationContainer = document.getElementById('notification-container');
+    console.log("DOM elements cached.");
   }
 
   function renderAll() {
     if (!STATE.isBooted) return;
+    console.log("Rendering all components...");
     renderSchedulesTree();
     renderRotationEditor();
     renderAssignmentGrid();
     renderPlanner();
+    console.log("All components rendered.");
   }
 
   function renderSchedulesTree() {
     const { sites, leaders, advisors } = STATE;
-    if (!ELS.schedulesTree) return;
+    if (!ELS.schedulesTree) {
+        console.error("Schedules tree element not found during render.");
+        return;
+    }
     
     const filter = ELS.treeSearch.value.toLowerCase();
     let html = `
@@ -386,17 +396,13 @@
     });
     html += '</tbody></table>';
     
-    // Set the HTML content
     ELS.rotationGrid.innerHTML = html;
     
-    // --- THIS IS THE FIX ---
-    // Now that the HTML is in the DOM, add the event listener
-    // to the parent container ELS.rotationGrid.
+    // --- EVENT DELEGATION FIX (v10.3) ---
+    // This listener is now attached to the parent grid, which always exists.
     ELS.rotationGrid.onclick = function(e) {
-      // Check if the clicked element *is* a button or *is inside* a button
       const button = e.target.closest('.btn-day-editor');
       if (button) {
-        // Prevent default button behavior (like form submission)
         e.preventDefault(); 
         const { week, dow } = button.dataset;
         openDayEditor(week, dow);
@@ -472,7 +478,10 @@
   }
 
   function renderPlanner() {
-    if (!ELS.plannerSection) return;
+    if (!ELS.plannerSection) {
+        console.error("Planner section element not found during render.");
+        return;
+    }
     ELS.plannerSection.innerHTML = `
       <div class="planner-header">
          <h2>Team Schedule</h2>
@@ -650,6 +659,7 @@
   // --- 5. EVENT HANDLERS ---
 
   function wireEventHandlers() {
+    console.log("Wiring event handlers...");
     // Top Bar
     flatpickr(ELS.weekStart, {
       dateFormat: "Y-m-d",
@@ -702,10 +712,11 @@
     });
     ELS.schedulesTree.addEventListener('change', handleTreeSelectionChange);
     
-    // NEW: Modal Listeners
+    // MODAL Listeners
     ELS.modalClose.addEventListener('click', closeDayEditor);
     ELS.modalSave.addEventListener('click', handleSaveDay);
     ELS.modalClear.addEventListener('click', handleClearDay);
+    console.log("Event handlers wired.");
   }
 
   function handleTreeSelectionChange(e) {
@@ -907,33 +918,47 @@
     STATE.weekStart = `${y}-${m}-${dStr}`;
   }
 
+  /**
+   * Main application boot sequence.
+   * This is called by init.js AFTER the DOM is loaded.
+   */
   async function bootApplication() {
     console.log("Booting application (Hybrid System v10.3)...");
     
-    // Cache elements first so utilities like showToast can work
-    cacheDOMElements();
-    
     try {
+      // 1. Cache elements *first*
+      // This is now SAFE because init.js waited for DOMContentLoaded
+      cacheDOMElements();
+      
+      // 2. Set defaults
       setDefaultWeek();
+      
+      // 3. Load data
       await loadCoreData();
 
+      // 4. Set state
       STATE.isBooted = true;
       saveHistory("Initial Load");
 
-      // CRITICAL: Render *must* happen before wiring handlers
+      // 5. Render
       renderAll();
+      
+      // 6. Wire handlers
       wireEventHandlers();
 
       console.log("Boot complete. State:", STATE);
+      showToast("Application Loaded", "success");
+      
     } catch (e) {
-      // Catch any fatal boot errors (e.g., components not loading)
+      // Catch any fatal boot errors
       console.error("FATAL BOOT ERROR:", e);
+      // We can use showToast because ELS is cached
       showToast(e.message, "danger", 10000);
-      document.body.innerHTML = `<h1 style="color: red; padding: 20px;">${e.message}</h1>`;
     }
   }
-
-  // Expose boot function to global scope
+  
+  // Expose the boot function to the global scope
+  // so init.js can call it.
   window.APP.bootApplication = bootApplication;
 
 })();
