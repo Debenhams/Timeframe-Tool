@@ -85,14 +85,24 @@ async function bootApplication() {
     renderAssignmentTable();
     renderPlannerHeader();
     
-    // *** THIS IS THE FIX ***
-    // We MUST set the default week start date *BEFORE* we call renderPlanner()
-    // which depends on this value.
+    // Set default week start date
     const today = new Date();
     const monday = getMonday(today);
     UI.weekStart.value = formatDate(monday);
     
-    // Now that the date is set, we can render the planner
+    // *** UX FIX: Auto-select the first advisor ***
+    // This prevents the "blank slate" problem and shows data on load.
+    const firstAdvisorId = STATE.advisors.keys().next().value;
+    if (firstAdvisorId) {
+      STATE.selectedAdvisors.add(firstAdvisorId);
+      // Programmatically check the box in the UI
+      const firstCheckbox = document.getElementById(`adv-${firstAdvisorId}`);
+      if (firstCheckbox) {
+        firstCheckbox.checked = true;
+      }
+    }
+    
+    // Now that the date is set AND an advisor is selected, we can render the planner.
     renderPlanner();
     
     // Save initial state for Undo
@@ -1058,6 +1068,7 @@ window.App = {
   handleDocumentClick,
   handleChange,
 };
+
 
 
 
