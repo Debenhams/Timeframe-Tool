@@ -1,5 +1,9 @@
-/* This file should be placed in a 'styles' folder.
-  It merges all styles from your plannercss.css and the inline styles.
+/* VERSION 3:
+  - Implements full-width "app" layout.
+  - Redesigned all panels for a modern, professional aesthetic.
+  - Hides old manual-planning UI.
+  - Adds styles for the new "Planning Hub" (Tabs, Editors).
+  - Adds styles for tooltips and icons.
 */
 
 /* =========================
@@ -12,7 +16,16 @@
   --paper: #ffffff;
   --wash: #f5f7fb;
   --line: #e4e9f2;
-
+  --text-muted: #64748b;
+  --text-label: #374151;
+  --blue-light: #eef2ff;
+  --blue-dark: #3730a3;
+  --danger: #dc2626;
+  --danger-light: #fef2f2;
+  --danger-dark: #991b1b;
+  
+  --font-sans: Inter, Roboto, Segoe UI, system-ui, Arial, Helvetica, sans-serif;
+  
   /* Vertical Calendar Timeline */
   --timeline-start: 7;
   --timeline-end: 20;
@@ -33,6 +46,14 @@
   --color-shrink: #ffd166;
 }
 
+html {
+  box-sizing: border-box;
+}
+
+*, *:before, *:after {
+  box-sizing: inherit;
+}
+
 html,
 body {
   height: 100%;
@@ -40,209 +61,491 @@ body {
 
 body {
   margin: 0;
-  background: #eef2f6;
+  background: var(--wash);
   color: var(--ink);
-  font-family: Inter, Roboto, Segoe UI, system-ui, Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 14px;
 }
 
 /* =========================
-   TOP BAR & LAYOUT
+   TOP APPLICATION BAR
    ========================= */
 .topbar {
-  background: var(--brand);
-  color: #fff;
-  padding: 14px 18px;
+  background: var(--paper);
+  color: var(--ink);
+  padding: 10px 24px;
   display: flex;
   align-items: center;
-  gap: 14px;
-  box-shadow: 0 4px 14px rgba(13, 71, 161, .18);
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 2px solid var(--line);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
-.topbar h1 {
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.topbar-left i {
+  font-size: 24px;
+  color: var(--brand);
+}
+.topbar-left h1 {
   margin: 0;
   font-size: 18px;
   font-weight: 800;
+  color: var(--brand);
 }
 
-.layout {
-  display: grid;
-  grid-template-columns: 1fr 360px;
-  gap: 18px;
-  max-width: 1500px;
-  margin: 18px auto;
-  padding: 0 16px;
+.topbar-center {
+  display: flex;
+  justify-content: center;
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* =========================
-   PANELS & CORE COMPONENTS
+   NEW FULL WIDTH LAYOUT
+   ========================= */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 380px; /* Main content | Right sidebar */
+  gap: 24px;
+  padding: 24px;
+}
+
+.view-container {
+  grid-column: 1 / 3; /* Span both columns */
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* =========================
+   NEW PANEL STYLES
    ========================= */
 .panel {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: 0 8px 20px rgba(12, 27, 74, .06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-hub {
+  height: 500px; /* Fixed height for hub */
+  min-height: 500px;
+}
+.panel-schedules {
+  height: 500px; /* Fixed height for hub */
+  min-height: 500px;
 }
 
 .panel-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--line);
+  background: #fafbfc;
 }
 
 .panel-header h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .panel-body {
-  padding: 12px 14px;
+  padding: 16px;
+  overflow: auto;
+  flex-grow: 1; /* Make body fill panel */
 }
 
-.muted {
-  color: #64748b;
+/* =========================
+   NEW PLANNING HUB (TABS)
+   ========================= */
+.tab-bar {
+  padding: 8px;
+  display: flex;
+  gap: 8px;
+  background: var(--wash);
+}
+.tab-button {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+.tab-button:hover {
+  background: var(--paper);
+  color: var(--ink);
+}
+.tab-button.active {
+  background: var(--paper);
+  color: var(--brand);
+  border-color: var(--line);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+.tab-content {
+  display: none; /* Hidden by default */
+}
+.tab-content.active {
+  display: block; /* Shown by JS */
 }
 
+/* =========================
+   FORM & UI COMPONENTS
+   ========================= */
+.muted-text {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+.form-label {
+  font-weight: 600;
+  color: var(--text-label);
+  font-size: 13px;
+}
+.form-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .btn {
   background: var(--accent);
   color: #fff;
   border: 0;
-  border-radius: 10px;
-  padding: 9px 12px;
-  font-weight: 800;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-weight: 700;
   cursor: pointer;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
 }
-
 .btn:hover {
   filter: brightness(.95);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
 }
-
 .btn.subtle {
-  background: #e9eef6;
-  color: #0f172a;
+  background: var(--blue-light);
+  color: var(--blue-dark);
 }
-
+.btn.danger {
+  background: var(--danger-light);
+  color: var(--danger-dark);
+}
 .btn.icon {
-  padding: 7px 9px;
+  padding: 8px;
 }
-
+.btn i {
+  font-size: 16px;
+}
 .seg {
   display: inline-flex;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
 }
-
 .seg button {
   background: #fff;
   border: 0;
-  padding: 8px 12px;
-  cursor: pointer;
-}
-
-.seg button.active {
-  background: #1e5fe0;
-  color: #fff;
-}
-
-.input,
-select,
-input[type=date] {
-  padding: 8px 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fff;
-}
-
-.collapsible[open] .chev {
-  transform: rotate(90deg);
-}
-
-.chev {
-  transition: transform .2s;
-}
-
-/* =========================
-   SETTINGS: TEMPLATE EDITOR
-   ========================= */
-.template-row {
-  display: grid;
-  grid-template-columns: 140px 1fr 140px 1fr;
-  gap: 10px 14px;
-  align-items: center;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: #fafcff;
-  margin-bottom: 10px;
-}
-
-.template-row .full {
-  grid-column: 1/-1;
-}
-
-.inline {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.danger {
-  background: #dc3545;
-  color: #fff;
-  border: 0;
-  border-radius: 8px;
   padding: 6px 10px;
   cursor: pointer;
 }
-
-.key-row {
-  display: grid;
-  grid-template-columns: 18px 120px 1fr;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 8px;
+.seg button.active {
+  background: var(--blue-light);
+  color: var(--blue-dark);
 }
-
-.swatch {
-  width: 18px;
-  height: 18px;
-  border-radius: 3px;
+.input,
+select,
+input[type=date] {
+  padding: 7px 10px;
   border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+}
+input[type=date] {
+  min-width: 140px;
 }
 
 /* =========================
-   SETTINGS: MASTER ASSIGNMENT TABLE
+   NEW ROTATION EDITOR (TAB 1)
    ========================= */
-.table-wrap {
-  overflow: auto;
+.rotation-editor-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.rotation-editor-controls .input {
+  flex-grow: 1;
 }
 
-table {
+/* =========================
+   TABLES (Rotation Editor & Advisor Assignments)
+   ========================= */
+.table-wrap-condensed {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.data-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 600px;
+}
+.data-table th {
+  background: #fafbfc;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.data-table td {
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  vertical-align: middle;
+}
+.data-table tbody tr:hover {
+  background: var(--wash);
+}
+/* Rotation Editor Grid Specifics */
+#rotationEditorGrid .data-table {
   min-width: 900px;
 }
-
-th,
-td {
-  border: 1px solid var(--line);
-  padding: 8px;
+#rotationEditorGrid th, #rotationEditorGrid td {
   text-align: center;
+  padding: 4px;
 }
-
-thead th {
-  background: #0d47a1;
-  color: #fff;
-  font-weight: 800;
-}
-
-td.name {
+#rotationEditorGrid th:first-child,
+#rotationEditorGrid td:first-child {
+  text-align: left;
+  padding-left: 12px;
+  font-weight: 700;
   position: sticky;
   left: 0;
-  background: #e8f1ff;
-  font-weight: 800;
+  background: var(--paper);
+}
+#rotationEditorGrid select {
+  width: 100%;
+  padding: 4px;
+  font-size: 12px;
+}
+
+/* Advisor Assignment Table Specifics */
+#advisorAssignmentTable .input,
+#advisorAssignmentTable select {
+  width: 100%;
+}
+
+/* =========================
+   RIGHT SIDEBAR: SCHEDULES TREE
+   ========================= */
+.view-toggle {
+  margin-left: auto;
+}
+.tree-search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.tree {
+  max-height: 280px; /* Constrain height */
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 6px;
+  background: var(--wash);
+}
+.tree details {
+  padding: 3px 4px;
+  border-radius: 6px;
+}
+.tree summary {
+  list-style: none;
+  cursor: pointer;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+}
+.tree summary:hover {
+  background: var(--blue-light);
+}
+.tree summary .twisty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  font-weight: 900;
+}
+.tree summary::-webkit-details-marker {
+  display: none;
+}
+.tree .node {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 4px 4px 28px; /* Indent */
+}
+.tree .node label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.chip-container {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--blue-light);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* =========================
+   HORIZONTAL TEAM PLANNER
+   ========================= */
+.planner {
+  border-top: 1px solid var(--line);
+  overflow: hidden;
+}
+.planner__header {
+  display: grid;
+  grid-template-columns: var(--name-w) 1fr;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  background: #fafbfc;
+  z-index: 2;
+  border-bottom: 1px solid var(--line);
+  min-height: 44px;
+}
+.planner__col--name {
+  font-weight: 700;
+  padding: 8px 16px;
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+}
+#timeHeader {
+  width: 100%;
+  position: relative;
+  padding: 6px 0;
+}
+.time-scale {
+  position: relative;
+  height: 24px;
+}
+.time-scale .tick {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--text-muted);
+  user-select: none;
+}
+.planner__body {
+  display: block;
+  overflow: auto;
+  max-height: 64vh;
+}
+.planner__row {
+  display: grid;
+  grid-template-columns: var(--name-w) 1fr;
+  align-items: center;
+  min-height: 44px;
+  border-bottom: 1px solid #f0f2f7;
+}
+.planner__row:nth-child(odd) {
+  background: #fafcff;
+}
+.planner__name {
+  padding: 10px 16px;
+  border-right: 1px solid var(--line);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+}
+.planner__timeline {
+  position: relative;
+  height: 44px;
+  background:
+    repeating-linear-gradient(90deg, transparent, transparent calc((100% / 14) - 1px), var(--line) 0, var(--line) calc(100% / 14));
+}
+.planner__bar {
+  position: absolute;
+  top: 8px;
+  height: 28px;
+  border-radius: 6px;
+  opacity: .96;
+  cursor: pointer;
+  transition: opacity .15s;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 0 8px;
+  box-sizing: border-box;
+  line-height: 28px;
+  overflow: hidden;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.planner__bar:hover {
+  opacity: 1;
+  transform: scale(1.02);
 }
 
 /* =========================
@@ -251,19 +554,16 @@ td.name {
 .calendar {
   border-top: 1px solid var(--line);
 }
-
 .cal-grid {
   display: grid;
   grid-template-columns: 80px repeat(7, 1fr);
   grid-auto-flow: column;
   overflow: auto;
 }
-
 .hour-col {
   border-right: 1px solid var(--line);
-  background: #fafcfe;
+  background: #fafbfc;
 }
-
 .hour {
   height: calc(var(--timeline-height)/(var(--timeline-end)-var(--timeline-start)));
   border-bottom: 1px solid var(--line);
@@ -274,19 +574,16 @@ td.name {
   position: relative;
   box-sizing: border-box;
 }
-
 .hour span {
   position: absolute;
   top: -7px;
   right: 6px;
-  background: #fafcfe;
+  background: #fafbfc;
   padding: 0 4px;
 }
-
 .day-col {
   border-left: 1px solid var(--line);
 }
-
 .day-head {
   height: 56px;
   border-bottom: 1px solid var(--line);
@@ -294,69 +591,49 @@ td.name {
   flex-direction: column;
   justify-content: center;
   padding: 6px 10px;
-  background: #f6f8fb;
-  font-weight: 800;
+  background: #fafbfc;
+  font-weight: 700;
 }
-
 .day-head small {
   font-weight: 700;
   color: #8792a6;
 }
-
 .day-summary {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 10px;
   border-bottom: 1px solid var(--line);
+  font-size: 13px;
 }
-
 .summary-right {
   margin-left: auto;
   color: #5b6b7f;
   font-size: 12px;
 }
-
-.day-actions {
-  display: flex;
-  gap: 6px;
-  border-bottom: 1px solid var(--line);
-  padding: 6px 10px;
-}
-
-.iconbtn {
-  border: 1px solid var(--line);
-  background: #fff;
-  border-radius: 6px;
-  padding: 6px 8px;
-  cursor: pointer;
-}
-
 .off {
   height: 40px;
   border-bottom: 1px solid var(--line);
   padding: 8px 10px;
   background: repeating-linear-gradient(45deg, #f2f3f7, #f2f3f7 8px, #e8ecf4 8px, #e8ecf4 16px);
-  font-weight: 800;
+  font-weight: 700;
   color: #8892a0;
+  font-size: 13px;
 }
-
 .timeline-cell {
   position: relative;
   height: var(--timeline-height);
   background:
-    linear-gradient(#0000, #0000),
     repeating-linear-gradient(180deg, #0000, #0000 calc(100%/(var(--timeline-end) - var(--timeline-start))), var(--line) 0, var(--line) calc(100%/(var(--timeline-end) - var(--timeline-start)) + 1px));
 }
-
 .block {
   position: absolute;
-  left: 10px;
-  right: 10px;
+  left: 6px;
+  right: 6px;
   border-radius: 6px;
   padding: 3px 6px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
   color: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, .12);
   line-height: 1.1;
@@ -366,7 +643,6 @@ td.name {
   gap: 6px;
   align-items: flex-start;
 }
-
 .block .time {
   display: block;
   font-weight: 700;
@@ -375,150 +651,7 @@ td.name {
 }
 
 /* =========================
-   HORIZONTAL TEAM PLANNER
-   ========================= */
-.planner {
-  margin-top: 16px;
-  border: 1px solid var(--line, #e6e6f4);
-  border-radius: 8px;
-  background: #fff;
-  overflow: hidden;
-}
-
-.planner__header {
-  display: grid;
-  grid-template-columns: var(--name-w) 1fr;
-  align-items: center;
-  position: sticky;
-  top: 0;
-  background: #f8fafc;
-  z-index: 2;
-  border-bottom: 1px solid var(--line, #e6e6f4);
-  min-height: 44px;
-}
-
-.planner__col--name {
-  font-weight: 800;
-  padding: 8px 10px;
-  border-right: 1px solid var(--line, #e6e6f4);
-  white-space: nowrap;
-}
-
-/* Time Header for Horizontal Planner */
-#timeHeader {
-  width: 100%;
-  position: relative;
-  padding: 6px 0;
-}
-
-.time-scale {
-  position: relative;
-  height: 24px;
-}
-
-.time-scale .tick {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-  font-size: 12px;
-  color: #6b7280;
-  user-select: none;
-}
-
-.planner__body {
-  display: block;
-  overflow: auto;
-  max-height: 64vh;
-}
-
-.planner__row {
-  display: grid;
-  grid-template-columns: var(--name-w) 1fr;
-  align-items: center;
-  min-height: 44px;
-  border-bottom: 1px solid #f0f2f7;
-}
-
-.planner__row:nth-child(odd) {
-  background: #fbfdff;
-}
-
-.planner__name {
-  padding: 10px;
-  border-right: 1px solid var(--line, #e6e6f4);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.planner__badge {
-  font-size: 12px;
-  line-height: 18px;
-  padding: 0 6px;
-  border-radius: 6px;
-  background: #eef2f7;
-  color: #374151;
-}
-
-.planner__timeline {
-  position: relative;
-  height: 44px;
-  /* 1-hour ticks background */
-  background:
-    linear-gradient(#f6f8fb 1px, transparent 1px) 0 0 / calc(100% / 14) 44px;
-}
-
-.planner__bar {
-  position: absolute;
-  top: 12px;
-  height: 20px;
-  border-radius: 4px;
-  opacity: .96;
-  cursor: pointer;
-  transition: opacity .15s;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 0 6px;
-  box-sizing: border-box;
-  line-height: 20px;
-  overflow: hidden;
-  white-space: nowrap;
-}
-
-.planner__bar:hover {
-  opacity: 1;
-}
-
-.planner__guide {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(0, 0, 0, .25);
-  pointer-events: none;
-  z-index: 5;
-}
-
-/* Tooltip (shared) */
-.planner__tooltip {
-  position: fixed;
-  pointer-events: none;
-  z-index: 50;
-  padding: 6px 8px;
-  background: #111827;
-  color: #fff;
-  border-radius: 6px;
-  font-size: 12px;
-  transform: translate(-50%, -120%);
-  white-space: nowrap;
-}
-
-/* =========================
-   COLOR CLASSES (for both schedules)
+   COLOR CLASSES
    ========================= */
 .c-email { background: var(--color-email); }
 .c-mirakl { background: var(--color-mirakl); color: #111; }
@@ -529,132 +662,84 @@ td.name {
 .c-absence { background: var(--color-absence); color: #111; }
 .c-shrink { background: var(--color-shrink); color: #213; }
 .c-meeting { background: var(--color-meeting); color: #111; }
-
-/* =========================
-   Hiding old/unused elements
-   ========================= */
-.colours-card,
-.palette,
-.color-panel {
-  display: none !important;
-}
-
+.c-rdo { background: var(--wash); color: var(--text-muted); border: 1px dashed var(--line); }
 
 /* =========================
    DIALOGS
    ========================= */
-.row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin: 6px 0;
-}
-
-.row .del {
-  background: #ffe2e2;
-  color: #b42318;
-  border: 1px solid #f2b8b5;
-  border-radius: 6px;
-  padding: 4px 8px;
-  cursor: pointer;
-}
-
 dialog {
   max-width: 780px;
   width: 95%;
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 12px 14px;
+  padding: 0;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
 }
-
-/* =========================
-   RIGHT SIDEBAR: SCHEDULES TREE
-   ========================= */
-.tree-search {
+.dialog-header {
+  font-size: 16px;
+  font-weight: 700;
+  padding: 16px;
   display: flex;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
 }
-
-.tree {
-  max-height: 70vh;
+.dialog-header i {
+  font-size: 20px;
+  color: var(--brand);
+}
+.dialog-list {
+  max-height: 260px;
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 6px;
-  background: #fff;
+  padding: 8px;
+  background: var(--wash);
+  margin: 16px;
 }
-
-.tree details {
-  padding: 3px 4px;
-  border-radius: 6px;
-}
-
-.tree summary {
-  list-style: none;
-  cursor: pointer;
-  font-weight: 800;
+.dialog-actions {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 14px;
+  padding: 16px;
+  background: #fafbfc;
+  border-top: 1px solid var(--line);
 }
 
-.tree summary .twisty {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: #f5f7fb;
-  font-weight: 900;
-}
-
-.tree summary::-webkit-details-marker {
-  display: none;
-}
-
-.tree .node {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  padding: 2px 2px;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: #eef2ff;
-  border: 1px solid #d6dcff;
-  border-radius: 999px;
-  padding: 3px 8px;
+/* =========================
+   TOOLTIP
+   ========================= */
+.tooltip {
+  position: absolute;
+  background: #111827;
+  color: #fff;
   font-size: 12px;
-}
-
-.node-actions button {
-  border: 1px solid var(--line);
-  background: #fff;
+  padding: 6px 10px;
   border-radius: 6px;
-  padding: 3px 6px;
-  cursor: pointer;
-  font-size: 11px;
+  white-space: pre;
+  pointer-events: none;
+  z-index: 200;
+  transition: opacity 0.1s;
 }
 
 /* =========================
    PRINT STYLES
    ========================= */
 @media print {
-  .no-print {
+  .no-print, .topbar {
     display: none;
   }
-
   .panel {
     box-shadow: none;
+    border: 1px solid #ccc;
   }
-
   .layout {
     grid-template-columns: 1fr;
+    padding: 0;
+  }
+  body {
+    background: #fff;
   }
 }
+
