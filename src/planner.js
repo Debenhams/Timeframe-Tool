@@ -1,5 +1,5 @@
 /**
- * Professional Team Rota System - Main Application Logic (v9.3 - Final Render Fix)
+ * Professional Team Rota System - Main Application Logic (v9.4 - setDefaultWeek FIX)
  *
  * This file contains all the core logic for the planner, including:
  * - Data fetching from Supabase (advisors, leaders, rotations, templates)
@@ -562,7 +562,7 @@
     
     const assignment = getAssignmentForAdvisor(advisorId);
     if (!assignment || !assignment.rotation_name || !assignment.start_date || !STATE.weekStart) {
-      console.log("[calc] 2. No assignment found or missing data.");
+      console.log("[calc] 2. No assignment found or missing data.", { assignment, weekStart: STATE.weekStart });
       return []; // No rotation assigned
     }
 
@@ -1089,6 +1089,7 @@
   
   /**
    * Sets a default Monday for the week picker.
+   * FIX v9.4: Correctly use the string date `dStr` instead of the Date object `d`.
    */
   function setDefaultWeek() {
     let d = new Date(); // Local time
@@ -1102,6 +1103,8 @@
     const y = localMonday.getFullYear();
     const m = String(localMonday.getMonth() + 1).padStart(2, '0');
     const dStr = String(localMonday.getDate()).padStart(2, '0');
+    
+    // THE FIX: Use dStr, not d
     STATE.weekStart = `${y}-${m}-${dStr}`;
   }
 
