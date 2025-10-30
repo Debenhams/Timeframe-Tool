@@ -1,5 +1,5 @@
 /**
- * Professional Team Rota System - Main Application Logic (v9 - DB Table Fix)
+ * Professional Team Rota System - Main Application Logic (v9.2 - Final Logic Fix)
  *
  * This file contains all the core logic for the planner, including:
  * - Data fetching from Supabase (advisors, leaders, rotations, templates)
@@ -64,7 +64,6 @@
         supabase.from('leaders').select('*'),
         supabase.from('advisors').select('*'),
         supabase.from('shift_templates').select('*'),
-        // FIX v9: Read from 'rotation_patterns' table
         supabase.from('rotation_patterns').select('*'), 
         supabase.from('rotation_assignments').select('*')
       ]);
@@ -82,7 +81,6 @@
       STATE.leaders = leadersRes.data || [];
       STATE.advisors = advisorsRes.data || [];
       STATE.shiftTemplates = templatesRes.data || [];
-      // FIX v9: Data is already in the correct format, no transform needed
       STATE.rotationPatterns = patternsRes.data || [];
       STATE.rotationAssignments = assignmentsRes.data || [];
       
@@ -473,7 +471,6 @@
    * Renders the main horizontal planner ("Team Schedule").
    */
   function renderPlanner() {
-    // FIX v7: Check if elements exist before reading properties
     if (!ELS.timeHeader || !ELS.plannerBody || !ELS.plannerDay) {
       console.warn("Planner elements not found. Skipping render.");
       return;
@@ -566,6 +563,7 @@
       return []; // No rotation assigned
     }
 
+    // FIX v9.2: Pass assignment to getEffectiveWeek
     const effectiveWeek = getEffectiveWeek(assignment.start_date, STATE.weekStart, assignment);
     if (effectiveWeek === null) {
       return []; // Invalid date
@@ -601,25 +599,29 @@
    * FIX v8: This function is now timezone-proof by parsing dates as local.
    * @param {string} startDateStr - "dd/mm/yyyy" start of Week 1
    * @param {string} weekStartISO - "YYYY-MM-DD" of the week to check
+   * @param {object} assignment - The assignment object (for getting pattern)
    * @returns {number | null} The week number (1-6) or null
    */
-  function getEffectiveWeek(startDateStr, weekStartISO) {
+  function getEffectiveWeek(startDateStr, weekStartISO, assignment) {
     try {
-      if (!startDateStr || !weekStartISO) return null;
+      if (!startDateStr || !weekStartISO || !assignment) return null;
       
       // Parse "dd/mm/yyyy" as local date
       const [d, m, y] = startDateStr.split('/').map(Number);
-      const startDate = new Date(y, m - 1, d); // JS Date: month is 0-indexed
+      if (isNaN(d) || isNaN(m) || isNaN(y)) return null; // Invalid date format
       
       // Parse "YYYY-MM-DD" as local date
       const [y2, m2, d2] = weekStartISO.split('-').map(Number);
-      const checkDate = new Date(y2, m2 - 1, d2);
+      if (isNaN(y2) || isNaN(m2) || isNaN(d2)) return null; // Invalid date format
 
       // We must use UTC methods to get a clean day/week count,
       // but first, we create UTC-equivalent dates from our local parts.
       // This avoids timezone shifts entirely.
       const startUTC = Date.UTC(y, m - 1, d);
       const checkUTC = Date.UTC(y2, m2 - 1, d2);
+      
+      // We also need the local Date object for getDay()
+      const startDate = new Date(y, m - 1, d);
 
       // Check if start date is a Monday (1)
       const startDay = (startDate.getDay() + 6) % 7; // 0=Mon, 6=Sun
@@ -632,7 +634,13 @@
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       const diffWeeks = Math.floor(diffDays / 7);
       
-      const numWeeksInRotation = 6; // TODO: Make this dynamic from pattern
+      const pattern = getPatternByName(assignment.rotation_name);
+      // FIX v9.2: Check if pattern.pattern exists before getting keys
+      const numWeeksInRotation = (pattern && pattern.pattern && Object.keys(pattern.pattern).length > 0) 
+        ? Object.keys(pattern.pattern).length 
+        : 6; // Default to 6 if pattern is malformed or empty
+      
+      if (numWeeksInRotation === 0) return 1; // Default to week 1 if pattern is empty
       
       const effectiveWeek = (diffWeeks % numWeeksInRotation + numWeeksInRotation) % numWeeksInRotation + 1;
       
@@ -739,7 +747,7 @@
     // Top Bar
     flatpickr(ELS.weekStart, {
       dateFormat: "Y-m-d",
-      defaultDate: STATE.weekStart,
+      defaultDate: STATE.weekStart, // This is now a valid date
       onChange: (selectedDates, dateStr) => {
         STATE.weekStart = dateStr;
         renderPlanner();
@@ -1075,7 +1083,7 @@
   
   /**
    * Sets a default Monday for the week picker.
-   * FIX v8: Use local date parsing to avoid timezone shift.
+   * FIX v9.1: Correctly use the string date of the Monday.
    */
   function setDefaultWeek() {
     let d = new Date(); // Local time
@@ -1089,7 +1097,8 @@
     const y = localMonday.getFullYear();
     const m = String(localMonday.getMonth() + 1).padStart(2, '0');
     const dStr = String(localMonday.getDate()).padStart(2, '0');
-    STATE.weekStart = `${y}-${m}-${d}`;
+    // FIX was: `${y}-${m}-${d}` (d was Date object)
+    STATE.weekStart = `${y}-${m}-${dStr}`;
   }
 
   /**
