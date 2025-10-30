@@ -455,7 +455,8 @@ function calculateSegmentsForAdvisor(advId, targetDateStr) {
   }
   
   // 1. Calculate effective week
-  const effectiveWeekNum = getEffectiveWeek(assignment.start_date, targetDateStr);
+  // *** FIX: We must pass the entire 'assignment' object, not just the start date.
+  const effectiveWeekNum = getEffectiveWeek(assignment, targetDateStr);
   const weekKey = `Week ${effectiveWeekNum}`;
   const weekPattern = pattern[weekKey];
   if (!weekPattern) {
@@ -532,14 +533,16 @@ function calculateSegmentsForAdvisor(advId, targetDateStr) {
  * @param {string} targetDateStr - The date to check ("YYYY-MM-DD").
  * @returns {number} - The week number (1-6).
  */
-function getEffectiveWeek(startDateStr, targetDateStr) {
-  const startDate = new Date(startDateStr + "T00:00:00");
+function getEffectiveWeek(assignment, targetDateStr) {
+  // *** FIX: Use the passed 'assignment' object to get the start date.
+  const startDate = new Date(assignment.start_date + "T00:00:00");
   const targetDate = new Date(targetDateStr + "T00:00:00");
   
   const diffTime = targetDate.getTime() - startDate.getTime();
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   const diffWeeks = Math.floor(diffDays / 7);
   
+  // *** FIX: 'assignment' is now correctly defined in this function's scope.
   const pattern = STATE.rotationPatterns.get(assignment.rotation_name);
   const numWeeksInPattern = (pattern && Object.keys(pattern).length > 0) ? 
     Object.keys(pattern).length : 6;
@@ -1055,5 +1058,6 @@ window.App = {
   handleDocumentClick,
   handleChange,
 };
+
 
 
