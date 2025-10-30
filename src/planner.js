@@ -1,14 +1,10 @@
 /**
- * Professional Team Rota System - Main Application Logic (v10.1 - Day Editor UI)
+ * Professional Team Rota System - Main Application Logic (v10.2 - Function Hoisting FIX)
  *
  * This file contains the core logic for the new "Hybrid Adherence" planner.
  *
- * PLAN:
- * 1. (DONE) Load core data: sites, leaders, advisors, rotation_patterns, rotation_assignments.
- * 2. (DONE) Load the new 'schedule_components' table.
- * 3. (NEW) Build the "Advanced Day Editor" (Step 3 of Hybrid Plan).
- * 4. (NEW) Re-build the Rotation Editor tab to use the Advanced Day Editor.
- * 5. (NEW) Re-build the main schedule as a "Master Week View" (Step 4 of Hybrid Plan).
+ * FIX v10.2: Moved utility functions (minutesToTime, etc.) to the top of the
+ * file to prevent ReferenceErrors during rendering.
  */
 
 (function () {
@@ -39,11 +35,82 @@
   // DOM element cache
   const ELS = {};
 
+  // --- 0. UTILITIES (MOVED TO TOP) ---
+  // Moved here to prevent ReferenceErrors
+
+  /**
+   * Converts a 24-hour time string (e.g., "14:30") to minutes from midnight.
+   * @param {string} timeStr - "HH:mm"
+   * @returns {number}
+   */
+  function timeToMinutes(timeStr) {
+    const [h, m] = timeStr.split(':').map(Number);
+    return h * 60 + m;
+  }
+
+  /**
+   * Converts minutes from midnight to a 24-hour time string (e.g., "14:30").
+   * @param {number} totalMinutes
+   * @returns {string} - "HH:mm"
+   */
+  function minutesToTime(totalMinutes) {
+    if (typeof totalMinutes !== 'number' || isNaN(totalMinutes)) {
+      console.warn("Invalid input to minutesToTime:", totalMinutes);
+      return "00:00";
+    }
+    const h = Math.floor(totalMinutes / 60).toString().padStart(2, '0');
+    const m = (totalMinutes % 60).toString().padStart(2, '0');
+    return `${h}:${m}`;
+  }
+
+  /**
+   * Checks if a hex color is "dark" to decide if text on it should be white or black.
+   * @param {string} hexColor - e.g., "#FF0000" or "#F00"
+   * @returns {boolean} - true if dark, false if light
+   */
+  function isColorDark(hexColor) {
+    if (!hexColor) return true;
+    try {
+      let hex = hexColor.replace('#', '');
+      if (hex.length === 3) {
+        hex = hex.split('').map(c => c + c).join('');
+      }
+      const r = parseInt(hex.substring(0, 2), 16);
+      const g = parseInt(hex.substring(2, 4), 16);
+      const b = parseInt(hex.substring(4, 6), 16);
+      // Standard luminance formula
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      return luminance < 0.5;
+    } catch (e) {
+      return true; // Default to dark (white text) on error
+    }
+  }
+  
+  /**
+   * Displays a notification toast at the bottom of the screen.
+   * @param {string} message - The text to display.
+   * @param {'success' | 'danger'} type - The color/style of the toast.
+   * @param {number} duration - How long to show the toast (in ms).
+   */
+  function showToast(message, type = "success", duration = 3000) {
+    const toast = document.createElement('div');
+    toast.className = `toast is-${type}`;
+    toast.textContent = message;
+
+    ELS.notificationContainer.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(20px)';
+      setTimeout(() => toast.remove(), 300);
+    }, duration);
+  }
+
+
   // --- 1. DATA FETCHING (from Supabase) ---
 
   /**
    * Fetches all core data from Supabase in parallel.
-   * This is the main data load on application boot.
    */
   async function loadCoreData() {
     if (!window.supabase) {
@@ -56,31 +123,29 @@
         sitesRes,
         leadersRes,
         advisorsRes,
-        componentsRes, // <-- NEW: Fetching schedule_components
+        componentsRes,
         patternsRes,
         assignmentsRes
       ] = await Promise.all([
         supabase.from('sites').select('*'),
         supabase.from('leaders').select('*'),
         supabase.from('advisors').select('*'),
-        supabase.from('schedule_components').select('*').eq('is_active', true), // <-- NEW
+        supabase.from('schedule_components').select('*').eq('is_active', true),
         supabase.from('rotation_patterns').select('*'),
         supabase.from('rotation_assignments').select('*')
       ]);
 
-      // Check for errors in any of the promises
       if (sitesRes.error) throw new Error(`Sites: ${sitesRes.error.message}`);
       if (leadersRes.error) throw new Error(`Leaders: ${leadersRes.error.message}`);
       if (advisorsRes.error) throw new Error(`Advisors: ${advisorsRes.error.message}`);
-      if (componentsRes.error) throw new Error(`Components: ${componentsRes.error.message}`); // <-- NEW
+      if (componentsRes.error) throw new Error(`Components: ${componentsRes.error.message}`);
       if (patternsRes.error) throw new Error(`Patterns: ${patternsRes.error.message}`);
       if (assignmentsRes.error) throw new Error(`Assignments: ${assignmentsRes.error.message}`);
 
-      // All data fetched successfully, update state
       STATE.sites = sitesRes.data || [];
       STATE.leaders = leadersRes.data || [];
       STATE.advisors = advisorsRes.data || [];
-      STATE.scheduleComponents = componentsRes.data || []; // <-- NEW
+      STATE.scheduleComponents = componentsRes.data || [];
       STATE.rotationPatterns = patternsRes.data || [];
       STATE.rotationAssignments = assignmentsRes.data || [];
 
@@ -88,16 +153,15 @@
         sites: STATE.sites.length,
         leaders: STATE.leaders.length,
         advisors: STATE.advisors.length,
-        components: STATE.scheduleComponents.length, // <-- NEW
+        components: STATE.scheduleComponents.length,
         patterns: STATE.rotationPatterns.length,
         assignments: STATE.rotationAssignments.length,
       });
 
-      // --- !!! CRITICAL CHECK !!! ---
       if (STATE.scheduleComponents.length === 0) {
         console.error("FATAL: No schedule components loaded. Did you run the SQL script?");
         showToast("Error: 'schedule_components' table is empty. App cannot start.", "danger");
-        return; // Stop loading
+        return;
       }
 
     } catch (error) {
@@ -107,7 +171,6 @@
   }
 
   // --- 2. STATE MANAGEMENT & HISTORY (Undo/Redo) ---
-  // (This code remains largely the same as your V2 file)
 
   function saveHistory(reason = "Unknown change") {
     if (STATE.historyIndex < STATE.history.length - 1) {
@@ -177,7 +240,6 @@
 
     ELS.assignmentGrid = document.getElementById('assignmentGrid');
 
-    // Planner section (to be replaced)
     ELS.plannerSection = document.querySelector('.planner-section');
     
     // NEW MODAL ELEMENTS
@@ -204,12 +266,11 @@
     renderSchedulesTree();
     renderRotationEditor();
     renderAssignmentGrid();
-    renderPlanner(); // This will just show a "coming soon" message for now
+    renderPlanner();
   }
 
   /**
    * Renders the hierarchical schedules tree (Sites > Leaders > Advisors).
-   * (This code is unchanged from your V2 file)
    */
   function renderSchedulesTree() {
     const { sites, leaders, advisors } = STATE;
@@ -294,28 +355,23 @@
 
   /**
    * Renders the "Rotation Editor" tab.
-   * This will be heavily modified.
    */
   function renderRotationEditor() {
-    // 1. Populate Rotation Family dropdown
     const patterns = STATE.rotationPatterns.sort((a, b) => a.name.localeCompare(b.name));
     let opts = '<option value="">-- Select Rotation --</option>';
     patterns.forEach(p => {
       opts += `<option value="${p.name}" ${p.name === STATE.currentRotation ? 'selected' : ''}>${p.name}</option>`;
     });
     ELS.rotationFamily.innerHTML = opts;
-
-    // 2. Render the grid (NEW LOGIC)
     renderRotationGrid();
   }
 
   /**
    * Renders the 6-week grid for the selected rotation pattern.
-   * NEW: Instead of dropdowns, this now shows buttons to launch the "Advanced Day Editor".
    */
   function renderRotationGrid() {
     const pattern = getPatternByName(STATE.currentRotation);
-    const patternData = pattern ? (pattern.pattern || {}) : {}; // pattern.pattern is the JSONB
+    const patternData = pattern ? (pattern.pattern || {}) : {};
     const weeks = [1, 2, 3, 4, 5, 6];
     const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
 
@@ -326,7 +382,7 @@
     weeks.forEach(w => {
       html += `<tr><td>Week ${w}</td>`;
       days.forEach((d, i) => {
-        const dow = i + 1; // 1=Mon, 7=Sun
+        const dow = i + 1;
         const weekKey = `Week ${w}`;
         const dayData = (patternData[weekKey] && patternData[weekKey][dow]) ? patternData[weekKey][dow] : null;
 
@@ -334,6 +390,7 @@
         if (pattern) {
           if (dayData && Array.isArray(dayData) && dayData.length > 0) {
             // Day has been built! Show a summary.
+            // Functions minutesToTime IS available here now
             const first = dayData[0];
             const last = dayData[dayData.length - 1];
             cellContent = `
@@ -348,7 +405,6 @@
               </button>`;
           }
         } else {
-          // No rotation selected
           cellContent = `<button class="btn btn-secondary" disabled>+ Build Day</button>`;
         }
         
@@ -362,7 +418,6 @@
 
   /**
    * Renders the "Advisor Assignments" grid.
-   * (This code is unchanged from your V2 file)
    */
   function renderAssignmentGrid() {
     const advisors = STATE.advisors.sort((a, b) => a.name.localeCompare(b.name));
@@ -376,9 +431,8 @@
     advisors.forEach(adv => {
       const assignment = getAssignmentForAdvisor(adv.id);
       const rotationName = (assignment && assignment.rotation_name) ? assignment.rotation_name : '';
-      const startDate = (assignment && assignment.start_date) ? assignment.start_date : ''; // This is YYYY-MM-DD
+      const startDate = (assignment && assignment.start_date) ? assignment.start_date : '';
       
-      // Convert YYYY-MM-DD to d/m/Y for flatpickr
       let displayDate = '';
       if (startDate) {
         try {
@@ -406,7 +460,6 @@
     html += '</tbody></table>';
     ELS.assignmentGrid.innerHTML = html;
 
-    // Now set values and init calendars
     advisors.forEach(adv => {
       const assignment = getAssignmentForAdvisor(adv.id);
       const row = ELS.assignmentGrid.querySelector(`tr[data-advisor-id="${adv.id}"]`);
@@ -424,7 +477,6 @@
           defaultDate: dateInput.value,
           allowInput: true,
           onChange: function (selectedDates, dateStr, instance) {
-            // Convert "d/m/Y" to "YYYY-MM-DD" for Supabase
             const parts = dateStr.split('/');
             const isoDate = (parts.length === 3) ? `${parts[2]}-${parts[1]}-${parts[0]}` : null;
             handleAssignmentChange(instance.element.dataset.advisorId, 'start_date', isoDate);
@@ -436,7 +488,6 @@
 
   /**
    * Renders the main horizontal planner ("Team Schedule").
-   * THIS IS DEACTIVATED. We will replace this with the new Master Week View.
    */
   function renderPlanner() {
     if (!ELS.plannerSection) return;
@@ -448,29 +499,25 @@
         The new "Master Week View" will be built here.
       </div>
     `;
-    // All old logic (renderTimeHeader, renderSegmentsForAdvisor) is now GONE.
   }
 
   // --- 4. CORE LOGIC (Advanced Day Editor) ---
 
-  // Store the state of the day being edited
   const EDITOR_STATE = {
     week: null,
     dow: null,
-    segments: [] // Array of { name, type, color, start_min, end_min }
+    segments: []
   };
   
   const EDITOR_CONFIG = {
-    startHour: 6, // 6 AM
-    endHour: 22,  // 10 PM
+    startHour: 6,
+    endHour: 22,
     totalHours: 16,
     totalMinutes: 16 * 60
   };
 
   /**
    * Opens the Advanced Day Editor modal.
-   * @param {string} week - The week number (e.g., "1")
-   * @param {string} dow - The day of week (e.g., "1" for Mon)
    */
   function openDayEditor(week, dow) {
     console.log(`Opening editor for Week ${week}, DOW ${dow}`);
@@ -480,16 +527,10 @@
     const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][dow - 1];
     ELS.modalTitle.textContent = `Build Shift: Week ${week}, ${dayName}`;
     
-    // 1. Populate the component "bricks"
     renderComponentBricks();
-    
-    // 2. Render the timeline ticks
     renderTimeTicks();
-    
-    // 3. Load existing data (if any)
     loadDaySegments();
     
-    // 4. Show the modal
     ELS.modal.style.display = 'flex';
   }
 
@@ -501,7 +542,7 @@
     EDITOR_STATE.week = null;
     EDITOR_STATE.dow = null;
     EDITOR_STATE.segments = [];
-    ELS.modalTrack.innerHTML = ''; // Clear the track
+    ELS.modalTrack.innerHTML = '';
   }
 
   /**
@@ -509,7 +550,7 @@
    */
   function renderComponentBricks() {
     let html = '';
-    const types = ['Work', 'Break', 'Exception']; // Sort order
+    const types = ['Work', 'Break', 'Exception'];
     
     types.forEach(type => {
       html += `<h4 class="component-type-header">${type}s</h4>`;
@@ -530,7 +571,6 @@
         });
     });
     ELS.modalComponents.innerHTML = html;
-    // We will add drag-and-drop listeners for these bricks next.
   }
 
   /**
@@ -541,12 +581,10 @@
     const tickContainer = ELS.modalTimeTicks;
     const track = ELS.modalTrack;
     
-    // Set total width (e.g., 100px per hour)
     const totalWidth = totalHours * 100; // 1600px
     tickContainer.style.width = `${totalWidth}px`;
     track.style.width = `${totalWidth}px`;
     
-    // Set grid background size (15-min intervals)
     const pixelsPer15Min = 100 / 4; // 25px
     track.style.backgroundSize = `${pixelsPer15Min}px 100%`;
 
@@ -569,20 +607,17 @@
     const weekKey = `Week ${EDITOR_STATE.week}`;
     const dayData = (pattern.pattern && pattern.pattern[weekKey] && pattern.pattern[weekKey][EDITOR_STATE.dow]) 
       ? pattern.pattern[weekKey][EDITOR_STATE.dow] 
-      : []; // dayData is our array of segments
+      : [];
 
-    // Deep copy the segments into the editor state
     EDITOR_STATE.segments = JSON.parse(JSON.stringify(dayData));
-    
     renderDaySegments();
   }
   
   /**
    * Renders all segments in EDITOR_STATE.segments onto the timeline track.
-   * This is the main "draw" function for the timeline.
    */
   function renderDaySegments() {
-    ELS.modalTrack.innerHTML = ''; // Clear track
+    ELS.modalTrack.innerHTML = '';
     let html = '';
     
     EDITOR_STATE.segments.sort((a,b) => a.start_min - b.start_min);
@@ -596,7 +631,6 @@
       const label = `${seg.name} (${startTime} - ${endTime})`;
       const color = seg.color || '#333';
       
-      // Check for overlap with the *next* segment
       let overlapClass = '';
       if (index < EDITOR_STATE.segments.length - 1) {
         if (seg.end_min > EDITOR_STATE.segments[index + 1].start_min) {
@@ -615,12 +649,10 @@
     });
     
     ELS.modalTrack.innerHTML = html;
-    
-    // TODO: Add click listener for '.segment-delete'
   }
 
   /**
-   * Saves the current day's segments (from EDITOR_STATE) back into the main app STATE.
+   * Saves the current day's segments back into the main app STATE.
    */
   function handleSaveDay() {
     const pattern = getPatternByName(STATE.currentRotation);
@@ -629,23 +661,19 @@
       return;
     }
     
-    // Get the final, sorted segments
     const finalSegments = EDITOR_STATE.segments.sort((a,b) => a.start_min - b.start_min);
     
-    // Update the main STATE object
     const weekKey = `Week ${EDITOR_STATE.week}`;
     if (!pattern.pattern) pattern.pattern = {};
     if (!pattern.pattern[weekKey]) pattern.pattern[weekKey] = {};
     
-    // Save the array of segments as the day's data
     pattern.pattern[weekKey][EDITOR_STATE.dow] = finalSegments;
     
     console.log(`Saved ${finalSegments.length} segments to ${weekKey}, DOW ${EDITOR_STATE.dow}`);
     
     closeDayEditor();
-    renderRotationGrid(); // Re-render the grid to show the new summary
+    renderRotationGrid();
     
-    // We still need to click the main "Save Rotation" button
     showToast("Day saved locally. Click 'Save' to commit to database.", "success");
   }
 
@@ -656,9 +684,8 @@
     if (!confirm("Are you sure you want to clear this day and set it as RDO?")) {
       return;
     }
-    
-    EDITOR_STATE.segments = []; // Empty the array
-    handleSaveDay(); // Run the save logic to store the empty array
+    EDITOR_STATE.segments = [];
+    handleSaveDay();
   }
 
 
@@ -671,7 +698,6 @@
       defaultDate: STATE.weekStart,
       onChange: (selectedDates, dateStr) => {
         STATE.weekStart = dateStr;
-        // renderPlanner(); // Will render new Master Week View
       }
     });
     ELS.prevWeek.addEventListener('click', () => updateWeek(-7));
@@ -699,7 +725,7 @@
     ELS.btnSaveRotation.addEventListener('click', handleSaveRotation);
     ELS.btnDeleteRotation.addEventListener('click', handleDeleteRotation);
     
-    // NEW: Open the modal when a day button is clicked
+    // THIS IS THE FIX: This listener is now added *after* renderAll
     ELS.rotationGrid.addEventListener('click', (e) => {
       if (e.target.classList.contains('btn-day-editor')) {
         const { week, dow } = e.target.dataset;
@@ -720,24 +746,17 @@
     ELS.btnClearSelection.addEventListener('click', () => {
       STATE.selectedAdvisors.clear();
       renderSchedulesTree();
-      // renderPlanner();
     });
     ELS.schedulesTree.addEventListener('change', handleTreeSelectionChange);
-
-    // Planner
-    // ELS.plannerDay.addEventListener('change', ...); // OLD logic removed
     
     // NEW: Modal Listeners
     ELS.modalClose.addEventListener('click', closeDayEditor);
     ELS.modalSave.addEventListener('click', handleSaveDay);
     ELS.modalClear.addEventListener('click', handleClearDay);
-    
-    // We will add drag-and-drop listeners later
   }
 
   /**
    * Handles check/uncheck logic for the schedules tree
-   * (Unchanged from V2)
    */
   function handleTreeSelectionChange(e) {
     const target = e.target;
@@ -776,12 +795,10 @@
         allCheckboxes.forEach(cb => cb.checked = false);
       }
     }
-    // renderPlanner();
   }
 
   /**
    * Handles saving a change to an advisor's assignment.
-   * (Updated to handle YYYY-MM-DD date format)
    */
   async function handleAssignmentChange(advisorId, field, value) {
     if (!advisorId) return;
@@ -792,14 +809,8 @@
       STATE.rotationAssignments.push(assignment);
     }
 
-    // Ensure value is null, not empty string
     assignment[field] = value || null;
-
-    // ** CRITICAL **
-    // Supabase date fields require 'YYYY-MM-DD' or null.
-    // The flatpickr onChange handler now provides this.
     
-    // Create a clean object for upserting
     const upsertData = {
       advisor_id: assignment.advisor_id,
       rotation_name: assignment.rotation_name,
@@ -821,20 +832,15 @@
 
       saveHistory('Update assignment');
       showToast("Assignment saved.", "success");
-      // renderPlanner(); // Re-render the planner to show the change
 
     } catch (error) {
       console.error("Failed to save assignment:", error);
       showToast(`Error saving: ${error.message}`, "danger");
-      // TODO: Revert local state on failure?
     }
   }
 
-  // handleRotationGridChange is DELETED
-
   /**
    * Handles creating a new rotation pattern.
-   * (Unchanged from V2)
    */
   async function handleNewRotation() {
     const name = prompt("Enter a name for the new rotation family (e.g., 'Flex 7'):");
@@ -847,7 +853,7 @@
 
     const newPattern = {
       name: name,
-      pattern: {} // Empty pattern
+      pattern: {}
     };
 
     try {
@@ -871,7 +877,6 @@
 
   /**
    * Handles saving the currently edited rotation pattern.
-   * (Unchanged from V2)
    */
   async function handleSaveRotation() {
     const rotationName = STATE.currentRotation;
@@ -886,7 +891,7 @@
     try {
       const { data, error } = await supabase
         .from('rotation_patterns')
-        .update({ pattern: pattern.pattern }) // Only update the pattern JSON
+        .update({ pattern: pattern.pattern })
         .eq('name', rotationName)
         .select();
 
@@ -903,7 +908,6 @@
 
   /**
    * Handles deleting the currently selected rotation pattern.
-   * (Unchanged from V2)
    */
   async function handleDeleteRotation() {
     const rotationName = STATE.currentRotation;
@@ -930,8 +934,6 @@
       showToast(`Rotation '${rotationName}' deleted.`, "success");
       saveHistory(`Delete rotation ${rotationName}`);
       renderRotationEditor();
-
-      // TODO: We should also clear any advisor assignments that used this rotation.
       
     } catch (error) {
       console.error("Failed to delete rotation:", error);
@@ -941,7 +943,6 @@
 
   /**
    * Shifts the main weekStart date by a number of days.
-   * (Unchanged from V2)
    */
   function updateWeek(days) {
     const flatpickrInstance = ELS.weekStart._flatpickr;
@@ -950,84 +951,18 @@
     const currentDate = flatpickrInstance.selectedDates[0] || new Date();
     currentDate.setDate(currentDate.getDate() + days);
 
-    flatpickrInstance.setDate(currentDate, true); // true = trigger onChange
+    flatpickrInstance.setDate(currentDate, true);
+Done
   }
-
 
   // --- 6. UTILITIES ---
-
-  /**
-   * Displays a notification toast at the bottom of the screen.
-   * (Unchanged from V2)
-   */
-  function showToast(message, type = "success", duration = 3000) {
-    const toast = document.createElement('div');
-    toast.className = `toast is-${type}`;
-    toast.textContent = message;
-
-    ELS.notificationContainer.appendChild(toast);
-
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateY(20px)';
-      setTimeout(() => toast.remove(), 300);
-    }, duration);
-  }
-  
-  /**
-   * Converts a 24-hour time string (e.g., "14:30") to minutes from midnight.
-   * @param {string} timeStr - "HH:mm"
-   * @returns {number}
-   */
-  function timeToMinutes(timeStr) {
-    const [h, m] = timeStr.split(':').map(Number);
-    return h * 60 + m;
-  }
-
-  /**
-   * Converts minutes from midnight to a 24-hour time string (e.g., "14:30").
-   * @param {number} totalMinutes
-   * @returns {string} - "HH:mm"
-   */
-  function minutesToTime(totalMinutes) {
-    if (typeof totalMinutes !== 'number' || isNaN(totalMinutes)) {
-      console.warn("Invalid input to minutesToTime:", totalMinutes);
-      return "00:00";
-    }
-    const h = Math.floor(totalMinutes / 60).toString().padStart(2, '0');
-    const m = (totalMinutes % 60).toString().padStart(2, '0');
-    return `${h}:${m}`;
-  }
-
-  /**
-   * Checks if a hex color is "dark" to decide if text on it should be white or black.
-   * @param {string} hexColor - e.g., "#FF0000" or "#F00"
-   * @returns {boolean} - true if dark, false if light
-   */
-  function isColorDark(hexColor) {
-    if (!hexColor) return true;
-    try {
-      let hex = hexColor.replace('#', '');
-      if (hex.length === 3) {
-        hex = hex.split('').map(c => c + c).join('');
-      }
-      const r = parseInt(hex.substring(0, 2), 16);
-      const g = parseInt(hex.substring(2, 4), 16);
-      const b = parseInt(hex.substring(4, 6), 16);
-      // Standard luminance formula
-      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-      return luminance < 0.5;
-    } catch (e) {
-      return true; // Default to dark (white text) on error
-    }
-  }
+  // (Moved to top of file)
 
 
   // --- 7. APPLICATION BOOT ---
 
   /**
    * Sets a default Monday for the week picker.
-   * (Unchanged from V2)
    */
   function setDefaultWeek() {
     let d = new Date();
@@ -1047,23 +982,15 @@
   async function bootApplication() {
     console.log("Booting application (Hybrid System)...");
 
-    // 1. Cache DOM elements
     cacheDOMElements();
-
-    // 2. Set default date
     setDefaultWeek();
-
-    // 3. Load all data from Supabase
     await loadCoreData();
 
-    // 4. Set initial state and save "base" history
     STATE.isBooted = true;
     saveHistory("Initial Load");
 
-    // 5. Render all UI components
+    // CRITICAL: Render *must* happen before wiring handlers
     renderAll();
-
-    // 6. Wire up event listeners
     wireEventHandlers();
 
     console.log("Boot complete. State:", STATE);
