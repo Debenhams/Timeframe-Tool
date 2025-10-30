@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   
   <!-- Main Stylesheet -->
-  <link rel="stylesheet" href="./styles/planner.css?v=5" />
+  <link rel="stylesheet" href="./styles/planner.css?v=7" />
 
   <!-- Supabase Client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -23,8 +23,12 @@
       <label for="weekStart">Week Start (Monday)</label>
       <input type="text" id="weekStart" class="week-picker" placeholder="Select week..." />
       
-      <button id="prevWeek" class="btn-icon" title="Previous Week">↩️</button>
-      <button id="nextWeek" class="btn-icon" title="Next Week">↪️</button>
+      <button id="prevWeek" class="btn-icon" title="Previous Week">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <button id="nextWeek" class="btn-icon" title="Next Week">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
       
       <button id="btnCommit" class="btn btn-primary" title="Commit schedule changes to database">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
@@ -151,7 +155,7 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
     
     // Create a single, global Supabase client
-    // FIX: Use window.supabase.createClient to avoid ReferenceError
+    // FIX v6: Use window.supabase.createClient to avoid ReferenceError
     const supabase = (window.supabase && window.supabase.createClient)
       ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
       : null;
@@ -166,8 +170,8 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
   <!-- Project Scripts -->
-  <script src="./src/planner.js?v=6"></script>
-  <script src="./src/init.js?v=6"></script>
+  <script src="./src/planner.js?v=7"></script>
+  <script src="./src/init.js?v=7"></script>
 
 </body>
 </html>
