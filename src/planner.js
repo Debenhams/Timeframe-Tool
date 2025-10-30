@@ -84,12 +84,16 @@ async function bootApplication() {
     renderRotationEditor();
     renderAssignmentTable();
     renderPlannerHeader();
-    renderPlanner();
     
-    // Set default week start to today
+    // *** THIS IS THE FIX ***
+    // We MUST set the default week start date *BEFORE* we call renderPlanner()
+    // which depends on this value.
     const today = new Date();
     const monday = getMonday(today);
     UI.weekStart.value = formatDate(monday);
+    
+    // Now that the date is set, we can render the planner
+    renderPlanner();
     
     // Save initial state for Undo
     saveHistory();
@@ -536,8 +540,9 @@ function getEffectiveWeek(startDateStr, targetDateStr) {
   const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
   const diffWeeks = Math.floor(diffDays / 7);
   
-  const numWeeksInPattern = STATE.rotationPatterns.size > 0 ? 
-    Object.keys(STATE.rotationPatterns.values().next().value).length : 6;
+  const pattern = STATE.rotationPatterns.get(assignment.rotation_name);
+  const numWeeksInPattern = (pattern && Object.keys(pattern).length > 0) ? 
+    Object.keys(pattern).length : 6;
 
   return (diffWeeks % numWeeksInPattern + numWeeksInPattern) % numWeeksInPattern + 1;
 }
@@ -702,11 +707,11 @@ function handleChange(e) {
 
   if (target.matches(".adv-check")) {
     const advId = target.dataset.id;
-    if (target.checked) {
-      STATE.selectedAdvisors.add(advId);
-    } else {
-      STATE.selectedAdvisors.delete(advId);
-    }
+      if (target.checked) {
+        STATE.selectedAdvisors.add(advId);
+      } else {
+        STATE.selectedAdvisors.delete(advId);
+      }
     renderPlanner();
   }
 }
@@ -1050,4 +1055,5 @@ window.App = {
   handleDocumentClick,
   handleChange,
 };
+
 
