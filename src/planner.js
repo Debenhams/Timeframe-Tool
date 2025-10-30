@@ -1,1052 +1,879 @@
-/*
-  VERSION 3: The "Big Leap" Update
+/* ========================================================================
+    APPLICATION LOGIC (src/planner.js)
+    - Fetches data from Supabase
+    - Contains all business logic for rotations
+    - Contains all rendering functions for the UI
+======================================================================== */
 
-  - WORKFLOW OVERHAUL: Removed all manual shift-planning logic.
-  - NEW: App is now driven by "Rotation Families" and "Advisor Assignments."
-  - NEW: Core logic now auto-calculates schedules based on an advisor's assigned rotation and start date.
-  - NEW: "Rotation Editor" logic to create/read/update/delete rotation families (Phase 2).
-  - NEW: "Advisor Assignment" logic to assign rotations to advisors (Phase 2).
-  - NEW: Undo/Redo state management (Phase 1).
-  - NEW: Tooltip logic (Phase 3).
-  - RE-PURPOSED: "Commit Week" now saves the *auto-generated* schedule to the `rotas` table for historical audit.
-*/
+// --- Globals & App State ---
+(function (global) {
+    "use strict";
 
-/* =========================
-   Supabase configuration
-   ========================= */
-const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
+    // Globals to hold our database state
+    global.APP_STATE = {
+        advisors: new Map(), // (id -> {id, name, ...})
+        leaders: new Map(),  // (id -> {id, name, site_id, ...})
+        sites: new Map(),    // (id -> {id, name, ...})
+        
+        shiftTemplates: new Map(), // (code -> {code, start_time, ...})
+        
+        rotationPatterns: new Map(), // (name -> {name, pattern: {week1: {...}, ...}})
+        rotationAssignments: new Map(), // (advisor_id -> {advisor_id, rotation_name, start_date})
 
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-window.supabase = sb; // Expose for helpers
+        selectedAdvisors: new Set(), // Set of advisor IDs
+        
+        // Undo/Redo buffer for advisor assignments
+        history: [],
+        historyIndex: -1,
+        isUndoing: false, // Flag to prevent re-triggering history save
 
-/* =========================
-   App State (Globals)
-   ========================= */
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const DOW = { 'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4, 'Friday': 5, 'Saturday': 6, 'Sunday': 7 };
-const MAX_WEEKS_IN_ROTATION = 6;
-
-// Data Stores
-let ORG = { sites: {} };
-let ADVISORS_LIST = [];
-let ADVISOR_BY_NAME = new Map();
-let ADVISOR_BY_ID = new Map();
-let SHIFT_TEMPLATES = new Map(); // "7A" -> { name: "7A", start_time: "07:00", ... }
-let ROTATION_FAMILIES = new Map(); // "Flex A" -> { name: "Flex A", pattern: { 1: { Mon: "7A", ... }, 2: { ... } } }
-let ADVISOR_ASSIGNMENTS = new Map(); // advisor_id -> { advisor_id, rotation_name, start_date }
-
-// State
-let selectedAdvisors = new Set();
-let currentWeekStart = ""; // ISO date string of the viewed Monday
-let activeTooltip = {
-  element: null,
-  visible: false
-};
-
-// Undo/Redo Buffer
-let history = [];
-let historyIndex = -1;
-
-/* =========================
-   Core Helpers
-   ========================= */
-const $ = s => document.querySelector(s),
-  $$ = s => Array.from(document.querySelectorAll(s));
-window.$ = $;
-window.$$ = $$;
-
-const pad = n => String(n).padStart(2, '0');
-const fmt = (t) => t ? t.slice(0, 5) : ''; // HH:MM from HH:MM:SS
-
-window.setToMonday = function(d) {
-  const day = d.getDay();
-  const diff = (day === 0 ? -6 : 1) - day;
-  d.setDate(d.getDate() + diff);
-  return d;
-}
-
-function toMin(t) {
-  if (t === null || t === undefined) return null;
-  const [h, m] = String(t).split(':').map(Number);
-  if (isNaN(h) || isNaN(m)) return null;
-  return (h * 60) + m;
-}
-
-function m2t(m) {
-  if (m === null || m === undefined) return '';
-  return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
-}
-
-function toISODateLocal(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function getMondayISO(d) {
-  const date = (d instanceof Date) ? d : new Date(d + 'T00:00:00'); // Use local time
-  const day = date.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-  const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust to Monday
-  return toISODateLocal(new Date(date.setDate(diff)));
-}
-
-/**
- * Calculates the difference in days between two dates.
- */
-function dateDiffInDays(a, b) {
-  const _MS_PER_DAY = 1000 * 60 * 60 * 24;
-  // Discard time and time-zone information.
-  const utc1 = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
-  const utc2 = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
-  return Math.floor((utc2 - utc1) / _MS_PER_DAY);
-}
-
-/**
- * Calculates the effective week of a rotation.
- * @param {string} rotationStartDateISO - The "Week 1" start date (a Monday)
- * @param {string} plannerWeekStartISO - The Monday of the week we are viewing
- * @returns {number} The effective week number (1-6)
- */
-function effectiveWeek(rotationStartDateISO, plannerWeekStartISO) {
-  try {
-    const rotationStart = new Date(rotationStartDateISO + 'T00:00:00');
-    const plannerStart = new Date(plannerWeekStartISO + 'T00:00:00');
-
-    // Ensure both dates are Mondays
-    const rsm = getMondayISO(rotationStart);
-    const psm = getMondayISO(plannerStart);
-
-    const diffDays = dateDiffInDays(new Date(rsm), new Date(psm));
-    if (diffDays < 0) return 1; // Viewing a week before the rotation started
-
-    const diffWeeks = Math.floor(diffDays / 7);
-    const numWeeksInRotation = MAX_WEEKS_IN_ROTATION; // TODO: Make this dynamic from the rotation family
-    
-    return (diffWeeks % numWeeksInRotation) + 1; // 1-indexed week number
-  } catch (e) {
-    console.error("Error in effectiveWeek:", e);
-    return 1; // Fallback
-  }
-}
-
-/* =========================
-   Vertical Calendar Config
-   ========================= */
-const css = getComputedStyle(document.documentElement);
-const START_HOUR_VC = +css.getPropertyValue('--timeline-start') || 7;
-const END_HOUR_VC = +css.getPropertyValue('--timeline-end') || 20;
-const HEIGHT_VC = +css.getPropertyValue('--timeline-height').replace('px', '') || 800;
-const PX_PER_MIN_VC = HEIGHT_VC / ((END_HOUR_VC - START_HOUR_VC) * 60);
-
-/* =========================
-   Horizontal Planner Config
-   ========================= */
-const DAY_START_HC = 6 * 60, // 6am
-  DAY_END_HC = 20 * 60; // 8pm (14 hours)
-const DAY_SPAN_HC = DAY_END_HC - DAY_START_HC;
-function m2hmm(m) {
-  const h = Math.floor(m / 60),
-    mm = String(m % 60).padStart(2, '0');
-  return `${h}:${mm}`;
-}
-
-window.renderTimeHeader = function(el) {
-  if (!el) return;
-  el.innerHTML = '';
-  const wrap = document.createElement('div');
-  wrap.className = 'time-scale';
-  for (let m = DAY_START_HC; m <= DAY_END_HC; m += 60) {
-    const t = document.createElement('div');
-    t.className = 'tick';
-    t.style.left = `${((m - DAY_START_HC) / DAY_SPAN_HC) * 100}%`;
-    t.textContent = m2hmm(m);
-    wrap.appendChild(t);
-  }
-  el.appendChild(wrap);
-}
-
-/* =========================
-   Shift Template Helpers
-   ========================= */
-function codeSelectGroupedHTML(val = '') {
-  // TODO: This should be dynamic from shift templates
-  const codes = ["7A", "7B", "7C", "8A", "8B", "9A", "9C", "RDO", "AL", "Sick"];
-  return `<option value="">--</option>` + codes.map(c => `<option value="${c}" ${val===c?'selected':''}>${c}</option>`).join('');
-}
-
-function classForCode(code) {
-  const k = (code || '').toLowerCase();
-  if (k === 'rdo' || k === 'al' || k === 'sick') return 'c-rdo';
-  if (/\blunch\b/.test(k)) return 'c-lunch';
-  if (/\bbreak\b/.test(k)) return 'c-break';
-  if (/\bovertime\b/.test(k)) return 'c-overtime';
-  if (/\bmirakl\b/.test(k)) return 'c-mirakl';
-  if (/\bsocial\b/.test(k)) return 'c-social';
-  if (/\bemail\b/.test(k)) return 'c-email';
-  if (['al', 'sick', 'maternity', 'lts'].some(w => k.includes(w))) return 'c-absence';
-  if (['121', 'atl', 'coaching', 'huddle', 'iti', 'projects', 'team meeting', 'training'].some(w => k.includes(w))) return 'c-shrink';
-  return 'c-email'; // Default
-}
-
-/* =========================
-   Data Loading (Supabase)
-   ========================= */
-
-window.loadOrg = async function() {
-  const { data: advisorsRes, error } = await sb.from('advisors').select('*');
-  if (error) console.error("Error loading advisors:", error);
-  
-  ADVISORS_LIST = (advisorsRes || []).map(a => ({
-    id: a.id,
-    name: a.name,
-    leader_id: a.leader_id // TODO: Load sites/leaders
-  }));
-  
-  ADVISOR_BY_NAME = new Map(ADVISORS_LIST.map(a => [a.name, a.id]));
-  ADVISOR_BY_ID = new Map(ADVISORS_LIST.map(a => [a.id, a]));
-}
-
-window.loadShiftTemplates = async function() {
-  const { data, error } = await sb.from('shift_templates').select('*');
-  if (error) console.error("Error loading shift templates:", error);
-  SHIFT_TEMPLATES.clear();
-  (data || []).forEach(t => SHIFT_TEMPLATES.set(t.name, t));
-}
-
-window.loadRotationFamilies = async function() {
-  const { data, error } = await sb.from('rotations').select('name, pattern');
-  if (error) console.error("Error loading rotation families:", error);
-  ROTATION_FAMILIES.clear();
-  (data || []).forEach(r => ROTATION_FAMILIES.set(r.name, r));
-}
-
-window.loadAdvisorAssignments = async function() {
-  const { data, error } = await sb.from('advisor_assignments').select('advisor_id, rotation_name, start_date');
-  if (error) console.error("Error loading advisor assignments:", error);
-  ADVISOR_ASSIGNMENTS.clear();
-  (data || []).forEach(a => ADVISOR_ASSIGNMENTS.set(a.advisor_id, a));
-  
-  // After loading, save the initial state for undo
-  saveStateToHistory();
-}
-
-/* =========================
-   Rotation Editor (Phase 2)
-   ========================= */
-   
-window.populateRotationEditor = function() {
-  const sel = $('#rotationSelect');
-  const grid = $('#rotationEditorGrid');
-  if (!sel || !grid) return;
-
-  const familyNames = Array.from(ROTATION_FAMILIES.keys()).sort();
-  sel.innerHTML = familyNames.map(name => `<option value="${name}">${name}</option>`).join('');
-  sel.insertAdjacentHTML('afterbegin', '<option value="">-- Select Rotation --</option>');
-  sel.value = "";
-
-  // Event listener for dropdown change
-  sel.onchange = () => {
-    const familyName = sel.value;
-    const family = ROTATION_FAMILIES.get(familyName);
-    renderRotationGrid(family);
-  };
-  
-  renderRotationGrid(null); // Render empty grid
-}
-
-function renderRotationGrid(family) {
-  const grid = $('#rotationEditorGrid');
-  const pattern = family ? (family.pattern || {}) : {};
-  
-  const shiftOptions = Array.from(SHIFT_TEMPLATES.keys()).sort().map(name => `<option value="${name}">${name}</option>`).join('');
-  
-  let html = `<table class="data-table"><thead><tr><th>Week</th>`;
-  DAYS.forEach(day => html += `<th>${day.slice(0,3)}</th>`);
-  html += `</tr></thead><tbody>`;
-
-  for (let w = 1; w <= MAX_WEEKS_IN_ROTATION; w++) {
-    html += `<tr><td>Week ${w}</td>`;
-    const weekPattern = pattern[w] || {};
-    DAYS.forEach(day => {
-      const shift = weekPattern[day] || "";
-      html += `<td>
-        <select class="input" data-week="${w}" data-day="${day}">
-          <option value="">--</option>
-          ${shiftOptions}
-        </select>
-      </td>`;
-    });
-    html += `</tr>`;
-  }
-  html += `</tbody></table>`;
-  grid.innerHTML = html;
-  
-  // Now, set the selected values
-  for (let w = 1; w <= MAX_WEEKS_IN_ROTATION; w++) {
-    const weekPattern = pattern[w] || {};
-    DAYS.forEach(day => {
-      const shift = weekPattern[day] || "";
-      const sel = grid.querySelector(`select[data-week="${w}"][data-day="${day}"]`);
-      if (sel) sel.value = shift;
-    });
-  }
-}
-
-async function saveRotation() {
-  const familyName = $('#rotationSelect').value;
-  if (!familyName) {
-    alert("Please select or create a rotation first.");
-    return;
-  }
-  
-  const pattern = {};
-  for (let w = 1; w <= MAX_WEEKS_IN_ROTATION; w++) {
-    pattern[w] = {};
-    DAYS.forEach(day => {
-      const sel = $(`#rotationEditorGrid select[data-week="${w}"][data-day="${day}"]`);
-      if (sel && sel.value) {
-        pattern[w][day] = sel.value;
-      }
-    });
-  }
-  
-  const { data, error } = await sb.from('rotations').upsert({ name: familyName, pattern }, { onConflict: 'name' }).select().single();
-  
-  if (error) {
-    console.error("Error saving rotation:", error);
-    alert("Error saving rotation: " + error.message);
-  } else {
-    ROTATION_FAMILIES.set(data.name, data);
-    alert(`Rotation "${data.name}" saved.`);
-  }
-}
-
-async function newRotation() {
-  const familyName = prompt("Enter new rotation family name:");
-  if (!familyName) return;
-  
-  if (ROTATION_FAMILIES.has(familyName)) {
-    alert("A rotation with this name already exists.");
-    return;
-  }
-  
-  const newRotation = { name: familyName, pattern: {} };
-  ROTATION_FAMILIES.set(familyName, newRotation);
-  
-  // Refresh dropdown
-  const sel = $('#rotationSelect');
-  sel.insertAdjacentHTML('beforeend', `<option value="${familyName}">${familyName}</option>`);
-  sel.value = familyName;
-  
-  // Render empty grid
-  renderRotationGrid(newRotation);
-}
-
-async function deleteRotation() {
-  const familyName = $('#rotationSelect').value;
-  if (!familyName) {
-    alert("Please select a rotation to delete.");
-    return;
-  }
-  
-  if (!confirm(`Are you sure you want to PERMANENTLY delete the "${familyName}" rotation?\nThis action cannot be undone.`)) {
-    return;
-  }
-
-  const { error } = await sb.from('rotations').delete().eq('name', familyName);
-  
-  if (error) {
-    console.error("Error deleting rotation:", error);
-    alert("Error deleting rotation: " + error.message);
-  } else {
-    ROTATION_FAMILIES.delete(familyName);
-    populateRotationEditor(); // Re-render the whole editor
-    alert(`Rotation "${familyName}" deleted.`);
-  }
-}
-
-/* =========================
-   Advisor Assignment (Phase 2)
-   ========================= */
-
-window.populateAdvisorAssignments = function() {
-  const tableBody = $(`#advisorAssignmentTable tbody`);
-  if (!tableBody) return;
-  
-  const rotationOptions = Array.from(ROTATION_FAMILIES.keys()).sort().map(name => `<option value="${name}">${name}</option>`).join('');
-  
-  let html = "";
-  const advisors = ADVISORS_LIST.sort((a,b) => a.name.localeCompare(b.name));
-  
-  for (const advisor of advisors) {
-    const assignment = ADVISOR_ASSIGNMENTS.get(advisor.id) || {};
-    const rotationName = assignment.rotation_name || "";
-    const startDate = assignment.start_date || "";
-    
-    html += `
-      <tr data-advisor-id="${advisor.id}">
-        <td><strong>${advisor.name}</strong></td>
-        <td>
-          <select class="input sel-rotation">
-            <option value="">-- No Rotation --</option>
-            ${rotationOptions}
-          </select>
-        </td>
-        <td>
-          <input type="date" class="input input-start-date" value="${startDate}">
-        </td>
-      </tr>
-    `;
-  }
-  tableBody.innerHTML = html;
-  
-  // Now, set selected values
-  for (const advisor of advisors) {
-    const assignment = ADVISOR_ASSIGNMENTS.get(advisor.id) || {};
-    const row = tableBody.querySelector(`tr[data-advisor-id="${advisor.id}"]`);
-    if (row) {
-      row.querySelector('.sel-rotation').value = assignment.rotation_name || "";
-    }
-  }
-  
-  // Add event listeners
-  $$('#advisorAssignmentTable select, #advisorAssignmentTable input').forEach(el => {
-    el.addEventListener('change', (e) => {
-      saveStateToHistory(); // Save *before* the change
-      
-      const row = e.target.closest('tr');
-      const advisorId = row.dataset.advisorId;
-      
-      const newAssignment = {
-        advisor_id: advisorId,
-        rotation_name: row.querySelector('.sel-rotation').value,
-        start_date: row.querySelector('.input-start-date').value
-      };
-      
-      // Update local state
-      ADVISOR_ASSIGNMENTS.set(advisorId, newAssignment);
-      
-      // Upsert to Supabase (fire and forget)
-      sb.from('advisor_assignments').upsert(newAssignment, { onConflict: 'advisor_id' }).then(({ error }) => {
-        if (error) console.error("Error saving assignment:", error);
-      });
-      
-      // Refresh the schedules
-      window.refreshAllSchedules();
-    });
-  });
-}
-
-
-/* =========================
-   Schedules Tree (Right Sidebar)
-   ========================= */
-window.rebuildTree = function() {
-  const t = $('#tree');
-  if(!t) return;
-  const q = $('#treeSearch').value.trim().toLowerCase();
-
-  // Simplified tree (no leaders/sites yet)
-  let html = "";
-  const advisors = ADVISORS_LIST.sort((a,b) => a.name.localeCompare(b.name));
-  
-  advisors.forEach(obj => {
-    const name = obj.name;
-    if (q && !name.toLowerCase().includes(q)) return;
-    
-    const checked = selectedAdvisors.has(obj.id) ? 'checked' : '';
-    html += `<div class="node">
-      <label>
-        <input type="checkbox" data-adv-id="${obj.id}" ${checked} data-role="advisor"/>
-        <span>${name}</span>
-      </label>
-    </div>`;
-  });
-
-  t.innerHTML = html || '<div class="muted" style="padding: 10px;">No advisors found.</div>';
-
-  // Advisor select
-  $$('#tree [data-adv-id]').forEach(ch => {
-    ch.onchange = () => {
-      const id = ch.dataset.advId;
-      ch.checked ? selectedAdvisors.add(id) : selectedAdvisors.delete(id);
-      refreshUI();
+        // Caches
+        advisorSelectOptions: '', // HTML for advisor dropdowns
     };
-  });
-}
 
-window.refreshChips = function() {
-  const box = $('#activeChips');
-  if(!box) return;
-  box.innerHTML = '';
-  if (!selectedAdvisors.size) {
-    box.innerHTML = '<span class="muted" style="font-size: 12px;">No advisors selected.</span>';
-    return;
-  }
-  [...selectedAdvisors].map(id => ADVISOR_BY_ID.get(id)).sort((a,b) => a.name.localeCompare(b.name)).forEach(a => {
-    const chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.textContent = a.name;
-    const x = document.createElement('button');
-    x.innerHTML = '&times;';
-    x.style.border='none'; x.style.background='transparent'; x.style.cursor='pointer';
-    x.onclick = () => {
-      selectedAdvisors.delete(a.id);
-      refreshUI();
-    };
-    chip.appendChild(x);
-    box.appendChild(chip);
-  });
-}
+    // --- Utility Functions ---
+    const $ = (s) => document.querySelector(s);
+    const $$ = (s) => Array.from(document.querySelectorAll(s));
 
-/* =========================
-   Top Controls UI
-   ========================= */
-window.updateRangeLabel = function() {
-  const wsEl = $('#weekStart');
-  if (!wsEl) return;
-  currentWeekStart = wsEl.value; // Update global state
-  
-  const s = new Date(currentWeekStart + 'T00:00:00');
-  const e = new Date(s);
-  e.setDate(e.getDate() + 6);
-  
-  const f = d => d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-  
-  const dayName = $('#teamDay').value || 'Monday';
-  const dayIdx = DAYS.indexOf(dayName);
-  const d = new Date(s);
-  d.setDate(d.getDate() + dayIdx);
-  
-  $('#horizontalTitle').textContent = `Team Schedule – ${dayName}, ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' })}`;
-  $('#verticalTitle').textContent = `Advisor Week – ${f(s)} – ${f(e)}`;
-}
+    /**
+     * Sets the Monday of a given date.
+     * @param {Date} d - The input date.
+     * @returns {Date} A new Date object set to the Monday of that week.
+     */
+    function setToMonday(d) {
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+        return new Date(d.setDate(diff));
+    }
+    global.setToMonday = setToMonday;
 
+    /**
+     * Formats a Date object to "YYYY-MM-DD" string.
+     * @param {Date} d - The input date.
+     * @returns {string} The formatted date string.
+     */
+    function toISODate(d) {
+        return d.toISOString().split('T')[0];
+    }
+    global.toISODate = toISODate;
 
-/* =========================
-   CORE SCHEDULING LOGIC
-   ========================= */
-   
-/**
- * This is the new "brain" of the application.
- * It calculates the schedule for a single advisor for a given week.
- * @returns {Object} e.g. { Monday: "7A", Tuesday: "7A", ... }
- */
-function getScheduleForAdvisor(advisorId, weekStartISO) {
-  const assignment = ADVISOR_ASSIGNMENTS.get(advisorId);
-  
-  // 1. No assignment? Return empty schedule.
-  if (!assignment || !assignment.rotation_name || !assignment.start_date) {
-    return {}; // Empty schedule
-  }
-  
-  // 2. Get the assigned rotation family
-  const family = ROTATION_FAMILIES.get(assignment.rotation_name);
-  if (!family || !family.pattern) {
-    console.warn(`Advisor ${advisorId} assigned to non-existent rotation "${assignment.rotation_name}"`);
-    return {};
-  }
-  
-  // 3. Calculate the effective week
-  const weekNum = effectiveWeek(assignment.start_date, weekStartISO);
-  
-  // 4. Get the pattern for that specific week
-  const weekPattern = family.pattern[weekNum];
-  if (!weekPattern) {
-    // This rotation might be shorter than 6 weeks, default to week 1
-    const defaultPattern = family.pattern[1] || {};
-    return defaultPattern;
-  }
-  
-  return weekPattern;
-}
+    /**
+     * Converts "HH:MM:SS" or "HH:MM" to total minutes from midnight.
+     * @param {string} timeStr - The time string.
+     * @returns {number | null} Total minutes or null if invalid.
+     */
+    function timeToMinutes(timeStr) {
+        if (!timeStr) return null;
+        const [hours, minutes] = String(timeStr).split(':').map(Number);
+        if (isNaN(hours) || isNaN(minutes)) return null;
+        return hours * 60 + minutes;
+    }
+    global.timeToMinutes = timeToMinutes;
 
-/**
- * Gets the schedule for *all selected advisors* for the current week.
- * @returns {Map} A map of `advisorId` -> schedule object
- * e.g., { "123": { Mon: "7A", ... }, "456": { Mon: "RDO", ... } }
- */
-function getSchedulesForView() {
-  const schedules = new Map();
-  const weekStartISO = $('#weekStart').value;
-  
-  for (const advisorId of selectedAdvisors) {
-    const schedule = getScheduleForAdvisor(advisorId, weekStartISO);
-    schedules.set(advisorId, schedule);
-  }
-  return schedules;
-}
+    /**
+     * Converts total minutes from midnight to "HH:MM" format.
+     * @param {number} minutes - The total minutes.
+     * @returns {string} The formatted "HH:MM" string.
+     */
+    function minutesToTime(minutes) {
+        if (minutes === null || isNaN(minutes)) return "--:--";
+        const hours = Math.floor(minutes / 60).toString().padStart(2, '0');
+        const mins = (minutes % 60).toString().padStart(2, '0');
+        return `${hours}:${mins}`;
+    }
+    global.minutesToTime = minutesToTime;
 
-/* =========================
-   Horizontal Planner UI
-   ========================= */
+    /**
+     * Calculates the effective week number (1-6) of a rotation.
+     * @param {string} rotationStartDateISO - The "Week 1" start date (YYYY-MM-DD).
+     * @param {string} plannerDateISO - The date to check (YYYY-MM-DD).
+     * @returns {number} The effective week number (1 to 6).
+     */
+    function getEffectiveWeek(rotationStartDateISO, plannerDateISO) {
+        const start = new Date(rotationStartDateISO + 'T00:00:00');
+        const plan = new Date(plannerDateISO + 'T00:00:00');
+        
+        // Get the Monday of the planner date
+        const planMonday = setToMonday(plan);
+        
+        // Get the Monday of the rotation start date
+        const startMonday = setToMonday(start);
 
-window.computePlannerRows = function(schedules) {
-  const dayName = $('#teamDay').value || 'Monday';
-  const rows = [];
-  
-  for (const [advisorId, weekSchedule] of schedules.entries()) {
-    const advisor = ADVISOR_BY_ID.get(advisorId);
-    if (!advisor) continue;
-    
-    const shiftCode = weekSchedule[dayName] || "RDO"; // Get the shift code for the selected day
-    const template = SHIFT_TEMPLATES.get(shiftCode);
-    
-    let segments = [];
-    if (template) {
-      // Process template into segments (start, end, break1, lunch, break2)
-      const s = toMin(fmt(template.start_time));
-      const e = toMin(fmt(template.finish_time));
-      if (s !== null && e !== null && e > s) {
-        segments.push({ type: 'work', code: shiftCode, start: s, end: e });
-        // TODO: Add break/lunch segments
-      }
-    } else if (shiftCode !== "RDO") {
-      console.warn(`Shift template "${shiftCode}" not found.`);
+        const diffTime = planMonday.getTime() - startMonday.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        const diffWeeks = Math.floor(diffDays / 7);
+
+        // Use a 6-week cycle
+        const weekNum = (diffWeeks % 6);
+        // Ensure result is 1-6, handling negative mods
+        return (weekNum < 0 ? weekNum + 6 : weekNum) + 1;
+    }
+    global.getEffectiveWeek = getEffectiveWeek;
+
+    /**
+     * Shows a status message next to the save button.
+     * @param {string} text - The message to display.
+     * @param {'saving' | 'saved' | 'error' | 'idle'} type - The message type.
+     */
+    function showRotationStatus(text, type = 'idle') {
+        const el = $('#rotationStatus');
+        if (!el) return;
+        el.textContent = text;
+        el.className = 'form-status-label'; // Reset
+        if (type !== 'idle') {
+            el.classList.add(type);
+        }
+        // Clear "saved" message after a delay
+        if (type === 'saved') {
+            setTimeout(() => {
+                if (el.textContent === text) {
+                    el.textContent = '';
+                    el.className = 'form-status-label';
+                }
+            }, 2000);
+        }
     }
 
-    rows.push({
-      id: advisorId,
-      name: advisor.name,
-      badge: shiftCode,
-      segments: segments
-    });
-  }
-  
-  return rows.sort((a,b) => a.name.localeCompare(b.name));
-}
+    // ========================================================================
+    //      DATABASE: LOADERS (Called by init.js)
+    // ========================================================================
 
-window.renderPlanner = function(rows) {
-  try {
-    const body = document.getElementById('plannerBody');
-    if (!body) return;
-    body.innerHTML = '';
-    
-    if (rows.length === 0) {
-        body.innerHTML = `<div class="planner-empty-state">No advisors selected or no schedules found for this day.</div>`; // TODO: Style this
+    /**
+     * Loads all foundational data from Supabase in parallel.
+     */
+    async function loadAllData() {
+        console.log("Loading data from Supabase...");
+        showRotationStatus("Loading data...", "saving");
+        try {
+            const [orgData, templates, patterns, assignments] = await Promise.all([
+                loadOrgData(),
+                loadShiftTemplates(),
+                loadRotationPatterns(),
+                loadRotationAssignments()
+            ]);
+            console.log("Data Loaded.", {
+                org: orgData,
+                templates: templates.size,
+                patterns: patterns.size,
+                assignments: assignments.size
+            });
+            showRotationStatus("Data Loaded", "saved");
+        } catch (error) {
+            console.error("Error loading all data:", error);
+            showRotationStatus("Error loading data!", "error");
+        }
     }
-    
-    rows.forEach(r => {
-      const row = document.createElement('div');
-      row.className = 'planner__row';
-      const left = document.createElement('div');
-      left.className = 'planner__name';
-      left.textContent = r.name;
-      
-      const badge = document.createElement('span');
-      badge.className = 'planner__badge';
-      badge.textContent = r.badge;
-      left.appendChild(badge);
-      row.appendChild(left);
-      
-      const tl = document.createElement('div');
-      tl.className = 'planner__timeline';
-      
-      r.segments.forEach(s => {
-        if (s.start == null || s.end == null || s.end <= s.start) return;
-        
-        const bar = document.createElement('div');
-        bar.className = `planner__bar ${classForCode(s.code)}`;
-        
-        const pct = m => (m - DAY_START_HC) / DAY_SPAN_HC * 100;
-        const leftPct = Math.max(0, pct(s.start));
-        const widthPct = Math.max(0, pct(s.end) - leftPct);
+    global.loadAllData = loadAllData;
 
-        bar.style.left = leftPct + '%';
-        bar.style.width = widthPct + '%';
+    /**
+     * Loads sites, leaders, and advisors.
+     */
+    async function loadOrgData() {
+        const { data, error } = await supabase
+            .from('sites')
+            .select(`
+                id, name,
+                leaders ( id, name, site_id,
+                    advisors ( id, name, leader_id, email )
+                )
+            `);
         
-        const label = `${s.code} ${m2t(s.start)}–${m2t(s.end)}`;
-        bar.dataset.tooltip = label;
+        if (error) throw error;
+
+        // Clear old maps
+        APP_STATE.sites.clear();
+        APP_STATE.leaders.clear();
+        APP_STATE.advisors.clear();
+
+        // Populate new maps
+        for (const site of data) {
+            APP_STATE.sites.set(site.id, site);
+            for (const leader of site.leaders) {
+                APP_STATE.leaders.set(leader.id, leader);
+                for (const advisor of leader.advisors) {
+                    APP_STATE.advisors.set(advisor.id, advisor);
+                }
+            }
+        }
+        return { sites: APP_STATE.sites.size, leaders: APP_STATE.leaders.size, advisors: APP_STATE.advisors.size };
+    }
+    global.loadOrgData = loadOrgData;
+
+    /**
+     * Loads all shift templates (e.g., "7A", "RDO").
+     */
+    async function loadShiftTemplates() {
+        const { data, error } = await supabase
+            .from('shift_templates')
+            .select('code, start_time, end_time, break1, lunch, break2')
+            .order('code');
+
+        if (error) throw error;
+
+        APP_STATE.shiftTemplates.clear();
+        data.forEach(t => APP_STATE.shiftTemplates.set(t.code, t));
         
-        if (widthPct > 5) {
-            bar.textContent = label;
+        // Cache the <option> HTML for all dropdowns
+        APP_STATE.advisorSelectOptions = '<option value="">--</option>';
+        APP_STATE.advisorSelectOptions += data.map(t => 
+            `<option value="${t.code}">${t.code}</option>`
+        ).join('');
+
+        return APP_STATE.shiftTemplates;
+    }
+    global.loadShiftTemplates = loadShiftTemplates;
+
+    /**
+     * Loads all saved rotation patterns from the new `rotation_patterns` table.
+     */
+    async function loadRotationPatterns() {
+        // Use the new, unique table name
+        const { data, error } = await supabase
+            .from('rotation_patterns')
+            .select('name, pattern');
+
+        if (error) throw error;
+
+        APP_STATE.rotationPatterns.clear();
+        data.forEach(p => APP_STATE.rotationPatterns.set(p.name, p));
+        return APP_STATE.rotationPatterns;
+    }
+    global.loadRotationPatterns = loadRotationPatterns;
+
+    /**
+     * Loads all advisor assignments from the new `rotation_assignments` table.
+     */
+    async function loadRotationAssignments() {
+        // Use the new, unique table name
+        const { data, error } = await supabase
+            .from('rotation_assignments')
+            .select('advisor_id, rotation_name, start_date');
+
+        if (error) throw error;
+
+        APP_STATE.rotationAssignments.clear();
+        data.forEach(a => APP_STATE.rotationAssignments.set(a.advisor_id, a));
+        return APP_STATE.rotationAssignments;
+    }
+    global.loadRotationAssignments = loadRotationAssignments;
+
+    // ========================================================================
+    //      DATABASE: SAVERS (Called by UI events)
+    // ========================================================================
+
+    /**
+     * Saves (upserts) the currently displayed rotation pattern.
+     */
+    async function saveRotationPattern() {
+        const select = $('#rotationNameSelect');
+        const rotationName = select.value;
+        if (!rotationName) return;
+
+        showRotationStatus("Saving...", "saving");
+        const pattern = {};
+        let hasData = false;
+
+        // Read the 6x7 grid
+        for (let week = 1; week <= 6; week++) {
+            const weekKey = `week${week}`;
+            pattern[weekKey] = {};
+            const weekRow = $(`#rotationEditorGrid tr[data-week="${weekKey}"]`);
+            if (weekRow) {
+                const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+                days.forEach(day => {
+                    const sel = weekRow.querySelector(`select[data-day="${day}"]`);
+                    if (sel && sel.value) {
+                        pattern[weekKey][day] = sel.value;
+                        hasData = true;
+                    } else {
+                        pattern[weekKey][day] = null;
+                    }
+                });
+            }
+        }
+
+        if (!hasData) {
+            showRotationStatus("Cannot save an empty rotation.", "error");
+            return;
+        }
+
+        // Use the new, unique table name
+        const { error } = await supabase
+            .from('rotation_patterns')
+            .upsert({ name: rotationName, pattern: pattern }, { onConflict: 'name' });
+
+        if (error) {
+            console.error("Error saving rotation:", error);
+            showRotationStatus(error.message, "error");
+        } else {
+            APP_STATE.rotationPatterns.set(rotationName, { name: rotationName, pattern });
+            showRotationStatus("Saved!", "saved");
+            $('#btnSaveRotation').disabled = true;
+        }
+    }
+    global.saveRotationPattern = saveRotationPattern;
+
+    /**
+     * Deletes the currently selected rotation pattern.
+     */
+    async function deleteRotationPattern() {
+        const select = $('#rotationNameSelect');
+        const rotationName = select.value;
+        if (!rotationName) return;
+
+        if (!confirm(`Are you sure you want to delete the "${rotationName}" rotation pattern? This cannot be undone.`)) {
+            return;
+        }
+
+        showRotationStatus("Deleting...", "saving");
+
+        // Use the new, unique table name
+        const { error } = await supabase
+            .from('rotation_patterns')
+            .delete()
+            .eq('name', rotationName);
+        
+        if (error) {
+            console.error("Error deleting rotation:", error);
+            showRotationStatus(error.message, "error");
+        } else {
+            APP_STATE.rotationPatterns.delete(rotationName);
+            showRotationStatus("Deleted!", "saved");
+            populateRotationFamilySelect(); // Re-populate the main dropdown
+            displayRotationPattern(null); // Clear the grid
+        }
+    }
+    global.deleteRotationPattern = deleteRotationPattern;
+
+    /**
+     * Saves a single advisor's rotation assignment.
+     * @param {string} advisorId - The UUID of the advisor.
+     * @param {string} rotationName - The name of the rotation family.
+     * @param {string} startDate - The "Week 1" start date (YYYY-MM-DD).
+     */
+    async function saveAdvisorAssignment(advisorId, rotationName, startDate) {
+        if (!advisorId) return;
+
+        // Find the row and show a saving indicator
+        const row = $(`#advisorAssignmentBody tr[data-advisor-id="${advisorId}"]`);
+        if (row) row.classList.add('saving');
+
+        const assignment = {
+            advisor_id: advisorId,
+            rotation_name: rotationName || null,
+            start_date: startDate || null
+        };
+        
+        // Use the new, unique table name
+        const { error } = await supabase
+            .from('rotation_assignments')
+            .upsert(assignment, { onConflict: 'advisor_id' });
+
+        if (row) row.classList.remove('saving');
+
+        if (error) {
+            console.error("Error saving assignment:", error);
+            if (row) row.classList.add('error');
+        } else {
+            console.log("Saved assignment for", advisorId);
+            APP_STATE.rotationAssignments.set(advisorId, assignment);
+            if (row) {
+                row.classList.add('saved');
+                setTimeout(() => row.classList.remove('saved'), 1500);
+            }
+            // Re-render the planners
+            refreshAllUI();
+        }
+    }
+    global.saveAdvisorAssignment = saveAdvisorAssignment;
+
+    // ========================================================================
+    //      UI: RENDERERS (Populate the page)
+    // ========================================================================
+
+    /**
+     * Re-draws all UI components that depend on data.
+     */
+    function refreshAllUI() {
+        rebuildAdvisorTree();
+        populateRotationFamilySelect();
+        populateRotationEditorGrid();
+        populateAdvisorAssignmentTable();
+        renderTimeHeader();
+        renderPlanner();
+        // NOTE: Vertical calendar is not part of this "v3" build
+    }
+    global.refreshAllUI = refreshAllUI;
+
+    /**
+     * Rebuilds the Advisor "Schedules" tree on the right.
+     * This version ONLY shows advisors, as requested by the "Big Leap" plan.
+     */
+    function rebuildAdvisorTree() {
+        const treeEl = $('#tree');
+        if (!treeEl) return;
+
+        const advisors = Array.from(APP_STATE.advisors.values());
+        advisors.sort((a, b) => a.name.localeCompare(b.name));
+
+        const filter = ($('#treeSearch').value || '').toLowerCase();
+
+        const advisorNodes = advisors
+            .filter(a => a.name.toLowerCase().includes(filter))
+            .map(a => `
+                <div class="node">
+                    <label>
+                        <input type="checkbox" class="advisor-tree-checkbox" value="${a.id}" ${APP_STATE.selectedAdvisors.has(a.id) ? 'checked' : ''}>
+                        <span>${a.name}</span>
+                    </label>
+                </div>
+            `);
+
+        treeEl.innerHTML = `
+            <details class="tree" open>
+                <summary>
+                    <span class="twisty">▼</span>
+                    <strong>All Advisors</strong>
+                </summary>
+                ${advisorNodes.join('') || '<div class="node-muted">No advisors found.</div>'}
+            </details>
+        `;
+    }
+    global.rebuildAdvisorTree = rebuildAdvisorTree;
+
+    /**
+     * Updates the "Selected Advisors" chips below the tree.
+     */
+    function refreshAdvisorChips() {
+        const chipsEl = $('#activeChips');
+        if (!chipsEl) return;
+
+        const selected = Array.from(APP_STATE.selectedAdvisors);
+        selected.sort((a, b) => {
+            const nameA = APP_STATE.advisors.get(a)?.name || '';
+            const nameB = APP_STATE.advisors.get(b)?.name || '';
+            return nameA.localeCompare(nameB);
+        });
+
+        chipsEl.innerHTML = selected.map(id => {
+            const advisor = APP_STATE.advisors.get(id);
+            if (!advisor) return '';
+            return `
+                <span class="chip" data-advisor-id="${id}">
+                    ${advisor.name}
+                    <button class="chip-remove" data-id="${id}">&times;</button>
+                </span>
+            `;
+        }).join('');
+    }
+    global.refreshAdvisorChips = refreshAdvisorChips;
+
+    /**
+     * Populates the "Rotation Family" <select> dropdown.
+     */
+    function populateRotationFamilySelect() {
+        const select = $('#rotationNameSelect');
+        if (!select) return;
+
+        const currentVal = select.value;
+        const families = Array.from(APP_STATE.rotationPatterns.keys());
+        families.sort();
+
+        select.innerHTML = '<option value="">-- Select a Rotation --</option>';
+        select.innerHTML += families.map(name =>
+            `<option value="${name}">${name}</option>`
+        ).join('');
+        
+        // Try to re-select the previous value
+        if (APP_STATE.rotationPatterns.has(currentVal)) {
+            select.value = currentVal;
+        }
+    }
+    global.populateRotationFamilySelect = populateRotationFamilySelect;
+
+    /**
+     * Populates the 6x7 "Rotation Editor" grid with dropdowns.
+     */
+    function populateRotationEditorGrid() {
+        const gridBody = $('#rotationEditorGrid');
+        if (!gridBody) return;
+
+        gridBody.innerHTML = ''; // Clear it
+        for (let week = 1; week <= 6; week++) {
+            const row = document.createElement('tr');
+            row.dataset.week = `week${week}`;
+            row.innerHTML = `
+                <td>Week ${week}</td>
+                <td><select class="form-select" data-day="mon">${APP_STATE.advisorSelectOptions}</select></td>
+                <td><select class="form-select" data-day="tue">${APP_STATE.advisorSelectOptions}</select></td>
+                <td><select class="form-select" data-day="wed">${APP_STATE.advisorSelectOptions}</select></td>
+                <td><select class="form-select" data-day="thu">${APP_STATE.advisorSelectOptions}</select></td>
+                <td><select class="form-select" data-day="fri">${APP_STATE.advisorSelectOptions}</select></td>
+                <td><select class="form-select" data-day="sat">${APP_STATE.advisorSelectOptions}</select></td>
+                <td><select class="form-select" data-day="sun">${APP_STATE.advisorSelectOptions}</select></td>
+                <td>
+                    <button class="form-button subtle form-button-sm btn-copy-week" title="Copy this week's pattern down">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/></svg>
+                    </button>
+                </td>
+            `;
+            gridBody.appendChild(row);
+        }
+    }
+    global.populateRotationEditorGrid = populateRotationEditorGrid;
+
+    /**
+     * Fills the "Rotation Editor" grid with a pattern's data.
+     * @param {string | null} rotationName - The name of the rotation to display.
+     */
+    function displayRotationPattern(rotationName) {
+        const pattern = rotationName ? APP_STATE.rotationPatterns.get(rotationName)?.pattern : null;
+
+        for (let week = 1; week <= 6; week++) {
+            const weekKey = `week${week}`;
+            const weekRow = $(`#rotationEditorGrid tr[data-week="${weekKey}"]`);
+            if (weekRow) {
+                const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+                days.forEach(day => {
+                    const sel = weekRow.querySelector(`select[data-day="${day}"]`);
+                    if (sel) {
+                        sel.value = pattern?.[weekKey]?.[day] || '';
+                    }
+                });
+            }
         }
         
-        tl.appendChild(bar);
-      });
-      row.appendChild(tl);
-      body.appendChild(row);
-    });
-  } catch (e) {
-    console.warn('renderPlanner error', e);
-  }
-}
+        // Enable/disable buttons based on selection
+        $('#btnSaveRotation').disabled = !rotationName;
+        $('#btnDeleteRotation').disabled = !rotationName;
+        // Mark as "un-dirty"
+        showRotationStatus(rotationName ? "Loaded pattern" : "Select or create a pattern");
+    }
+    global.displayRotationPattern = displayRotationPattern;
 
-/* =========================
-   Vertical Calendar UI
-   ========================= */
-function hoursHTML() {
-  let h = '';
-  for (let i = START_HOUR_VC; i <= END_HOUR_VC; i++) {
-    h += `<div class="hour"><span>${String(i).padStart(2,'0')}:00</span></div>`;
-  }
-  return h;
-}
-window.setHours = function() {
-  const el = $('#hours');
-  if (el) el.innerHTML = hoursHTML();
-}
+    /**
+     * Populates the "Advisor Assignments" table.
+     */
+    function populateAdvisorAssignmentTable() {
+        const tableBody = $('#advisorAssignmentBody');
+        if (!tableBody) return;
 
-function resetGrid() {
-  const grid = $('#calGrid');
-  if(grid) {
-    grid.innerHTML = '<div class="hour-col"><div id="hours"></div></div>';
-    $('#hours').innerHTML = hoursHTML();
-  }
-}
+        const advisors = Array.from(APP_STATE.advisors.values());
+        advisors.sort((a, b) => a.name.localeCompare(b.name));
 
-window.renderCalendar = function(schedules) {
-  resetGrid();
-  const grid = $('#calGrid');
-  
-  if (schedules.size === 0) {
-      // TODO: Show empty state
-      return;
-  }
-  
-  // Vertical view only shows the *first selected advisor*
-  const firstAdvisorId = schedules.keys().next().value;
-  const advisor = ADVISOR_BY_ID.get(firstAdvisorId);
-  const weekSchedule = schedules.get(firstAdvisorId);
-  
-  if (!advisor || !weekSchedule) return;
+        const rotationNames = ['<option value="">-- No Rotation --</option>'];
+        rotationNames.push(
+            ...Array.from(APP_STATE.rotationPatterns.keys()).sort().map(name =>
+                `<option value="${name}">${name}</option>`
+            )
+        );
 
-  $('#verticalTitle').textContent = `${advisor.name}'s Week – ${currentWeekStart}`;
+        tableBody.innerHTML = ''; // Clear old data
+        advisors.forEach(a => {
+            const assignment = APP_STATE.rotationAssignments.get(a.id);
+            const tr = document.createElement('tr');
+            tr.dataset.advisorId = a.id;
+            tr.innerHTML = `
+                <td>${a.name}</td>
+                <td>
+                    <select class="form-select assign-rotation-name" data-advisor-id="${a.id}">
+                        ${rotationNames.join('')}
+                    </select>
+                </td>
+                <td>
+                    <input type="date" class="form-input assign-start-date" data-advisor-id="${a.id}" />
+                </td>
+            `;
+            // Set current values
+            if (assignment) {
+                tr.querySelector('.assign-rotation-name').value = assignment.rotation_name || '';
+                tr.querySelector('.assign-start-date').value = assignment.start_date || '';
+            }
+            tableBody.appendChild(tr);
+        });
+        
+        // Save to history for undo/redo
+        saveHistory();
+    }
+    global.populateAdvisorAssignmentTable = populateAdvisorAssignmentTable;
 
-  DAYS.forEach((day, idx) => {
-    const col = document.createElement('div');
-    col.className = 'day-col';
-    
-    const d = new Date(currentWeekStart + 'T00:00:00');
-    d.setDate(d.getDate() + idx);
-    const month = d.toLocaleDateString('en-GB', { month: 'long' });
-    const num = d.getDate();
-    col.insertAdjacentHTML('beforeend', `<div class="day-head"><small>${month}</small>${day}<span style="float:right">${num}</span></div>`);
 
-    const shiftCode = weekSchedule[day];
-    const template = SHIFT_TEMPLATES.get(shiftCode);
-    
-    const cell = document.createElement('div');
-    cell.className = 'timeline-cell';
+    // ========================================================================
+    //      UI: HORIZONTAL PLANNER (Main Schedule)
+    // ========================================================================
 
-    if (template) {
-      const s = toMin(fmt(template.start_time));
-      const e = toMin(fmt(template.finish_time));
-      const totalMins = (e - s);
-      col.insertAdjacentHTML('beforeend',`<div class="day-summary"><span class="muted">${shiftCode}</span> ${fmt(template.start_time)} – ${fmt(template.finish_time)}<span class="summary-right">${(totalMins/60).toFixed(1)}h</span></div>`);
-      
-      const top = (s - START_HOUR_VC * 60) * PX_PER_MIN_VC;
-      const h = (e - s) * PX_PER_MIN_VC;
-      const el = document.createElement('div');
-      el.className = `block ${classForCode(shiftCode)}`;
-      el.style.top = top + 'px';
-      el.style.height = Math.max(16, h) + 'px';
-      el.innerHTML = `<div>${shiftCode}<span class="time">${m2t(s)} – ${m2t(e)}</span></div>`;
-      el.dataset.tooltip = `${shiftCode} ${m2t(s)}–${m2t(e)}`;
-      cell.appendChild(el);
-      
-    } else {
-       col.insertAdjacentHTML('beforeend', `<div class="off">${shiftCode || 'Roster Day Off'}</div>`);
+    /**
+     * Renders the hour ticks (e.g., "06:00", "07:00") in the header.
+     */
+    function renderTimeHeader() {
+        const el = $('#timeHeader');
+        if (!el) return;
+
+        const startHour = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-start-hour') || '6', 10);
+        const endHour = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-end-hour') || '20', 10);
+        const hourWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-hour-width') || '60', 10);
+
+        el.innerHTML = '';
+        for (let h = startHour; h <= endHour; h++) {
+            const tick = document.createElement('div');
+            tick.className = 'tick';
+            tick.textContent = `${h.toString().padStart(2, '0')}:00`;
+            tick.style.left = `${(h - startHour) * hourWidth}px`;
+            el.appendChild(tick);
+        }
+    }
+    global.renderTimeHeader = renderTimeHeader;
+
+    /**
+     * Main function to calculate and render the horizontal planner.
+     */
+    function renderPlanner() {
+        const body = $('#plannerBody');
+        if (!body) return;
+
+        const rows = computeScheduleRows();
+        
+        body.innerHTML = ''; // Clear old rows
+        if (!rows.length) {
+            body.innerHTML = '<div class="planner-row-empty">No advisors selected or no shifts scheduled for this day.</div>';
+            return;
+        }
+
+        const startHour = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-start-hour') || '6', 10);
+        const hourWidth = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--timeline-hour-width') || '60', 10);
+        const startMinutes = startHour * 60;
+        const pxPerMinute = hourWidth / 60;
+
+        rows.forEach(row => {
+            const rowEl = document.createElement('div');
+            rowEl.className = 'planner-row';
+            
+            // Name Column
+            const nameEl = document.createElement('div');
+            nameEl.className = 'planner-name';
+            nameEl.textContent = row.name;
+            nameEl.title = row.name;
+            rowEl.appendChild(nameEl);
+
+            // Timeline Column
+            const timelineEl = document.createElement('div');
+            timelineEl.className = 'planner-timeline';
+
+            row.segments.forEach(seg => {
+                const bar = document.createElement('div');
+                bar.className = `planner-bar ${seg.cssClass || 'c-email'}`;
+                
+                const left = (seg.start - startMinutes) * pxPerMinute;
+                const width = (seg.end - seg.start) * pxPerMinute;
+
+                bar.style.left = `${left}px`;
+                bar.style.width = `${width}px`;
+
+                bar.innerHTML = `
+                    <span class="planner-bar-label">${seg.code}</span>
+                    <span class="planner-bar-time">${minutesToTime(seg.start)} - ${minutesToTime(seg.end)}</span>
+                `;
+                
+                // Add tooltip data
+                bar.dataset.tooltip = `
+                    ${row.name}<br>
+                    <span>${seg.code}</span>
+                    <span>${minutesToTime(seg.start)} - ${minutesToTime(seg.end)}</span>
+                `;
+                timelineEl.appendChild(bar);
+            });
+            rowEl.appendChild(timelineEl);
+            body.appendChild(rowEl);
+        });
+    }
+    global.renderPlanner = renderPlanner;
+
+    /**
+     * Calculates the schedule rows for the selected advisors and day.
+     * This is the "brains" of the auto-scheduler.
+     * @returns {Array<object>} An array of row objects for the renderer.
+     */
+    function computeScheduleRows() {
+        const weekStartISO = $('#weekStart').value;
+        const dayName = $('#teamDay').value; // "Monday", "Tuesday", ...
+        if (!weekStartISO || !dayName) return [];
+        
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const dayIndex = days.indexOf(dayName);
+        const dayKey = dayName.toLowerCase().substring(0, 3); // "mon", "tue", ...
+
+        // Get the specific date for the selected day
+        const plannerDate = new Date(weekStartISO + 'T00:00:00');
+        plannerDate.setDate(plannerDate.getDate() + dayIndex);
+        const plannerDateISO = toISODate(plannerDate);
+
+        const scheduledRows = [];
+
+        // Loop over only the selected advisors
+        for (const advisorId of APP_STATE.selectedAdvisors) {
+            const advisor = APP_STATE.advisors.get(advisorId);
+            if (!advisor) continue;
+
+            const assignment = APP_STATE.rotationAssignments.get(advisorId);
+            
+            // If no assignment, add a blank row
+            if (!assignment || !assignment.rotation_name || !assignment.start_date) {
+                scheduledRows.push({ name: advisor.name, segments: [] });
+                continue;
+            }
+
+            // 1. Get the rotation pattern
+            const pattern = APP_STATE.rotationPatterns.get(assignment.rotation_name);
+            if (!pattern) {
+                scheduledRows.push({ name: advisor.name, segments: [] }); // Pattern deleted?
+                continue;
+            }
+
+            // 2. Find the effective week (1-6)
+            const weekNum = getEffectiveWeek(assignment.start_date, plannerDateISO);
+            const weekKey = `week${weekNum}`;
+            
+            // 3. Get the shift code for that day (e.g., "7A")
+            const shiftCode = pattern.pattern?.[weekKey]?.[dayKey];
+            if (!shiftCode || shiftCode === "RDO") {
+                scheduledRows.push({ name: advisor.name, segments: [] }); // Day off
+                continue;
+            }
+
+            // 4. Get the shift template details
+            const template = APP_STATE.shiftTemplates.get(shiftCode);
+            if (!template) {
+                scheduledRows.push({ name: advisor.name, segments: [] }); // Unknown code
+                continue;
+            }
+
+            // 5. Build segments (shift, breaks, lunch)
+            const segments = [];
+            const workStart = timeToMinutes(template.start_time);
+            const workEnd = timeToMinutes(template.end_time);
+
+            if (workStart === null || workEnd === null || workEnd <= workStart) {
+                scheduledRows.push({ name: advisor.name, segments: [] }); // Invalid template
+                continue;
+            }
+            
+            // Add work segment
+            segments.push({
+                code: shiftCode,
+                start: workStart,
+                end: workEnd,
+                cssClass: 'c-email' // Default class, can be improved
+            });
+            
+            // Add breaks/lunch
+            if (template.break1) {
+                const start = timeToMinutes(template.break1);
+                if (start) segments.push({ code: 'Break', start, end: start + 15, cssClass: 'c-break' });
+            }
+            if (template.lunch) {
+                const start = timeToMinutes(template.lunch);
+                if (start) segments.push({ code: 'Lunch', start, end: start + 30, cssClass: 'c-lunch' });
+            }
+            if (template.break2) {
+                const start = timeToMinutes(template.break2);
+                if (start) segments.push({ code: 'Break', start, end: start + 15, cssClass: 'c-break' });
+            }
+
+            scheduledRows.push({ name: advisor.name, segments });
+        }
+
+        // Sort rows by name
+        scheduledRows.sort((a, b) => a.name.localeCompare(b.name));
+        return scheduledRows;
     }
 
-    col.appendChild(cell);
-    grid.appendChild(col);
-  });
-}
+    // ========================================================================
+    //      UI: HISTORY (Undo/Redo)
+    // ========================================================================
 
-/* =========================
-   Unified UI Refresh
-   ========================= */
+    /**
+     * Saves the current state of `rotationAssignments` to the history buffer.
+     */
+    function saveHistory() {
+        if (APP_STATE.isUndoing) return; // Don't save history *while* undoing
 
-/**
- * The new central renderer.
- * Gets all schedules and updates both horizontal and vertical views.
- */
-window.refreshAllSchedules = function() {
-  const schedules = getSchedulesForView();
-  
-  // 1. Refresh Horizontal Planner
-  const rows = window.computePlannerRows(schedules);
-  window.renderPlanner(rows);
-  
-  // 2. Refresh Vertical Calendar
-  window.renderCalendar(schedules);
-  
-  // 3. Update labels
-  window.updateRangeLabel();
-}
+        const currentState = JSON.stringify(Array.from(APP_STATE.rotationAssignments.entries()));
 
-/**
- * Refreshes all data-driven UI components.
- */
-window.refreshUI = function() {
-  window.refreshChips();
-  window.rebuildTree();
-  window.populateAdvisorAssignments();
-  window.refreshAllSchedules();
-}
-
-/* =========================
-   State & Undo/Redo (Phase 1)
-   ========================= */
-function saveStateToHistory() {
-  const state = JSON.stringify(Array.from(ADVISOR_ASSIGNMENTS.entries()));
-  
-  // If we're in the middle of history, clear the "redo" future
-  if (historyIndex < history.length - 1) {
-    history = history.slice(0, historyIndex + 1);
-  }
-  
-  // Add the new state
-  history.push(state);
-  historyIndex = history.length - 1;
-  
-  // Limit history size
-  if (history.length > 20) {
-    history.shift();
-    historyIndex--;
-  }
-  
-  updateUndoRedoButtons();
-}
-
-function applyStateFromHistory(index) {
-  if (index < 0 || index >= history.length) return;
-  
-  const stateString = history[index];
-  try {
-    const assignmentsArray = JSON.parse(stateString);
-    ADVISOR_ASSIGNMENTS = new Map(assignmentsArray);
-    historyIndex = index;
-    
-    // Refresh UI to show the restored state
-    window.populateAdvisorAssignments();
-    window.refreshAllSchedules();
-    updateUndoRedoButtons();
-  } catch (e) {
-    console.error("Error applying history state:", e);
-  }
-}
-
-function undo() {
-  if (historyIndex > 0) {
-    applyStateFromHistory(historyIndex - 1);
-  }
-}
-
-function redo() {
-  if (historyIndex < history.length - 1) {
-    applyStateFromHistory(historyIndex + 1);
-  }
-}
-
-function updateUndoRedoButtons() {
-  const btnUndo = $('#btnUndo');
-  const btnRedo = $('#btnRedo');
-  if (!btnUndo || !btnRedo) return;
-  
-  btnUndo.disabled = historyIndex <= 0;
-  btnRedo.disabled = historyIndex >= history.length - 1;
-}
-
-/* =========================
-   Tooltip Logic (Phase 3)
-   ========================= */
-function setupTooltips() {
-  const tooltip = $('#tooltip');
-  if (!tooltip) return;
-  
-  // Use event delegation on common ancestors
-  const bodies = ['#plannerBody', '#calGrid'];
-  
-  bodies.forEach(bodySelector => {
-    const parent = $(bodySelector);
-    if (!parent) return;
-
-    parent.addEventListener('mouseover', (e) => {
-      const target = e.target.closest('[data-tooltip]');
-      if (!target) return;
-      
-      tooltip.textContent = target.dataset.tooltip;
-      tooltip.style.display = 'block';
-      activeTooltip.visible = true;
-    });
-
-    parent.addEventListener('mouseout', () => {
-      tooltip.style.display = 'none';
-      activeTooltip.visible = false;
-    });
-
-    parent.addEventListener('mousemove', (e) => {
-      if (activeTooltip.visible) {
-        tooltip.style.left = (e.clientX + 10) + 'px';
-        tooltip.style.top = (e.clientY - 28) + 'px';
-      }
-    });
-  });
-}
-
-
-/* =========================
-   Dialogs: Commit Week (Phase 1)
-   ========================= */
-
-function openCommitDialog() {
-  const commitDlg = $('#commitDlg');
-  const summary = $('#commitSummary');
-  const list = $('#commitList');
-  if (!commitDlg || !summary || !list) return;
-  
-  const schedules = getSchedulesForView();
-  if (schedules.size === 0) {
-    alert("Please select advisors to commit.");
-    return;
-  }
-  
-  summary.textContent = `This will save the auto-generated schedule for ${schedules.size} advisor(s) for the week starting ${currentWeekStart}.`;
-  
-  list.innerHTML = `<ul>` +
-    Array.from(schedules.keys()).map(id => ADVISOR_BY_ID.get(id).name)
-    .sort()
-    .map(name => `<li>${name}</li>`).join('') +
-    `</ul>`;
-  
-  commitDlg.showModal();
-}
-
-async function doCommit() {
-  const commitDlg = $('#commitDlg');
-  const schedules = getSchedulesForView();
-  const weekStartISO = currentWeekStart;
-  
-  const recordsToUpsert = [];
-  
-  for (const [advisorId, weekSchedule] of schedules.entries()) {
-    // The `rotas` table stores the *final, historical* schedule.
-    // The primary key is (advisor_id, week_start).
-    // The `data` column stores the { Mon: "7A", ... } object.
-    recordsToUpsert.push({
-      advisor_id: advisorId,
-      week_start: weekStartISO,
-      data: weekSchedule
-    });
-  }
-  
-  if (recordsToUpsert.length === 0) {
-    commitDlg.close();
-    return;
-  }
-
-  const { error } = await sb.from('rotas').upsert(recordsToUpsert, { onConflict: 'advisor_id, week_start' });
-  
-  if (error) {
-    console.error("Error committing week:", error);
-    alert("Error saving schedules: " + error.message);
-  } else {
-    alert(`Successfully committed schedules for ${recordsToUpsert.length} advisor(s).`);
-  }
-  
-  commitDlg.close();
-}
-
-
-/* =========================
-   Event Wiring
-   ========================= */
-window.wire = function() {
-  // Top Bar
-  wireOnce($('#btnToday'), 'click', () => {
-    const t = window.setToMonday(new Date());
-    $('#weekStart').value = t.toISOString().slice(0, 10);
-    window.refreshAllSchedules();
-  });
-  wireOnce($('#prevWeek'), 'click', () => {
-    const d = new Date($('#weekStart').value || new Date());
-    d.setDate(d.getDate() - 7);
-    $('#weekStart').value = d.toISOString().slice(0, 10);
-    window.refreshAllSchedules();
-  });
-  wireOnce($('#nextWeek'), 'click', () => {
-    const d = new Date($('#weekStart').value || new Date());
-    d.setDate(d.getDate() + 7);
-    $('#weekStart').value = d.toISOString().slice(0, 10);
-    window.refreshAllSchedules();
-  });
-  wireOnce($('#weekStart'), 'change', window.refreshAllSchedules);
-  
-  // Undo/Redo
-  wireOnce($('#btnUndo'), 'click', undo);
-  wireOnce($('#btnRedo'), 'click', redo);
-  document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey || e.metaKey) {
-      if (e.key === 'z') { e.preventDefault(); undo(); }
-      if (e.key === 'y') { e.preventDefault(); redo(); }
+        // If current state is same as last state, do nothing
+        if (APP_STATE.historyIndex > -1 && APP_STATE.history[APP_STATE.historyIndex] === currentState) {
+            return;
+        }
+        
+        // Truncate history if we've undone
+        APP_STATE.history = APP_STATE.history.slice(0, APP_STATE.historyIndex + 1);
+        
+        // Add new state
+        APP_STATE.history.push(currentState);
+        
+        // Limit history size
+        if (APP_STATE.history.length > 20) {
+            APP_STATE.history.shift();
+        }
+        
+        APP_STATE.historyIndex = APP_STATE.history.length - 1;
+        
+        updateUndoRedoButtons();
     }
-  });
+    global.saveHistory = saveHistory;
 
-  // Commit
-  wireOnce($('#btnCommitWeek'), 'click', openCommitDialog);
-  wireOnce($('#commitOK'), 'click', doCommit);
-  
-  // Print
-  wireOnce($('#btnPrint'), 'click', () => window.print());
+    /**
+     * Restores the previous state from history.
+     */
+    function undo() {
+        if (APP_STATE.historyIndex <= 0) return; // Nothing to undo
 
-  // Planning Hub Tabs
-  $$('.tab-button').forEach(btn => {
-    wireOnce(btn, 'click', () => {
-      const tabId = btn.dataset.tab;
-      $$('.tab-button').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      $$('.tab-content').forEach(c => c.style.display = 'none');
-      $(`#${tabId}`).style.display = 'block';
-    });
-  });
-  
-  // Rotation Editor
-  wireOnce($('#btnNewRotation'), 'click', newRotation);
-  wireOnce($('#btnSaveRotation'), 'click', saveRotation);
-  wireOnce($('#btnDeleteRotation'), 'click', deleteRotation);
-  
-  // Schedules Tree
-  wireOnce($('#treeSearch'), 'input', window.rebuildTree);
-  wireOnce($('#btnClearSel'), 'click', () => {
-    selectedAdvisors.clear();
-    refreshUI();
-  });
-  
-  // View Toggle
-  wireOnce($('#viewToggleHorizontal'), 'click', () => {
-    $('#horizontalView').style.display = 'block';
-    $('#verticalView').style.display = 'none';
-    $('#viewToggleHorizontal').classList.add('active');
-    $('#viewToggleVertical').classList.remove('active');
-  });
-  wireOnce($('#viewToggleVertical'), 'click', () => {
-    $('#horizontalView').style.display = 'none';
-    $('#verticalView').style.display = 'block';
-    $('#viewToggleHorizontal').classList.remove('active');
-    $('#viewToggleVertical').classList.add('active');
-  });
-  wireOnce($('#teamDay'), 'change', window.refreshAllSchedules);
+        APP_STATE.isUndoing = true;
+        APP_STATE.historyIndex--;
+        
+        const oldState = JSON.parse(APP_STATE.history[APP_STATE.historyIndex]);
+        APP_STATE.rotationAssignments = new Map(oldState);
+        
+        // Re-render the assignment table (which triggers planner render)
+        populateAdvisorAssignmentTable();
+        refreshAllUI();
+        
+        updateUndoRedoButtons();
+        APP_STATE.isUndoing = false;
+    }
+    global.undo = undo;
 
-  // Tooltips
-  setupTooltips();
-}
+    /**
+     * Restores the next state from history.
+     */
+    function redo() {
+        if (APP_STATE.historyIndex >= APP_STATE.history.length - 1) return; // Nothing to redo
+        
+        APP_STATE.isUndoing = true;
+        APP_STATE.historyIndex++;
 
-/* =========================
-   Realtime Subscriptions
-   ========================= */
-window.subscribeRealtime = function() {
-  // TODO: Add subscriptions for new tables
-  // This is a placeholder
-  sb.channel('any-changes')
-    .on('postgres_changes', {
-      event: 'INSERT',
-      schema: 'public',
-      table: 'advisors'
-    }, () => window.loadOrg().then(window.rebuildTree))
-    .subscribe();
-}
+        const newState = JSON.parse(APP_STATE.history[APP_STATE.historyIndex]);
+        APP_STATE.rotationAssignments = new Map(newState);
+
+        // Re-render
+        populateAdvisorAssignmentTable();
+        refreshAllUI();
+        
+        updateUndoRedoButtons();
+        APP_STATE.isUndoing = false;
+    }
+    global.redo = redo;
+
+    /**
+     * Updates the disabled state of the Undo/Redo buttons.
+     */
+    function updateUndoRedoButtons() {
+        const btnUndo = $('#btnUndo');
+        const btnRedo = $('#btnRedo');
+        if (btnUndo) btnUndo.disabled = APP_STATE.historyIndex <= 0;
+        if (btnRedo) btnRedo.disabled = APP_STATE.historyIndex >= APP_STATE.history.length - 1;
+    }
+    global.updateUndoRedoButtons = updateUndoRedoButtons;
+
+
+})(window);
 

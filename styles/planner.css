@@ -1,745 +1,751 @@
-/* VERSION 3:
-  - Implements full-width "app" layout.
-  - Redesigned all panels for a modern, professional aesthetic.
-  - Hides old manual-planning UI.
-  - Adds styles for the new "Planning Hub" (Tabs, Editors).
-  - Adds styles for tooltips and icons.
-*/
-
-/* =========================
-   ROOT VARIABLES & DEFAULTS
-   ========================= */
+/* =================================== */
+/* Global & Root Variables        */
+/* =================================== */
 :root {
-  --brand: #0d47a1;
-  --accent: #00c853;
-  --ink: #1f2937;
-  --paper: #ffffff;
-  --wash: #f5f7fb;
-  --line: #e4e9f2;
-  --text-muted: #64748b;
-  --text-label: #374151;
-  --blue-light: #eef2ff;
-  --blue-dark: #3730a3;
-  --danger: #dc2626;
-  --danger-light: #fef2f2;
-  --danger-dark: #991b1b;
-  
-  --font-sans: Inter, Roboto, Segoe UI, system-ui, Arial, Helvetica, sans-serif;
-  
-  /* Vertical Calendar Timeline */
-  --timeline-start: 7;
-  --timeline-end: 20;
-  --timeline-height: 800px;
+    --brand-primary: #0d47a1; /* Deep Boohoo Blue */
+    --brand-accent: #00c853; /* Bright Green */
+    --brand-danger: #e53935; /* Red */
+    --ink-primary: #1f2937; /* Dark text */
+    --ink-secondary: #4b5563; /* Lighter text */
+    --ink-muted: #9ca3af; /* Muted text */
+    --paper-primary: #ffffff; /* Main background */
+    --paper-secondary: #f9fafb; /* Slightly off-white */
+    --wash: #f3f4f6; /* Page background */
+    --line-primary: #e5e7eb; /* Borders */
+    --line-secondary: #f3f4f6; /* Lighter borders */
+    
+    /* Semantic Colors for Rota */
+    --color-email: #2ecc71;
+    --color-mirakl: #b1b51e;
+    --color-social: #5e35b1;
+    --color-overtime: #e53935;
+    --color-meeting: #ffd700;
+    --color-break: #cfd8dc;
+    --color-lunch: #b0bec5;
+    --color-absence: #b0c4de;
+    --color-shrink: #ffd166;
+    --color-rdo: #e0e0e0;
 
-  /* Horizontal Planner */
-  --name-w: 260px; /* Name column width */
-
-  /* Color Palette */
-  --color-email: #2ecc71;
-  --color-mirakl: #b1b51e;
-  --color-social: #5e35b1;
-  --color-overtime: #e53935;
-  --color-meeting: #ffd700;
-  --color-break: #cfd8dc;
-  --color-lunch: #b0bec5;
-  --color-absence: #b0c4de;
-  --color-shrink: #ffd166;
+    /* Timeline Config */
+    --timeline-start-hour: 6;
+    --timeline-end-hour: 20;
+    --timeline-total-hours: calc(var(--timeline-end-hour) - var(--timeline-start-hour));
+    --timeline-hour-width: 60px; /* Width for one hour */
+    
+    /* Layout Config */
+    --sidebar-width: 320px;
 }
 
-html {
-  box-sizing: border-box;
+html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: Inter, Roboto, Segoe UI, system-ui, Arial, Helvetica, sans-serif;
+    background-color: var(--wash);
+    color: var(--ink-primary);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
-*, *:before, *:after {
-  box-sizing: inherit;
+* {
+    box-sizing: border-box;
 }
 
-html,
-body {
-  height: 100%;
-}
-
-body {
-  margin: 0;
-  background: var(--wash);
-  color: var(--ink);
-  font-family: var(--font-sans);
-  font-size: 14px;
-}
-
-/* =========================
-   TOP APPLICATION BAR
-   ========================= */
+/* =================================== */
+/* Top Bar & Header               */
+/* =================================== */
 .topbar {
-  background: var(--paper);
-  color: var(--ink);
-  padding: 10px 24px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  border-bottom: 2px solid var(--line);
-  position: sticky;
-  top: 0;
-  z-index: 100;
+    background: var(--brand-primary);
+    color: #fff;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: 0 4px 14px rgba(13, 71, 161, 0.18);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
-.topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.topbar-left i {
-  font-size: 24px;
-  color: var(--brand);
-}
-.topbar-left h1 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--brand);
+.topbar h1 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    white-space: nowrap;
 }
 
-.topbar-center {
-  display: flex;
-  justify-content: center;
+.topbar-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    margin-left: 24px;
 }
 
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.topbar-label {
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    opacity: 0.8;
 }
 
-.week-nav {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.topbar-input {
+    background-color: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border-radius: 6px;
+    padding: 6px 8px;
+    font-family: inherit;
+    font-size: 14px;
+}
+/* Fix for date picker icon color */
+input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.8;
+    cursor: pointer;
 }
 
-/* =========================
-   NEW FULL WIDTH LAYOUT
-   ========================= */
+.topbar-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: var(--brand-accent);
+    color: #fff;
+    border: 0;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.2s, filter 0.2s;
+    white-space: nowrap;
+}
+
+.topbar-button:hover {
+    filter: brightness(1.1);
+}
+
+.topbar-button.subtle {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.topbar-button.subtle:hover {
+    background: rgba(255, 255, 255, 0.2);
+    filter: none;
+}
+.topbar-button.subtle svg {
+    width: 16px;
+    height: 16px;
+}
+
+.topbar-button.accent {
+    background: var(--brand-accent);
+    color: #fff;
+}
+.topbar-button.accent:hover {
+    background: #00e05d;
+    filter: none;
+}
+
+.topbar-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: none;
+}
+
+.topbar-spacer {
+    flex: 1 1 auto; /* Pushes subsequent items to the right */
+}
+
+/* =================================== */
+/* Main Layout (Full Width)       */
+/* =================================== */
 .layout {
-  display: grid;
-  grid-template-columns: 1fr 380px; /* Main content | Right sidebar */
-  gap: 24px;
-  padding: 24px;
+    display: grid;
+    /* Main content flexes, sidebar is fixed */
+    grid-template-columns: 1fr var(--sidebar-width);
+    gap: 24px;
+    padding: 24px;
+    /* Removed max-width and margin:auto */
 }
 
-.view-container {
-  grid-column: 1 / 3; /* Span both columns */
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+.main-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    min-width: 0; /* Prevents flex overflow */
 }
 
-/* =========================
-   NEW PANEL STYLES
-   ========================= */
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    /* Make sidebar sticky within layout */
+    position: sticky;
+    top: 80px; /* Height of topbar + padding */
+    height: calc(100vh - 80px);
+}
+
+/* =================================== */
+/* Panel & Form Elements          */
+/* =================================== */
 .panel {
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.panel-hub {
-  height: 500px; /* Fixed height for hub */
-  min-height: 500px;
-}
-.panel-schedules {
-  height: 500px; /* Fixed height for hub */
-  min-height: 500px;
+    background: var(--paper-primary);
+    border: 1px solid var(--line-primary);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    display: flex;
+    flex-direction: column;
 }
 
 .panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--line);
-  background: #fafbfc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line-primary);
 }
 
 .panel-header h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
+    margin: 0;
+    font-size: 16px;
 }
 
 .panel-body {
-  padding: 16px;
-  overflow: auto;
-  flex-grow: 1; /* Make body fill panel */
+    padding: 16px;
 }
 
-/* =========================
-   NEW PLANNING HUB (TABS)
-   ========================= */
-.tab-bar {
-  padding: 8px;
-  display: flex;
-  gap: 8px;
-  background: var(--wash);
-}
-.tab-button {
-  flex: 1;
-  padding: 8px 12px;
-  font-size: 14px;
-  font-weight: 700;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.2s;
-}
-.tab-button:hover {
-  background: var(--paper);
-  color: var(--ink);
-}
-.tab-button.active {
-  background: var(--paper);
-  color: var(--brand);
-  border-color: var(--line);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-.tab-content {
-  display: none; /* Hidden by default */
-}
-.tab-content.active {
-  display: block; /* Shown by JS */
+.panel-subtitle {
+    font-size: 13px;
+    color: var(--ink-secondary);
+    margin: -8px 0 16px 0;
 }
 
-/* =========================
-   FORM & UI COMPONENTS
-   ========================= */
-.muted-text {
-  color: var(--text-muted);
-  font-size: 13px;
-  margin-top: 0;
-  margin-bottom: 16px;
+.panel-tabs {
+    display: flex;
+    padding: 8px 8px 0 8px;
+    border-bottom: 1px solid var(--line-primary);
 }
+
+.panel-tab-button {
+    border: 0;
+    background: none;
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink-secondary);
+    border-bottom: 3px solid transparent;
+    transform: translateY(1px);
+    cursor: pointer;
+}
+.panel-tab-button.active {
+    color: var(--brand-primary);
+    border-bottom-color: var(--brand-primary);
+}
+.panel-tab-button:hover {
+    color: var(--ink-primary);
+}
+
+/* Form Elements */
 .form-label {
-  font-weight: 600;
-  color: var(--text-label);
-  font-size: 13px;
-}
-.form-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.btn {
-  background: var(--accent);
-  color: #fff;
-  border: 0;
-  border-radius: 8px;
-  padding: 8px 14px;
-  font-weight: 700;
-  cursor: pointer;
-  font-size: 14px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  transition: all 0.2s;
-}
-.btn:hover {
-  filter: brightness(.95);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
-}
-.btn.subtle {
-  background: var(--blue-light);
-  color: var(--blue-dark);
-}
-.btn.danger {
-  background: var(--danger-light);
-  color: var(--danger-dark);
-}
-.btn.icon {
-  padding: 8px;
-}
-.btn i {
-  font-size: 16px;
-}
-.seg {
-  display: inline-flex;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  overflow: hidden;
-}
-.seg button {
-  background: #fff;
-  border: 0;
-  padding: 6px 10px;
-  cursor: pointer;
-}
-.seg button.active {
-  background: var(--blue-light);
-  color: var(--blue-dark);
-}
-.input,
-select,
-input[type=date] {
-  padding: 7px 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 500;
-}
-input[type=date] {
-  min-width: 140px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-secondary);
+    white-space: nowrap;
 }
 
-/* =========================
-   NEW ROTATION EDITOR (TAB 1)
-   ========================= */
-.rotation-editor-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 16px;
+.form-select,
+.form-input {
+    padding: 6px 10px;
+    border: 1px solid var(--line-primary);
+    border-radius: 6px;
+    background: var(--paper-primary);
+    font-family: inherit;
+    font-size: 14px;
 }
-.rotation-editor-controls .input {
-  flex-grow: 1;
-}
-
-/* =========================
-   TABLES (Rotation Editor & Advisor Assignments)
-   ========================= */
-.table-wrap-condensed {
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-}
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 600px;
-}
-.data-table th {
-  background: #fafbfc;
-  padding: 10px 12px;
-  text-align: left;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-.data-table td {
-  padding: 8px 12px;
-  border-top: 1px solid var(--line);
-  vertical-align: middle;
-}
-.data-table tbody tr:hover {
-  background: var(--wash);
-}
-/* Rotation Editor Grid Specifics */
-#rotationEditorGrid .data-table {
-  min-width: 900px;
-}
-#rotationEditorGrid th, #rotationEditorGrid td {
-  text-align: center;
-  padding: 4px;
-}
-#rotationEditorGrid th:first-child,
-#rotationEditorGrid td:first-child {
-  text-align: left;
-  padding-left: 12px;
-  font-weight: 700;
-  position: sticky;
-  left: 0;
-  background: var(--paper);
-}
-#rotationEditorGrid select {
-  width: 100%;
-  padding: 4px;
-  font-size: 12px;
+.form-select:focus,
+.form-input:focus {
+    outline: 2px solid var(--brand-primary);
+    outline-offset: 1px;
+    border-color: var(--brand-primary);
 }
 
-/* Advisor Assignment Table Specifics */
-#advisorAssignmentTable .input,
-#advisorAssignmentTable select {
-  width: 100%;
+.form-select-sm {
+    padding: 4px 8px;
+    font-size: 13px;
 }
 
-/* =========================
-   RIGHT SIDEBAR: SCHEDULES TREE
-   ========================= */
-.view-toggle {
-  margin-left: auto;
+.form-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
-.tree-search {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
+
+.form-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 0;
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background-color 0.2s, filter 0.2s;
+    white-space: nowrap;
 }
-.tree {
-  max-height: 280px; /* Constrain height */
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 6px;
-  background: var(--wash);
+.form-button svg {
+    width: 16px;
+    height: 16px;
 }
+.form-button.accent {
+    background: var(--brand-accent);
+    color: #fff;
+}
+.form-button.accent:hover { filter: brightness(1.1); }
+
+.form-button.subtle {
+    background: var(--paper-secondary);
+    color: var(--ink-primary);
+    border: 1px solid var(--line-primary);
+}
+.form-button.subtle:hover { background: var(--wash); }
+
+.form-button.danger {
+    background: var(--brand-danger);
+    color: #fff;
+}
+.form-button.danger.subtle {
+    background: #fff5f5;
+    color: var(--brand-danger);
+    border: 1px solid #fecaca;
+}
+.form-button.danger.subtle:hover { background: #fee2e2; }
+
+.form-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    filter: none;
+}
+.form-button-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+}
+.form-button-sm svg {
+    width: 14px;
+    height: 14px;
+}
+
+.form-status-label {
+    font-size: 13px;
+    font-weight: 600;
+    margin-left: auto;
+    color: var(--ink-muted);
+}
+.form-status-label.saving {
+    color: var(--brand-primary);
+}
+.form-status-label.saved {
+    color: var(--brand-accent);
+}
+.form-status-label.error {
+    color: var(--brand-danger);
+}
+
+
+/* =================================== */
+/* Rotation Editor Tab          */
+/* =================================== */
+.rotation-editor-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.rotation-editor-header .form-select {
+    min-width: 200px;
+}
+.rotation-editor-header #btnDeleteRotation {
+    margin-left: 8px;
+}
+
+.table-wrap {
+    overflow-x: auto;
+}
+.rotation-grid-wrap {
+    max-height: 45vh; /* Limit height of rotation grid */
+    overflow-y: auto;
+}
+.rotation-grid {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 900px;
+}
+.rotation-grid th,
+.rotation-grid td {
+    border: 1px solid var(--line-primary);
+    padding: 0; /* Remove padding for select */
+    text-align: center;
+    height: 40px;
+}
+.rotation-grid th {
+    background: var(--paper-secondary);
+    color: var(--ink-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 8px 12px;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+.rotation-grid td:first-child {
+    padding: 8px 12px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+.rotation-grid td .form-select {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0 8px;
+    font-size: 13px;
+    font-weight: 500;
+}
+.rotation-grid td .form-select:focus {
+    outline: 2px solid var(--brand-primary);
+    position: relative;
+    z-index: 1;
+}
+
+/* =================================== */
+/* Advisor Assignments Tab        */
+/* =================================== */
+.assignment-table-wrap {
+    max-height: 50vh;
+    overflow-y: auto;
+}
+.assignment-grid {
+    width: 100%;
+    border-collapse: collapse;
+}
+.assignment-grid th,
+.assignment-grid td {
+    border: 1px solid var(--line-primary);
+    padding: 8px 12px;
+    text-align: left;
+}
+.assignment-grid th {
+    background: var(--paper-secondary);
+    color: var(--ink-secondary);
+    font-size: 12px;
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+.assignment-grid tr:nth-child(even) td {
+    background: var(--paper-secondary);
+}
+.assignment-grid td:first-child {
+    font-weight: 600;
+}
+.assignment-grid td .form-select,
+.assignment-grid td .form-input {
+    width: 100%;
+    padding: 4px 8px;
+    font-size: 13px;
+}
+
+/* =================================== */
+/* Horizontal Planner             */
+/* =================================== */
+.planner-container {
+    border-top: 1px solid var(--line-primary);
+}
+
+.planner-header {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    background: var(--paper-secondary);
+    border-bottom: 1px solid var(--line-primary);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.planner-name-col {
+    padding: 10px 12px;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--ink-secondary);
+    border-right: 1px solid var(--line-primary);
+}
+
+.planner-time-col {
+    position: relative;
+    height: 38px;
+    /* Full width calculation */
+    width: calc(var(--timeline-total-hours) * var(--timeline-hour-width));
+    min-width: 100%; /* Ensure it fills at least the viewport */
+    background: repeating-linear-gradient(
+        90deg,
+        var(--line-secondary),
+        var(--line-secondary) 1px,
+        transparent 1px,
+        transparent var(--timeline-hour-width)
+    );
+}
+
+.planner-time-col .tick {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    color: var(--ink-muted);
+    user-select: none;
+    padding: 2px 4px;
+    background: var(--paper-secondary);
+}
+
+.planner-body {
+    position: relative;
+    overflow: auto;
+    max-height: 60vh;
+}
+
+.planner-row {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    border-bottom: 1px solid var(--line-secondary);
+    min-height: 44px;
+}
+.planner-row:nth-child(even) {
+    background: var(--paper-secondary);
+}
+
+.planner-name {
+    padding: 10px 12px;
+    border-right: 1px solid var(--line-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+.planner-timeline {
+    position: relative;
+    height: 44px;
+    width: calc(var(--timeline-total-hours) * var(--timeline-hour-width));
+    min-width: 100%;
+    background: repeating-linear-gradient(
+        90deg,
+        var(--line-primary),
+        var(--line-primary) 1px,
+        transparent 1px,
+        transparent var(--timeline-hour-width)
+    );
+}
+
+.planner-bar {
+    position: absolute;
+    height: 28px;
+    top: 8px;
+    border-radius: 6px;
+    opacity: 0.95;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    overflow: hidden;
+    padding: 0 6px;
+    white-space: nowrap;
+    transition: opacity 0.2s, filter 0.2s;
+}
+.planner-bar:hover {
+    opacity: 1;
+    filter: brightness(1.1);
+}
+.planner-bar.c-break,
+.planner-bar.c-lunch,
+.planner-bar.c-shrink,
+.planner-bar.c-rdo,
+.planner-bar.c-mirakl {
+    color: var(--ink-primary);
+}
+.planner-bar-label {
+    opacity: 0.9;
+}
+.planner-bar-time {
+    font-weight: 500;
+    opacity: 0.7;
+    margin-left: 6px;
+}
+
+/* Tooltip for horizontal planner */
+.planner-tooltip {
+    position: fixed;
+    pointer-events: none;
+    z-index: 200;
+    padding: 8px 12px;
+    background: var(--ink-primary);
+    color: #fff;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.4;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    transform: translate(-50%, -110%);
+}
+.planner-tooltip span {
+    display: block;
+    font-weight: 500;
+    color: var(--ink-muted);
+}
+
+/* =================================== */
+/* Right Sidebar: Schedules       */
+/* =================================== */
+.sidebar .panel {
+    flex: 1 1 auto; /* Grow to fill sidebar height */
+    max-height: 100%;
+}
+.sidebar .panel-body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.tree-container {
+    flex: 1 1 auto; /* Grow to fill available space */
+    overflow-y: auto;
+    border: 1px solid var(--line-primary);
+    border-radius: 6px;
+    padding: 6px;
+    margin-top: 12px;
+    background: var(--paper-primary);
+}
+
 .tree details {
-  padding: 3px 4px;
-  border-radius: 6px;
+    padding: 3px 4px;
+    border-radius: 6px;
 }
 .tree summary {
-  list-style: none;
-  cursor: pointer;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px;
+    list-style: none;
+    cursor: pointer;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px;
+    border-radius: 4px;
 }
 .tree summary:hover {
-  background: var(--blue-light);
+    background: var(--paper-secondary);
 }
 .tree summary .twisty {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--paper);
-  font-weight: 900;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--line-primary);
+    border-radius: 4px;
+    background: var(--paper-secondary);
+    font-weight: 900;
+    font-size: 12px;
+    transition: transform 0.2s;
+}
+.tree details[open] > summary .twisty {
+    transform: rotate(90deg);
 }
 .tree summary::-webkit-details-marker {
-  display: none;
+    display: none;
 }
 .tree .node {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-  padding: 4px 4px 4px 28px; /* Indent */
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    padding: 4px 2px 4px 24px; /* Indent advisors */
 }
 .tree .node label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+    cursor: pointer;
 }
+.tree .node input {
+    cursor: pointer;
+}
+
 .chip-container {
-  margin-top: 12px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+    margin-top: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 120px; /* Limit chip container height */
+    overflow-y: auto;
 }
+
 .chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--blue-light);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 3px 8px;
-  font-size: 12px;
-  font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #eef2ff;
+    border: 1px solid #d6dcff;
+    border-radius: 999px;
+    padding: 3px 8px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.chip-remove {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 700;
+    color: #a5b4fc;
+    padding: 0 0 0 4px;
+}
+.chip-remove:hover {
+    color: #6366f1;
 }
 
-/* =========================
-   HORIZONTAL TEAM PLANNER
-   ========================= */
-.planner {
-  border-top: 1px solid var(--line);
-  overflow: hidden;
-}
-.planner__header {
-  display: grid;
-  grid-template-columns: var(--name-w) 1fr;
-  align-items: center;
-  position: sticky;
-  top: 0;
-  background: #fafbfc;
-  z-index: 2;
-  border-bottom: 1px solid var(--line);
-  min-height: 44px;
-}
-.planner__col--name {
-  font-weight: 700;
-  padding: 8px 16px;
-  border-right: 1px solid var(--line);
-  white-space: nowrap;
-}
-#timeHeader {
-  width: 100%;
-  position: relative;
-  padding: 6px 0;
-}
-.time-scale {
-  position: relative;
-  height: 24px;
-}
-.time-scale .tick {
-  position: absolute;
-  top: 0;
-  transform: translateX(-50%);
-  font-size: 12px;
-  color: var(--text-muted);
-  user-select: none;
-}
-.planner__body {
-  display: block;
-  overflow: auto;
-  max-height: 64vh;
-}
-.planner__row {
-  display: grid;
-  grid-template-columns: var(--name-w) 1fr;
-  align-items: center;
-  min-height: 44px;
-  border-bottom: 1px solid #f0f2f7;
-}
-.planner__row:nth-child(odd) {
-  background: #fafcff;
-}
-.planner__name {
-  padding: 10px 16px;
-  border-right: 1px solid var(--line);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-weight: 600;
-}
-.planner__timeline {
-  position: relative;
-  height: 44px;
-  background:
-    repeating-linear-gradient(90deg, transparent, transparent calc((100% / 14) - 1px), var(--line) 0, var(--line) calc(100% / 14));
-}
-.planner__bar {
-  position: absolute;
-  top: 8px;
-  height: 28px;
-  border-radius: 6px;
-  opacity: .96;
-  cursor: pointer;
-  transition: opacity .15s;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 0 8px;
-  box-sizing: border-box;
-  line-height: 28px;
-  overflow: hidden;
-  white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-}
-.planner__bar:hover {
-  opacity: 1;
-  transform: scale(1.02);
-}
-
-/* =========================
-   VERTICAL CALENDAR
-   ========================= */
-.calendar {
-  border-top: 1px solid var(--line);
-}
-.cal-grid {
-  display: grid;
-  grid-template-columns: 80px repeat(7, 1fr);
-  grid-auto-flow: column;
-  overflow: auto;
-}
-.hour-col {
-  border-right: 1px solid var(--line);
-  background: #fafbfc;
-}
-.hour {
-  height: calc(var(--timeline-height)/(var(--timeline-end)-var(--timeline-start)));
-  border-bottom: 1px solid var(--line);
-  font-size: 12px;
-  color: #748099;
-  text-align: right;
-  padding-right: 6px;
-  position: relative;
-  box-sizing: border-box;
-}
-.hour span {
-  position: absolute;
-  top: -7px;
-  right: 6px;
-  background: #fafbfc;
-  padding: 0 4px;
-}
-.day-col {
-  border-left: 1px solid var(--line);
-}
-.day-head {
-  height: 56px;
-  border-bottom: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 6px 10px;
-  background: #fafbfc;
-  font-weight: 700;
-}
-.day-head small {
-  font-weight: 700;
-  color: #8792a6;
-}
-.day-summary {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--line);
-  font-size: 13px;
-}
-.summary-right {
-  margin-left: auto;
-  color: #5b6b7f;
-  font-size: 12px;
-}
-.off {
-  height: 40px;
-  border-bottom: 1px solid var(--line);
-  padding: 8px 10px;
-  background: repeating-linear-gradient(45deg, #f2f3f7, #f2f3f7 8px, #e8ecf4 8px, #e8ecf4 16px);
-  font-weight: 700;
-  color: #8892a0;
-  font-size: 13px;
-}
-.timeline-cell {
-  position: relative;
-  height: var(--timeline-height);
-  background:
-    repeating-linear-gradient(180deg, #0000, #0000 calc(100%/(var(--timeline-end) - var(--timeline-start))), var(--line) 0, var(--line) calc(100%/(var(--timeline-end) - var(--timeline-start)) + 1px));
-}
-.block {
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  border-radius: 6px;
-  padding: 3px 6px;
-  font-size: 11px;
-  font-weight: 700;
-  color: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .12);
-  line-height: 1.1;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
-  align-items: flex-start;
-}
-.block .time {
-  display: block;
-  font-weight: 700;
-  font-size: 10px;
-  opacity: .95;
-}
-
-/* =========================
-   COLOR CLASSES
-   ========================= */
-.c-email { background: var(--color-email); }
-.c-mirakl { background: var(--color-mirakl); color: #111; }
-.c-social { background: var(--color-social); }
-.c-break { background: var(--color-break); color: #213; }
-.c-lunch { background: var(--color-lunch); color: #213; }
-.c-overtime { background: var(--color-overtime); }
-.c-absence { background: var(--color-absence); color: #111; }
-.c-shrink { background: var(--color-shrink); color: #213; }
-.c-meeting { background: var(--color-meeting); color: #111; }
-.c-rdo { background: var(--wash); color: var(--text-muted); border: 1px dashed var(--line); }
-
-/* =========================
-   DIALOGS
-   ========================= */
-dialog {
-  max-width: 780px;
-  width: 95%;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 0;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-}
-.dialog-header {
-  font-size: 16px;
-  font-weight: 700;
-  padding: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-bottom: 1px solid var(--line);
-}
-.dialog-header i {
-  font-size: 20px;
-  color: var(--brand);
-}
-.dialog-list {
-  max-height: 260px;
-  overflow: auto;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 8px;
-  background: var(--wash);
-  margin: 16px;
-}
-.dialog-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-  margin-top: 14px;
-  padding: 16px;
-  background: #fafbfc;
-  border-top: 1px solid var(--line);
-}
-
-/* =========================
-   TOOLTIP
-   ========================= */
-.tooltip {
-  position: absolute;
-  background: #111827;
-  color: #fff;
-  font-size: 12px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  white-space: pre;
-  pointer-events: none;
-  z-index: 200;
-  transition: opacity 0.1s;
-}
-
-/* =========================
-   PRINT STYLES
-   ========================= */
+/* =================================== */
+/* Print Styles                   */
+/* =================================== */
 @media print {
-  .no-print, .topbar {
-    display: none;
-  }
-  .panel {
-    box-shadow: none;
-    border: 1px solid #ccc;
-  }
-  .layout {
-    grid-template-columns: 1fr;
-    padding: 0;
-  }
-  body {
-    background: #fff;
-  }
+    .no-print,
+    .topbar,
+    .sidebar {
+        display: none !important;
+    }
+    .layout {
+        display: block;
+        padding: 0;
+    }
+    .panel {
+        box-shadow: none;
+        border: none;
+    }
+    .planner-body,
+    .rotation-grid-wrap,
+    .assignment-table-wrap {
+        max-height: none;
+        overflow: visible;
+    }
 }
 

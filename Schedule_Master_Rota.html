@@ -1,177 +1,228 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Professional Team Rota System — Supabase</title>
-
-<!-- 
-  VERSION 3:
-  Cache-busted to load all new styles and logic.
--->
-<link rel="stylesheet" href="./styles/planner.css?v=3" />
-<link href="https://cdn.jsdelivr.net/npm/remixicon@4.2.0/fonts/remixicon.css" rel="stylesheet" />
-
-<!-- Supabase client library -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Professional Team Rota System</title>
+    <!-- Link to the new, full-width, professional stylesheet -->
+    <link rel="stylesheet" href="./styles/planner.css?v=3" />
+    
+    <!-- Supabase Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-  <!-- ======================================= -->
-  <!-- TOP APPLICATION BAR -->
-  <!-- ======================================= -->
-  <div class="topbar">
-    <div class="topbar-left">
-      <i class="ri-calendar-event-line"></i>
-      <h1>Professional Team Rota System</h1>
-    </div>
-    <div class="topbar-center">
-      <div class="week-nav">
-        <button class="btn icon" id="prevWeek" title="Previous Week"><i class="ri-arrow-left-s-line"></i></button>
-        <button class="btn subtle" id="btnToday" title="Go to Today"><i class="ri-calendar-today-line"></i> Today</button>
-        <input type="date" id="weekStart" class="input" />
-        <button class="btn icon" id="nextWeek" title="Next Week"><i class="ri-arrow-right-s-line"></i></button>
-      </div>
-    </div>
-    <div class="topbar-right">
-      <button class="btn subtle" id="btnUndo" title="Undo (Ctrl+Z)"><i class="ri-reply-line"></i></button>
-      <button class="btn subtle" id="btnRedo" title="Redo (Ctrl+Y)"><i class="ri-share-forward-line"></i></button>
-      <button class="btn" id="btnCommitWeek"><i class="ri-save-3-line"></i> Commit Week</button>
-      <button class="btn subtle icon no-print" id="btnPrint" title="Print"><i class="ri-printer-line"></i></button>
-    </div>
-  </div>
+    <!-- ======================= -->
+    <!--      TOP BAR            -->
+    <!-- ======================= -->
+    <header class="topbar">
+        <h1>Professional Team Rota System</h1>
+        
+        <!-- Main Controls -->
+        <div class="topbar-controls">
+            <label for="weekStart" class="topbar-label">Week Start (Monday)</label>
+            <input type="date" id="weekStart" class="topbar-input"/>
+            
+            <button class="topbar-button subtle" id="prevWeek" title="Previous Week">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M11.354 1.646a.5.5 0 0 1 0 .708L5.707 8l5.647 5.646a.5.5 0 0 1-.708.708l-6-6a.5.5 0 0 1 0-.708l6-6a.5.5 0 0 1 .708 0z"/></svg>
+            </button>
+            <button class="topbar-button subtle" id="btnToday" title="Go to Today">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>
+            </button>
+            <button class="topbar-button subtle" id="nextWeek" title="Next Week">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 1.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1 0 .708l-6 6a.5.5 0 0 1-.708-.708L10.293 8 4.646 2.354a.5.5 0 0 1 0-.708z"/></svg>
+            </button>
 
-  <!-- ======================================= -->
-  <!-- MAIN APPLICATION LAYOUT (FULL WIDTH) -->
-  <!-- ======================================= -->
-  <div class="layout">
+            <!-- Spacer -->
+            <div class="topbar-spacer"></div>
 
-    <!-- == LEFT PANEL: PLANNING HUB == -->
-    <div class="panel panel-hub">
-      <div class="panel-header tab-bar">
-        <button class="tab-button active" data-tab="tab-rotations"><i class="ri-refresh-line"></i> Rotation Editor</button>
-        <button class="tab-button" data-tab="tab-assignments"><i class="ri-user-line"></i> Advisor Assignments</button>
-      </div>
+            <button class="topbar-button subtle" id="btnUndo" title="Undo (Ctrl+Z)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 3a5 5 0 1 1-4.546 2.914.5.5 0 0 0-.908-.417A6 6 0 1 0 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 0-.41-.192L5.23 2.72a.25.25 0 0 0 0 .384l2.36 2.36a.25.25 0 0 0 .41-.192z"/></svg>
+            </button>
+            <button class="topbar-button subtle" id="btnRedo" title="Redo (Ctrl+Y)">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"/><path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 2.36a.25.25 0 0 1 0 .384l-2.36 2.36a.25.25 0 0 1-.41-.192z"/></svg>
+            </button>
 
-      <!-- TAB 1: ROTATION EDITOR (Phase 2) -->
-      <div class="panel-body tab-content active" id="tab-rotations">
-        <div class="rotation-editor-controls">
-          <label for="rotationSelect" class="form-label">Rotation Family:</label>
-          <select id="rotationSelect" class="input">
-            <option value="">(loading...)</option>
-          </select>
-          <button class="btn subtle" id="btnNewRotation" title="New Rotation"><i class="ri-add-line"></i> New</button>
-          <button class="btn subtle" id="btnSaveRotation" title="Save Rotation"><i class="ri-save-line"></i> Save</button>
-          <button class="btn danger" id="btnDeleteRotation" title="Delete Rotation" style="margin-left: auto;"><i class="ri-delete-bin-line"></i></button>
+            <button class="topbar-button accent" id="btnCommit" title="Commit this week's auto-generated schedule to the database for historical records">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2Z"/></svg>
+                Commit Week
+            </button>
+
+            <button class="topbar-button subtle no-print" id="btnPrint" title="Print View">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M2.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1z"/><path d="M5 1a2 2 0 0 0-2 2v2H2a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h1v1a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-1h1a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-1V3a2 2 0 0 0-2-2H5zM4 3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2H4V3zm1 5a2 2 0 0 0-2 2v1H2a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v-1a2 2 0 0 0-2-2H5zm7 2v3a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1z"/></svg>
+            </button>
         </div>
-        <p class="muted-text">Define the multi-week pattern for this rotation. Select a shift template (e.g., "7A", "9C", "RDO") for each day.</p>
-        <div class="table-wrap-condensed" id="rotationEditorGrid">
-          <!-- Rotation Editor Grid will be generated by JS -->
-        </div>
-      </div>
+    </header>
 
-      <!-- TAB 2: ADVISOR ASSIGNMENTS (Phase 2) -->
-      <div class="panel-body tab-content" id="tab-assignments" style="display: none;">
-        <p class="muted-text">Assign a rotation and its "Week 1" start date to each advisor. The system will auto-calculate their schedule from this.</p>
-        <div class="table-wrap-condensed">
-          <table class="data-table" id="advisorAssignmentTable">
-            <thead>
-              <tr>
-                <th>Advisor</th>
-                <th>Assigned Rotation</th>
-                <th>Rotation Start Date (Week 1)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- Advisor assignments will be generated by JS -->
-            </tbody>
-          </table>
-        </div>
-      </div>
+    <!-- ======================= -->
+    <!--      MAIN LAYOUT        -->
+    <!-- ======================= -->
+    <div class="layout">
 
+        <!-- Left Column: Planning Hub (Tabs) -->
+        <main class="main-content">
+            <div class="panel">
+                <div class="panel-tabs">
+                    <button class="panel-tab-button active" data-tab="tab-rotation-editor">Rotation Editor</button>
+                    <button class="panel-tab-button" data-tab="tab-advisor-assignments">Advisor Assignments</button>
+                </div>
+
+                <!-- ======================= -->
+                <!-- Tab 1: Rotation Editor  -->
+                <!-- ======================= -->
+                <div class="panel-body" id="tab-rotation-editor">
+                    <div class="rotation-editor-header">
+                        <label for="rotationNameSelect" class="form-label">Rotation Family</label>
+                        <select id="rotationNameSelect" class="form-select">
+                            <option value="">-- Select a Rotation --</option>
+                        </select>
+                        <button id="btnNewRotation" class="form-button subtle">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
+                            New
+                        </button>
+                        <button id="btnSaveRotation" class="form-button accent" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="m10.97 4.97-.02.022-3.473 4.425-2.093-2.094a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-1.071-1.05z"/></svg>
+                            Save
+                        </button>
+                        <button id="btnDeleteRotation" class="form-button danger subtle" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+                        </button>
+                        <span id="rotationStatus" class="form-status-label"></span>
+                    </div>
+                    <p class="panel-subtitle">
+                        Define the multi-week pattern for this rotation. Select a shift template (e.g., "7A", "RDO") for each day.
+                    </p>
+                    
+                    <div class="table-wrap rotation-grid-wrap">
+                        <table class="rotation-grid">
+                            <thead>
+                                <tr>
+                                    <th>Week</th>
+                                    <th>Mon</th>
+                                    <th>Tue</th>
+                                    <th>Wed</th>
+                                    <th>Thu</th>
+                                    <th>Fri</th>
+                                    <th>Sat</th>
+                                    <th>Sun</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rotationEditorGrid">
+                                <!-- Rows (e.g., Week 1, Week 2...) will be generated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- ============================== -->
+                <!-- Tab 2: Advisor Assignments     -->
+                <!-- ============================== -->
+                <div class="panel-body" id="tab-advisor-assignments" style="display: none;">
+                    <p class="panel-subtitle">
+                        Assign advisors to a rotation family and set their "Week 1" start date. The schedule will auto-calculate from here.
+                    </p>
+                    <div class="table-wrap assignment-table-wrap">
+                        <table class="assignment-grid">
+                            <thead>
+                                <tr>
+                                    <th>Advisor</th>
+                                    <th>Assigned Rotation</th>
+                                    <th>Rotation Start Date (Week 1)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="advisorAssignmentBody">
+                                <!-- Advisor rows will be generated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ======================= -->
+            <!--   HORIZONTAL PLANNER    -->
+            <!-- ======================= -->
+            <section id="teamPlanner" class="panel">
+                <div class="panel-header">
+                    <h2>Team Schedule</h2>
+                    <div class="form-inline">
+                        <label for="teamDay" class="form-label">Day:</label>
+                        <select id="teamDay" class="form-select form-select-sm">
+                            <option>Monday</option>
+                            <option>Tuesday</option>
+                            <option>Wednesday</option>
+                            <option>Thursday</option>
+                            <option>Friday</option>
+                            <option>Saturday</option>
+                            <option>Sunday</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="planner-container">
+                    <div class="planner-header">
+                        <div class="planner-name-col">Name</div>
+                        <div class="planner-time-col" id="timeHeader"></div>
+                    </div>
+                    <div class="planner-body" id="plannerBody">
+                        <!-- Planner rows will be generated by JS -->
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- ======================= -->
+        <!--  Right Sidebar: Schedules -->
+        <!-- ======================= -->
+        <aside class="sidebar">
+            <div class="panel">
+                <div class="panel-header">
+                    <h2>Schedules</h2>
+                    <button class="form-button subtle form-button-sm" id="btnClearSel">Clear</button>
+                </div>
+                <div class="panel-body">
+                    <input id="treeSearch" class="form-input" placeholder="Filter advisors..." style="width: 100%; box-sizing: border-box;"/>
+                    <div class="tree-container" id="tree">
+                        <!-- Advisor tree will be generated by JS -->
+                    </div>
+                    <div class="chip-container" id="activeChips">
+                        <!-- Active advisor chips will be generated by JS -->
+                    </div>
+                </div>
+            </div>
+        </aside>
     </div>
 
-    <!-- == RIGHT PANEL: SCHEDULES & VIEW == -->
-    <div class="panel panel-schedules">
-      <div class="panel-header">
-        <h2>Schedules</h2>
-        <div class="view-toggle seg">
-          <button class="active" id="viewToggleHorizontal" title="Horizontal View"><i class="ri-layout-row-line"></i></button>
-          <button id="viewToggleVertical" title="Vertical View"><i class="ri-layout-column-line"></i></button>
-        </div>
-      </div>
-      <div class="panel-body">
-        <div class="tree-search">
-          <input id="treeSearch" class="input" placeholder="Filter sites / leaders / advisors…" style="flex:1" />
-          <button class="btn subtle" id="btnClearSel">Clear</button>
-        </div>
-        <div class="tree" id="tree"></div>
-        <div class="chip-container" id="activeChips"></div>
-      </div>
-    </div>
-  </div>
+    <!-- Tooltip (for horizontal planner) -->
+    <div id="plannerTooltip" class="planner-tooltip" style="display: none; opacity: 0;"></div>
 
-  <!-- ======================================= -->
-  <!-- SCHEDULE VIEWER (HORIZONTAL & VERTICAL) -->
-  <!-- ======================================= -->
-  <div class="view-container">
-    <div class="panel" id="horizontalView">
-      <div class="panel-header">
-        <h2 id="horizontalTitle">Team Schedule</h2>
-        <div class="form-group" style="margin-left: auto;">
-          <label for="teamDay" class="form-label">Day:</label>
-          <select id="teamDay" class="input">
-            <option>Monday</option><option>Tuesday</option><option>Wednesday</option><option>Thursday</option>
-            <option>Friday</option><option>Saturday</option><option>Sunday</option>
-          </select>
-        </div>
-      </div>
-      <section id="teamPlanner" class="planner">
-        <div class="planner__header">
-          <div class="planner__col--name">Name</div>
-          <div class="planner__col--time" id="timeHeader"></div>
-        </div>
-        <div class="planner__body" id="plannerBody"></div>
-      </section>
-    </div>
+    <!-- ======================= -->
+    <!--     APP BOOTSTRAP       -->
+    <!-- ======================= -->
+    <script>
+        /* =========================
+           Supabase configuration
+           ========================= */
+        // These are the credentials for your project.
+        const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 
-    <div class="panel" id="verticalView" style="display: none;">
-      <div class="panel-header">
-        <h2 id="verticalTitle">Advisor Week (Calendar)</h2>
-      </div>
-      <div class="panel-body calendar">
-        <div class="cal-grid" id="calGrid">
-          <div class="hour-col"><div id="hours"></div></div>
-        </div>
-      </div>
-    </div>
-  </div>
+        // Create a single, shared Supabase client instance
+        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Expose it to the global window object for all scripts to use
+        window.supabase = sb;
 
+        console.log("Supabase client initialized.");
 
-  <!-- ======================================= -->
-  <!-- DIALOGS -->
-  <!-- ======================================= -->
-
-  <!-- Commit confirmation dialog -->
-  <dialog id="commitDlg">
-    <div class="dialog-header"><i class="ri-save-3-line"></i> Commit Week Schedule</div>
-    <div class="muted" id="commitSummary" style="margin-bottom:8px"></div>
-    <div id="commitList" class="dialog-list"></div>
-    <div class="dialog-actions">
-      <button onclick="commitDlg.close()" class="btn subtle">Cancel</button>
-      <button id="commitOK" class="btn">Commit</button>
-    </div>
-  </dialog>
-  
-  <!-- Tooltip -->
-  <div id="tooltip" class="tooltip" style="display: none;"></div>
-
-  <!-- 
-    VERSION 3:
-    Cache-busted to load all new logic.
-  -->
-  <script src="./src/planner.js?v=3"></script>
-  <script src="./src/init.js?v=3"></script>
+    </script>
+    
+    <!-- 
+      Project scripts are deferred to load after the DOM is parsed.
+      1. planner.js: Contains all application logic, functions, and data fetching.
+      2. init.js: Contains all event listeners and the boot-up sequence.
+    -->
+    <script src="./src/planner.js?v=4" defer></script>
+    <script src="./src/init.js?v=4" defer></script>
 
 </body>
 </html>
