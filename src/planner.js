@@ -1,8 +1,7 @@
 /**
- * WFM Intelligence Platform - Application Logic (v13.1)
+ * WFM Intelligence Platform - Application Logic (v14.0)
  * 
- * Modular architecture designed for enterprise scalability and AI readiness.
- * This file contains the core logic, excluding the bootloader (init.js).
+ * Modular architecture. Includes Precision Time Cursor and Extended Timeline.
  */
 
 // Global Namespace Initialization
@@ -10,7 +9,7 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.Config
- * Description: Configuration constants and environment variables.
+ * V14.0 Update: Extended Timeline to 23:00.
  */
 (function(APP) {
     const Config = {};
@@ -19,10 +18,10 @@ window.APP = window.APP || {};
     Config.SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
     Config.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 
-    // Timeline Visualization Constants
+    // V14.0: Timeline Visualization Constants (Extended to 23:00)
     Config.TIMELINE_START_MIN = 6 * 60; // 06:00
-    Config.TIMELINE_END_MIN = 22 * 60; // 22:00
-    Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_MIN;
+    Config.TIMELINE_END_MIN = 23 * 60; // 23:00
+    Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_MIN; // 17 hours
 
     APP.Config = Config;
 }(window.APP));
@@ -52,8 +51,16 @@ window.APP = window.APP || {};
 
     Utils.formatMinutesToTime = (minutes) => {
         if (minutes === null || isNaN(minutes)) return "";
-        const h = Math.floor(minutes / 60);
-        const m = minutes % 60;
+        // Use Math.round for precision displays (like the mouse cursor)
+        let roundedMinutes = Math.round(minutes);
+        const h = Math.floor(roundedMinutes / 60);
+        const m = roundedMinutes % 60;
+        
+        // Handle edge case where rounding results in 60 minutes
+        if (m === 60) {
+             return `${String(h + 1).padStart(2, '0')}:00`;
+        }
+        
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     };
 
@@ -122,7 +129,7 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.DataService
- * Description: Handles all interactions with the backend (Supabase).
+ * (No significant changes, included for completeness)
  */
 (function(APP) {
     const DataService = {};
@@ -215,7 +222,7 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.StateManager
- * Description: Manages the global application state and history (Undo/Redo).
+ * (No significant changes, included for completeness)
  */
 (function(APP) {
     const StateManager = {};
@@ -317,7 +324,7 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.Components.ComponentManager
- * Description: Logic for the Components tab (CRUD operations).
+ * (No significant changes, included for completeness)
  */
 (function(APP) {
     const ComponentManager = {};
@@ -397,7 +404,7 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.Components.AssignmentManager
- * Description: Logic for the Advisor Assignments tab.
+ * (No significant changes, included for completeness)
  */
 (function(APP) {
     const AssignmentManager = {};
@@ -499,7 +506,7 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.Components.ShiftDefinitionEditor (Sequential Builder)
- * Description: Logic for the Shift Definitions tab and the Sequential Builder Modal.
+ * (No significant changes, included for completeness)
  */
 (function(APP) {
     const ShiftDefinitionEditor = {};
@@ -825,7 +832,7 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.Components.RotationEditor
- * Description: Logic for the 6-week Rotation Editor tab (Dropdown-based, Auto-save).
+ * (No significant changes, included for completeness)
  */
 (function(APP) {
     const RotationEditor = {};
@@ -991,7 +998,7 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.Components.ScheduleViewer
- * Description: Logic for the main visualization (Planner) and advisor selection.
+ * V14.0 Update: Implements Precision Time Cursor and updates visualization for 06:00-23:00.
  */
 (function(APP) {
     const ScheduleViewer = {};
@@ -1008,6 +1015,10 @@ window.APP = window.APP || {};
         ELS.plannerBody = document.getElementById('plannerBody');
         ELS.timelineContainer = document.getElementById('timelineContainer');
         ELS.currentTimeIndicator = document.getElementById('currentTimeIndicator');
+        
+        // V14.0: Precision Cursor Elements
+        ELS.mouseTimeIndicator = document.getElementById('mouseTimeIndicator');
+        ELS.mouseTimeTooltip = document.getElementById('mouseTimeTooltip');
 
         if (ELS.treeSearch) ELS.treeSearch.addEventListener('input', renderTree);
         if (ELS.btnClearSelection) ELS.btnClearSelection.addEventListener('click', clearSelection);
@@ -1015,13 +1026,20 @@ window.APP = window.APP || {};
         if (ELS.plannerDay) ELS.plannerDay.addEventListener('change', () => {
             APP.StateManager.getState().selectedDay = ELS.plannerDay.value;
             renderPlanner();
-            updateCurrentTimeIndicator(); // Update indicator visibility when day changes
+            updateCurrentTimeIndicator();
         });
 
-        // V13.1: Initialize Intraday Time Indicator
+        // Initialize Intraday Time Indicator (Red Line)
         if (timeIndicatorInterval) clearInterval(timeIndicatorInterval);
-        timeIndicatorInterval = setInterval(updateCurrentTimeIndicator, 60000); // Update every minute
-        updateCurrentTimeIndicator(); // Initial update
+        timeIndicatorInterval = setInterval(updateCurrentTimeIndicator, 60000);
+        updateCurrentTimeIndicator();
+
+        // V14.0: Initialize Precision Time Cursor (Mouse Follower)
+        if (ELS.timelineContainer) {
+            ELS.timelineContainer.addEventListener('mousemove', updateMouseTimeIndicator);
+            ELS.timelineContainer.addEventListener('mouseenter', showMouseIndicator);
+            ELS.timelineContainer.addEventListener('mouseleave', hideMouseIndicator);
+        }
     };
 
     ScheduleViewer.render = () => {
@@ -1029,7 +1047,8 @@ window.APP = window.APP || {};
         renderPlanner();
     };
 
-    const renderTree = () => {
+    // (renderTree, handleTreeChange, clearSelection remain the same)
+     const renderTree = () => {
         if (!ELS.tree) return;
         const STATE = APP.StateManager.getState();
         const filter = ELS.treeSearch.value.toLowerCase();
@@ -1046,11 +1065,10 @@ window.APP = window.APP || {};
         });
         ELS.tree.innerHTML = html || '<div>No advisors found.</div>';
 
-        // Auto-select first advisor if none selected (prevents blank screen)
         if (STATE.selectedAdvisors.size === 0 && STATE.advisors.length > 0 && !STATE.treeInitialized) {
             const firstAdvisor = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name))[0];
             STATE.selectedAdvisors.add(firstAdvisor.id);
-            STATE.treeInitialized = true; // Flag to prevent loop
+            STATE.treeInitialized = true;
             renderTree();
             renderPlanner();
         }
@@ -1101,8 +1119,10 @@ window.APP = window.APP || {};
         });
         
         ELS.plannerBody.innerHTML = html;
+        updateCurrentTimeIndicator(); // Ensure indicator position is correct after render
     };
 
+    // V14.0: Updated for 06:00-23:00
     const renderTimeHeader = (headerElement) => {
         const startHour = Math.floor(Config.TIMELINE_START_MIN / 60);
         const endHour = Math.floor(Config.TIMELINE_END_MIN / 60);
@@ -1147,9 +1167,9 @@ window.APP = window.APP || {};
         }).join('');
     };
 
-    // Core calculation logic
+    // (calculateSegmentsForAdvisor remains the same)
     const calculateSegmentsForAdvisor = (advisorId) => {
-        const STATE = APP.StateManager.getState();
+         const STATE = APP.StateManager.getState();
         const assignment = APP.StateManager.getAssignmentForAdvisor(advisorId);
         
         if (!assignment || !assignment.rotation_name || !assignment.start_date || !STATE.weekStart) return [];
@@ -1174,7 +1194,7 @@ window.APP = window.APP || {};
         return definition.structure;
     };
 
-    // V13.1: Intraday Time Indicator Logic
+    // Intraday Time Indicator (Red Line)
     const updateCurrentTimeIndicator = () => {
         if (!ELS.currentTimeIndicator || !ELS.timelineContainer) return;
 
@@ -1182,7 +1202,6 @@ window.APP = window.APP || {};
         const currentDayName = now.toLocaleDateString('en-US', { weekday: 'long' });
         const STATE = APP.StateManager.getState();
 
-        // Only show if the selected day is today
         if (currentDayName !== STATE.selectedDay) {
             ELS.currentTimeIndicator.style.display = 'none';
             return;
@@ -1195,16 +1214,58 @@ window.APP = window.APP || {};
             return;
         }
 
-        // Calculate position percentage
         const pct = ((currentMinutes - Config.TIMELINE_START_MIN) / Config.TIMELINE_DURATION_MIN) * 100;
         
-        // Calculate offset based on the timeline name column width
         const nameColElement = ELS.timelineContainer.querySelector('.header-name');
-        const nameColWidth = nameColElement ? nameColElement.offsetWidth : 220; // Use CSS default as fallback
+        const nameColWidth = nameColElement ? nameColElement.offsetWidth : 220;
 
         ELS.currentTimeIndicator.style.display = 'block';
-        // Position it relative to the start of the actual timeline track
         ELS.currentTimeIndicator.style.left = `calc(${nameColWidth}px + ${pct}%)`;
+    };
+
+    // V14.0: Precision Time Cursor (Mouse Follower)
+    const updateMouseTimeIndicator = (e) => {
+        if (!ELS.mouseTimeIndicator || !ELS.timelineContainer) return;
+
+        const containerRect = ELS.timelineContainer.getBoundingClientRect();
+        // Calculate mouseX relative to the container, accounting for horizontal scroll
+        const mouseX = e.clientX - containerRect.left + ELS.timelineContainer.scrollLeft;
+        
+        const nameColElement = ELS.timelineContainer.querySelector('.header-name');
+        const nameColWidth = nameColElement ? nameColElement.offsetWidth : 220;
+        const headerHeight = ELS.timeHeader ? ELS.timeHeader.offsetHeight : 48;
+
+        // Hide if over the names column
+        if (mouseX < nameColWidth) {
+            hideMouseIndicator();
+            return;
+        }
+
+        // Calculate time based on mouse position within the track area
+        // Use scrollWidth for the total width of the track
+        const trackWidth = ELS.timelineContainer.scrollWidth - nameColWidth;
+        const relativeX = mouseX - nameColWidth;
+        const pct = relativeX / trackWidth;
+        const timeInMinutes = Config.TIMELINE_START_MIN + (pct * Config.TIMELINE_DURATION_MIN);
+
+        // Update line position
+        ELS.mouseTimeIndicator.style.left = `${mouseX}px`;
+        
+        // Update tooltip position and text
+        ELS.mouseTimeTooltip.textContent = APP.Utils.formatMinutesToTime(timeInMinutes);
+        // Position tooltip slightly above the header area
+        ELS.mouseTimeTooltip.style.top = `${headerHeight - 30}px`; 
+        ELS.mouseTimeTooltip.style.left = `${mouseX}px`;
+    };
+
+    const showMouseIndicator = () => {
+        if (ELS.mouseTimeIndicator) ELS.mouseTimeIndicator.style.display = 'block';
+        if (ELS.mouseTimeTooltip) ELS.mouseTimeTooltip.style.display = 'block';
+    };
+
+    const hideMouseIndicator = () => {
+        if (ELS.mouseTimeIndicator) ELS.mouseTimeIndicator.style.display = 'none';
+        if (ELS.mouseTimeTooltip) ELS.mouseTimeTooltip.style.display = 'none';
     };
 
 
@@ -1223,7 +1284,7 @@ window.APP = window.APP || {};
 
     // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v13.1) Initializing...");
+        console.log("WFM Intelligence Platform (v14.0) Initializing...");
         
         // Initialize foundational services
         APP.Utils.cacheDOMElements();

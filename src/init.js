@@ -1,5 +1,5 @@
 /**
- * WFM Intelligence Platform - Initialization Script (v13.1)
+ * WFM Intelligence Platform - Initialization Script (v14.0)
  * 
  * Bootloader (Entry Point).
  */
