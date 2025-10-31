@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WFM Intelligence Platform (v14.1)</title>
+  <title>WFM Intelligence Platform (v14.2)</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./styles/planner.css?v=14.1" />
+  <link rel="stylesheet" href="./styles/planner.css?v=14.2" />
 </head>
 <body>
 
@@ -81,7 +81,7 @@
         <div class="planner-layout">
             <div class="planner-controls card">
                 <h2>Team Selection</h2>
-                <input type="text" id="treeSearch" class="form-input" placeholder="Filter advisors...">
+                <input type="text" id="treeSearch" class="form-input" placeholder="Filter leaders/advisors...">
                 <button id="btnClearSelection" class="btn btn-secondary btn-sm" style="margin-top: 8px;">Clear All</button>
                 <div class="schedules-tree" id="schedulesTree">
                 </div>
@@ -155,7 +155,7 @@
       <section id="tab-advisor-assignments" class="tab-content">
         <div class="card">
             <h2>Advisor Assignments</h2>
-            <p class="helper-text">Assign advisors to a rotation family and set the Start Date to control their starting week.</p>
+            <p class="helper-text">Assign advisors to a rotation family and set the Start Date (the date corresponding to Week 1) to control their starting week.</p>
             <div class="table-container" id="assignmentGrid">
             </div>
         </div>
@@ -229,8 +229,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   
-  <script src="./src/planner.js?v=14.1"></script>
-  <script src="./src/init.js?v=14.1"></script>
+  <script src="./src/planner.js?v=14.2"></script>
+  <script src="./src/init.js?v=14.2"></script>
 
 </body>
 </html>

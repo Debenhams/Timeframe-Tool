@@ -1,5 +1,5 @@
 /**
- * WFM Intelligence Platform - Initialization Script (v14.1)
+ * WFM Intelligence Platform - Initialization Script (v14.2)
  * 
  * Bootloader (Entry Point).
  */
@@ -15,7 +15,10 @@
       window.APP.Core.initialize();
     } else {
       console.error("Fatal Error: planner.js did not load or APP.Core.initialize is not defined.");
-      document.body.innerHTML = "<h1>Fatal Error: Application failed to load.</h1>";
+      // Attempt to display the error on the page if initialization fails
+      if (document.body) {
+        document.body.innerHTML = "<h1>Fatal Error: Application failed to load. Check console for details.</h1>";
+      }
     }
   }
 
