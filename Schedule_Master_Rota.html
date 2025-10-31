@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Professional Team Rota System</title>
+  <title>Professional Team Rota System (v10.5 - Hybrid Adherence)</title>
   
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   
-  <link rel="stylesheet" href="./styles/planner.css" />
+  <link rel="stylesheet" href="./styles/planner.css?v=10.5" />
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -26,9 +26,9 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </button>
       
-      <button id="btnCommit" class="btn btn-primary" title="Commit schedule changes to database">
+      <button id="btnCommit" class="btn btn-primary" title="Commit live schedule changes (exceptions) to database" disabled>
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-        Commit Week
+        Save Live Exceptions
       </button>
       
       <div class="separator"></div>
@@ -40,11 +40,6 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17v-6h6"></path><path d="M21 7a9 9 0 0 1-9 9 9 9 0 0 1-6-2.3l3-2.7"></path></svg>
       </button>
       
-      <div class="separator"></div>
-
-      <button id="btnPrint" class="btn-icon" title="Print Schedule">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-      </button>
     </div>
   </header>
   
@@ -55,6 +50,7 @@
       <nav class="tab-nav">
         <button class="tab-link active" data-tab="tab-rotation-editor">Rotation Editor</button>
         <button class="tab-link" data-tab="tab-advisor-assignments">Advisor Assignments</button>
+        <button class="tab-link" data-tab="tab-component-manager">Manage Components</button>
       </nav>
 
       <section id="tab-rotation-editor" class="tab-content active">
@@ -67,27 +63,39 @@
             <button id="btnNewRotation" class="btn btn-secondary">[+] New</button>
             <button id="btnSaveRotation" class="btn btn-primary">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-              Save
+              Save Pattern
             </button>
             <button id="btnDeleteRotation" class="btn btn-danger">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
               Delete
             </button>
           </div>
         </div>
-        <p class="helper-text">Define the multi-week pattern for this rotation. Click a button to build a day's shift.</p>
+        <p class="helper-text">Define the multi-week pattern. Click a cell to open the Advanced Day Editor.</p>
         <div class="table-container" id="rotationGrid">
           </div>
       </section>
       
       <section id="tab-advisor-assignments" class="tab-content">
+        <p class="helper-text">Assign advisors to a rotation family and set the date when their "Week 1" begins (must be a Monday).</p>
         <div class="table-container" id="assignmentGrid">
           </div>
       </section>
 
+      <section id="tab-component-manager" class="tab-content">
+        <div class="editor-controls">
+            <h2>Schedule Components Library</h2>
+            <div class="editor-buttons">
+                <button id="btnNewComponent" class="btn btn-primary">[+] Add New Component</button>
+                </div>
+        </div>
+        <p class="helper-text">Manage the available activities, platforms, breaks, absences, and shrinkage codes used for building schedules.</p>
+        <div class="table-container" id="componentManagerGrid">
+            </div>
+      </section>
+
       <section class="planner-section">
         <div class="planner-header">
-          <h2>Team Schedule</h2>
+          <h2>Team Schedule (Live View)</h2>
           <div class="planner-day-toggle">
             <label for="plannerDay">Day:</label>
             <select id="plannerDay" class="form-select">
@@ -127,65 +135,64 @@
         </div>
     </aside>
 
-  </div> <div id="notification-container"></div>
+  </div> <div class="modal-backdrop" id="dayEditorModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTitle">Edit Day</h2>
+        <button class="btn-icon modal-close" id="modalClose">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        
+        <div class="editor-sidebar">
+          <h3>Components Library</h3>
+          <div class="component-list" id="modalComponentList">
+            </div>
+        </div>
+        
+        <div class="editor-timeline">
+          <div class="editor-timeline-header" id="modalTimeHeader">
+            </div>
+          <div class="editor-timeline-track" id="modalTrack">
+            </div>
+          <div class="editor-summary">
+            Total Scheduled: <strong id="modalTotalTime">0h 0m</strong> | 
+            Paid Time: <strong id="modalPaidTime">0h 0m</strong>
+          </div>
+        </div>
+        
+      </div>
+      <div class="modal-footer">
+        <button id="modalClearDay" class="btn btn-danger">Clear Day (RDO)</button>
+        <button id="modalSaveDay" class="btn btn-primary">Save & Close</button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="notification-container"></div>
 
   <script>
     // These are provided by the environment
     const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
     
+    // Create a single, global Supabase client
     const supabase = (window.supabase && window.supabase.createClient)
       ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
       : null;
     
     if (!supabase) {
-      console.error("Supabase client failed to initialize. Check CDN script.");
+      console.error("Supabase client failed to initialize.");
       document.body.innerHTML = "<h1>Error: Supabase client failed to initialize.</h1>";
     }
   </script>
   
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
-  <script src="./src/planner.js"></script>
-  <script src="./src/init.js"></script>
-
-
-<div id="dayEditorModal" class="modal-backdrop" style="display: none;">
-  <div class="modal-content">
-    
-    <div class="modal-header">
-      <h3 id="dayEditorTitle">Build Shift: Week 1, Monday</h3>
-      <button id="dayEditorClose" class="btn-icon">&times;</button>
-    </div>
-    
-    <div class="modal-body">
-      <div class="editor-layout">
-        
-        <div class="editor-sidebar" id="dayEditorComponents">
-          <div class="loading-spinner">Loading components...</div>
-        </div>
-        
-        <div class="editor-main">
-          <div class="editor-timeline-header" id="dayEditorTimeTicks">
-            </div>
-          <div class="editor-timeline-track" id="dayEditorTrack">
-            <div class="track-segment" style="left: 10%; width: 20%; background-color: #2ecc71; display: none;">
-              <span class="segment-label">Test Segment (07:36 - 10:48)</span>
-              <button class="segment-delete">&times;</button>
-            </div>
-          </div>
-        </div>
-        
-      </div>
-    </div>
-    
-    <div class="modal-footer">
-      <button id="dayEditorClear" class="btn btn-secondary">Clear Day (RDO)</button>
-      <button id="dayEditorSave" class="btn btn-primary">Save Day</button>
-    </div>
-    
-  </div>
-</div>
+  <script src="./src/planner.js?v=10.5"></script>
+  <script src="./src/init.js?v=10.5"></script>
 
 </body>
 </html>
