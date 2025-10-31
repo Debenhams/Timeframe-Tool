@@ -1,4 +1,4 @@
-/* === V14.0 ADVANCED GANTT VISUALIZATION === */
+/* === V14.1 WEEKLY VIEW & ADVANCED GANTT VISUALIZATION === */
 :root {
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   
@@ -106,7 +106,7 @@ tbody tr:hover { background-color: #F9FAFB; }
 thead th:first-child { background-color: var(--timeline-header-bg); }
 
 
-/* === SCHEDULE VIEW (Layout) === */
+/* === SCHEDULE VIEW (V14.1 Layout) === */
 .planner-section { height: 100%; }
 .planner-layout { display: grid; grid-template-columns: 320px 1fr; gap: 24px; height: 100%; }
 .planner-controls { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
@@ -115,13 +115,46 @@ thead th:first-child { background-color: var(--timeline-header-bg); }
 .schedules-tree label:hover { background-color: var(--color-hover-bg); }
 .planner-viewer { display: flex; flex-direction: column; overflow: hidden; padding: 0; }
 .planner-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--color-border); }
+
+/* V14.1: View Controls (Toggle and Day Select) */
+.planner-view-controls { display: flex; align-items: center; gap: 20px; }
 .planner-day-toggle { display: flex; align-items: center; gap: 12px; }
 
-/* === TIMELINE VISUALIZATION (V14.0 Updates) === */
-.timeline-container {
+.view-toggle-group {
+    display: flex;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+}
+
+.btn-toggle {
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    background-color: var(--color-panel-bg);
+    color: var(--color-text-muted);
+    border: none;
+    cursor: pointer;
+}
+
+.btn-toggle:first-child { border-top-left-radius: var(--border-radius); border-bottom-left-radius: var(--border-radius); }
+.btn-toggle:last-child { border-top-right-radius: var(--border-radius); border-bottom-right-radius: var(--border-radius); }
+
+.btn-toggle.active {
+    background-color: var(--brand-primary);
+    color: white;
+}
+
+
+/* === VISUALIZATION CONTAINER (V14.1) === */
+.visualization-container {
   flex-grow: 1;
   overflow: auto; 
   position: relative; /* Required for Indicators and Trackers */
+}
+
+/* === DAILY TIMELINE (GANTT) VIEW === */
+.timeline-container {
+    /* Specific styles for the container when it holds a timeline */
 }
 
 .timeline-header {
@@ -158,7 +191,7 @@ thead th:first-child { background-color: var(--timeline-header-bg); }
   top: 0;
 }
 
-/* V14.0: Current Time Indicator (Red Line) */
+/* Time Indicators (Current and Mouse) */
 .current-time-indicator {
     position: absolute;
     top: 0;
@@ -168,10 +201,9 @@ thead th:first-child { background-color: var(--timeline-header-bg); }
     z-index: 99;
     pointer-events: none;
     box-shadow: 0 0 8px rgba(220, 38, 38, 0.5);
-    display: none; /* Hidden by default, shown by JS if today */
+    display: none;
 }
 
-/* V14.0: Precision Time Cursor (Mouse Follower) */
 .mouse-time-indicator {
     position: absolute;
     top: 0;
@@ -180,7 +212,7 @@ thead th:first-child { background-color: var(--timeline-header-bg); }
     background-color: #111827; /* Dark line */
     z-index: 98;
     pointer-events: none;
-    display: none; /* Hidden until mouse enters container */
+    display: none;
 }
 
 .mouse-time-tooltip {
@@ -191,10 +223,10 @@ thead th:first-child { background-color: var(--timeline-header-bg); }
     font-size: 12px;
     font-weight: 600;
     border-radius: 4px;
-    z-index: 101; /* Ensure tooltip is above header elements */
+    z-index: 101;
     pointer-events: none;
     display: none;
-    transform: translateX(-50%); /* Center tooltip on cursor */
+    transform: translateX(-50%);
 }
 
 
@@ -232,7 +264,6 @@ thead th:first-child { background-color: var(--timeline-header-bg); }
   align-items: center;
   overflow: hidden;
   border-radius: 0;
-  /* Subtle border between adjacent segments */
   border-right: 1px solid rgba(255,255,255,0.3); 
 }
 
@@ -246,6 +277,53 @@ thead th:first-child { background-color: var(--timeline-header-bg); }
     /* Using the Olive Green color from the screenshots provided previously */
     background-color: #808000 !important; 
     color: white !important;
+}
+
+/* === WEEKLY VIEW (V14.1 New) === */
+.weekly-grid {
+    width: 100%;
+}
+
+.weekly-grid th {
+    min-width: 120px;
+}
+
+/* Ensure the Name column is sticky in the weekly view */
+.weekly-grid th:first-child, .weekly-grid td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 5;
+    background-color: var(--color-panel-bg);
+}
+
+.weekly-grid thead th:first-child {
+    background-color: var(--timeline-header-bg);
+    z-index: 15; /* Above sticky names and sticky header */
+}
+
+
+.weekly-cell-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 8px 12px;
+}
+
+.weekly-shift-code {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--brand-primary);
+}
+
+.weekly-shift-time {
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.weekly-rdo {
+    font-size: 13px;
+    color: #9CA3AF;
+    font-weight: 500;
 }
 
 

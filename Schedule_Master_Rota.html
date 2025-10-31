@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WFM Intelligence Platform (v14.0)</title>
+  <title>WFM Intelligence Platform (v14.1)</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./styles/planner.css?v=14.0" />
+  <link rel="stylesheet" href="./styles/planner.css?v=14.1" />
 </head>
 <body>
 
@@ -88,34 +88,32 @@
             </div>
             <div class="planner-viewer card">
                 <div class="planner-header">
-                    <h2>Schedule Visualization (Daily 06:00 - 23:00)</h2>
-                    <div class="planner-day-toggle">
-                        <label for="plannerDay">Day:</label>
-                        <select id="plannerDay" class="form-select">
-                        <option value="Monday">Monday</option>
-                        <option value="Tuesday">Tuesday</option>
-                        <option value="Wednesday">Wednesday</option>
-                        <option value="Thursday">Thursday</option>
-                        <option value="Friday">Friday</option>
-                        <option value="Saturday">Saturday</option>
-                        <option value="Sunday">Sunday</option>
-                        </select>
+                    <h2 id="scheduleViewTitle">Schedule Visualization</h2>
+                    
+                    <div class="planner-view-controls">
+                        <div class="view-toggle-group" id="viewToggleGroup">
+                            <button class="btn-toggle active" data-view="daily">Daily</button>
+                            <button class="btn-toggle" data-view="weekly">Weekly</button>
+                        </div>
+
+                        <div class="planner-day-toggle" id="dayToggleContainer">
+                            <label for="plannerDay">Day:</label>
+                            <select id="plannerDay" class="form-select">
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                            <option value="Saturday">Saturday</option>
+                            <option value="Sunday">Sunday</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 
-                <div class="timeline-container" id="timelineContainer">
-                    <div class="timeline-header">
-                        <div class="header-name">Name</div>
-                        <div class="header-timeline" id="timeHeader">
-                        </div>
+                <div class="visualization-container" id="visualizationContainer">
                     </div>
-                    <div class="timeline-body" id="plannerBody">
-                    </div>
-                    
-                    <div id="currentTimeIndicator" class="current-time-indicator"></div>
-                    <div id="mouseTimeIndicator" class="mouse-time-indicator"></div>
-                    <div id="mouseTimeTooltip" class="mouse-time-tooltip">00:00</div>
-                </div>
+                
             </div>
         </div>
       </section>
@@ -157,7 +155,7 @@
       <section id="tab-advisor-assignments" class="tab-content">
         <div class="card">
             <h2>Advisor Assignments</h2>
-            <p class="helper-text">Assign advisors to a rotation family and set the date when their "Week 1" begins.</p>
+            <p class="helper-text">Assign advisors to a rotation family and set the Start Date to control their starting week.</p>
             <div class="table-container" id="assignmentGrid">
             </div>
         </div>
@@ -231,8 +229,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   
-  <script src="./src/planner.js?v=14.0"></script>
-  <script src="./src/init.js?v=14.0"></script>
+  <script src="./src/planner.js?v=14.1"></script>
+  <script src="./src/init.js?v=14.1"></script>
 
 </body>
 </html>
