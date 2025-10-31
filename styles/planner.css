@@ -3,13 +3,13 @@
   --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   
   /* Brand & Colors */
-  --brand-primary: #0d47a1; /* Deep Blue */
-  --brand-secondary: #1e88e5; /* Lighter Blue */
+  --brand-primary: #0d47a1; 
+  --brand-secondary: #1e88e5; 
   
   /* Neutrals */
-  --color-text: #212529;
+  --color-text: #333333;
   --color-text-muted: #6c757d;
-  --color-bg: #f8f9fa; /* Light grey app background */
+  --color-bg: #f8f9fa;
   --color-panel-bg: #ffffff;
   --color-border: #dee2e6;
   --color-border-light: #e9ecef;
@@ -17,20 +17,19 @@
   /* UI Colors */
   --color-danger: #d93025;
   --color-danger-bg: #fdf0ef;
-  --color-danger-border: #f9c6c2;
   --color-success: #1e8d4d;
-  --color-success-bg: #e6f9f0;
   
   /* Layout */
-  --sidebar-width: 360px;
+  --sidebar-width: 300px;
   --top-bar-height: 60px;
   --border-radius: 8px;
   
-  /* Timeline (Main Planner) */
-  --timeline-name-col: 220px;
-  --timeline-row-height: 44px;
-  --timeline-bar-height: 28px;
-  --timeline-grid-color: #e9ecef;
+  /* Timeline (V11 Visual Upgrade) */
+  --timeline-name-col: 250px;
+  --timeline-row-height: 36px; /* Reduced height for density */
+  --timeline-bar-height: 36px; /* Full height bars */
+  --timeline-grid-color: #e0e0e0;
+  --timeline-header-bg: #f1f3f5;
 
   /* Modal Editor */
   --modal-sidebar-width: 220px;
@@ -85,13 +84,14 @@ html, body {
 }
 
 .sidebar-header { padding: 16px; border-bottom: 1px solid var(--color-border); }
-.sidebar-controls { display: flex; gap: 8px; }
+.sidebar-controls { display: flex; gap: 8px; margin-top: 8px; }
 
 /* === FORM ELEMENTS & BUTTONS === */
 .form-input, .form-select, .week-picker {
   padding: 8px 12px;
   border: 1px solid var(--color-border);
   border-radius: var(--border-radius);
+  font-size: 14px;
 }
 
 .week-picker { width: 140px; }
@@ -113,12 +113,11 @@ html, body {
 
 .btn-primary { background-color: var(--brand-secondary); color: #ffffff; }
 .btn-primary:hover { background-color: #1a7bd1; }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn-secondary { background-color: var(--color-panel-bg); color: var(--color-text); border-color: var(--color-border); }
 .btn-secondary:hover { background-color: #f1f3f5; }
 
-.btn-danger { background-color: var(--color-danger-bg); color: var(--color-danger); border-color: var(--color-danger-border); }
+.btn-danger { background-color: var(--color-danger-bg); color: var(--color-danger); }
 
 .btn-sm { padding: 4px 8px; font-size: 12px; }
 
@@ -161,33 +160,24 @@ html, body {
 
 table { width: 100%; border-collapse: collapse; }
 th, td { padding: 10px 12px; border-bottom: 1px solid var(--color-border-light); text-align: left; font-size: 13px; }
-thead th { background-color: #f1f3f5; font-weight: 600; position: sticky; top: 0; z-index: 10; }
+thead th { background-color: var(--timeline-header-bg); font-weight: 600; position: sticky; top: 0; z-index: 10; }
 tbody tr:hover { background-color: #f5f9ff; }
 
-/* === ROTATION EDITOR (v10 Refactor) === */
+/* === EDITOR COMMON === */
 .editor-controls { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; }
 .editor-buttons { display: flex; gap: 8px; }
 .helper-text { font-size: 13px; color: var(--color-text-muted); margin: -8px 0 16px 0; }
 
-#rotationGrid th, #rotationGrid td { text-align: center; vertical-align: middle; min-width: 100px; }
 
-#rotationGrid td[data-week] {
-    cursor: pointer;
-    transition: background-color 0.1s;
+/* === ROTATION EDITOR (V11 Refactor) === */
+#rotationGrid th, #rotationGrid td { text-align: center; vertical-align: middle; min-width: 150px; }
+
+#rotationGrid .form-select {
+    width: 100%;
+    padding: 6px;
+    font-size: 13px;
+    font-weight: 500;
 }
-#rotationGrid td[data-week]:hover { background-color: #e8f0fe; }
-
-.rotation-cell-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 60px;
-}
-
-.cell-time { font-weight: 600; font-size: 14px; }
-.cell-duration { font-size: 12px; color: var(--color-text-muted); }
-.cell-build { color: var(--brand-secondary); font-weight: 600; }
 
 #rotationGrid th:first-child, #rotationGrid td:first-child {
   text-align: left;
@@ -198,9 +188,11 @@ tbody tr:hover { background-color: #f5f9ff; }
   z-index: 5;
 }
 
-/* === ASSIGNMENT GRID & COMPONENT MANAGER === */
+/* === GRIDS (Assignments, Components, Definitions) === */
 #assignmentGrid th:first-child, #assignmentGrid td:first-child,
-#componentManagerGrid th:first-child, #componentManagerGrid td:first-child {
+#componentManagerGrid th:first-child, #componentManagerGrid td:first-child,
+#shiftDefinitionsGrid th:first-child, #shiftDefinitionsGrid td:first-child
+ {
   position: sticky;
   left: 0;
   background: var(--color-panel-bg);
@@ -209,35 +201,44 @@ tbody tr:hover { background-color: #f5f9ff; }
 
 /* === SCHEDULES TREE (Right Sidebar) === */
 .schedules-tree { flex-grow: 1; overflow-y: auto; padding: 16px; }
-.schedules-tree summary { cursor: pointer; font-weight: 600; padding: 4px; border-radius: 4px; }
-.schedules-tree summary:hover { background-color: #f1f3f5; }
-.schedules-tree details[open] > summary { background-color: #e8f0fe; color: var(--brand-primary); }
 .schedules-tree label { cursor: pointer; display: block; padding: 4px; }
-.schedules-tree .tree-node-leader { padding-left: 20px; }
-.schedules-tree .tree-node-advisor { padding-left: 40px; font-weight: normal; }
+.tree-node-advisor { font-weight: normal; }
 
-/* === HORIZONTAL PLANNER (Team Schedule) === */
-.planner-section { margin-top: 24px; }
+/* === HORIZONTAL PLANNER (V11 Visual Upgrade) === */
+.planner-section { margin-top: 24px; flex-grow: 1; display: flex; flex-direction: column; }
 .planner-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.planner-header h2 { margin: 0; font-size: 1.2rem; }
-.planner-day-toggle { display: flex; align-items: center; gap: 8px; }
 
 .timeline-container {
   border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
   background: var(--color-panel-bg);
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow: auto; /* Allows scrolling the whole container if needed */
 }
 
 .timeline-header {
   display: grid;
   grid-template-columns: var(--timeline-name-col) 1fr;
-  background-color: #f1f3f5;
+  background-color: var(--timeline-header-bg);
+  border-bottom: 2px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
-.header-name { padding: 10px 12px; border-right: 1px solid var(--color-border); }
+.header-name { 
+    padding: 10px 12px; 
+    border-right: 1px solid var(--color-border); 
+    font-weight: 600;
+    position: sticky;
+    left: 0;
+    background-color: var(--timeline-header-bg);
+    z-index: 10;
+}
 .header-timeline { position: relative; height: 40px; }
 
-/* Used in both main planner and modal editor */
+/* Time Ticks (Used in planner and modal) */
 .time-tick {
   position: absolute;
   top: 50%;
@@ -245,49 +246,86 @@ tbody tr:hover { background-color: #f5f9ff; }
   font-size: 11px;
   color: var(--color-text-muted);
   user-select: none;
+  /* Visual line extending down (V11 Enhancement) */
+  border-left: 1px solid var(--timeline-grid-color);
+  height: 100vh; /* Extend line far down */
+  padding-left: 4px;
+  display: flex;
+  align-items: center;
+  top: 0;
+  transform: none;
 }
 
-.timeline-body { overflow-y: auto; max-height: 40vh; }
+.timeline-body {
+  /* Contains the rows */
+}
 
 .timeline-row {
   display: grid;
   grid-template-columns: var(--timeline-name-col) 1fr;
   height: var(--timeline-row-height);
-  border-top: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-light);
 }
 
-.timeline-name { padding: 0 12px; border-right: 1px solid var(--color-border); display: flex; align-items: center; font-weight: 500; }
+/* Alternating row colors like the screenshot */
+.timeline-row:nth-child(odd) {
+    background-color: #FFFFFF;
+}
+.timeline-row:nth-child(even) {
+    background-color: #F9F9F9;
+}
+
+
+.timeline-name { 
+    padding: 0 12px; 
+    border-right: 1px solid var(--color-border); 
+    display: flex; 
+    align-items: center; 
+    font-size: 13px;
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background-color: inherit; /* Inherit from the row for striping */
+}
 
 .timeline-track {
   position: relative;
   height: 100%;
-  /* Grid background - 1 line per hour */
-  background-image: linear-gradient(to right, var(--timeline-grid-color) 1px, transparent 1px);
-  background-size: calc(100% / 16) 100%; /* 16 hours visible (06:00-22:00) */
 }
-.timeline-track .no-data { font-size: 12px; color: var(--color-text-muted); padding: 12px; }
 
-/* The actual segment bars on the timeline */
+/* The actual segment bars on the timeline (V11 Upgrade) */
 .timeline-bar {
   position: absolute;
-  top: calc( (var(--timeline-row-height) - var(--timeline-bar-height)) / 2 );
+  top: 0; /* V11: Bars fill the track height */
   height: var(--timeline-bar-height);
-  border-radius: 4px;
   font-size: 11px;
   font-weight: 600;
-  padding: 0 8px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-  border: 1px solid rgba(0,0,0,0.15);
   overflow: hidden;
+  /* Removing borders/shadows/radius for the flat look in the screenshot */
+  border-radius: 0;
+  border-right: 1px solid rgba(255,255,255,0.5); 
+  white-space: nowrap;
+}
+
+/* Specific styling for breaks/lunch to appear as gaps */
+.timeline-bar.is-gap {
+    background-color: #E0E0E0 !important; /* Grey color for gaps like the screenshot */
+    color: #666 !important;
+}
+
+/* Specific styling for "Activity" types (Work) */
+.timeline-bar.is-activity {
+    /* Using the Olive Green color from the screenshot */
+    background-color: #808000 !important; 
+    color: white !important;
 }
 
 
-/* === ADVANCED DAY EDITOR MODAL (v10 New) === */
+/* === ADVANCED EDITOR MODAL (V11 Repurposed) === */
 .modal-backdrop {
-  display: none; /* Hidden by default */
+  display: none; 
   position: fixed;
   z-index: 1050;
   left: 0;
@@ -311,29 +349,16 @@ tbody tr:hover { background-color: #f5f9ff; }
   max-height: 85vh;
 }
 
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 24px;
-  border-bottom: 1px solid var(--color-border);
-}
-.modal-header h2 { margin: 0; font-size: 1.2rem; }
+.modal-header, .modal-footer { padding: 16px 24px; border-bottom: 1px solid var(--color-border); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; }
+.modal-footer { border-top: 1px solid var(--color-border); display: flex; justify-content: space-between; }
 .modal-close { color: var(--color-text); }
-.modal-close:hover { background-color: var(--color-border-light); }
 
 .modal-body {
   display: grid;
   grid-template-columns: var(--modal-sidebar-width) 1fr;
   flex-grow: 1;
   overflow: hidden;
-}
-
-.modal-footer {
-  padding: 16px 24px;
-  border-top: 1px solid var(--color-border);
-  display: flex;
-  justify-content: space-between;
 }
 
 /* Modal Sidebar (Component List) */
@@ -343,8 +368,7 @@ tbody tr:hover { background-color: #f5f9ff; }
   overflow-y: auto;
   background-color: var(--color-bg);
 }
-.editor-sidebar h3 { font-size: 1rem; margin-top: 0; }
-.editor-sidebar h4 { font-size: 0.9rem; margin: 16px 0 8px 0; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); padding-bottom: 4px;}
+.editor-sidebar h4 { font-size: 0.9rem; margin: 16px 0 8px 0; color: var(--color-text-muted); border-bottom: 1px solid var(--color-border); }
 
 .component-list { display: flex; flex-direction: column; gap: 8px; }
 
@@ -359,7 +383,6 @@ tbody tr:hover { background-color: #f5f9ff; }
   user-select: none;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
-.component-brick:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
 .component-brick:active { cursor: grabbing; }
 
 /* Modal Timeline Area */
@@ -370,7 +393,6 @@ tbody tr:hover { background-color: #f5f9ff; }
   height: 40px;
   background-color: #f8f9fa;
   border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
 }
 
 /* The drop target track */
@@ -382,7 +404,6 @@ tbody tr:hover { background-color: #f5f9ff; }
   background-image: linear-gradient(to right, var(--color-border-light) 1px, transparent 1px);
   /* 16 hours * 4 intervals/hour = 64 intervals */
   background-size: calc(100% / 64) 100%; 
-  transition: background-color 0.1s;
 }
 
 /* Style when dragging over the track */
@@ -391,8 +412,8 @@ tbody tr:hover { background-color: #f5f9ff; }
 /* Segments dropped onto the track */
 .track-segment {
     position: absolute;
-    height: 60px; /* Fixed height for easier manipulation */
-    top: calc(50% - 30px); /* Center vertically */
+    height: 60px;
+    top: calc(50% - 30px);
     border-radius: var(--border-radius);
     cursor: move;
     user-select: none;
@@ -419,7 +440,6 @@ tbody tr:hover { background-color: #f5f9ff; }
     cursor: pointer;
     color: inherit;
     opacity: 0.3;
-    transition: opacity 0.1s;
 }
 .track-segment:hover .segment-delete { opacity: 0.8; }
 
@@ -429,7 +449,6 @@ tbody tr:hover { background-color: #f5f9ff; }
   background-color: #f8f9fa;
   font-size: 13px;
 }
-#modalPaidTime { color: var(--color-success); }
 
 
 /* === NOTIFICATION TOAST & LOADING === */
@@ -447,7 +466,7 @@ tbody tr:hover { background-color: #f5f9ff; }
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
   margin-top: 12px;
 }
-.toast.is-success { background-color: var(--color-success-bg); color: var(--color-success); }
+.toast.is-success { background-color: #e6f9f0; color: var(--color-success); }
 .toast.is-danger { background-color: var(--color-danger-bg); color: var(--color-danger); }
 
 .loading-spinner { padding: 24px; color: var(--color-text-muted); }

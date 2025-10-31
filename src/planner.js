@@ -1,8 +1,9 @@
 /**
- * Professional Team Rota System - Main Application Logic (v10.5 - Component-Based Refactor)
+ * Professional Team Rota System - Main Application Logic (v11.0 - Shift Definitions Architecture)
  *
- * Implements the Hybrid Adherence model, Advanced Day Editor, Drag-and-Drop with Collision Detection, 
- * Component Management, and Core Schedule Calculation.
+ * Implements a system where detailed shifts are defined once (Shift Definitions) 
+ * and then applied efficiently via dropdowns in the Rotation Editor.
+ * Includes significant visual upgrades to the main planner view.
  */
 
 (function () {
@@ -14,14 +15,12 @@
   
   // Core Application State
   const STATE = {
-    sites: [],
-    leaders: [],
     advisors: [],
-    scheduleComponents: [], // NEW v10: The building blocks
+    scheduleComponents: [], 
+    shiftDefinitions: [], // NEW v11: Library of predefined shifts
     rotationPatterns: [], 
     rotationAssignments: [],
     selectedAdvisors: new Set(),
-    selectedDay: 'Monday',
     weekStart: null, 
     currentRotation: null,
     isBooted: false,
@@ -29,13 +28,11 @@
     historyIndex: -1
   };
 
-  // Temporary state for the Advanced Day Editor Modal
+  // Temporary state for the Editor Modal (Now used for Shift Definitions)
   const EDITOR_STATE = {
     isOpen: false,
-    rotationName: null,
-    week: null,
-    dow: null, // Day of week (1=Mon, 7=Sun)
-    segments: [], 
+    shiftDefinitionId: null, // The ID of the shift being edited
+    segments: [], // The structure (JSONB) of the shift
     dragData: null,
   };
 
@@ -43,7 +40,7 @@
   const TIMELINE_START_MIN = 6 * 60; // 360
   const TIMELINE_END_MIN = 22 * 60; // 1320
   const TIMELINE_DURATION_MIN = TIMELINE_END_MIN - TIMELINE_START_MIN; // 960 mins (16 hours)
-  const SNAP_INTERVAL = 15; // Snap to 15 minutes
+  const SNAP_INTERVAL = 15; 
 
   // DOM element cache
   const ELS = {};
@@ -54,28 +51,26 @@
     if (!window.supabase) return;
 
     try {
-      // Fetch the new schedule_components and remove shift_templates
-      const [sitesRes, leadersRes, advisorsRes, componentsRes, patternsRes, assignmentsRes] = await Promise.all([
-        supabase.from('sites').select('*'),
-        supabase.from('leaders').select('*'),
+      // Fetch the new shift_definitions table
+      const [advisorsRes, componentsRes, definitionsRes, patternsRes, assignmentsRes] = await Promise.all([
         supabase.from('advisors').select('*'),
-        supabase.from('schedule_components').select('*'), // NEW v10
+        supabase.from('schedule_components').select('*'),
+        supabase.from('shift_definitions').select('*'), // NEW v11
         supabase.from('rotation_patterns').select('*'), 
         supabase.from('rotation_assignments').select('*')
       ]);
 
       // Basic error checking
-      if (componentsRes.error) throw new Error(`Components: ${componentsRes.error.message}`);
+      if (definitionsRes.error) throw new Error(`Shift Definitions: ${definitionsRes.error.message}`);
       
       // Update state
-      STATE.sites = sitesRes.data || [];
-      STATE.leaders = leadersRes.data || [];
       STATE.advisors = advisorsRes.data || [];
       STATE.scheduleComponents = componentsRes.data || [];
+      STATE.shiftDefinitions = definitionsRes.data || [];
       STATE.rotationPatterns = patternsRes.data || [];
       STATE.rotationAssignments = assignmentsRes.data || [];
       
-      console.log("Core data loaded. Components:", STATE.scheduleComponents.length);
+      console.log("Core data loaded. Definitions:", STATE.shiftDefinitions.length);
 
     } catch (error) {
       console.error("Boot Failed:", error);
@@ -90,24 +85,27 @@
       STATE.history = STATE.history.slice(0, STATE.historyIndex + 1);
     }
     const snapshot = {
+      // V11: We now also track changes to shift definitions
+      shiftDefinitions: JSON.parse(JSON.stringify(STATE.shiftDefinitions)),
       rotationPatterns: JSON.parse(JSON.stringify(STATE.rotationPatterns)),
       rotationAssignments: JSON.parse(JSON.stringify(STATE.rotationAssignments)),
     };
     STATE.history.push(snapshot);
-    if (STATE.history.length > 20) STATE.history.shift();
+    if (STATE.history.length > 30) STATE.history.shift();
     STATE.historyIndex = STATE.history.length - 1;
     updateUndoRedoButtons();
   }
 
   function applyHistory(direction) {
     if (direction === 'undo' && STATE.historyIndex > 0) {
-      STATE.historyIndex--;
+        STATE.historyIndex--;
     } else if (direction === 'redo' && STATE.historyIndex < STATE.history.length - 1) {
-      STATE.historyIndex++;
+        STATE.historyIndex++;
     } else {
-      return;
+        return;
     }
     const snapshot = STATE.history[STATE.historyIndex];
+    STATE.shiftDefinitions = JSON.parse(JSON.stringify(snapshot.shiftDefinitions));
     STATE.rotationPatterns = JSON.parse(JSON.stringify(snapshot.rotationPatterns));
     STATE.rotationAssignments = JSON.parse(JSON.stringify(snapshot.rotationAssignments));
     renderAll();
@@ -123,10 +121,14 @@
   function getAssignmentForAdvisor(id) { return STATE.rotationAssignments.find(a => a.advisor_id === id) || null; }
   function getPatternByName(name) { return STATE.rotationPatterns.find(p => p.name === name) || null; }
   function getComponentById(id) { return STATE.scheduleComponents.find(c => c.id === id) || null; }
+  function getShiftDefinitionById(id) { return STATE.shiftDefinitions.find(d => d.id === id) || null; }
+  function getShiftDefinitionByCode(code) { return STATE.shiftDefinitions.find(d => d.code === code) || null; }
+
 
   // --- 3. RENDERING ---
 
   function cacheDOMElements() {
+    // Standard Elements
     ELS.weekStart = document.getElementById('weekStart');
     ELS.prevWeek = document.getElementById('prevWeek');
     ELS.nextWeek = document.getElementById('nextWeek');
@@ -134,22 +136,28 @@
     ELS.btnRedo = document.getElementById('btnRedo');
     ELS.tabNav = document.querySelector('.tab-nav');
     ELS.tabs = document.querySelectorAll('.tab-content');
+    // Rotation Editor
     ELS.rotationFamily = document.getElementById('rotationFamily');
     ELS.btnNewRotation = document.getElementById('btnNewRotation');
-    ELS.btnSaveRotation = document.getElementById('btnSaveRotation');
     ELS.btnDeleteRotation = document.getElementById('btnDeleteRotation');
     ELS.rotationGrid = document.getElementById('rotationGrid');
+    // Shift Definitions (New V11)
+    ELS.shiftDefinitionsGrid = document.getElementById('shiftDefinitionsGrid');
+    ELS.btnNewShiftDefinition = document.getElementById('btnNewShiftDefinition');
+    // Assignments and Components
     ELS.assignmentGrid = document.getElementById('assignmentGrid');
     ELS.componentManagerGrid = document.getElementById('componentManagerGrid');
     ELS.btnNewComponent = document.getElementById('btnNewComponent');
+    // Planner View
     ELS.plannerDay = document.getElementById('plannerDay');
     ELS.timeHeader = document.getElementById('timeHeader');
     ELS.plannerBody = document.getElementById('plannerBody');
+    // Sidebar
     ELS.schedulesTree = document.getElementById('schedulesTree');
     ELS.treeSearch = document.getElementById('treeSearch');
     ELS.btnClearSelection = document.getElementById('btnClearSelection');
     ELS.notificationContainer = document.getElementById('notification-container');
-    // Modal Elements
+    // Modal Elements (Repurposed V11)
     ELS.dayEditorModal = document.getElementById('dayEditorModal');
     ELS.modalTitle = document.getElementById('modalTitle');
     ELS.modalClose = document.getElementById('modalClose');
@@ -165,30 +173,29 @@
   function renderAll() {
     if (!STATE.isBooted) return;
     renderSchedulesTree();
+    renderShiftDefinitions(); // New V11
     renderRotationEditor();
     renderAssignmentGrid();
-    renderComponentManager(); // New v10
+    renderComponentManager(); 
     renderPlanner();
   }
 
-  // (renderSchedulesTree and renderAssignmentGrid remain largely the same as V9.4)
-  // Simplified implementations provided here for context.
+  // Simplified renderSchedulesTree
   function renderSchedulesTree() {
     let html = '';
     STATE.advisors.sort((a,b) => a.name.localeCompare(b.name)).forEach(adv => {
         const isChecked = STATE.selectedAdvisors.has(adv.id);
-        html += `<div class="tree-node-advisor" style="padding-left: 20px;"><label>
+        html += `<div class="tree-node-advisor" style="padding-left: 10px;"><label>
             <input type="checkbox" class="select-advisor" data-advisor-id="${adv.id}" ${isChecked ? 'checked' : ''} />
             ${adv.name}
         </label></div>`;
     });
-    ELS.schedulesTree.innerHTML = html || '<div class="loading-spinner">No advisors loaded.</div>';
+    ELS.schedulesTree.innerHTML = html || '<div class="loading-spinner">No advisors.</div>';
 
-     // Auto-select first advisor if none selected
      if (STATE.selectedAdvisors.size === 0 && STATE.advisors.length > 0) {
         const firstAdvisor = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name))[0];
         STATE.selectedAdvisors.add(firstAdvisor.id);
-        renderSchedulesTree(); // Re-render to check the box
+        renderSchedulesTree();
         renderPlanner();
     }
   }
@@ -196,7 +203,6 @@
   function renderAssignmentGrid() {
     const advisors = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name));
     const patterns = STATE.rotationPatterns.sort((a,b) => a.name.localeCompare(b.name));
-    
     const patternOpts = patterns.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
 
     let html = '<table><thead><tr><th>Advisor</th><th>Assigned Rotation</th><th>Start Date (dd/mm/yyyy)</th></tr></thead><tbody>';
@@ -205,24 +211,15 @@
       const assignment = getAssignmentForAdvisor(adv.id);
       const startDate = (assignment && assignment.start_date) ? assignment.start_date : '';
       
-      html += `
-        <tr data-advisor-id="${adv.id}">
+      html += `<tr data-advisor-id="${adv.id}">
           <td>${adv.name}</td>
-          <td>
-            <select class="form-select assign-rotation" data-advisor-id="${adv.id}">
-              <option value="">-- No Rotation --</option>
-              ${patternOpts}
-            </select>
-          </td>
-          <td>
-            <input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${startDate}" placeholder="dd/mm/yyyy" />
-          </td>
+          <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
+          <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${startDate}" /></td>
         </tr>`;
     });
     html += '</tbody></table>';
     ELS.assignmentGrid.innerHTML = html;
 
-    // Now set values and init calendars
     advisors.forEach(adv => {
       const assignment = getAssignmentForAdvisor(adv.id);
       const row = ELS.assignmentGrid.querySelector(`tr[data-advisor-id="${adv.id}"]`);
@@ -240,12 +237,70 @@
           allowInput: true,
           "locale": { "firstDayOfWeek": 1 }, // Monday
           onChange: function(selectedDates, dateStr, instance) {
-            const advisorId = instance.element.dataset.advisorId;
-            handleAssignmentChange(advisorId, 'start_date', dateStr);
+            handleAssignmentChange(instance.element.dataset.advisorId, 'start_date', dateStr);
           }
         });
       }
     });
+  }
+  
+  function renderComponentManager() {
+     const components = STATE.scheduleComponents.sort((a,b) => a.name.localeCompare(b.name));
+
+    let html = '<table><thead><tr><th>Name</th><th>Type</th><th>Color</th><th>Default Duration</th><th>Paid</th><th>Actions</th></tr></thead><tbody>';
+
+    components.forEach(comp => {
+        html += `<tr data-component-id="${comp.id}">
+            <td>${comp.name}</td>
+            <td>${comp.type}</td>
+            <td><span style="display: inline-block; width: 20px; height: 20px; background-color: ${comp.color}; border-radius: 4px;"></span></td>
+            <td>${comp.default_duration_min}m</td>
+            <td>${comp.is_paid ? 'Yes' : 'No'}</td>
+            <td><button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button></td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    ELS.componentManagerGrid.innerHTML = html;
+  }
+
+  /**
+   * Renders the "Shift Definitions" grid (New V11).
+   */
+  function renderShiftDefinitions() {
+    const definitions = STATE.shiftDefinitions.sort((a,b) => a.name.localeCompare(b.name));
+
+    let html = '<table><thead><tr><th>Code</th><th>Name</th><th>Total Duration</th><th>Paid Duration</th><th>Actions</th></tr></thead><tbody>';
+
+    definitions.forEach(def => {
+        // Calculate durations based on the structure
+        let totalDuration = 0;
+        let paidDuration = 0;
+
+        if (def.structure && Array.isArray(def.structure)) {
+            def.structure.forEach(seg => {
+                const duration = seg.end_min - seg.start_min;
+                totalDuration += duration;
+                const component = getComponentById(seg.component_id);
+                if (component && component.is_paid) {
+                    paidDuration += duration;
+                }
+            });
+        }
+
+        html += `
+        <tr data-definition-id="${def.id}">
+            <td><strong>${def.code}</strong></td>
+            <td>${def.name}</td>
+            <td>${formatDuration(totalDuration)}</td>
+            <td>${formatDuration(paidDuration)}</td>
+            <td>
+                <button class="btn btn-sm btn-primary edit-structure" data-definition-id="${def.id}">Edit Structure</button>
+                <button class="btn btn-sm btn-danger delete-definition" data-definition-id="${def.id}">Delete</button>
+            </td>
+        </tr>`;
+    });
+    html += '</tbody></table>';
+    ELS.shiftDefinitionsGrid.innerHTML = html;
   }
 
   /**
@@ -262,7 +317,7 @@
   }
   
   /**
-   * Renders the 6-week grid. REFACTORED v10: Cells are clickable summaries.
+   * Renders the 6-week grid. REFACTORED V11: Uses dropdowns of Shift Definitions.
    */
   function renderRotationGrid() {
     const pattern = getPatternByName(STATE.currentRotation);
@@ -270,6 +325,12 @@
     const weeks = [1, 2, 3, 4, 5, 6];
     const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
     
+    // Build Shift Definition options
+    const definitionOpts = STATE.shiftDefinitions
+      .sort((a,b) => (a.code || '').localeCompare(b.code || ''))
+      .map(d => `<option value="${d.code}">${d.code} (${d.name})</option>`)
+      .join('');
+      
     let html = '<table><thead><tr><th>WEEK</th>';
     days.forEach(d => html += `<th>${d}</th>`);
     html += '</tr></thead><tbody>';
@@ -277,75 +338,41 @@
     weeks.forEach(w => {
       html += `<tr><td>Week ${w}</td>`;
       days.forEach((d, i) => {
-        const dow = i + 1;
-        const weekKey = `Week ${w}`;
-        const weekData = patternData[weekKey] || {};
-        const daySegments = weekData[dow] || []; 
+        const dow = i + 1; 
         
-        let cellContent = '';
-        let cellAttributes = `data-week="${w}" data-dow="${dow}"`;
-
-        if (!pattern) {
-            cellContent = `<div class="rotation-cell-content"></div>`;
-             cellAttributes = ''; // Disable interaction if no pattern selected
-        } else if (daySegments.length > 0) {
-            // Calculate summary (Start Time, End Time, Duration)
-            // We assume segments are sorted when saved
-            const startMin = daySegments[0].start_min;
-            const endMin = daySegments[daySegments.length - 1].end_min;
-            const durationMin = daySegments.reduce((acc, s) => acc + (s.end_min - s.start_min), 0);
-
-            const startTime = formatMinutesToTime(startMin);
-            const endTime = formatMinutesToTime(endMin);
-            const duration = formatDuration(durationMin);
-
-            cellContent = `
-                <div class="rotation-cell-content">
-                    <span class="cell-time">${startTime} - ${endTime}</span>
-                    <span class="cell-duration">(${duration})</span>
-                </div>`;
-        } else {
-            // Empty day
-            cellContent = `<div class="rotation-cell-content"><span class="cell-build">+ Build Day</span></div>`;
-        }
-        
-        // The TD is the clickable element
-        html += `<td ${cellAttributes}>${cellContent}</td>`;
+        // V11: The grid now contains dropdowns
+        html += `
+          <td>
+            <select class="form-select rotation-grid-select" data-week="${w}" data-dow="${dow}" ${!pattern ? 'disabled' : ''}>
+              <option value="">-- RDO --</option>
+              ${definitionOpts}
+            </select>
+          </td>`;
       });
       html += '</tr>';
     });
     html += '</tbody></table>';
     ELS.rotationGrid.innerHTML = html;
+    
+    // Now that HTML is in DOM, set the selected values
+    if (pattern) {
+      weeks.forEach(w => {
+        days.forEach((d, i) => {
+          const dow = i + 1;
+          const weekData = patternData[`Week ${w}`] || {};
+          // V11: The value stored is the shift definition CODE
+          const code = weekData[dow] || ''; 
+          const sel = ELS.rotationGrid.querySelector(`select[data-week="${w}"][data-dow="${dow}"]`);
+          if (sel) {
+            sel.value = code;
+          }
+        });
+      });
+    }
   }
 
   /**
-   * Renders the "Component Manager" tab (New v10).
-   */
-  function renderComponentManager() {
-    const components = STATE.scheduleComponents.sort((a,b) => a.name.localeCompare(b.name));
-
-    let html = '<table><thead><tr><th>Name</th><th>Type</th><th>Color</th><th>Default Duration</th><th>Paid</th><th>Actions</th></tr></thead><tbody>';
-
-    components.forEach(comp => {
-        html += `
-        <tr data-component-id="${comp.id}">
-            <td>${comp.name}</td>
-            <td>${comp.type}</td>
-            <td><span style="display: inline-block; width: 20px; height: 20px; background-color: ${comp.color}; border-radius: 4px;"></span></td>
-            <td>${comp.default_duration_min}m</td>
-            <td>${comp.is_paid ? 'Yes' : 'No'}</td>
-            <td>
-                <button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button>
-            </td>
-        </tr>`;
-    });
-    html += '</tbody></table>';
-    ELS.componentManagerGrid.innerHTML = html;
-  }
-
-
-  /**
-   * Renders the main horizontal planner ("Team Schedule").
+   * Renders the main horizontal planner ("Team Schedule"). UPGRADED V11 Visuals.
    */
   function renderPlanner() {
     if (!ELS.timeHeader || !ELS.plannerBody) return;
@@ -387,7 +414,8 @@
     const totalHours = (TIMELINE_END_MIN - TIMELINE_START_MIN) / 60;
     
     let html = '';
-    for (let h = startHour; h <= endHour; h++) {
+    // Render ticks every hour
+    for (let h = startHour; h < endHour; h++) {
       const pct = (h - startHour) / totalHours * 100;
       const label = h.toString().padStart(2, '0') + ':00';
       html += `<div class="time-tick" style="left: ${pct}%;">${label}</div>`;
@@ -396,16 +424,15 @@
   }
   
   /**
-   * Calculates and renders the HTML for all segments for a given advisor.
+   * Renders the HTML for segments. UPGRADED V11 Visuals to match screenshot.
    */
   function renderSegmentsForAdvisor(advisorId) {
     const segments = calculateSegmentsForAdvisor(advisorId);
     if (!segments || segments.length === 0) {
-      return '<div class="no-data">RDO or Unassigned</div>';
+      return ''; // RDO (empty track looks cleaner than text)
     }
     
     return segments.map(seg => {
-      // Find component details (color, name)
       const component = getComponentById(seg.component_id);
       if (!component) return '';
 
@@ -413,13 +440,22 @@
       const startPct = ((seg.start_min - TIMELINE_START_MIN) / TIMELINE_DURATION_MIN) * 100;
       const widthPct = ((seg.end_min - seg.start_min) / TIMELINE_DURATION_MIN) * 100;
       
-      const startTime = formatMinutesToTime(seg.start_min);
-      const endTime = formatMinutesToTime(seg.end_min);
-      const textColor = getContrastingTextColor(component.color);
+      // V11 Visual Upgrade: Determine bar styling based on type to match screenshot
+      let barClass = '';
+      // Use specific colors/styles if the component type matches the screenshot aesthetic
+      if (component.type === 'Break' || component.type === 'Lunch') {
+        // Breaks/Lunch appear as grey gaps
+        barClass = 'is-gap';
+      } else if (component.type === 'Activity') {
+        // Work activities use the specific olive green color
+        barClass = 'is-activity';
+      }
+      
+      // For other types (Absence, Shrinkage), use their defined color from the database
+      const style = (barClass === '') ? `background-color: ${component.color}; color: ${getContrastingTextColor(component.color)};` : '';
 
       return `
-        <div class="timeline-bar" style="left: ${startPct}%; width: ${widthPct}%; background-color: ${component.color}; color: ${textColor};" title="${component.name} (${startTime} - ${endTime})">
-          <span class="bar-label">${component.name}</span>
+        <div class="timeline-bar ${barClass}" style="left: ${startPct}%; width: ${widthPct}%; ${style}" title="${component.name} (${formatMinutesToTime(seg.start_min)} - ${formatMinutesToTime(seg.end_min)})">
         </div>
       `;
     }).join('');
@@ -428,12 +464,9 @@
   // --- 4. CORE LOGIC (Calculations) ---
 
   /**
-   * Calculates segments for an advisor. REFACTORED v10: Reads component-based structure.
+   * Calculates segments for an advisor. REFACTORED V11: Uses Shift Definitions.
    */
   function calculateSegmentsForAdvisor(advisorId) {
-    // Future Step: Check `rotas` table for live exceptions first.
-
-    // Fallback to the rotation pattern
     const assignment = getAssignmentForAdvisor(advisorId);
     if (!assignment || !assignment.rotation_name || !assignment.start_date || !STATE.weekStart) return [];
 
@@ -446,17 +479,21 @@
     const pattern = getPatternByName(assignment.rotation_name);
     if (!pattern || !pattern.pattern) return [];
     
-    // Get the segments array for the specific week and day
+    // 1. Get the Shift Definition CODE from the rotation pattern
     const weekPattern = pattern.pattern[`Week ${effectiveWeek}`] || {};
-    const daySegments = weekPattern[dayIndex];
-    
-    return daySegments || [];
+    const shiftCode = weekPattern[dayIndex];
+
+    if (!shiftCode) return []; // RDO
+
+    // 2. Find the Shift Definition associated with the code
+    const definition = getShiftDefinitionByCode(shiftCode);
+    if (!definition || !definition.structure) return [];
+
+    // 3. Return the segments defined in the structure
+    return definition.structure;
   }
   
-  /**
-   * Calculates the effective week number (1-N) of a rotation.
-   * CRITICAL FUNCTIONALITY restored from V9.4 and refined.
-   */
+  // getEffectiveWeek (Robust implementation handling d/m/Y format)
   function getEffectiveWeek(startDateStr, weekStartISO, assignment) {
     try {
       if (!startDateStr || !weekStartISO || !assignment) return null;
@@ -476,31 +513,23 @@
       const checkUTC = Date.UTC(y2, m2 - 1, d2);
       
       const diffTime = checkUTC - startUTC;
-      
-      // If the checked week is before the rotation start date, it's invalid for this rotation
       if (diffTime < 0) return null;
 
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-      const diffWeeks = Math.floor(diffDays / 7);
+      const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
       
-      // Determine rotation length (defaulting to 6 weeks)
       const pattern = getPatternByName(assignment.rotation_name);
       let numWeeksInRotation = 6; 
       if (pattern && pattern.pattern && Object.keys(pattern.pattern).length > 0) {
           const keys = Object.keys(pattern.pattern);
-          // Find the highest numbered week defined (e.g., "Week 6")
           const maxWeek = Math.max(...keys.map(k => parseInt(k.replace('Week ', ''), 10) || 0));
           if (maxWeek > 0) {
               numWeeksInRotation = maxWeek;
           }
       }
             
-      // Calculate the effective week number using modulo arithmetic (1-based index)
       const effectiveWeek = (diffWeeks % numWeeksInRotation) + 1;
-      
       return effectiveWeek;
     } catch (e) {
-      console.error("Error calculating effective week:", e);
       return null;
     }
   }
@@ -541,25 +570,26 @@
       renderRotationGrid();
     });
     ELS.btnNewRotation.addEventListener('click', handleNewRotation);
-    ELS.btnSaveRotation.addEventListener('click', handleSaveRotation);
     ELS.btnDeleteRotation.addEventListener('click', handleDeleteRotation);
-    
-    // NEW v10: Click handler for the rotation grid (opens the modal)
-    ELS.rotationGrid.addEventListener('click', handleRotationGridClick);
+    // V11: Event listener for the dropdowns inside the grid (handles auto-save)
+    ELS.rotationGrid.addEventListener('change', handleRotationGridChange);
+
+    // Shift Definitions (New V11)
+    ELS.btnNewShiftDefinition.addEventListener('click', handleNewShiftDefinition);
+    ELS.shiftDefinitionsGrid.addEventListener('click', handleShiftDefinitionsClick);
 
     // Assignment Grid
     ELS.assignmentGrid.addEventListener('change', (e) => {
         if (e.target.classList.contains('assign-rotation')) {
             handleAssignmentChange(e.target.dataset.advisorId, 'rotation_name', e.target.value);
         }
-        // Date changes are handled by flatpickr instances
     });
 
-    // Component Manager (New v10)
+    // Component Manager
     ELS.btnNewComponent.addEventListener('click', handleNewComponent);
     ELS.componentManagerGrid.addEventListener('click', handleComponentManagerClick);
 
-    // Schedules Tree (Simplified handler)
+    // Schedules Tree
     ELS.schedulesTree.addEventListener('change', (e) => {
         if (e.target.classList.contains('select-advisor')) {
             const id = e.target.dataset.advisorId;
@@ -571,66 +601,56 @@
     // Planner
     ELS.plannerDay.addEventListener('change', () => renderPlanner());
 
-    // Advanced Day Editor Modal (New v10)
+    // Editor Modal (Repurposed V11)
     ELS.modalClose.addEventListener('click', closeDayEditorModal);
-    ELS.modalSaveDay.addEventListener('click', handleSaveDay);
-    ELS.modalClearDay.addEventListener('click', handleClearDay);
+    ELS.modalSaveDay.addEventListener('click', handleSaveShiftStructure); // Renamed handler
+    ELS.modalClearDay.addEventListener('click', handleClearShiftStructure); // Renamed handler
     
     // Modal Drag and Drop Events
-    // Note: Drag start listeners are added dynamically in renderComponentBricks
     ELS.modalTrack.addEventListener('dragover', handleDragOver);
     ELS.modalTrack.addEventListener('dragleave', handleDragLeave);
     ELS.modalTrack.addEventListener('drop', handleDrop);
-    ELS.modalTrack.addEventListener('click', handleTrackClick); // For deleting segments
+    ELS.modalTrack.addEventListener('click', handleTrackClick); 
   }
-  
+
+  // --- 6. SHIFT DEFINITION EDITOR (Modal Logic - V11) ---
+
   /**
-   * Handles clicking on a cell in the rotation grid. Opens the Advanced Day Editor.
+   * Handles clicks on the Shift Definitions grid (Edit Structure, Delete).
    */
-  function handleRotationGridClick(e) {
-    const cell = e.target.closest('td[data-week]');
-    if (!cell) return;
-
-    const { week, dow } = cell.dataset;
-    const rotationName = STATE.currentRotation;
-
-    if (!rotationName) {
-        // If the user clicks a cell when "Select Rotation" is active, do nothing (handled by CSS pointer-events: none on the cell, but this is a fallback)
-        return;
+  function handleShiftDefinitionsClick(e) {
+    if (e.target.classList.contains('edit-structure')) {
+        const definitionId = e.target.dataset.definitionId;
+        openShiftEditorModal(definitionId);
+    } else if (e.target.classList.contains('delete-definition')) {
+        const definitionId = e.target.dataset.definitionId;
+        handleDeleteShiftDefinition(definitionId);
     }
-
-    openDayEditorModal(rotationName, parseInt(week), parseInt(dow));
   }
 
-  // --- 6. ADVANCED DAY EDITOR (Modal Logic - New v10) ---
-
   /**
-   * Opens the modal and initializes the editor state.
+   * Opens the modal to edit the structure of a Shift Definition.
    */
-  function openDayEditorModal(rotationName, week, dow) {
-    const pattern = getPatternByName(rotationName);
-    if (!pattern) return;
+  function openShiftEditorModal(shiftDefinitionId) {
+    const definition = getShiftDefinitionById(shiftDefinitionId);
+    if (!definition) return;
 
-    // 1. Load existing data for the day
-    const weekKey = `Week ${week}`;
-    const existingSegments = (pattern.pattern && pattern.pattern[weekKey] && pattern.pattern[weekKey][dow])
-        ? JSON.parse(JSON.stringify(pattern.pattern[weekKey][dow]))
+    // 1. Load existing structure
+    const existingSegments = (definition.structure && Array.isArray(definition.structure))
+        ? JSON.parse(JSON.stringify(definition.structure))
         : [];
 
     // 2. Set EDITOR_STATE
     EDITOR_STATE.isOpen = true;
-    EDITOR_STATE.rotationName = rotationName;
-    EDITOR_STATE.week = week;
-    EDITOR_STATE.dow = dow;
+    EDITOR_STATE.shiftDefinitionId = shiftDefinitionId;
     EDITOR_STATE.segments = existingSegments;
 
     // 3. Render the modal UI
-    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-    ELS.modalTitle.textContent = `Edit Day: ${rotationName} - Week ${week}, ${dayNames[dow-1]}`;
+    ELS.modalTitle.textContent = `Edit Structure: ${definition.name} (${definition.code})`;
     
     renderTimeHeader(ELS.modalTimeHeader);
     renderComponentBricks();
-    renderDaySegments();
+    renderDaySegments(); // This function renders based on EDITOR_STATE.segments
 
     // 4. Show the modal
     ELS.dayEditorModal.style.display = 'flex';
@@ -641,9 +661,7 @@
     ELS.dayEditorModal.style.display = 'none';
   }
 
-  /**
-   * Renders the draggable "bricks" in the modal sidebar, categorized by type.
-   */
+  // renderComponentBricks (Renders the draggable items in the modal sidebar)
   function renderComponentBricks() {
     const types = ['Activity', 'Break', 'Lunch', 'Shrinkage', 'Absence'];
     let html = '';
@@ -675,9 +693,7 @@
     });
   }
 
-  /**
-   * Renders the segments currently in EDITOR_STATE onto the modal track.
-   */
+  // renderDaySegments (Renders the segments onto the modal track)
   function renderDaySegments() {
     let html = '';
     let totalDuration = 0;
@@ -717,14 +733,13 @@
     ELS.modalPaidTime.textContent = formatDuration(paidDuration);
   }
 
-  // --- 7. DRAG AND DROP LOGIC (New v10) ---
-
+  // --- 7. DRAG AND DROP LOGIC (V11 - Used for Shift Definitions) ---
+  
   function handleDragStart(e) {
     const componentId = e.target.dataset.componentId;
     const component = getComponentById(componentId);
     if (!component) return;
 
-    // Store data about the dragged item
     EDITOR_STATE.dragData = {
         componentId: component.id,
         duration: component.default_duration_min,
@@ -736,7 +751,7 @@
   }
 
   function handleDragOver(e) {
-    e.preventDefault(); // Necessary to allow drop
+    e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     ELS.modalTrack.classList.add('drag-over');
   }
@@ -753,7 +768,7 @@
 
     const dragData = EDITOR_STATE.dragData;
     
-    // 1. Calculate drop position in minutes
+    // 1. Calculate drop position
     const trackRect = ELS.modalTrack.getBoundingClientRect();
     const dropX = e.clientX - trackRect.left;
     const trackWidth = trackRect.width;
@@ -761,25 +776,21 @@
     const dropPct = dropX / trackWidth;
     let startMin = TIMELINE_START_MIN + (dropPct * TIMELINE_DURATION_MIN);
     
-    // 2. Adjust positioning (attempt to center on cursor initially)
+    // 2. Adjust positioning and Snap
     startMin = startMin - (dragData.duration / 2);
-
-    // 3. Snap to grid
     startMin = Math.round(startMin / SNAP_INTERVAL) * SNAP_INTERVAL;
     
-    // 4. Constrain to timeline boundaries
+    // 3. Constrain to boundaries
     startMin = Math.max(TIMELINE_START_MIN, startMin); 
-
     let endMin = startMin + dragData.duration;
     if (endMin > TIMELINE_END_MIN) {
         endMin = TIMELINE_END_MIN;
         startMin = endMin - dragData.duration;
-        if (startMin < TIMELINE_START_MIN) startMin = TIMELINE_START_MIN; // Handle case where duration > total time
+         if (startMin < TIMELINE_START_MIN) startMin = TIMELINE_START_MIN;
     }
 
-    // 5. Check for overlaps (CRITICAL: Collision detection)
+    // 4. Collision detection
     const overlaps = EDITOR_STATE.segments.some(seg => {
-        // Overlap occurs if StartA < EndB AND EndA > StartB
         return startMin < seg.end_min && endMin > seg.start_min;
     });
 
@@ -788,28 +799,24 @@
         return;
     }
 
-    // 6. Create the new segment (We only store the ID and times)
+    // 5. Create the new segment
     const newSegment = {
         component_id: dragData.componentId,
         start_min: startMin,
         end_min: endMin
     };
 
-    // 7. Add to state and re-render
+    // 6. Add to state and re-render
     EDITOR_STATE.segments.push(newSegment);
     renderDaySegments();
 
     EDITOR_STATE.dragData = null;
   }
 
-  /**
-   * Handles clicks on the modal track (specifically for deleting segments).
-   */
   function handleTrackClick(e) {
     if (e.target.classList.contains('segment-delete')) {
         const index = parseInt(e.target.dataset.index, 10);
         if (!isNaN(index)) {
-            // Since renderDaySegments sorts the array, we must remove based on the sorted index
             EDITOR_STATE.segments.sort((a, b) => a.start_min - b.start_min);
             EDITOR_STATE.segments.splice(index, 1);
             renderDaySegments();
@@ -818,41 +825,51 @@
   }
 
   /**
-   * Saves the day from the modal back to the main STATE.
+   * Saves the structure from the modal back to the Shift Definition and persists to DB.
    */
-  function handleSaveDay() {
-    const { rotationName, week, dow, segments } = EDITOR_STATE;
-    const pattern = getPatternByName(rotationName);
+  async function handleSaveShiftStructure() {
+    const { shiftDefinitionId, segments } = EDITOR_STATE;
+    const definition = getShiftDefinitionById(shiftDefinitionId);
 
-    if (!pattern) return;
+    if (!definition) return;
 
-    if (!pattern.pattern) pattern.pattern = {};
-    const weekKey = `Week ${week}`;
-    if (!pattern.pattern[weekKey]) pattern.pattern[weekKey] = {};
+    // Ensure segments are sorted
+    segments.sort((a, b) => a.start_min - b.start_min);
+    
+    // Update local state
+    definition.structure = segments;
 
-    if (segments.length > 0) {
-        // Ensure segments are sorted and saved
-        segments.sort((a, b) => a.start_min - b.start_min);
-        pattern.pattern[weekKey][dow] = segments;
-    } else {
-        // If segments are empty, delete the day entry (RDO)
-        delete pattern.pattern[weekKey][dow];
+    // Persist to Supabase
+    try {
+        const { error } = await supabase
+            .from('shift_definitions')
+            .update({ structure: segments })
+            .eq('id', shiftDefinitionId);
+
+        if (error) throw error;
+
+        saveHistory("Update Shift Structure");
+        renderShiftDefinitions(); // Re-render the definitions table
+        renderRotationGrid(); // Re-render rotation grid (though options haven't changed)
+        renderPlanner(); // Re-render planner as the shift structure might have changed
+        closeDayEditorModal();
+        showToast("Shift structure saved successfully.", "success");
+
+    } catch (error) {
+        showToast(`Error saving structure: ${error.message}`, "danger");
     }
-
-    // Re-render the rotation grid to show the updated summary
-    renderRotationGrid();
-    closeDayEditorModal();
-    showToast("Day updated locally. Click 'Save Pattern' to commit to database.", "success", 5000);
   }
 
-  function handleClearDay() {
-    if (confirm("Are you sure you want to clear all activities for this day (RDO)?")) {
+  function handleClearShiftStructure() {
+    if (confirm("Are you sure you want to clear the entire structure for this shift definition?")) {
         EDITOR_STATE.segments = [];
         renderDaySegments();
     }
   }
 
-  // --- 8. CRUD HANDLERS (Rotations, Components & Assignments) ---
+  // --- 8. CRUD HANDLERS ---
+
+  // Rotation Handlers (V11: Auto-save implemented)
 
   async function handleNewRotation() {
     const name = prompt("Enter a name for the new rotation family:");
@@ -866,28 +883,53 @@
         STATE.currentRotation = name;
         saveHistory(`Create rotation`);
         renderRotationEditor();
+        showToast(`Rotation '${name}' created.`, "success");
     } catch (error) {
         showToast(`Error creating rotation: ${error.message}`, "danger");
     }
   }
 
-  async function handleSaveRotation() {
-    const rotationName = STATE.currentRotation;
-    if (!rotationName) return;
-    const pattern = getPatternByName(rotationName);
+  /**
+   * Handles changes to the rotation grid dropdowns AND saves immediately (V11).
+   */
+  async function handleRotationGridChange(e) {
+    if (!e.target.classList.contains('rotation-grid-select')) return;
     
-    try {
-      // The pattern object in STATE already contains the updated JSONB data
-      const { error } = await supabase.from('rotation_patterns').update({ pattern: pattern.pattern }).eq('name', rotationName);
-      if (error) throw error;
-      
-      showToast(`Rotation '${rotationName}' saved successfully.`, "success");
-      saveHistory(`Save rotation`);
-      renderPlanner(); // Re-render planner in case this rotation is active
-      
-    } catch (error) {
-      showToast(`Error saving rotation: ${error.message}`, "danger");
+    const { week, dow } = e.target.dataset;
+    const shiftCode = e.target.value; // The selected Shift Definition Code
+    const rotationName = STATE.currentRotation;
+    
+    const pattern = getPatternByName(rotationName);
+    if (!pattern) return;
+    
+    // 1. Update the local state object
+    if (!pattern.pattern) pattern.pattern = {};
+    const weekKey = `Week ${week}`;
+    if (!pattern.pattern[weekKey]) pattern.pattern[weekKey] = {};
+    
+    if (shiftCode) {
+      pattern.pattern[weekKey][dow] = shiftCode;
+    } else {
+      delete pattern.pattern[weekKey][dow]; // RDO
     }
+
+    // 2. V11: Auto-save the entire pattern object immediately
+    try {
+        const { error } = await supabase
+          .from('rotation_patterns')
+          .update({ pattern: pattern.pattern })
+          .eq('name', rotationName);
+          
+        if (error) throw error;
+        
+        // showToast(`Rotation updated.`, "success");
+        saveHistory(`Update rotation cell`);
+        renderPlanner(); // Re-render planner to reflect the change
+        
+      } catch (error) {
+        showToast(`Error saving rotation change: ${error.message}`, "danger");
+        // Optionally revert the change in STATE if save fails
+      }
   }
 
   async function handleDeleteRotation() {
@@ -904,11 +946,73 @@
         STATE.currentRotation = null;
         saveHistory(`Delete rotation`);
         renderRotationEditor();
+        showToast(`Rotation deleted.`, "success");
     } catch (error) {
         showToast(`Error deleting rotation: ${error.message}. It might be assigned to advisors.`, "danger");
     }
   }
 
+  // Shift Definition Handlers (New V11)
+
+  async function handleNewShiftDefinition() {
+    const name = prompt("Enter the full name for the new shift (e.g., 'Early 7am-4pm Flex'):");
+    if (!name) return;
+    const code = prompt("Enter a unique shortcode (e.g., 'E74F'):");
+    if (!code) return;
+
+    if (getShiftDefinitionByCode(code) || STATE.shiftDefinitions.find(d => d.name === name)) {
+        showToast("Error: Name or Code already exists.", "danger");
+        return;
+    }
+
+    const newDefinition = { name, code, structure: [] };
+
+    try {
+        const { data, error } = await supabase
+            .from('shift_definitions')
+            .insert(newDefinition)
+            .select();
+        
+        if (error) throw error;
+        
+        STATE.shiftDefinitions.push(data[0]);
+        saveHistory("Create Shift Definition");
+        renderShiftDefinitions();
+        renderRotationGrid(); // Update the dropdown options in the rotation editor
+        showToast(`Shift '${name}' created. Now click 'Edit Structure'.`, "success");
+
+    } catch (error) {
+        showToast(`Error creating shift definition: ${error.message}`, "danger");
+    }
+  }
+
+  async function handleDeleteShiftDefinition(definitionId) {
+    const definition = getShiftDefinitionById(definitionId);
+    if (!definition) return;
+
+    if (!confirm(`Are you sure you want to delete '${definition.name}' (${definition.code})? This may affect existing rotations.`)) return;
+
+    try {
+        const { error } = await supabase
+            .from('shift_definitions')
+            .delete()
+            .eq('id', definitionId);
+        
+        if (error) throw error;
+
+        STATE.shiftDefinitions = STATE.shiftDefinitions.filter(d => d.id !== definitionId);
+        saveHistory("Delete Shift Definition");
+        renderShiftDefinitions();
+        renderRotationGrid(); // Update the dropdown options
+        showToast(`Shift deleted.`, "success");
+
+    } catch (error) {
+        showToast(`Error deleting shift definition: ${error.message}`, "danger");
+    }
+  }
+
+
+  // Assignment Handlers
   async function handleAssignmentChange(advisorId, field, value) {
     let assignment = getAssignmentForAdvisor(advisorId);
     
@@ -927,7 +1031,6 @@
         
       if (error) throw error;
       
-      // Update state with the definitive data returned from DB
       const index = STATE.rotationAssignments.findIndex(a => a.advisor_id === advisorId);
       if (index > -1) {
         STATE.rotationAssignments[index] = data[0];
@@ -941,34 +1044,26 @@
     }
   }
 
-  // Component Management Handlers (Using basic prompts as requested)
+  // Component Handlers
   async function handleNewComponent() {
-    const name = prompt("Enter component name (e.g., 'PLT WhatsApp'):");
+    // (Uses prompts as requested)
+    const name = prompt("Enter component name:");
     if (!name) return;
     const type = prompt("Enter type (Activity, Break, Lunch, Shrinkage, Absence):", "Activity");
-    const color = prompt("Enter hex color code (e.g., '#3498db'):", "#3498db");
+    const color = prompt("Enter hex color code:", "#3498db");
     const duration = parseInt(prompt("Enter default duration in minutes:", "60"), 10);
     const isPaid = confirm("Is this a paid activity?");
 
-    if (!name || !type || !color || isNaN(duration)) {
-        showToast("Invalid input for new component.", "danger");
-        return;
-    }
+    if (!name || !type || !color || isNaN(duration)) return;
 
     const newComponent = { name, type, color, default_duration_min: duration, is_paid: isPaid };
 
     try {
-        const { data, error } = await supabase
-            .from('schedule_components')
-            .insert(newComponent)
-            .select();
-        
+        const { data, error } = await supabase.from('schedule_components').insert(newComponent).select();
         if (error) throw error;
-        
         STATE.scheduleComponents.push(data[0]);
         renderComponentManager();
-        showToast(`Component '${name}' created.`, "success");
-
+        showToast(`Component created.`, "success");
     } catch (error) {
         showToast(`Error creating component: ${error.message}`, "danger");
     }
@@ -976,29 +1071,21 @@
 
   function handleComponentManagerClick(e) {
     if (e.target.classList.contains('delete-component')) {
-        const componentId = e.target.dataset.componentId;
-        handleDeleteComponent(componentId);
+        handleDeleteComponent(e.target.dataset.componentId);
     }
   }
 
   async function handleDeleteComponent(componentId) {
     const component = getComponentById(componentId);
     if (!component) return;
-
-    if (!confirm(`Are you sure you want to delete '${component.name}'? This may affect existing rotations.`)) return;
+    if (!confirm(`Are you sure you want to delete '${component.name}'?`)) return;
 
     try {
-        const { error } = await supabase
-            .from('schedule_components')
-            .delete()
-            .eq('id', componentId);
-        
+        const { error } = await supabase.from('schedule_components').delete().eq('id', componentId);
         if (error) throw error;
-
         STATE.scheduleComponents = STATE.scheduleComponents.filter(c => c.id !== componentId);
         renderComponentManager();
         showToast(`Component deleted.`, "success");
-
     } catch (error) {
         showToast(`Error deleting component: ${error.message}`, "danger");
     }
@@ -1027,18 +1114,16 @@
     return `${h}h ${String(m).padStart(2, '0')}m`;
   }
 
-  // Determines if white or black text should be used on a given background color.
   function getContrastingTextColor(hexColor) {
     if (!hexColor) return '#000000';
     try {
         const r = parseInt(hexColor.substr(1, 2), 16);
         const g = parseInt(hexColor.substr(3, 2), 16);
         const b = parseInt(hexColor.substr(5, 2), 16);
-        // Calculate perceived brightness (YIQ)
         const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
         return (brightness > 128) ? '#000000' : '#FFFFFF';
     } catch (e) {
-        return '#FFFFFF'; // Fallback
+        return '#FFFFFF';
     }
   }
 
@@ -1053,7 +1138,6 @@
   // --- 10. APPLICATION BOOT ---
   
   function setDefaultWeek() {
-    // Logic to set the current Monday
     let d = new Date();
     let day = d.getDay();
     let diff = d.getDate() - day + (day === 0 ? -6 : 1);
@@ -1065,7 +1149,7 @@
   }
 
   async function bootApplication() {
-    console.log("Booting application (v10.5)...");
+    console.log("Booting application (v11.0)...");
     cacheDOMElements();
     setDefaultWeek();
     await loadCoreData();
