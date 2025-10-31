@@ -1,20 +1,25 @@
 /**
- * WFM Enterprise Rota System - Initialization Script (v12.0)
+ * WFM Intelligence Platform - Initialization Script (v13.1)
+ * 
+ * Bootloader (Entry Point).
  */
 (function () {
   "use strict";
 
   function onDOMLoaded() {
-    console.log("DOM Loaded. Initializing app (v12.0)...");
+    console.log("DOM Loaded. Initializing application...");
 
-    if (window.APP && typeof window.APP.bootApplication === "function") {
-      window.APP.bootApplication();
+    // Ensure the Core module (defined in planner.js) is ready before initializing
+    // We access APP.Core via the global window object.
+    if (window.APP && window.APP.Core && typeof window.APP.Core.initialize === "function") {
+      window.APP.Core.initialize();
     } else {
-      console.error("Fatal Error: Application failed to load.");
+      console.error("Fatal Error: planner.js did not load or APP.Core.initialize is not defined.");
       document.body.innerHTML = "<h1>Fatal Error: Application failed to load.</h1>";
     }
   }
 
+  // Ensure the DOM is fully loaded before initialization
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", onDOMLoaded);
   } else {

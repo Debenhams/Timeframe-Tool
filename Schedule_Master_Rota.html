@@ -3,41 +3,46 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WFM Enterprise Rota System (v12.0)</title>
+  <title>WFM Intelligence Platform (v13.1)</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  
-  <link rel="stylesheet" href="./styles/planner.css?v=12.0" />
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <link rel="stylesheet" href="./styles/planner.css?v=13.1" />
 </head>
 <body>
 
   <aside class="app-sidebar">
     <div class="sidebar-header">
-        WFM Enterprise
+        WFM Intelligence
     </div>
-    <nav class="tab-nav">
-        <button class="tab-link active" data-tab="tab-schedule-view">
+    <nav class="tab-nav" id="main-navigation">
+        <button class="tab-link active" data-tab="tab-schedule-view" title="Schedule View">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-            Schedule View
+            <span>Schedule View</span>
         </button>
-        <button class="tab-link" data-tab="tab-rotation-editor">
+        
+        <div class="nav-separator">PLANNING</div>
+
+        <button class="tab-link" data-tab="tab-rotation-editor" title="Rotation Editor">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-            Rotation Editor
+            <span>Rotation Editor</span>
         </button>
-        <button class="tab-link" data-tab="tab-shift-definitions">
+        <button class="tab-link" data-tab="tab-shift-definitions" title="Shift Definitions">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-            Shift Definitions
+            <span>Shift Definitions</span>
         </button>
-        <button class="tab-link" data-tab="tab-advisor-assignments">
+        <button class="tab-link" data-tab="tab-advisor-assignments" title="Assignments">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-            Assignments
+            <span>Assignments</span>
         </button>
-        <button class="tab-link" data-tab="tab-component-manager">
+
+         <div class="nav-separator">ADMINISTRATION</div>
+
+        <button class="tab-link" data-tab="tab-component-manager" title="Components">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            Components
+            <span>Components</span>
         </button>
     </nav>
   </aside>
@@ -65,9 +70,12 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17v-6h6"></path><path d="M21 7a9 9 0 0 1-9 9 9 9 0 0 1-6-2.3l3-2.7"></path></svg>
             </button>
         </div>
+        <div class="ai-assistant-placeholder">
+            <input type="text" class="form-input" placeholder="Ask AI Assistant (Future Feature)" disabled>
+        </div>
     </header>
 
-    <main class="content-area">
+    <main class="content-area" id="main-content-area">
 
       <section id="tab-schedule-view" class="tab-content active planner-section">
         <div class="planner-layout">
@@ -95,7 +103,7 @@
                     </div>
                 </div>
                 
-                <div class="timeline-container">
+                <div class="timeline-container" id="timelineContainer">
                     <div class="timeline-header">
                         <div class="header-name">Name</div>
                         <div class="header-timeline" id="timeHeader">
@@ -103,6 +111,7 @@
                     </div>
                     <div class="timeline-body" id="plannerBody">
                     </div>
+                    <div id="currentTimeIndicator" class="current-time-indicator"></div>
                 </div>
             </div>
         </div>
@@ -145,7 +154,7 @@
       <section id="tab-advisor-assignments" class="tab-content">
         <div class="card">
             <h2>Advisor Assignments</h2>
-            <p class="helper-text">Assign advisors to a rotation family and set the date when their "Week 1" begins (must be a Monday).</p>
+            <p class="helper-text">Assign advisors to a rotation family and set the date when their "Week 1" begins.</p>
             <div class="table-container" id="assignmentGrid">
             </div>
         </div>
@@ -217,26 +226,10 @@
 
   <div id="notification-container"></div>
 
-  <script>
-    // These are provided by the environment
-    const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
-    
-    // Create a single, global Supabase client
-    const supabase = (window.supabase && window.supabase.createClient)
-      ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-      : null;
-    
-    if (!supabase) {
-      console.error("Supabase client failed to initialize.");
-      document.body.innerHTML = "<h1>Error: Supabase client failed to initialize.</h1>";
-    }
-  </script>
-  
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-
-  <script src="./src/planner.js?v=12.0"></script>
-  <script src="./src/init.js?v=12.0"></script>
+  
+  <script src="./src/planner.js?v=13.1"></script>
+  <script src="./src/init.js?v=13.1"></script>
 
 </body>
 </html>
