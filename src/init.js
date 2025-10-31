@@ -1,11 +1,11 @@
 /**
- * Professional Team Rota System - Initialization Script (v11.0)
+ * WFM Enterprise Rota System - Initialization Script (v12.0)
  */
 (function () {
   "use strict";
 
   function onDOMLoaded() {
-    console.log("DOM Loaded. Initializing app (v11.0)...");
+    console.log("DOM Loaded. Initializing app (v12.0)...");
 
     if (window.APP && typeof window.APP.bootApplication === "function") {
       window.APP.bootApplication();
