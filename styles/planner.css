@@ -1,4 +1,4 @@
-/* === V14.2 HIERARCHICAL VIEW & ADVANCED GANTT === */
+/* === V14.3 HIERARCHICAL VIEW & STABILITY === */
 :root {
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   
@@ -92,8 +92,17 @@ tbody tr:hover { background-color: #F9FAFB; }
 
 /* === EDITOR COMMON === */
 .editor-controls { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
-.editor-buttons { display: flex; gap: 12px; }
+.editor-buttons { display: flex; gap: 12px; align-items: center; }
 .helper-text { font-size: 14px; color: var(--color-text-muted); margin-bottom: 24px; }
+
+/* V14.3: Auto Save Status */
+.auto-save-status {
+    font-size: 13px;
+    color: var(--brand-accent);
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
 
 /* === ROTATION EDITOR === */
 #rotationGrid th, #rotationGrid td { text-align: center; vertical-align: middle; min-width: 160px; }
@@ -111,7 +120,7 @@ thead th:first-child { background-color: var(--timeline-header-bg); }
 .planner-layout { display: grid; grid-template-columns: 320px 1fr; gap: 24px; height: 100%; }
 .planner-controls { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
 
-/* V14.2: Hierarchical Tree View */
+/* V14.3: Hierarchical Tree View */
 .schedules-tree { flex-grow: 1; margin-top: 16px; }
 .schedules-tree label { cursor: pointer; display: block; padding: 8px 12px; border-radius: 6px; }
 .schedules-tree label:hover { background-color: var(--color-hover-bg); }
@@ -164,6 +173,12 @@ thead th:first-child { background-color: var(--timeline-header-bg); }
   flex-grow: 1;
   overflow: auto; 
   position: relative; /* Required for Indicators and Trackers */
+}
+
+.visualization-empty {
+    padding: 40px;
+    text-align: center;
+    color: var(--color-text-muted);
 }
 
 /* === DAILY TIMELINE (GANTT) VIEW === */

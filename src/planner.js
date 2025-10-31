@@ -1,7 +1,7 @@
 /**
- * WFM Intelligence Platform - Application Logic (v14.2)
+ * WFM Intelligence Platform - Application Logic (v14.3)
  * 
- * Includes Hierarchical Team View, Weekly View, Precision Time Cursor, and Extended Timeline.
+ * Includes Hierarchical Team View, Stability Fixes, Weekly View, Precision Time Cursor.
  * Consolidated file (includes all modules).
  */
 
@@ -60,6 +60,7 @@ window.APP = window.APP || {};
         const h = Math.floor(roundedMinutes / 60);
         const m = roundedMinutes % 60;
         
+        // Handle edge case where rounding might result in 60 (though unlikely with Math.round)
         if (m === 60) {
              return `${String(h + 1).padStart(2, '0')}:00`;
         }
@@ -99,10 +100,13 @@ window.APP = window.APP || {};
             const [y2, m2, d2] = weekStartISO.split('-').map(Number);
             if (isNaN(y2) || isNaN(m2) || isNaN(d2)) return null;
 
+            // Use UTC to avoid timezone shifts
             const startUTC = Date.UTC(y, m - 1, d);
             const checkUTC = Date.UTC(y2, m2 - 1, d2);
             
             const diffTime = checkUTC - startUTC;
+            
+            // If the checked week is before the rotation's "Week 1 Day 1", it's invalid for this rotation
             if (diffTime < 0) return null;
 
             const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
@@ -118,6 +122,7 @@ window.APP = window.APP || {};
                 }
             }
                 
+            // Calculate the effective week number using modulo arithmetic (1-based index)
             const effectiveWeek = (diffWeeks % numWeeksInRotation) + 1;
             return effectiveWeek;
         } catch (e) {
@@ -132,7 +137,7 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.DataService
- * V14.2 Update: Added fetching for 'leaders'.
+ * V14.3 Update: Added fetching for 'leaders'.
  */
 (function(APP) {
     const DataService = {};
@@ -184,13 +189,13 @@ window.APP = window.APP || {};
         return { data: null, error: null };
     };
 
-    // V14.2: Updated to fetch leaders
+    // V14.3: Updated to fetch leaders
     DataService.loadCoreData = async () => {
         try {
             // Parallel fetching
             const [advisors, leaders, components, definitions, patterns, assignments] = await Promise.all([
                 fetchTable('advisors'),
-                fetchTable('leaders'), // Added V14.2
+                fetchTable('leaders'),
                 fetchTable('schedule_components'),
                 fetchTable('shift_definitions'),
                 fetchTable('rotation_patterns'),
@@ -222,14 +227,14 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.StateManager
- * V14.2 Update: Added 'leaders' to state.
+ * V14.3 Update: Added 'leaders' to state.
  */
 (function(APP) {
     const StateManager = {};
 
     const STATE = {
         advisors: [],
-        leaders: [], // Added V14.2
+        leaders: [], // Added V14.3
         scheduleComponents: [], 
         shiftDefinitions: [], 
         rotationPatterns: [], 
@@ -258,7 +263,7 @@ window.APP = window.APP || {};
     StateManager.getComponentById = (id) => STATE.scheduleComponents.find(c => c.id === id) || null;
     StateManager.getShiftDefinitionById = (id) => STATE.shiftDefinitions.find(d => d.id === id) || null;
     StateManager.getShiftDefinitionByCode = (code) => STATE.shiftDefinitions.find(d => d.code === code) || null;
-    // V14.2: New selector for hierarchical view
+    // V14.3: New selector for hierarchical view
     StateManager.getAdvisorsByLeader = (leaderId) => STATE.advisors.filter(a => a.leader_id === leaderId);
 
     // History Management
@@ -833,6 +838,7 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.Components.RotationEditor
+ * V14.3 Update: Added Auto-Save feedback indicator.
  */
 (function(APP) {
     const RotationEditor = {};
@@ -843,6 +849,7 @@ window.APP = window.APP || {};
         ELS.btnNew = document.getElementById('btnNewRotation');
         ELS.btnDelete = document.getElementById('btnDeleteRotation');
         ELS.grid = document.getElementById('rotationGrid');
+        ELS.autoSaveStatus = document.getElementById('autoSaveStatus'); // V14.3
 
         if (ELS.familySelect) ELS.familySelect.addEventListener('change', handleFamilyChange);
         if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNewRotation);
@@ -955,10 +962,16 @@ window.APP = window.APP || {};
         }
     };
 
-    // Auto-save functionality when a dropdown changes
+    // Auto-save functionality with feedback
     const handleGridChange = async (e) => {
         if (!e.target.classList.contains('rotation-grid-select')) return;
         
+        // V14.3: Show Saving indicator
+        if (ELS.autoSaveStatus) {
+            ELS.autoSaveStatus.textContent = "Saving...";
+            ELS.autoSaveStatus.style.opacity = 1;
+        }
+
         const { week, dow } = e.target.dataset;
         const shiftCode = e.target.value;
         const STATE = APP.StateManager.getState();
@@ -967,7 +980,7 @@ window.APP = window.APP || {};
         const pattern = APP.StateManager.getPatternByName(rotationName);
         if (!pattern) return;
         
-        // 1. Update the local state object (required for history snapshot)
+        // 1. Update the local state object
         if (!pattern.pattern) pattern.pattern = {};
         const weekKey = `Week ${week}`;
         if (!pattern.pattern[weekKey]) pattern.pattern[weekKey] = {};
@@ -983,10 +996,19 @@ window.APP = window.APP || {};
             
         if (!error) {
             APP.StateManager.saveHistory(`Update rotation cell`);
-            // Re-render visualization as the schedule has changed
+            // V14.3: Show Saved indicator and fade out
+            if (ELS.autoSaveStatus) {
+                ELS.autoSaveStatus.textContent = "✓ Saved";
+                setTimeout(() => {
+                    ELS.autoSaveStatus.style.opacity = 0;
+                }, 2000);
+            }
+            // Re-render visualization
             APP.Components.ScheduleViewer.render();
         } else {
-            // If save fails, the DataService already showed a toast.
+             if (ELS.autoSaveStatus) {
+                ELS.autoSaveStatus.textContent = "Error Saving";
+            }
             APP.Utils.showToast("Failed to auto-save rotation change.", "danger");
         }
     };
@@ -998,7 +1020,7 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.Components.ScheduleViewer
- * V14.2 Update: Implements Hierarchical Tree View.
+ * V14.3 Update: Implements Hierarchical Tree View, ensures blank canvas renders.
  */
 (function(APP) {
     const ScheduleViewer = {};
@@ -1056,7 +1078,7 @@ window.APP = window.APP || {};
         }
     };
 
-    // V14.2: Updated to render hierarchical view (Leaders -> Advisors)
+    // V14.3: Updated to render hierarchical view (Leaders -> Advisors)
     const renderTree = () => {
         if (!ELS.tree) return;
         const STATE = APP.StateManager.getState();
@@ -1099,13 +1121,13 @@ window.APP = window.APP || {};
             }
         });
         
-        // Handle advisors without leaders (if required, can be added here)
+        // Handle advisors without leaders (Optional: Add a "Unassigned" group if needed)
 
-        ELS.tree.innerHTML = html || '<div>No teams or advisors found.</div>';
+        ELS.tree.innerHTML = html || '<div class="visualization-empty">No teams or advisors found.</div>';
 
         // Auto-select logic (simplified for hierarchy)
         if (STATE.selectedAdvisors.size === 0 && STATE.advisors.length > 0 && !STATE.treeInitialized) {
-            // Auto-select the first advisor found in the hierarchy
+            // Auto-select the first advisor found in the hierarchy, if any
             const firstAdvisor = advisors.find(a => a.leader_id);
              if (firstAdvisor) {
                 STATE.selectedAdvisors.add(firstAdvisor.id);
@@ -1116,7 +1138,7 @@ window.APP = window.APP || {};
         }
     };
 
-    // V14.2: Updated to handle hierarchical selection logic
+    // V14.3: Updated to handle hierarchical selection logic
     const handleTreeChange = (e) => {
         const target = e.target;
         const STATE = APP.StateManager.getState();
@@ -1133,7 +1155,7 @@ window.APP = window.APP || {};
                     STATE.selectedAdvisors.delete(adv.id);
                 }
             });
-            // Re-render tree to update checkbox states visually
+            // Re-render tree to update checkbox states visually (necessary for synchronization)
             renderTree();
 
         } else if (target.classList.contains('select-advisor')) {
@@ -1164,21 +1186,304 @@ window.APP = window.APP || {};
     };
 
     // --- DAILY VIEW (GANTT) ---
-    // (Implementation identical to V14.1)
-    // [Implementation Omitted for Brevity, but is present in the final file]
+
+    const renderDailyPlanner = () => {
+        ELS.scheduleViewTitle.textContent = "Schedule Visualization (Daily 06:00 - 23:00)";
+
+        // Setup the structure for the Daily Timeline
+        ELS.visualizationContainer.innerHTML = `
+            <div class="timeline-container" id="timelineContainer">
+                <div class="timeline-header">
+                    <div class="header-name">Name</div>
+                    <div class="header-timeline" id="timeHeader"></div>
+                </div>
+                <div class="timeline-body" id="plannerBody"></div>
+                <div id="currentTimeIndicator" class="current-time-indicator"></div>
+                <div id="mouseTimeIndicator" class="mouse-time-indicator"></div>
+                <div id="mouseTimeTooltip" class="mouse-time-tooltip">00:00</div>
+            </div>
+        `;
+        
+        // Cache elements specific to the daily view
+        const ELS_DAILY = {
+            timeHeader: document.getElementById('timeHeader'),
+            plannerBody: document.getElementById('plannerBody'),
+            timelineContainer: document.getElementById('timelineContainer'),
+            currentTimeIndicator: document.getElementById('currentTimeIndicator'),
+            mouseTimeIndicator: document.getElementById('mouseTimeIndicator'),
+            mouseTimeTooltip: document.getElementById('mouseTimeTooltip')
+        };
+
+        renderTimeHeader(ELS_DAILY.timeHeader);
+        
+        const STATE = APP.StateManager.getState();
+        const selected = Array.from(STATE.selectedAdvisors);
+        
+        if (selected.length > 0) {
+            const advisorsToRender = STATE.advisors
+                .filter(a => selected.includes(a.id))
+                .sort((a,b) => a.name.localeCompare(b.name));
+                
+            let html = '';
+            advisorsToRender.forEach(adv => {
+                // Calculate segments for the currently selected day
+                const segments = calculateSegments(adv.id, STATE.selectedDay);
+                html += `
+                <div class="timeline-row">
+                    <div class="timeline-name">${adv.name}</div>
+                    <div class="timeline-track">
+                        ${renderSegments(segments)}
+                    </div>
+                </div>
+                `;
+            });
+            ELS_DAILY.plannerBody.innerHTML = html;
+        } else {
+             // V14.3: Ensure blank canvas shows when no advisors selected
+             ELS_DAILY.plannerBody.innerHTML = '<div class="visualization-empty">Select advisors to view schedules.</div>';
+        }
+
+        // Initialize Intraday Indicators
+        setupIntradayIndicators(ELS_DAILY);
+    };
+
+    const renderTimeHeader = (headerElement) => {
+        const startHour = Math.floor(Config.TIMELINE_START_MIN / 60);
+        const endHour = Math.floor(Config.TIMELINE_END_MIN / 60);
+        const totalHours = Config.TIMELINE_DURATION_MIN / 60;
+        
+        let html = '';
+        for (let h = startHour; h < endHour; h++) {
+            const pct = (h - startHour) / totalHours * 100;
+            const label = h.toString().padStart(2, '0') + ':00';
+            html += `<div class="time-tick" style="left: ${pct}%;">${label}</div>`;
+        }
+        headerElement.innerHTML = html;
+    };
+
+    const renderSegments = (segments) => {
+        if (!segments || segments.length === 0) {
+            return ''; // RDO
+        }
+        
+        return segments.map(seg => {
+            const component = APP.StateManager.getComponentById(seg.component_id);
+            if (!component) return '';
+
+            const startPct = ((seg.start_min - Config.TIMELINE_START_MIN) / Config.TIMELINE_DURATION_MIN) * 100;
+            const widthPct = ((seg.end_min - seg.start_min) / Config.TIMELINE_DURATION_MIN) * 100;
+            
+            // Determine visualization style
+            let barClass = '';
+            if (component.type === 'Break' || component.type === 'Lunch') {
+                barClass = 'is-gap';
+            } else if (component.type === 'Activity') {
+                barClass = 'is-activity';
+            }
+            
+            const style = (barClass === '') ? `background-color: ${component.color}; color: ${APP.Utils.getContrastingTextColor(component.color)};` : '';
+
+            return `
+            <div class="timeline-bar ${barClass}" style="left: ${startPct}%; width: ${widthPct}%; ${style}" title="${component.name} (${APP.Utils.formatMinutesToTime(seg.start_min)} - ${APP.Utils.formatMinutesToTime(seg.end_min)})">
+            </div>
+            `;
+        }).join('');
+    };
 
     // --- WEEKLY VIEW ---
-    // (Implementation identical to V14.1)
-    // [Implementation Omitted for Brevity, but is present in the final file]
+
+    const renderWeeklyPlanner = () => {
+        ELS.scheduleViewTitle.textContent = "Schedule Visualization (Weekly Overview)";
+
+        // Setup the structure for the Weekly View (Table based)
+        ELS.visualizationContainer.innerHTML = `
+            <div class="table-container">
+                <table class="weekly-grid" id="weeklyGrid">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>MON</th>
+                            <th>TUE</th>
+                            <th>WED</th>
+                            <th>THU</th>
+                            <th>FRI</th>
+                            <th>SAT</th>
+                            <th>SUN</th>
+                        </tr>
+                    </thead>
+                    <tbody id="weeklyBody">
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        const ELS_WEEKLY = {
+            weeklyBody: document.getElementById('weeklyBody')
+        };
+
+        const STATE = APP.StateManager.getState();
+        const selected = Array.from(STATE.selectedAdvisors);
+        const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        
+        if (selected.length > 0) {
+            const advisorsToRender = STATE.advisors
+                .filter(a => selected.includes(a.id))
+                .sort((a,b) => a.name.localeCompare(b.name));
+
+            let html = '';
+            advisorsToRender.forEach(adv => {
+                html += `<tr><td>${adv.name}</td>`;
+                
+                daysOfWeek.forEach(day => {
+                    // Calculate segments for each specific day
+                    const segments = calculateSegments(adv.id, day);
+                    html += `<td>${renderWeeklyCell(segments)}</td>`;
+                });
+                
+                html += `</tr>`;
+            });
+            ELS_WEEKLY.weeklyBody.innerHTML = html;
+        } else {
+             // V14.3: Ensure blank canvas shows when no advisors selected
+             ELS_WEEKLY.weeklyBody.innerHTML = `<tr><td colspan="8" class="visualization-empty">Select advisors to view schedules.</td></tr>`;
+        }
+    };
+
+    const renderWeeklyCell = (segments) => {
+        if (!segments || segments.length === 0) {
+            return `<div class="weekly-cell-content"><span class="weekly-rdo">RDO</span></div>`;
+        }
+        
+        // To get the shift code, we find which definition matches these segments.
+        const STATE = APP.StateManager.getState();
+        const definition = STATE.shiftDefinitions.find(def => {
+            // A simple comparison of the structure JSON works because sorting is enforced
+            return JSON.stringify(def.structure) === JSON.stringify(segments);
+        });
+
+        const startMin = segments[0].start_min;
+        const endMin = segments[segments.length - 1].end_min;
+        const timeString = `${APP.Utils.formatMinutesToTime(startMin)} - ${APP.Utils.formatMinutesToTime(endMin)}`;
+
+        return `
+            <div class="weekly-cell-content">
+                <span class="weekly-shift-code">${definition ? definition.code : 'N/A'}</span>
+                <span class="weekly-shift-time">${timeString}</span>
+            </div>
+        `;
+    };
 
 
     // --- CORE CALCULATION (Shared by Daily/Weekly) ---
-    // (Implementation identical to V14.1)
-    // [Implementation Omitted for Brevity, but is present in the final file]
+
+    // Generalized calculation function that accepts a specific day name
+    const calculateSegments = (advisorId, dayName) => {
+        const STATE = APP.StateManager.getState();
+        const assignment = APP.StateManager.getAssignmentForAdvisor(advisorId);
+        
+        if (!assignment || !assignment.rotation_name || !assignment.start_date || !STATE.weekStart) return [];
+
+        const effectiveWeek = APP.Utils.getEffectiveWeek(assignment.start_date, STATE.weekStart, assignment, APP.StateManager.getPatternByName);
+        if (effectiveWeek === null) return [];
+        
+        const dayIndex = (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(dayName) + 1).toString();
+
+        const pattern = APP.StateManager.getPatternByName(assignment.rotation_name);
+        if (!pattern || !pattern.pattern) return [];
+        
+        const weekPattern = pattern.pattern[`Week ${effectiveWeek}`] || {};
+        const shiftCode = weekPattern[dayIndex];
+
+        if (!shiftCode) return []; // RDO
+
+        const definition = APP.StateManager.getShiftDefinitionByCode(shiftCode);
+        if (!definition || !definition.structure) return [];
+
+        // Ensure segments are sorted before returning (critical for visualization and weekly summary comparison)
+        return JSON.parse(JSON.stringify(definition.structure)).sort((a, b) => a.start_min - b.start_min);
+    };
 
     // --- INTRADAY INDICATORS (Daily View Only) ---
-    // (Implementation identical to V14.1)
-    // [Implementation Omitted for Brevity, but is present in the final file]
+    
+    const setupIntradayIndicators = (ELS_DAILY) => {
+         // Initialize Intraday Time Indicator (Red Line)
+        if (timeIndicatorInterval) clearInterval(timeIndicatorInterval);
+        timeIndicatorInterval = setInterval(() => updateCurrentTimeIndicator(ELS_DAILY), 60000);
+        updateCurrentTimeIndicator(ELS_DAILY);
+
+        // Initialize Precision Time Cursor (Mouse Follower)
+        if (ELS_DAILY.timelineContainer) {
+            ELS_DAILY.timelineContainer.addEventListener('mousemove', (e) => updateMouseTimeIndicator(e, ELS_DAILY));
+            ELS_DAILY.timelineContainer.addEventListener('mouseenter', () => showMouseIndicator(ELS_DAILY));
+            ELS_DAILY.timelineContainer.addEventListener('mouseleave', () => hideMouseIndicator(ELS_DAILY));
+        }
+    };
+    
+    const updateCurrentTimeIndicator = (ELS_DAILY) => {
+        if (!ELS_DAILY || !ELS_DAILY.currentTimeIndicator || !ELS_DAILY.timelineContainer) return;
+
+        const now = new Date();
+        const currentDayName = now.toLocaleDateString('en-US', { weekday: 'long' });
+        const STATE = APP.StateManager.getState();
+
+        // Only show if the selected day is today AND we are in daily view
+        if (currentDayName !== STATE.selectedDay || STATE.scheduleViewMode !== 'daily') {
+            ELS_DAILY.currentTimeIndicator.style.display = 'none';
+            return;
+        }
+
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        
+        if (currentMinutes < Config.TIMELINE_START_MIN || currentMinutes > Config.TIMELINE_END_MIN) {
+            ELS_DAILY.currentTimeIndicator.style.display = 'none';
+            return;
+        }
+
+        const pct = ((currentMinutes - Config.TIMELINE_START_MIN) / Config.TIMELINE_DURATION_MIN) * 100;
+        
+        const nameColElement = ELS_DAILY.timelineContainer.querySelector('.header-name');
+        const nameColWidth = nameColElement ? nameColElement.offsetWidth : 220;
+
+        ELS_DAILY.currentTimeIndicator.style.display = 'block';
+        ELS_DAILY.currentTimeIndicator.style.left = `calc(${nameColWidth}px + ${pct}%)`;
+    };
+
+    const updateMouseTimeIndicator = (e, ELS_DAILY) => {
+        if (!ELS_DAILY || !ELS_DAILY.mouseTimeIndicator || !ELS_DAILY.timelineContainer) return;
+
+        const containerRect = ELS_DAILY.timelineContainer.getBoundingClientRect();
+        const mouseX = e.clientX - containerRect.left + ELS_DAILY.timelineContainer.scrollLeft;
+        
+        const nameColElement = ELS_DAILY.timelineContainer.querySelector('.header-name');
+        const nameColWidth = nameColElement ? nameColElement.offsetWidth : 220;
+        const headerHeight = ELS_DAILY.timeHeader ? ELS_DAILY.timeHeader.offsetHeight : 48;
+
+        if (mouseX < nameColWidth) {
+            hideMouseIndicator(ELS_DAILY);
+            return;
+        }
+
+        const trackWidth = ELS_DAILY.timelineContainer.scrollWidth - nameColWidth;
+        const relativeX = mouseX - nameColWidth;
+        const pct = relativeX / trackWidth;
+        const timeInMinutes = Config.TIMELINE_START_MIN + (pct * Config.TIMELINE_DURATION_MIN);
+
+        ELS_DAILY.mouseTimeIndicator.style.left = `${mouseX}px`;
+        
+        ELS_DAILY.mouseTimeTooltip.textContent = APP.Utils.formatMinutesToTime(timeInMinutes);
+        ELS_DAILY.mouseTimeTooltip.style.top = `${headerHeight - 30}px`; 
+        ELS_DAILY.mouseTimeTooltip.style.left = `${mouseX}px`;
+    };
+
+    const showMouseIndicator = (ELS_DAILY) => {
+        if (ELS_DAILY.mouseTimeIndicator) ELS_DAILY.mouseTimeIndicator.style.display = 'block';
+        if (ELS_DAILY.mouseTimeTooltip) ELS_DAILY.mouseTimeTooltip.style.display = 'block';
+    };
+
+    const hideMouseIndicator = (ELS_DAILY) => {
+        if (ELS_DAILY.mouseTimeIndicator) ELS_DAILY.mouseTimeIndicator.style.display = 'none';
+        if (ELS_DAILY.mouseTimeTooltip) ELS_DAILY.mouseTimeTooltip.style.display = 'none';
+    };
 
 
     APP.Components = APP.Components || {};
@@ -1195,7 +1500,7 @@ window.APP = window.APP || {};
 
     // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v14.2) Initializing...");
+        console.log("WFM Intelligence Platform (v14.3) Initializing...");
         
         // Initialize foundational services
         APP.Utils.cacheDOMElements();
@@ -1214,6 +1519,10 @@ window.APP = window.APP || {};
         const initialData = await APP.DataService.loadCoreData();
         if (!initialData) {
             console.error("Fatal Error: Failed to load core data.");
+            // Display error on screen if data fails to load
+             if (document.body) {
+                document.body.innerHTML = "<h1>Fatal Error: Failed to load core data from database. Check connection.</h1>";
+            }
             return;
         }
 
