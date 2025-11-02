@@ -1,7 +1,7 @@
 /**
- * WFM Intelligence Platform - Styles (v15.4)
+ * WFM Intelligence Platform - Styles (v15.5)
  * Includes Base Layout, Components, Editors, and Visualization (Daily/Weekly)
- * V15.4: Restored missing base styles (Layout, Sidebar, Forms, Tables) omitted in V15.0.
+ * V15.4/15.5: Restored missing base styles (Layout, Sidebar, Forms, Tables) omitted in V15.0.
 */
 
 /* === VARIABLES & CONFIGURATION === */
@@ -330,7 +330,8 @@ tr:last-child td {
     border-bottom: none;
 }
 
-tr:hover {
+/* General table row hover effect (Specific views may override this) */
+tbody tr:hover {
     background-color: var(--color-hover-bg);
 }
 
@@ -394,6 +395,10 @@ tr:hover {
     display: block;
     padding: 8px 12px;
     border-radius: 6px;
+}
+
+.schedules-tree input[type="checkbox"] {
+    margin-right: 8px;
 }
 
 .schedules-tree label:hover {
@@ -681,12 +686,9 @@ tr:hover {
 }
 
 /* V15.1: Make weekly cells clickable */
+/* We apply this to the TD element itself (using class .weekly-cell applied by JS) */
 .weekly-cell {
     cursor: pointer;
-}
-
-.weekly-cell:hover {
-    background-color: #F3F4F6;
 }
 
 /* V15.1: Exception visualization for weekly view */
@@ -700,7 +702,7 @@ tr:hover {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    padding: 8px 12px;
+    /* Padding is applied to the TD in the base table styles */
 }
 
 .weekly-shift-code {

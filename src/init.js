@@ -1,5 +1,5 @@
 /**
- * WFM Intelligence Platform - Initialization (v15.4)
+ * WFM Intelligence Platform - Initialization (v15.5)
  * Bootloader script.
  */
 
@@ -7,6 +7,7 @@
     // Ensure the DOM is fully loaded before initialization
     document.addEventListener('DOMContentLoaded', () => {
         if (window.APP && window.APP.Core) {
+            // Start the application
             window.APP.Core.initialize();
         } else {
             // If APP.Core is not available, the planner.js file failed to load or is corrupted.
