@@ -8,6 +8,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <link rel="stylesheet" href="./styles/planner.css?v=15.5" />
@@ -194,51 +195,49 @@
       <div class="modal-body sequential-layout">
         
         <div class="form-group exception-reason-group" id="exceptionReasonGroup" style="display: none;">
-            <label for="modalExceptionReason">Reason for Exception (Optional)</label>
-            <input type="text" id="modalExceptionReason" class="form-input" placeholder="e.g., Training, Meeting, Shift Swap" />
+            <label for="modalExceptionReason">Reason for Exception/Override</label>
+            <input type="text" id="modalExceptionReason" class="form-input" placeholder="e.g., Meeting, Training, Intraday Adjustment...">
         </div>
 
         <div class="builder-controls">
             <div class="form-group">
-                <label for="modalStartTime">Shift Start Time (HH:MM)</label>
-                <input type="text" id="modalStartTime" class="form-input time-picker-input" placeholder="e.g., 07:00" />
+                <label for="modalStartTime">Shift Start Time</label>
+                <input type="text" id="modalStartTime" class="form-input time-picker-input" placeholder="Select time..." />
             </div>
             <button id="modalAddActivity" class="btn btn-secondary">[+] Add Activity</button>
         </div>
-
+        
         <div class="builder-grid-container">
             <table class="builder-grid">
                 <thead>
                     <tr>
                         <th>#</th>
-                        <th>Activity Component</th>
-                        <th>Duration (Mins)</th>
+                        <th>Component</th>
+                        <th>Duration (min)</th>
                         <th>Start Time</th>
                         <th>End Time</th>
-                        <th></th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="modalSequenceBody">
                     </tbody>
             </table>
         </div>
-        
+
       </div>
       <div class="modal-footer">
         <div class="editor-summary">
-            Total Scheduled: <strong id="modalTotalTime">0h 0m</strong> | 
-            Paid Time: <strong id="modalPaidTime">0h 0m</strong>
+            Total Time: <strong id="modalTotalTime">0h 00m</strong> | 
+            Paid Time: <strong id="modalPaidTime">0h 00m</strong>
         </div>
-        <button id="modalSaveStructure" class="btn btn-primary">Save</button>
+        <button id="modalSaveStructure" class="btn btn-primary">Save Structure</button>
       </div>
     </div>
   </div>
 
   <div id="notification-container"></div>
 
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script src="./src/planner.js?v=15.5"></script>
+  <script src="./src/planner.js?v=15.5.1"></script>
   <script src="./src/init.js?v=15.5"></script>
-
 </body>
 </html>
