@@ -1,10 +1,8 @@
 /**
- * WFM Intelligence Platform - Application Logic (v15.5.1)
+ * WFM Intelligence Platform - Application Logic (v15.5.2-DEBUG)
  * 
+ * V15.5.2-DEBUG: Added extensive console logging for initialization and click event diagnosis.
  * V15.5.1: CRITICAL FIX: Robust Rotation Parsing. 
- *          - Updated Regex in all modules to correctly parse rotation keys (supports "Week1" and "Week 1").
- *          - Added fallback logic to read legacy day keys ("mon", "tue") in Visualization and Editor.
- *          - Implemented auto-normalization in Rotation Editor to clean legacy formats on save.
  * V15.4: Stabilization release.
  * V15.1: Implementation of Phase 2 (Live Editing, Exceptions), Finite Rotations, Visualization enhancements.
  */
@@ -19,8 +17,6 @@ window.APP = window.APP || {};
     const Config = {};
 
     // Supabase Configuration (Centralized)
-    // SECURITY NOTE: In a production environment, these keys should be managed securely (e.g., environment variables) 
-    // and Row Level Security (RLS) should be enabled on the Supabase tables.
     Config.SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
     Config.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 
@@ -35,7 +31,6 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.Utils
- * Utility functions for date handling, formatting, and UI feedback.
  */
 (function(APP) {
     const Utils = {};
@@ -233,11 +228,14 @@ window.APP = window.APP || {};
 
     // Initialize the Supabase client
     DataService.initialize = () => {
-        const { createClient } = window.supabase;
-        if (!createClient) {
-            APP.Utils.showToast("Error: Supabase library not loaded.", "danger", 10000);
+        // V15.5.2-DEBUG: Check if window.supabase exists
+        if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
+            console.error("DEBUG: CRITICAL ERROR - Supabase library not loaded.");
+            APP.Utils.showToast("Error: Database library not loaded.", "danger", 10000);
             return false;
         }
+        const { createClient } = window.supabase;
+        
         supabase = createClient(APP.Config.SUPABASE_URL, APP.Config.SUPABASE_ANON_KEY);
         return true;
     };
@@ -492,6 +490,7 @@ window.APP = window.APP || {};
     const ELS = {};
 
     ComponentManager.initialize = () => {
+        console.log("DEBUG: Initializing ComponentManager"); // DEBUG
         ELS.grid = document.getElementById('componentManagerGrid');
         ELS.btnNew = document.getElementById('btnNewComponent');
 
@@ -576,6 +575,7 @@ window.APP = window.APP || {};
     const ELS = {};
 
     AssignmentManager.initialize = () => {
+        console.log("DEBUG: Initializing AssignmentManager"); // DEBUG
         ELS.grid = document.getElementById('assignmentGrid');
         if (ELS.grid) ELS.grid.addEventListener('change', handleChange);
     };
@@ -617,6 +617,12 @@ window.APP = window.APP || {};
             
             const dateInput = row.querySelector('.assign-start-date');
             if (dateInput) {
+                // V15.5.2-DEBUG: Check if flatpickr exists before using it
+                if (typeof flatpickr === 'undefined') {
+                    // Log the error but continue the loop for other advisors
+                    console.error("DEBUG: CRITICAL ERROR - flatpickr library not loaded (AssignmentManager Render).");
+                    return;
+                }
                 // Configure Flatpickr to display and output as d/m/Y (UK format).
                 flatpickr(dateInput, {
                     dateFormat: "d/m/Y",
@@ -708,6 +714,8 @@ window.APP = window.APP || {};
     };
 
     SequentialBuilder.initialize = () => {
+        console.log("DEBUG: Initializing SequentialBuilder"); // DEBUG
+
         // Cache Modal Elements
         ELS.modal = document.getElementById('shiftBuilderModal');
         ELS.modalTitle = document.getElementById('modalTitle');
@@ -718,6 +726,15 @@ window.APP = window.APP || {};
         ELS.modalTotalTime = document.getElementById('modalTotalTime');
         ELS.modalPaidTime = document.getElementById('modalPaidTime');
         ELS.modalSave = document.getElementById('modalSaveStructure');
+
+        // V15.5.2-DEBUG: Check if critical elements are found
+        if (!ELS.modal || !ELS.modalSave || !ELS.modalSequenceBody) {
+            console.error("DEBUG: CRITICAL ERROR - SequentialBuilder failed to find modal elements in index.html. Check HTML integrity.");
+            APP.Utils.showToast("Fatal UI Error: Builder component missing.", "danger", 10000);
+            return; // Stop initialization of the builder if elements are missing
+        }
+        console.log("DEBUG: SequentialBuilder elements found successfully.");
+
 
         // V15.1: Exception specific elements
         ELS.exceptionReasonGroup = document.getElementById('exceptionReasonGroup');
@@ -741,6 +758,11 @@ window.APP = window.APP || {};
 
         // Initialize Time Picker (Flatpickr)
         if (ELS.modalStartTime) {
+            // V15.5.2-DEBUG: Check if flatpickr exists before using it
+            if (typeof flatpickr === 'undefined') {
+                console.error("DEBUG: CRITICAL ERROR - flatpickr library not loaded during SequentialBuilder init.");
+                return;
+            }
             flatpickr(ELS.modalStartTime, {
                 enableTime: true,
                 noCalendar: true,
@@ -760,6 +782,14 @@ window.APP = window.APP || {};
     // config: { mode, id, title, structure, date (optional), reason (optional) }
     SequentialBuilder.open = (config) => {
         
+        // V15.5.2-DEBUG: Ensure modal element exists before trying to open
+        if (!ELS.modal) {
+            console.error("DEBUG: Attempted to open SequentialBuilder, but modal element is missing.");
+            return;
+        }
+        console.log("DEBUG: SequentialBuilder.open() called. Mode:", config.mode);
+
+
         // 1. Convert absolute times (structure) to sequential format (segments)
         const sequentialSegments = [];
         let startTimeMin = 480; // Default 8:00 AM
@@ -790,7 +820,7 @@ window.APP = window.APP || {};
         // 3. Initialize UI
         ELS.modalTitle.textContent = config.title;
         
-        if (ELS.modalStartTime._flatpickr) {
+        if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
             ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
         }
 
@@ -810,7 +840,7 @@ window.APP = window.APP || {};
 
     SequentialBuilder.close = () => {
         BUILDER_STATE.isOpen = false;
-        ELS.modal.style.display = 'none';
+        if (ELS.modal) ELS.modal.style.display = 'none';
     };
 
     // Renders the dynamic sequence grid (The Ripple Effect)
@@ -1002,11 +1032,19 @@ window.APP = window.APP || {};
     const ELS = {};
 
     ShiftDefinitionEditor.initialize = () => {
+        console.log("DEBUG: Initializing ShiftDefinitionEditor"); // DEBUG
         ELS.grid = document.getElementById('shiftDefinitionsGrid');
         ELS.btnNew = document.getElementById('btnNewShiftDefinition');
 
         if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNewDefinition);
-        if (ELS.grid) ELS.grid.addEventListener('click', handleGridClick);
+        
+        // V15.5.2-DEBUG: Check if the grid element is found and attach listener
+        if (ELS.grid) {
+            ELS.grid.addEventListener('click', handleGridClick);
+            console.log("DEBUG: Attached click listener to shiftDefinitionsGrid.");
+        } else {
+            console.error("DEBUG: Failed to find shiftDefinitionsGrid.");
+        }
     };
 
     ShiftDefinitionEditor.render = () => {
@@ -1084,18 +1122,28 @@ window.APP = window.APP || {};
     };
     
     const handleGridClick = (e) => {
+        console.log("DEBUG: Click detected on ShiftDefinitionEditor Grid. Target:", e.target.tagName, e.target.className); // DEBUG
+
         if (e.target.classList.contains('edit-structure')) {
+            console.log("DEBUG: 'Edit Structure' button clicked."); // DEBUG
+
             // V15.1: Open the shared Sequential Builder in 'definition' mode
             const definitionId = e.target.dataset.definitionId;
             const definition = APP.StateManager.getShiftDefinitionById(definitionId);
-            if (definition && APP.Components.SequentialBuilder) {
+            
+            // V15.5.2-DEBUG: Check if SequentialBuilder is available
+            if (definition && APP.Components.SequentialBuilder && APP.Components.SequentialBuilder.open) {
+                console.log("DEBUG: Definition found and SequentialBuilder is available. Calling open().");
                 APP.Components.SequentialBuilder.open({
                     mode: 'definition',
                     id: definitionId,
                     title: `Sequential Builder: ${definition.name} (${definition.code})`,
                     structure: definition.structure
                 });
+            } else {
+                console.error("DEBUG: Failed to open builder. Definition missing or SequentialBuilder not initialized.");
             }
+
         } else if (e.target.classList.contains('delete-definition')) {
             handleDeleteDefinition(e.target.dataset.definitionId);
         }
@@ -1132,6 +1180,7 @@ window.APP = window.APP || {};
     const ELS = {};
 
     RotationEditor.initialize = () => {
+        console.log("DEBUG: Initializing RotationEditor"); // DEBUG
         ELS.familySelect = document.getElementById('rotationFamily');
         ELS.btnNew = document.getElementById('btnNewRotation');
         ELS.btnDelete = document.getElementById('btnDeleteRotation');
@@ -1438,6 +1487,8 @@ window.APP = window.APP || {};
     let timeIndicatorInterval = null;
 
     ScheduleViewer.initialize = () => {
+        console.log("DEBUG: Initializing ScheduleViewer"); // DEBUG
+
         // Cache Elements
         ELS.tree = document.getElementById('schedulesTree');
         ELS.treeSearch = document.getElementById('treeSearch');
@@ -1461,7 +1512,13 @@ window.APP = window.APP || {};
         if (ELS.viewToggleGroup) ELS.viewToggleGroup.addEventListener('click', handleViewToggle);
 
         // V15.1: Add listener for Live Editing clicks
-        if (ELS.visualizationContainer) ELS.visualizationContainer.addEventListener('click', handleVisualizationClick);
+        // V15.5.2-DEBUG: Check if container is found and attach listener
+        if (ELS.visualizationContainer) {
+            ELS.visualizationContainer.addEventListener('click', handleVisualizationClick);
+            console.log("DEBUG: Attached click listener to visualizationContainer.");
+        } else {
+            console.error("DEBUG: Failed to find visualizationContainer.");
+        }
     };
 
     ScheduleViewer.render = () => {
@@ -1486,6 +1543,8 @@ window.APP = window.APP || {};
 
     // V15.1: Handle clicks on the visualization (for Live Editing)
     const handleVisualizationClick = (e) => {
+        console.log("DEBUG: Click detected on ScheduleViewer Visualization. Target:", e.target.tagName, e.target.className); // DEBUG
+
         const STATE = APP.StateManager.getState();
         let advisorId, dateISO, dayName;
 
@@ -1493,6 +1552,7 @@ window.APP = window.APP || {};
         if (STATE.scheduleViewMode === 'daily') {
             const row = e.target.closest('.timeline-row');
             if (row && row.dataset.advisorId) {
+                console.log("DEBUG: Daily view timeline row clicked."); // DEBUG
                 advisorId = row.dataset.advisorId;
                 dayName = STATE.selectedDay;
                 // Calculate the specific ISO date for the selected day
@@ -1502,6 +1562,7 @@ window.APP = window.APP || {};
              const cell = e.target.closest('.weekly-cell');
              // The cell already has the required data attributes
              if (cell && cell.dataset.advisorId && cell.dataset.date) {
+                console.log("DEBUG: Weekly view cell clicked."); // DEBUG
                  advisorId = cell.dataset.advisorId;
                  dateISO = cell.dataset.date;
                  // Calculate dayName from dateISO (primarily for the modal title)
@@ -1522,15 +1583,15 @@ window.APP = window.APP || {};
             if (!advisor) return;
             
             // Calculate the current segments for this specific date to initialize the builder.
-            // We must calculate the Monday for that specific date to ensure rotation calculation is correct
-            // (e.g., if we clicked on a date far in the future via the weekly view).
             const weekStartISO = APP.Utils.getMondayForDate(dateISO); 
             
             // Use the robust calculateSegments
             const { segments, reason } = calculateSegments(advisorId, dayName, weekStartISO);
 
             // Open the Sequential Builder in 'exception' mode
-            if (APP.Components.SequentialBuilder) {
+            // V15.5.2-DEBUG: Check if SequentialBuilder is available
+            if (APP.Components.SequentialBuilder && APP.Components.SequentialBuilder.open) {
+                console.log("DEBUG: Context found and SequentialBuilder is available. Calling open().");
                 APP.Components.SequentialBuilder.open({
                     mode: 'exception',
                     id: advisorId,
@@ -1540,6 +1601,7 @@ window.APP = window.APP || {};
                     reason: reason
                 });
             } else {
+                 console.error("DEBUG: Failed to open builder. SequentialBuilder not initialized or missing.");
                  APP.Utils.showToast("Error: Live Editor module not initialized.", "danger");
             }
         }
@@ -2062,8 +2124,13 @@ window.APP = window.APP || {};
 
     // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v15.5.1) Initializing...");
+        console.log("WFM Intelligence Platform (v15.5.2-DEBUG) Initializing...");
         
+        // V15.5.2-DEBUG: Check for critical dependencies early (Visual check, DataService handles Supabase check)
+        if (typeof flatpickr === 'undefined') {
+            console.error("DEBUG: CRITICAL DEPENDENCY CHECK FAILED - Flatpickr not detected on window.");
+        }
+
         // Initialize foundational services
         APP.Utils.cacheDOMElements();
         if (!APP.DataService.initialize()) {
@@ -2078,6 +2145,7 @@ window.APP = window.APP || {};
         setDefaultWeek();
 
         // Load data
+        console.log("DEBUG: Loading Core Data...");
         const initialData = await APP.DataService.loadCoreData();
         if (!initialData) {
             console.error("Fatal Error: Failed to load core data.");
@@ -2086,26 +2154,40 @@ window.APP = window.APP || {};
             }
             return;
         }
+        console.log("DEBUG: Core Data Loaded.");
 
         // Initialize State Manager
         APP.StateManager.initialize(initialData);
 
         // Initialize UI Components
-        APP.Components.ComponentManager.initialize();
-        APP.Components.AssignmentManager.initialize();
-        // V15.1: Initialize the shared builder first
-        APP.Components.SequentialBuilder.initialize(); 
-        APP.Components.ShiftDefinitionEditor.initialize();
-        APP.Components.RotationEditor.initialize();
-        APP.Components.ScheduleViewer.initialize();
+        console.log("DEBUG: Initializing UI Components...");
+        try {
+            APP.Components.ComponentManager.initialize();
+            APP.Components.AssignmentManager.initialize();
+            // V15.1: Initialize the shared builder first
+            APP.Components.SequentialBuilder.initialize(); 
+            APP.Components.ShiftDefinitionEditor.initialize();
+            APP.Components.RotationEditor.initialize();
+            APP.Components.ScheduleViewer.initialize();
+        } catch (error) {
+            // This catch block handles synchronous errors during initialization (e.g., typos, unexpected nulls)
+            console.error("DEBUG: CRITICAL ERROR during UI Component Initialization:", error);
+            APP.Utils.showToast("Fatal Error during UI initialization. Check console logs.", "danger", 10000);
+            return; // Stop execution if initialization fails
+        }
+        console.log("DEBUG: UI Components Initialized.");
+
 
         // Render all components
+        console.log("DEBUG: Starting initial render...");
         Core.renderAll();
+        console.log("DEBUG: Initial render complete.");
+
 
         // Wire global event handlers
         wireGlobalEvents();
         
-        console.log("Initialization complete.");
+        console.log("Initialization complete. System Ready.");
     };
 
     const cacheCoreDOMElements = () => {
@@ -2133,17 +2215,23 @@ window.APP = window.APP || {};
     const wireGlobalEvents = () => {
         // Week Navigation
         if (ELS.weekStart) {
-            // Configure Week Picker (Flatpickr)
-            flatpickr(ELS.weekStart, {
-                dateFormat: "Y-m-d", // ISO format for consistency
-                defaultDate: APP.StateManager.getState().weekStart,
-                "locale": { "firstDayOfWeek": 1 }, // Monday start
-                onChange: (selectedDates, dateStr) => {
-                    // Update state and re-render visualization on date change
-                    APP.StateManager.getState().weekStart = dateStr;
-                    APP.Components.ScheduleViewer.render();
-                }
-            });
+             // V15.5.2-DEBUG: Check if flatpickr function exists before calling
+             if (typeof flatpickr !== 'function') {
+                console.error("DEBUG: CRITICAL ERROR - flatpickr library not loaded (Global Events).");
+                // Do not attempt to initialize the week picker if the library is missing
+            } else {
+                // Configure Week Picker (Flatpickr)
+                flatpickr(ELS.weekStart, {
+                    dateFormat: "Y-m-d", // ISO format for consistency
+                    defaultDate: APP.StateManager.getState().weekStart,
+                    "locale": { "firstDayOfWeek": 1 }, // Monday start
+                    onChange: (selectedDates, dateStr) => {
+                        // Update state and re-render visualization on date change
+                        APP.StateManager.getState().weekStart = dateStr;
+                        APP.Components.ScheduleViewer.render();
+                    }
+                });
+            }
         }
         if (ELS.prevWeek) ELS.prevWeek.addEventListener('click', () => updateWeek(-7));
         if (ELS.nextWeek) ELS.nextWeek.addEventListener('click', () => updateWeek(7));
@@ -2178,8 +2266,8 @@ window.APP = window.APP || {};
     };
 
     const updateWeek = (days) => {
+        if (!ELS.weekStart || !ELS.weekStart._flatpickr) return;
         const flatpickrInstance = ELS.weekStart._flatpickr;
-        if (!flatpickrInstance) return;
         const currentDate = flatpickrInstance.selectedDates[0] || new Date();
         currentDate.setDate(currentDate.getDate() + days);
         // Set the new date and trigger the onChange event
