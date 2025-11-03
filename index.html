@@ -1,241 +1,27 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WFM Intelligence Platform (v15.5.1)</title>
-  
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link rel="stylesheet" href="./styles/planner.css?v=15.5" />
+  <title>Redirecting…</title>
+  <meta http-equiv="refresh" content="0; url=https://debenhams.github.io/Timeframe-Tool/advisor-portal.html" />
+  <link rel="canonical" href="https://debenhams.github.io/Timeframe-Tool/advisor-portal.html" />
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;display:grid;place-items:center;height:100dvh;margin:0;background:#fafafa;color:#111}
+    a{color:#0d47a1;font-weight:600}
+    .card{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;box-shadow:0 2px 10px rgba(0,0,0,.05);text-align:center}
+  </style>
 </head>
 <body>
-
-  <aside class="app-sidebar">
-    <div class="sidebar-header">
-        WFM Intelligence
-    </div>
-    <nav class="tab-nav" id="main-navigation">
-        <button class="tab-link active" data-tab="tab-schedule-view" title="Schedule View">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-            <span>Schedule View</span>
-        </button>
-        
-        <div class="nav-separator">PLANNING</div>
-
-        <button class="tab-link" data-tab="tab-rotation-editor" title="Rotation Editor">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-            <span>Rotation Editor</span>
-        </button>
-        
-        <button class="tab-link" data-tab="tab-shift-definitions" title="Shift Definitions">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
-            <span>Shift Definitions</span>
-        </button>
-        
-        <button class="tab-link" data-tab="tab-advisor-assignments" title="Assignments">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-            <span>Assignments</span>
-        </button>
-
-         <div class="nav-separator">ADMINISTRATION</div>
-
-        <button class="tab-link" data-tab="tab-component-manager" title="Components">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            <span>Components</span>
-        </button>
-    </nav>
-  </aside>
-  
-  <div class="app-main-content">
-    
-    <header class="top-bar">
-        <div class="top-bar-controls">
-            <label for="weekStart">Week Start</label>
-            <input type="text" id="weekStart" class="week-picker" placeholder="Select week..." />
-            
-            <button id="prevWeek" class="btn-icon" title="Previous Week">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-            </button>
-            <button id="nextWeek" class="btn-icon" title="Next Week">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </button>
-            
-            <div class="separator"></div>
-            
-            <button id="btnUndo" class="btn-icon" title="Undo" disabled>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l-3 2.7"></path></svg>
-            </button>
-            <button id="btnRedo" class="btn-icon" title="Redo" disabled>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17v-6h6"></path><path d="M21 7a9 9 0 0 1-9 9 9 9 0 0 1-6-2.3l3-2.7"></path></svg>
-            </button>
-        </div>
-        <div class="ai-assistant-placeholder">
-            <input type="text" class="form-input" placeholder="Ask AI Assistant (Future Feature)" disabled>
-        </div>
-    </header>
-
-    <main class="content-area" id="main-content-area">
-
-      <section id="tab-schedule-view" class="tab-content active planner-section">
-        <div class="planner-layout">
-            <div class="planner-controls card">
-                <h2>Team Selection</h2>
-                <input type="text" id="treeSearch" class="form-input" placeholder="Filter leaders/advisors...">
-                <button id="btnClearSelection" class="btn btn-secondary btn-sm" style="margin-top: 8px;">Clear All</button>
-                <div class="schedules-tree" id="schedulesTree">
-                    </div>
-            </div>
-            <div class="planner-viewer card">
-                <div class="planner-header">
-                    <h2 id="scheduleViewTitle">Schedule Visualization</h2>
-                    
-                    <div class="planner-view-controls">
-                        <div class="view-toggle-group" id="viewToggleGroup">
-                            <button class="btn-toggle active" data-view="daily">Daily</button>
-                            <button class="btn-toggle" data-view="weekly">Weekly</button>
-                        </div>
-
-                        <div class="planner-day-toggle" id="dayToggleContainer">
-                            <label for="plannerDay">Day:</label>
-                            <select id="plannerDay" class="form-select">
-                            <option value="Monday">Monday</option>
-                            <option value="Tuesday">Tuesday</option>
-                            <option value="Wednesday">Wednesday</option>
-                            <option value="Thursday">Thursday</option>
-                            <option value="Friday">Friday</option>
-                            <option value="Saturday">Saturday</option>
-                            <option value="Sunday">Sunday</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="visualization-container" id="visualizationContainer">
-                    </div>
-                
-            </div>
-        </div>
-      </section>
-
-      <section id="tab-rotation-editor" class="tab-content">
-        <div class="card">
-            <div class="editor-controls">
-            <div class="form-group">
-                <label for="rotationFamily">Rotation Family</label>
-                <select id="rotationFamily" class="form-select"></select>
-            </div>
-            <div class="editor-buttons">
-                <span id="autoSaveStatus" class="auto-save-status"></span>
-                <button id="btnAddWeek" class="btn btn-secondary">[+] Add Week</button>
-                <button id="btnNewRotation" class="btn btn-primary">[+] New Rotation</button>
-                <button id="btnDeleteRotation" class="btn btn-danger">
-                Delete Rotation
-                </button>
-            </div>
-            </div>
-            <p class="helper-text">Select a predefined Shift Definition for each day. Changes are saved automatically. Rotations are finite and do not repeat.</p>
-            <div class="table-container" id="rotationGrid">
-                </div>
-        </div>
-      </section>
-
-      <section id="tab-shift-definitions" class="tab-content">
-        <div class="card">
-            <div class="editor-controls">
-                <h2>Shift Library</h2>
-                <div class="editor-buttons">
-                    <button id="btnNewShiftDefinition" class="btn btn-primary">[+] New Shift Definition</button>
-                </div>
-            </div>
-            <p class="helper-text">Define available shifts. Click 'Edit Structure' to configure using the Sequential Builder.</p>
-            <div class="table-container" id="shiftDefinitionsGrid">
-                </div>
-        </div>
-      </section>
-      
-      <section id="tab-advisor-assignments" class="tab-content">
-        <div class="card">
-            <h2>Advisor Assignments</h2>
-            <p class="helper-text">Assign a rotation. The 'Start Date' defines the exact calendar date corresponding to 'Week 1, Day 1' of the rotation for that advisor.</p>
-            <div class="table-container" id="assignmentGrid">
-                </div>
-        </div>
-      </section>
-
-      <section id="tab-component-manager" class="tab-content">
-        <div class="card">
-            <div class="editor-controls">
-                <h2>Components Library</h2>
-                <div class="editor-buttons">
-                    <button id="btnNewComponent" class="btn btn-primary">[+] Add New Component</button>
-                </div>
-            </div>
-            <p class="helper-text">Manage the available activities, platforms, breaks, absences, and shrinkage codes.</p>
-            <div class="table-container" id="componentManagerGrid">
-                </div>
-        </div>
-      </section>
-
-    </main>
-  </div> 
-
-  <div class="modal-backdrop" id="shiftBuilderModal">
-    <div class="modal-content modal-lg">
-      <div class="modal-header">
-        <h2 id="modalTitle">Sequential Builder</h2>
-        <button class="btn-icon modal-close" id="modalClose">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-      </div>
-      <div class="modal-body sequential-layout">
-        
-        <div class="form-group exception-reason-group" id="exceptionReasonGroup" style="display: none;">
-            <label for="modalExceptionReason">Reason for Exception/Override</label>
-            <input type="text" id="modalExceptionReason" class="form-input" placeholder="e.g., Meeting, Training, Intraday Adjustment...">
-        </div>
-
-        <div class="builder-controls">
-            <div class="form-group">
-                <label for="modalStartTime">Shift Start Time</label>
-                <input type="text" id="modalStartTime" class="form-input time-picker-input" placeholder="Select time..." />
-            </div>
-            <button id="modalAddActivity" class="btn btn-secondary">[+] Add Activity</button>
-        </div>
-        
-        <div class="builder-grid-container">
-            <table class="builder-grid">
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Component</th>
-                        <th>Duration (min)</th>
-                        <th>Start Time</th>
-                        <th>End Time</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="modalSequenceBody">
-                    </tbody>
-            </table>
-        </div>
-
-      </div>
-      <div class="modal-footer">
-        <div class="editor-summary">
-            Total Time: <strong id="modalTotalTime">0h 00m</strong> | 
-            Paid Time: <strong id="modalPaidTime">0h 00m</strong>
-        </div>
-        <button id="modalSaveStructure" class="btn btn-primary">Save Structure</button>
-      </div>
-    </div>
+  <div class="card">
+    <h1>Redirecting…</h1>
+    <p>If you’re not redirected automatically, <a href="https://debenhams.github.io/Timeframe-Tool/advisor-portal.html">click here to open the Advisor Portal</a>.</p>
   </div>
-  <div id="notification-container"></div>
-
-  <script src="./src/planner.js?v=15.5.1"></script>
-  <script src="./src/init.js?v=15.5"></script>
+  <script>
+    location.replace("https://debenhams.github.io/Timeframe-Tool/advisor-portal.html");
+  </script>
 </body>
 </html>
+Advisor Portal – My Rota
+ 
+
+      
