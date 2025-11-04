@@ -868,9 +868,15 @@ window.APP = window.APP || {};
                     </td>
                     <td class="time-display">${APP.Utils.formatMinutesToTime(startTime)}</td>
                     <td class="time-display">${APP.Utils.formatMinutesToTime(endTime)}</td>
-                    <td>
-                        <button class="btn btn-sm btn-danger delete-sequence-item" data-index="${index}">Remove</button>
-                    </td>
+<td class="actions-cell">
+  <div class="btn-group">
+    <button class="btn btn-sm" data-action="insert-before" data-index="${index}">+ Above</button>
+    <button class="btn btn-sm" data-action="insert-after" data-index="${index}">+ Below</button>
+    <button class="btn btn-sm" data-action="split-row" data-index="${index}">Split</button>
+    <button class="btn btn-sm btn-danger delete-sequence-item" data-index="${index}">Remove</button>
+  </div>
+</td>
+
                 </tr>
             `;
 
@@ -928,12 +934,74 @@ window.APP = window.APP || {};
     };
 
     const handleSequenceClick = (e) => {
-        if (e.target.classList.contains('delete-sequence-item')) {
-            const index = parseInt(e.target.dataset.index, 10);
-            BUILDER_STATE.segments.splice(index, 1);
-            render(); // Recalculate ripple effect
+    const target = e.target;
+    if (!target.closest('button')) return;
+
+    const index = parseInt(target.dataset.index, 10);
+    if (isNaN(index)) return;
+
+    // Helper: clamp duration to minimum 5 minutes
+    const clamp = (v) => Math.max(5, Math.round(v));
+
+    if (target.classList.contains('delete-sequence-item')) {
+        BUILDER_STATE.segments.splice(index, 1);
+        render();
+        return;
+    }
+
+    const action = target.dataset.action;
+
+    if (action === 'insert-before' || action === 'insert-after') {
+        // Default new block: 30 minutes, no component selected yet
+        const NEW_DURATION = 30;
+        const insertAt = action === 'insert-before' ? index : index + 1;
+
+        // Insert a blank segment
+        BUILDER_STATE.segments.splice(insertAt, 0, { component_id: null, duration_min: NEW_DURATION });
+
+        // Auto-adjust a neighbor so total end time stays aligned.
+        // First try to subtract from the row we inserted next to.
+        const adjustIndex = action === 'insert-before' ? index + 1 /* the original row moved down */ : index;
+        if (BUILDER_STATE.segments[adjustIndex]) {
+            const cur = BUILDER_STATE.segments[adjustIndex];
+            if (cur.duration_min > NEW_DURATION + 5) {
+                cur.duration_min = clamp(cur.duration_min - NEW_DURATION);
+            } else {
+                // Not enough room: borrow from the next segment if it exists
+                const nextIdx = adjustIndex + 1;
+                if (BUILDER_STATE.segments[nextIdx] && BUILDER_STATE.segments[nextIdx].duration_min > NEW_DURATION + 5) {
+                    BUILDER_STATE.segments[nextIdx].duration_min = clamp(BUILDER_STATE.segments[nextIdx].duration_min - NEW_DURATION);
+                }
+            }
         }
-    };
+
+        render();
+        return;
+    }
+
+    if (action === 'split-row') {
+        const seg = BUILDER_STATE.segments[index];
+        if (!seg) return;
+
+        // Split into two halves (minimum 10m each; fall back to 5 if very small)
+        let first = Math.max(10, Math.floor(seg.duration_min / 2));
+        let second = Math.max(10, seg.duration_min - first);
+
+        // Ensure sum stays the same and both >= 5
+        if (first < 5) first = 5;
+        if (second < 5) second = 5;
+        const diff = (first + second) - seg.duration_min;
+        if (diff !== 0) second = clamp(second - diff);
+
+        // Replace current with first half, insert second half after, same component
+        seg.duration_min = first;
+        BUILDER_STATE.segments.splice(index + 1, 0, { component_id: seg.component_id, duration_min: second });
+
+        render();
+        return;
+    }
+};
+
 
     // Generalized save function
     const handleSave = async () => {
