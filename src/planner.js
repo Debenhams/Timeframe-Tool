@@ -295,17 +295,22 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
     try {
         // We query the history table for all advisors whose row covers this date
         const { data, error } = await supabase
-            .from('rotation_assignments_history')
-            .select('advisor_id, rotation_name, start_date, end_date')
-            .lte('start_date', isoDate)
-            .or(`end_date.is.null,end_date.gte.${isoDate}`);
+  .from('rotation_assignments_history')
+  .select('advisor_id, rotation_name, start_date, end_date')
+  .lte('start_date', isoDate)
+  .or(`end_date.is.null,end_date.gte.${isoDate}`)
+  .order('start_date', { ascending: false });   // newest first
+
 
         if (error) return handleError(error, 'Fetch effective assignments for date');
 
         // Build a quick lookup map: advisor_id -> record
         const map = new Map();
-        (data || []).forEach(row => map.set(row.advisor_id, row));
-        return { data: map, error: null };
+(data || []).forEach(row => {
+  if (!map.has(row.advisor_id)) map.set(row.advisor_id, row); // keep newest only
+});
+return { data: map, error: null };
+
     } catch (err) {
         return handleError(err, 'Fetch effective assignments for date');
     }
@@ -646,11 +651,13 @@ if (weekStartISO) {
   <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
   <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${startDate}" /></td>
   <td>
-    <div class="btn-group">
-      <button class="btn btn-sm btn-primary act-assign-week" data-advisor-id="${adv.id}">Assign from this week</button>
-      <button class="btn btn-sm act-change-forward" data-advisor-id="${adv.id}">Change from this week forward</button>
-    </div>
-  </td>
+  <div class="btn-group">
+    <button class="btn btn-sm btn-primary act-assign-week" data-advisor-id="${adv.id}">Assign from this week</button>
+    <button class="btn btn-sm act-change-forward" data-advisor-id="${adv.id}">Change from this week forward</button>
+    <button class="btn btn-sm act-change-week" data-advisor-id="${adv.id}">Change only this week</button>
+  </div>
+</td>
+
 </tr>`;
 
         });
@@ -684,9 +691,12 @@ if (weekStartISO) {
 // --- wire row actions (buttons) ---
 const btnAssign = ELS.grid.querySelector(`.act-assign-week[data-advisor-id="${adv.id}"]`);
 const btnChange = ELS.grid.querySelector(`.act-change-forward[data-advisor-id="${adv.id}"]`);
+const btnWeek   = ELS.grid.querySelector(`.act-change-week[data-advisor-id="${adv.id}"]`);
 
 if (btnAssign) btnAssign.addEventListener('click', () => handleRowAction('assign_from_week', adv.id));
 if (btnChange) btnChange.addEventListener('click', () => handleRowAction('change_forward', adv.id));
+if (btnWeek)   btnWeek.addEventListener('click',   () => handleRowAction('change_one_week', adv.id));
+
 
 });           // <— end: advisors.forEach(adv => { ... })
 
@@ -709,6 +719,28 @@ const handleRowAction = async (action, advisorId) => {
     APP.Utils.showToast('Please pick a rotation and a start week first.', 'warning');
     return;
   }
+// One-week swap: create a bounded history row for this week only, do not touch the base cycle
+if (action === 'change_one_week') {
+  if (!confirm(`Change only this week?\nRotation: ${rotationName}\nWeek starting: ${startISO}`)) return;
+
+  // weekEnd = startISO + 6 days
+  const weekEndISO = (() => {
+    const d = new Date(startISO + 'T00:00:00'); d.setDate(d.getDate() + 6); return d.toISOString().slice(0,10);
+  })();
+
+  await APP.DataService.saveRecord('rotation_assignments_history', {
+    advisor_id: advisorId,
+    rotation_name: rotationName,
+    start_date: startISO,
+    end_date: weekEndISO,
+    effective_weeks: 1,
+    reason: 'swap_week'
+  });
+
+  APP.Utils?.showToast?.('Saved one-week swap.', 'success');
+  AssignmentManager.render();
+  return; // important: stop here (don’t run the forward-change logic)
+}
 
   const label = action === 'assign_from_week' ? 'Assign from this week' : 'Change from this week forward';
   if (!confirm(`${label}?\nRotation: ${rotationName}\nStart: ${startISO}`)) return;
