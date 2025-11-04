@@ -327,6 +327,7 @@ window.APP = window.APP || {};
 
     APP.DataService = DataService;
 }(window.APP));
+
 /**
  * MODULE: APP.StateManager
  * Manages the application's state, selectors, synchronization, and history (Undo/Redo).
@@ -682,6 +683,7 @@ window.APP = window.APP || {};
     APP.Components = APP.Components || {};
     APP.Components.AssignmentManager = AssignmentManager;
 }(window.APP));
+
 /**
  * MODULE: APP.Components.SequentialBuilder (Shared Modal Logic)
  * V15.5.2: Extracted module to support both Shift Definitions and Exceptions (Live Editing). Includes stability fixes.
