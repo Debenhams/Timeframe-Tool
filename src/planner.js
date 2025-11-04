@@ -1133,20 +1133,8 @@ window.APP = window.APP || {};
             </tr>`;
         });
         html += '</tbody></table>';
+ELS.grid.innerHTML = html;
 
-// Inline "Add Week" (only when a rotation is selected)
-if (pattern) {
-  html += `
-    <div class="table-footer-inline">
-      <button id="btnAddWeekInline" class="btn btn-secondary">[+] Add Week</button>
-    </div>
-  `;
-}
-
-        ELS.grid.innerHTML = html;
-        // Wire inline Add Week button (appears under the table)
-const inlineAdd = document.getElementById('btnAddWeekInline');
-if (inlineAdd) inlineAdd.addEventListener('click', handleAddWeek);
 
     };
 
@@ -1318,13 +1306,26 @@ if (inlineAdd) inlineAdd.addEventListener('click', handleAddWeek);
             html += '</tr>';
         });
         html += '</tbody></table>';
+
+// Inline "Add Week" (only when a rotation is selected)
+if (pattern) {
+  html += `
+    <div class="table-footer-inline">
+      <button id="btnAddWeekInline" class="btn btn-secondary">[+] Add Week</button>
+    </div>
+  `;
+}
+
         
         if (numWeeks === 0) {
              html = '<div class="visualization-empty">Select or create a rotation to begin editing.</div>';
         }
 
         ELS.grid.innerHTML = html;
-        
+        // Wire inline Add Week button (appears under the table)
+const inlineAdd = document.getElementById('btnAddWeekInline');
+if (inlineAdd) inlineAdd.addEventListener('click', handleAddWeek);
+
         // Set selected values (must be done after HTML insertion)
         if (pattern) {
             weeks.forEach(w => {

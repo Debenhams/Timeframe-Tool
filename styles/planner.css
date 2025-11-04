@@ -756,6 +756,13 @@ tbody tr:hover {
   padding: 12px 0 4px;
 }
 
+/* Inline footer under rotation grid */
+.table-footer-inline {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 4px;
+}
+
 /* Compact, flexible action buttons in the last cell */
 .actions-cell .btn-group {
   display: flex;
