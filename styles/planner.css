@@ -1,130 +1,171 @@
-/* WFM Intelligence Platform - Core Styles (v15.5.1) */
+/**
+ * WFM Intelligence Platform - Styles (v15.5)
+ * Includes Base Layout, Components, Editors, and Visualization (Daily/Weekly)
+ * V15.4/15.5: Restored missing base styles (Layout, Sidebar, Forms, Tables) omitted in V15.0.
+*/
 
+/* === VARIABLES & CONFIGURATION === */
 :root {
-    --primary-color: #3498db;
-    --primary-hover: #2980b9;
-    --success-color: #2ecc71;
-    --danger-color: #e74c3c;
-    --warning-color: #f39c12;
-    --text-color: #333;
-    --text-light: #777;
-    --bg-color: #f4f6f8;
-    --card-bg: #ffffff;
-    --border-color: #e0e0e0;
-    --sidebar-width: 250px;
-    --header-height: 60px;
-    --font-family: 'Inter', sans-serif;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  
+  /* Modern Enterprise Palette (Indigo/Emerald) */
+  --brand-primary: #4F46E5; /* Indigo 600 */
+  --brand-primary-dark: #4338CA; /* Indigo 700 */
+  --brand-accent: #059669; /* Emerald 600 */
+  
+  /* Neutrals (Cool Gray) */
+  --color-text: #111827;
+  --color-text-muted: #6B7280;
+  --color-bg: #F9FAFB; 
+  --color-panel-bg: #FFFFFF;
+  --color-border: #E5E7EB;
+  --color-hover-bg: #F3F4F6;
+  
+  /* Sidebar (Dark) */
+  --sidebar-bg: #111827;
+  --sidebar-text: #D1D5DB;
+  --sidebar-text-hover: #FFFFFF;
+  --sidebar-border: #1F2937;
 
-    /* Visualization Colors - Updated for accessibility */
-    --activity-color: #a5d6a7; /* Light Green */
-    --gap-color: #e0e0e0;      /* Light Gray */
-    --rdo-color: #f0f0f0;
+  /* UI States */
+  --color-success: #10B981;
+  --color-success-bg: #ECFDF5;
+  --color-danger: #EF4444;
+  --color-danger-bg: #FEE2E2;
+  
+  /* V15.0: Exception State (Purple) */
+  --color-exception: #9333EA; 
+
+  /* Layout */
+  --sidebar-width: 250px;
+  --top-bar-height: 60px;
+  --border-radius: 8px;
+  
+  /* Timeline Visualization */
+  --timeline-name-col: 220px;
+  --timeline-row-height: 34px;
+  --timeline-bar-height: 34px; 
+  --timeline-grid-color: #E5E7EB;
+  --timeline-header-bg: #F3F4F6;
 }
 
-/* --- Reset and Base --- */
-* {
-    box-sizing: border-box;
+/* === BASE STYLES & LAYOUT === */
+html, body {
+  height: 100%;
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: 14px;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  overflow: hidden; /* Prevent body scroll, rely on internal component scrolling */
 }
 
-body, html {
-    margin: 0;
-    padding: 0;
-    font-family: var(--font-family);
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    height: 100vh;
-    overflow: hidden;
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
-/* --- Layout Structure --- */
+body {
+  display: flex;
+}
+
+h1, h2, h3 {
+    margin-top: 0;
+    margin-bottom: 16px;
+    font-weight: 600;
+}
+
+h2 {
+    font-size: 20px;
+}
+
+/* === SIDEBAR NAVIGATION === */
 .app-sidebar {
-    position: fixed;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: var(--sidebar-width);
-    background-color: var(--card-bg);
-    border-right: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
+  width: var(--sidebar-width);
+  background-color: var(--sidebar-bg);
+  color: var(--sidebar-text);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  border-right: 1px solid var(--sidebar-border);
 }
 
-.app-main-content {
-    margin-left: var(--sidebar-width);
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-}
-
-.top-bar {
-    height: var(--header-height);
-    background-color: var(--card-bg);
-    border-bottom: 1px solid var(--border-color);
-    padding: 0 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-shrink: 0;
-}
-
-.content-area {
-    flex-grow: 1;
-    padding: 20px;
-    overflow-y: auto;
-}
-
-/* --- Sidebar Navigation --- */
 .sidebar-header {
-    padding: 20px;
-    font-size: 1.2rem;
+    padding: 20px 24px;
+    font-size: 18px;
     font-weight: 700;
-    border-bottom: 1px solid var(--border-color);
+    color: white;
+    border-bottom: 1px solid var(--sidebar-border);
 }
 
 .tab-nav {
     display: flex;
     flex-direction: column;
-    padding: 10px;
+    padding: 16px;
+    gap: 4px;
 }
 
 .tab-link {
-    display: flex;
-    align-items: center;
-    padding: 10px 15px;
-    margin-bottom: 5px;
-    border: none;
-    background: transparent;
-    text-align: left;
-    cursor: pointer;
-    border-radius: 6px;
-    font-size: 0.95rem;
-    color: var(--text-light);
-    transition: background-color 0.2s, color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--sidebar-text);
+  background-color: transparent;
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s, color 0.15s;
 }
 
-.tab-link svg {
-    margin-right: 12px;
+.tab-link:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--sidebar-text-hover);
 }
 
-.tab-link:hover, .tab-link.active {
-    background-color: #e9f5fe; /* Light blue background */
-    color: var(--primary-color);
+.tab-link.active {
+  background-color: var(--brand-primary);
+  color: white;
+}
+
+.tab-link.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .nav-separator {
-    font-size: 0.75rem;
+    margin: 12px 16px 8px 16px;
+    font-size: 12px;
     font-weight: 600;
-    color: var(--text-light);
-    margin: 15px 0 5px 15px;
+    color: #6B7280;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
-/* --- Top Bar Controls --- */
+/* === MAIN CONTENT & TOP BAR === */
+.app-main-content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Important for internal scrolling */
+}
+
+.top-bar {
+  height: var(--top-bar-height);
+  background-color: var(--color-panel-bg);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  flex-shrink: 0;
+}
+
 .top-bar-controls {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
 }
 
 .top-bar-controls label {
@@ -132,638 +173,622 @@ body, html {
 }
 
 .separator {
-    height: 25px;
+    height: 24px;
     width: 1px;
-    background-color: var(--border-color);
-    margin: 0 5px;
+    background-color: var(--color-border);
+    margin: 0 8px;
 }
 
-/* --- Tab Content Management --- */
+.ai-assistant-placeholder input {
+    width: 300px;
+}
+
+/* === CONTENT AREA & TABS === */
+.content-area {
+  flex-grow: 1;
+  overflow: auto; /* Allows content area to scroll if content overflows */
+}
+
 .tab-content {
-    display: none;
+  display: none;
+  padding: 24px;
 }
 
 .tab-content.active {
-    display: block;
+  display: block;
 }
 
-/* --- Components: Buttons, Inputs, Cards --- */
-.btn {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: background-color 0.2s;
+/* === CARDS & PANELS === */
+.card {
+    background-color: var(--color-panel-bg);
+    border-radius: var(--border-radius);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    padding: 24px;
+    border: 1px solid var(--color-border);
 }
 
-.btn-sm {
-    padding: 5px 10px;
-    font-size: 0.85rem;
-}
-
-.btn-primary {
-    background-color: var(--primary-color);
-    color: white;
-}
-.btn-primary:hover {
-    background-color: var(--primary-hover);
-}
-
-.btn-secondary {
-    background-color: #e0e0e0;
-    color: var(--text-color);
-}
-.btn-secondary:hover {
-    background-color: #d5d5d5;
-}
-
-.btn-danger {
-    background-color: var(--danger-color);
-    color: white;
-}
-.btn-danger:hover {
-    background-color: #c0392b;
-}
-
-
-.btn-icon {
-    background: transparent;
-    border: 1px solid transparent;
-    padding: 8px;
-    border-radius: 6px;
-    cursor: pointer;
+/* === FORMS & INPUTS === */
+.form-group {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-color);
-}
-.btn-icon:hover {
-    background-color: #f0f0f0;
-}
-.btn-icon:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
+    flex-direction: column;
+    gap: 6px;
 }
 
 .form-input, .form-select, .week-picker {
-    padding: 8px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    font-size: 0.95rem;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  color: var(--color-text);
+  background-color: white;
 }
 
-.form-select {
+.form-input:focus, .form-select:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+}
+
+/* === BUTTONS === */
+.btn {
+  padding: 10px 18px;
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.15s;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 13px;
+}
+
+.btn-primary {
+  background-color: var(--brand-primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background-color: var(--brand-primary-dark);
+}
+
+.btn-secondary {
+    background-color: var(--color-hover-bg);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover {
+    background-color: #E5E7EB;
+}
+
+.btn-danger {
+    background-color: var(--color-danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background-color: #B91C1C;
+}
+
+.btn-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    border-radius: var(--border-radius);
+    background-color: transparent;
+    border: 1px solid transparent;
     cursor: pointer;
+    color: var(--color-text-muted);
 }
 
-.card {
-    background-color: var(--card-bg);
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    padding: 20px;
-    border: 1px solid var(--border-color);
+.btn-icon:hover {
+    background-color: var(--color-hover-bg);
+    color: var(--color-text);
 }
 
-.card h2 {
-    margin-top: 0;
-    font-size: 1.3rem;
+.btn-icon:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background-color: transparent;
 }
 
-/* --- Tables (General) --- */
+
+/* === TABLES === */
 .table-container {
     overflow-x: auto;
-    margin-top: 15px;
+    margin-top: 20px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
 }
 
 table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.9rem;
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
 }
 
 th, td {
-    padding: 10px 15px;
-    text-align: left;
-    border-bottom: 1px solid var(--border-color);
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
 }
 
-thead th {
-    background-color: #f9f9f9;
-    font-weight: 600;
-    color: var(--text-light);
-    text-transform: uppercase;
-    font-size: 0.8rem;
+th {
+  background-color: var(--color-hover-bg);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
+tr:last-child td {
+    border-bottom: none;
+}
+
+/* General table row hover effect (Specific views may override this) */
 tbody tr:hover {
-    background-color: #f9f9f9;
+    background-color: var(--color-hover-bg);
 }
 
-/* --- Editor Controls Layout --- */
+/* === EDITOR LAYOUTS === */
 .editor-controls {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 15px;
-}
-
-.form-group {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    margin-bottom: 20px;
 }
 
 .editor-buttons {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
 }
 
 .helper-text {
-    color: var(--text-light);
-    font-size: 0.9rem;
-    margin-bottom: 15px;
+    color: var(--color-text-muted);
+    margin-top: -8px;
+    margin-bottom: 16px;
 }
 
-/* --- Rotation Editor Specifics --- */
-.rotation-grid-select {
-    width: 100%;
-    min-width: 120px;
-}
-
+/* Auto Save Status Indicator */
 .auto-save-status {
-    color: var(--success-color);
-    font-size: 0.9rem;
-    font-weight: 500;
+    font-size: 13px;
+    color: var(--brand-accent);
     opacity: 0;
-    transition: opacity 0.5s;
+    transition: opacity 0.3s;
 }
 
-/* --- Planner Layout (Main View) --- */
+/* === SCHEDULE VIEW (Layout) === */
+
+/* Ensures the schedule view takes the full available height */
 .planner-section {
-    /* Ensure the tab content fills the available height of the content-area */
-    height: 100%; 
+  height: 100%;
 }
 
 .planner-layout {
-    display: grid;
-    grid-template-columns: 300px 1fr;
-    gap: 20px;
-    /* Calculate height: 100vh - (header height + content-area padding) */
-    height: calc(100vh - (var(--header-height) + 40px));
+  display: grid;
+  grid-template-columns: 320px 1fr; /* Fixed width for controls, flexible for viewer */
+  gap: 24px;
+  height: 100%;
 }
 
 .planner-controls {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto; /* Allows tree view to scroll if it gets long */
 }
 
+/* Hierarchical Tree View */
 .schedules-tree {
-    flex-grow: 1;
-    overflow-y: auto;
-    margin-top: 15px;
-    padding-right: 10px;
+  flex-grow: 1;
+  margin-top: 16px;
 }
 
-.planner-viewer {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+.schedules-tree label {
+    cursor: pointer;
+    display: block;
+    padding: 8px 12px;
+    border-radius: 6px;
 }
 
-.visualization-container {
-    flex-grow: 1;
-    overflow: hidden; /* The internal timeline container handles its own scrolling */
-    /* margin-top: 15px;  Removed to maximize space */
+.schedules-tree input[type="checkbox"] {
+    margin-right: 8px;
 }
 
-/* --- Team Selection Tree --- */
-.tree-node-leader, .tree-node-advisor {
-    padding: 5px 0;
+.schedules-tree label:hover {
+    background-color: var(--color-hover-bg);
 }
 
-.tree-node-advisor {
-    padding-left: 25px;
-}
-
+/* Styling for the Leader nodes */
 .tree-node-leader label {
     font-weight: 600;
+    color: var(--brand-primary);
+    background-color: #EEF2FF; /* Light indigo background */
 }
 
-label {
-    cursor: pointer;
-    display: flex;
-    align-items: center;
+/* Styling for the Advisor nodes (indented) */
+.tree-node-advisor label {
+    padding-left: 32px;
 }
 
-input[type="checkbox"] {
-    margin-right: 8px;
-    cursor: pointer;
+
+.planner-viewer {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* Critical for the visualization container */
+  padding: 0; /* Remove padding from the card container itself */
 }
 
-/* --- Planner Header Controls --- */
 .planner-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--color-border);
 }
 
+/* View Controls (Daily/Weekly Toggle) */
 .planner-view-controls {
     display: flex;
     align-items: center;
     gap: 20px;
 }
 
-.view-toggle-group {
-    display: flex;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    overflow: hidden;
-}
-
-.btn-toggle {
-    padding: 6px 12px;
-    border: none;
-    background-color: transparent;
-    cursor: pointer;
-    font-size: 0.9rem;
-}
-
-.btn-toggle:not(:last-child) {
-    border-right: 1px solid var(--border-color);
-}
-
-.btn-toggle.active {
-    background-color: var(--primary-color);
-    color: white;
-}
-
 .planner-day-toggle {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
 }
 
-/* --- Daily Timeline (Gantt) Visualization --- */
-
-.timeline-container {
+.view-toggle-group {
     display: flex;
-    flex-direction: column;
-    height: 100%;
-    overflow: auto; /* Handles both vertical and horizontal scrolling */
-    position: relative; /* For indicators */
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+}
+
+.btn-toggle {
+    padding: 8px 16px;
+    font-size: 14px;
+    font-weight: 500;
+    background-color: var(--color-panel-bg);
+    color: var(--color-text-muted);
+    border: none;
+    cursor: pointer;
+}
+
+/* Handle rounded corners for the group */
+.btn-toggle:first-child {
+    border-top-left-radius: var(--border-radius);
+    border-bottom-left-radius: var(--border-radius);
+}
+.btn-toggle:last-child {
+    border-top-right-radius: var(--border-radius);
+    border-bottom-right-radius: var(--border-radius);
+}
+
+.btn-toggle.active {
+    background-color: var(--brand-primary);
+    color: white;
+}
+
+
+/* === VISUALIZATION CONTAINER === */
+.visualization-container {
+  flex-grow: 1;
+  overflow: auto; /* Allows the Gantt/Grid to scroll horizontally and vertically */
+  position: relative;
+}
+
+.visualization-empty {
+    padding: 40px;
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+/* === DAILY TIMELINE (GANTT) VIEW === */
+
+/* The container for the timeline rows and header */
+.timeline-container {
+    position: relative;
+    /* min-width ensures the timeline doesn't compress too much */
+    min-width: 1200px; 
 }
 
 .timeline-header {
-    display: flex;
-    position: sticky;
-    top: 0;
-    background-color: var(--card-bg);
-    z-index: 10;
-    border-bottom: 2px solid var(--border-color);
+  display: grid;
+  grid-template-columns: var(--timeline-name-col) 1fr;
+  background-color: var(--timeline-header-bg);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 100; /* Ensures header stays above content */
 }
 
-.timeline-body {
-    flex-grow: 1;
-}
-
-.header-name, .timeline-name {
-    width: 220px;
-    min-width: 220px;
-    padding: 15px 10px;
-    border-right: 1px solid var(--border-color);
-}
-
-.header-name {
+.header-name { 
+    padding: 12px 20px; 
+    border-right: 1px solid var(--color-border); 
     font-weight: 600;
-    /* Sticky behavior for the name column header */
+    /* Sticky positioning for the name column header */
     position: sticky;
     left: 0;
-    background-color: var(--card-bg);
-    z-index: 11;
+    background-color: var(--timeline-header-bg);
+    z-index: 10;
 }
 
-.header-timeline {
-    flex-grow: 1;
-    position: relative;
-    min-width: 1200px; /* Ensures timeline has enough space to render hours correctly */
+/* V15.1: Refined Header Timeline Styling (Matching Example) */
+.header-timeline { 
+    position: relative; 
+    height: 48px; 
+    background-color: var(--timeline-header-bg); 
 }
 
 .time-tick {
+  position: absolute;
+  font-size: 12px;
+  font-weight: 600; /* Bolder like the example */
+  color: #4B5563; /* Darker gray */
+  user-select: none;
+  height: 100%;
+  padding-left: 6px;
+  display: flex;
+  align-items: center;
+  top: 0;
+  /* Background behind text to prevent grid lines cutting through it */
+  background-color: var(--timeline-header-bg);
+  padding-right: 6px; 
+}
+
+/* V15.1: Grid Lines using pseudo-elements for better control */
+.time-tick::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 5000px; /* Extend line far down the page (will be clipped by overflow) */
+    width: 1px;
+    background-color: var(--timeline-grid-color);
+    z-index: -1; /* Behind the time label text */
+}
+
+
+/* Time Indicators (Current and Mouse) */
+.current-time-indicator {
     position: absolute;
     top: 0;
-    bottom: 0;
-    border-left: 1px solid var(--border-color);
-    padding-top: 5px;
-    font-size: 0.8rem;
-    color: var(--text-light);
-    /* Ensures the tick label is centered on the line */
-    transform: translateX(-50%); 
-    padding-left: 5px;
-    padding-right: 5px;
-    background-color: var(--card-bg); /* Prevents labels from overlapping strangely */
+    height: 100%;
+    width: 2px;
+    background-color: var(--color-danger);
+    z-index: 50;
+    display: none; /* Controlled by JS */
+    pointer-events: none; /* Allow clicks through the line */
 }
+
+.mouse-time-indicator {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 1px;
+    background-color: var(--color-text);
+    z-index: 51;
+    display: none; /* Controlled by JS */
+    pointer-events: none;
+}
+
+.mouse-time-tooltip {
+    position: absolute;
+    background-color: var(--color-text);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    z-index: 52;
+    display: none; /* Controlled by JS */
+    transform: translateX(-50%);
+    pointer-events: none;
+}
+
 
 .timeline-row {
-    display: flex;
-    border-bottom: 1px solid var(--border-color);
-    transition: background-color 0.1s;
+  display: grid;
+  grid-template-columns: var(--timeline-name-col) 1fr;
+  height: var(--timeline-row-height);
+  border-bottom: 1px solid var(--color-border);
+  /* V15.1: Make rows clickable for Live Editing */
+  cursor: pointer; 
 }
 
+/* V15.1: Hover effect for timeline rows */
 .timeline-row:hover {
-    background-color: #f9f9f9;
+    background-color: #F3F4F6 !important;
 }
 
-.timeline-name {
-    /* Sticky behavior for the advisor names when scrolling horizontally */
+/* Alternating row colors */
+.timeline-row:nth-child(odd) {
+    background-color: #FFFFFF;
+}
+.timeline-row:nth-child(even) {
+    background-color: #F9FAFB;
+}
+
+
+.timeline-name { 
+    padding: 0 20px; 
+    border-right: 1px solid var(--color-border); 
+    display: flex; 
+    align-items: center; 
+    font-size: 14px;
+    /* Sticky positioning for the name column body */
     position: sticky;
     left: 0;
-    background-color: inherit; /* Inherit from the row for hover effects */
-    z-index: 5;
-    display: flex;
-    align-items: center;
+    z-index: 10;
+    background-color: inherit; /* Inherits the alternating row color */
 }
 
 .timeline-track {
-    flex-grow: 1;
     position: relative;
-    min-height: 40px;
-    min-width: 1200px;
-    cursor: pointer; /* Indicate clickability for Live Editing */
+    height: 100%;
 }
 
 .timeline-bar {
-    position: absolute;
-    height: 70%;
-    top: 15%;
-    border-radius: 4px;
-    white-space: nowrap;
-    overflow: hidden;
-    font-size: 0.8rem;
-    display: flex;
-    align-items: center;
-    padding: 0 5px;
-    box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+  position: absolute;
+  top: 0;
+  height: var(--timeline-bar-height);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 0; /* Square edges */
+  border-right: 1px solid rgba(255,255,255,0.3); /* Subtle separator between segments */
 }
 
-/* Timeline Bar Colors */
-.timeline-bar.is-activity {
-    background-color: var(--activity-color);
-    color: var(--text-color);
-}
-
+/* Visualization Styles (Matching Screenshot Request) */
 .timeline-bar.is-gap {
-    background-color: var(--gap-color);
-    color: var(--text-light);
+    background-color: #D1D5DB !important; /* Gray for breaks/lunch */
+    color: #4B5563 !important;
 }
 
-/* V15.1: Exception Visualization (Hatched Pattern) */
-.timeline-row.is-exception .timeline-track {
-    /* Creates a subtle hatched background pattern using a distinct color (e.g., light orange) */
+.timeline-bar.is-activity {
+    /* Using the Olive Green color from the screenshots provided previously */
+    background-color: #808000 !important; 
+    color: white !important;
+}
+
+/* V15.1: Exception Visualization (Hatched Overlay) */
+/* When the parent row has 'is-exception', apply the overlay to the bars inside it */
+.is-exception .timeline-bar {
+    /* Apply a repeating linear gradient overlay to indicate an exception */
     background-image: repeating-linear-gradient(
         135deg,
-        rgba(243, 156, 18, 0.1),
-        rgba(243, 156, 18, 0.1) 10px,
+        rgba(255, 255, 255, 0.2),
+        rgba(255, 255, 255, 0.2) 10px,
         transparent 10px,
         transparent 20px
     );
 }
 
-/* --- Weekly Grid Visualization --- */
-.weekly-grid th {
-    text-align: center;
+
+/* === WEEKLY VIEW === */
+.weekly-grid {
+    width: 100%;
 }
 
-.weekly-grid td {
-    text-align: center;
-    vertical-align: middle;
-    padding: 5px;
-    min-width: 100px;
+/* Sticky headers for the weekly grid */
+.weekly-grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
+
+/* V15.1: Make weekly cells clickable */
+/* We apply this to the TD element itself (using class .weekly-cell applied by JS) */
+.weekly-cell {
+    cursor: pointer;
+}
+
+/* V15.1: Exception visualization for weekly view */
+.weekly-cell.is-exception {
+    /* Add a distinct border to indicate an exception */
+    border: 2px solid var(--color-exception);
+}
+
 
 .weekly-cell-content {
     display: flex;
     flex-direction: column;
-    padding: 8px;
-    border-radius: 6px;
-    background-color: #f9f9f9;
-    cursor: pointer; /* Indicate clickability for Live Editing */
-    transition: background-color 0.1s;
-}
-
-.weekly-cell-content:hover {
-     background-color: #e9f5fe;
+    align-items: flex-start;
+    /* Padding is applied to the TD in the base table styles */
 }
 
 .weekly-shift-code {
-    font-weight: 600;
-    font-size: 1rem;
-    margin-bottom: 4px;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--brand-primary);
+}
+
+/* V15.1: Change code color if it's an exception */
+.is-exception .weekly-shift-code {
+    color: var(--color-exception);
 }
 
 .weekly-shift-time {
-    font-size: 0.8rem;
-    color: var(--text-light);
+    font-size: 12px;
+    color: var(--color-text-muted);
 }
 
 .weekly-rdo {
-    font-size: 0.9rem;
-    color: var(--text-light);
-}
-
-/* V15.1: Exception Visualization (Purple Border) */
-.weekly-cell.is-exception .weekly-cell-content {
-    border: 2px solid #8e44ad; /* Distinct purple border */
-    background-color: #f8f1fc; /* Light purple background */
+    font-size: 13px;
+    color: #9CA3AF;
+    font-weight: 500;
 }
 
 
-/* --- Intraday Indicators --- */
+/* === SEQUENTIAL BUILDER MODAL (Shared) === */
+.modal-backdrop { display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(17, 24, 39, 0.5); align-items: center; justify-content: center; }
+.modal-content { background-color: var(--color-panel-bg); margin: auto; border-radius: var(--border-radius); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; max-height: 85vh; }
+.modal-lg { width: 90%; max-width: 1000px; }
+.modal-header, .modal-footer { padding: 20px 24px; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-border); }
+.modal-footer { border-top: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; }
+.modal-close { color: var(--color-text); }
+.modal-body { flex-grow: 1; overflow: hidden; padding: 24px; }
 
-.current-time-indicator {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background-color: var(--danger-color);
-    z-index: 20;
-    display: none; /* Hidden by default, shown by JS if applicable */
-}
-/* Add a small triangle/caret at the top */
-.current-time-indicator::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 0; 
-    height: 0; 
-    border-left: 6px solid transparent;
-    border-right: 6px solid transparent;
-    border-top: 6px solid var(--danger-color);
-}
+/* Layout inside the modal */
+.sequential-layout { display: flex; flex-direction: column; height: 100%; }
+.builder-controls { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
+.time-picker-input { width: 120px; }
 
+/* Scrollable grid container */
+.builder-grid-container { flex-grow: 1; overflow-y: auto; border-radius: var(--border-radius); }
 
-.mouse-time-indicator {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background-color: rgba(0,0,0,0.5);
-    z-index: 19;
-    pointer-events: none; /* Don't block clicks on the timeline */
-    display: none;
-}
-
-.mouse-time-tooltip {
-    position: absolute;
-    background-color: rgba(0,0,0,0.7);
-    color: white;
-    padding: 3px 6px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    z-index: 21;
-    pointer-events: none;
-    transform: translateX(-50%);
-    display: none;
-}
-
-
-/* --- Modal (Sequential Builder) --- */
-.modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.5);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.modal-content {
-    background-color: var(--card-bg);
-    border-radius: 8px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-    width: 90%;
-    max-width: 600px;
-    display: flex;
-    flex-direction: column;
-    max-height: 90vh;
-}
-
-.modal-lg {
-    max-width: 900px;
-}
-
-.modal-header {
-    padding: 15px 20px;
-    border-bottom: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.modal-header h2 {
-    margin: 0;
-    font-size: 1.2rem;
-}
-
-.modal-body {
-    padding: 20px;
-    overflow-y: auto;
-    flex-grow: 1;
-}
-
-.modal-footer {
-    padding: 15px 20px;
-    border-top: 1px solid var(--border-color);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* --- Sequential Builder Layout --- */
-.builder-controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
-}
-
-.time-picker-input {
-    width: 100px;
-}
-
-.builder-grid-container {
-    overflow-x: auto;
-}
-
-.builder-grid {
-    width: 100%;
-}
-
-.builder-grid th {
-    font-size: 0.8rem;
-}
-
-.builder-grid td {
-    padding: 8px;
-}
-
-.duration-input {
-    width: 80px;
-}
-
-.time-display {
-    font-family: monospace;
-}
-
-.editor-summary {
-    font-size: 0.9rem;
-}
+/* Specific table styles for the builder */
+.builder-grid th { font-size: 12px; padding: 10px 16px; position: sticky; top: 0; z-index: 1; }
+.builder-grid td { padding: 8px 16px; }
+.builder-grid .form-select, .builder-grid .form-input { width: 100%; padding: 6px 10px; font-size: 13px; }
+.duration-input { max-width: 100px; }
+.time-display { font-weight: 500; color: var(--color-text-muted); }
+.editor-summary { font-size: 14px; font-weight: 500; }
 
 /* V15.1: Exception Reason Input */
 .exception-reason-group {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
 }
 
-/* --- Notifications (Toasts) --- */
+#modalExceptionReason {
+    width: 100%;
+}
+
+/* === NOTIFICATION TOAST === */
 #notification-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 2000;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .toast {
-    padding: 12px 20px;
-    border-radius: 6px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    color: white;
-    min-width: 250px;
+  padding: 16px 20px;
+  border-radius: var(--border-radius);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  min-width: 300px;
+  color: var(--color-text);
+  font-weight: 500;
 }
 
 .toast.is-success {
-    background-color: var(--success-color);
+    background-color: #D1FAE5;
+    border-left: 4px solid var(--brand-accent);
 }
 
 .toast.is-danger {
-    background-color: var(--danger-color);
-}
-
-/* --- Utility Classes --- */
-.visualization-empty {
-    padding: 50px;
-    text-align: center;
-    color: var(--text-light);
-    font-style: italic;
+    background-color: var(--color-danger-bg);
+    border-left: 4px solid var(--color-danger);
 }

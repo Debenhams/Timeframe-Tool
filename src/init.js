@@ -1,22 +1,26 @@
 /**
- * WFM Intelligence Platform - Initialization (v15.5.1)
- * 
- * Bootstraps the application when the DOM is ready.
+ * WFM Intelligence Platform - Initialization (v15.5)
+ * Bootloader script.
  */
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Check if the main application logic (planner.js) has loaded and exposed the Core module
-    if (window.APP && window.APP.Core && typeof window.APP.Core.initialize === 'function') {
-        window.APP.Core.initialize();
-    } else {
-        // Fallback error handling if planner.js failed to load or is corrupted
-        console.error("Application failed to bootstrap. Core modules not found. Check planner.js integrity.");
-        // Display a user-friendly error message
-        const contentArea = document.getElementById('main-content-area');
-        if (contentArea) {
-            contentArea.innerHTML = "<h1>Fatal Error: Application modules failed to load. Please check file integrity and refresh.</h1>";
-        } else if (document.body) {
-             document.body.innerHTML = "<h1>Fatal Error: Application structure missing.</h1>";
+(function() {
+    // Ensure the DOM is fully loaded before initialization
+    document.addEventListener('DOMContentLoaded', () => {
+        if (window.APP && window.APP.Core) {
+            // Start the application
+            window.APP.Core.initialize();
+        } else {
+            // If APP.Core is not available, the planner.js file failed to load or is corrupted.
+            console.error("Fatal Error: Application core not found. Check planner.js loading and syntax.");
+            // Display a user-friendly error message
+            const mainArea = document.getElementById('main-content-area');
+            if (mainArea) {
+                mainArea.innerHTML = `<div class="card" style="text-align: center; padding: 50px; margin: 24px;">
+                    <h1>Initialization Failed</h1>
+                    <p>The core application files could not be loaded or are corrupted.</p>
+                    <p>Please check the console for errors and ensure all files are deployed correctly.</p>
+                </div>`;
+            }
         }
-    }
-});
+    });
+})();

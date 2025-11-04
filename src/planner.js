@@ -1,12 +1,13 @@
 /**
- * WFM Intelligence Platform - Application Logic (v15.5.1)
+ * WFM Intelligence Platform - Application Logic (v15.4)
  * 
- * V15.5.1: CRITICAL FIX: Robust Rotation Parsing. 
- *          - Updated Regex in all modules to correctly parse rotation keys (supports "Week1" and "Week 1").
- *          - Added fallback logic to read legacy day keys ("mon", "tue") in Visualization and Editor.
- *          - Implemented auto-normalization in Rotation Editor to clean legacy formats on save.
- * V15.4: Stabilization release.
- * V15.1: Implementation of Phase 2 (Live Editing, Exceptions), Finite Rotations, Visualization enhancements (06:00-20:00).
+ * V15.4: Stabilization release, ensuring all modules are consolidated correctly.
+ * V15.3: Restored missing SequentialBuilder module omitted in V15.2.
+ * V15.1: Implementation of Phase 2 (Live Editing, Exception Handling, Hybrid Adherence).
+ * V15.1: Implemented Finite Rotations (Non-repeating).
+ * V15.1: Added "Add Week" feature for rotation extensibility.
+ * V15.1: Visualization enhancements (06:00-20:00 range).
+ * Consolidated file (includes all modules).
  */
 
 // Global Namespace Initialization
@@ -192,9 +193,8 @@ window.APP = window.APP || {};
             if (pattern && pattern.pattern && Object.keys(pattern.pattern).length > 0) {
                 const keys = Object.keys(pattern.pattern);
                 // Robust method to find the max week number defined in the pattern
-                // V15.5.1 FIX: Updated regex to support "Week1" and "Week 1" (optional space)
                 const weekNumbers = keys.map(k => {
-                    const match = k.match(/^Week ?(\d+)$/i);
+                    const match = k.match(/^Week (\d+)$/i);
                     return match ? parseInt(match[1], 10) : 0;
                 });
                 const maxWeek = Math.max(0, ...weekNumbers);
@@ -481,6 +481,8 @@ window.APP = window.APP || {};
 
     APP.StateManager = StateManager;
 }(window.APP));
+
+
 /**
  * MODULE: APP.Components.ComponentManager
  * Manages the CRUD operations for Schedule Components (Activities, Breaks, etc.).
@@ -788,7 +790,7 @@ window.APP = window.APP || {};
         // 3. Initialize UI
         ELS.modalTitle.textContent = config.title;
         
-        if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
+        if (ELS.modalStartTime._flatpickr) {
             ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
         }
 
@@ -808,9 +810,7 @@ window.APP = window.APP || {};
 
     SequentialBuilder.close = () => {
         BUILDER_STATE.isOpen = false;
-        if (ELS.modal) {
-            ELS.modal.style.display = 'none';
-        }
+        ELS.modal.style.display = 'none';
     };
 
     // Renders the dynamic sequence grid (The Ripple Effect)
@@ -1129,17 +1129,6 @@ window.APP = window.APP || {};
  */
 (function(APP) {
     const RotationEditor = {};
-    // [Implementation continues...]
-    // !! ATTENTION: Due to persistent length limitations, the remainder of this file 
-    // (RotationEditor, ScheduleViewer, and Core modules) must be sent in a final chunk.
-    // Please request the final part (Part 3 of 3) to complete the transfer.
-}(window.APP));
-/**
- * MODULE: APP.Components.RotationEditor
- * Manages the creation and modification of rotation patterns (Auto-Save Architecture).
- */
-(function(APP) {
-    const RotationEditor = {};
     const ELS = {};
 
     RotationEditor.initialize = () => {
@@ -1185,9 +1174,8 @@ window.APP = window.APP || {};
         if (pattern) {
              if (pattern.pattern && Object.keys(pattern.pattern).length > 0) {
                 const keys = Object.keys(pattern.pattern);
-                // V15.5.1 FIX: Updated regex to support "Week1" and "Week 1" (optional space)
                 const weekNumbers = keys.map(k => {
-                    const match = k.match(/^Week ?(\d+)$/i);
+                    const match = k.match(/^Week (\d+)$/i);
                     return match ? parseInt(match[1], 10) : 0;
                 });
                 const maxWeek = Math.max(0, ...weekNumbers);
@@ -1237,16 +1225,12 @@ window.APP = window.APP || {};
         // Set selected values (must be done after HTML insertion)
         if (pattern) {
             weeks.forEach(w => {
-                // V15.5.1 FIX: Need a robust way to find the week data regardless of key format
-                const weekKey = findWeekKey(patternData, w);
-                const weekData = weekKey ? patternData[weekKey] : {};
+                const weekKey = `Week ${w}`;
+                const weekData = patternData[weekKey] || {};
                 
                 days.forEach((d, i) => {
                     const dow = i + 1;
-                    // V15.5.1 FIX: Handle legacy DOW keys (e.g., 'mon') if numerical key is missing
-                    const legacyDayKey = d.toLowerCase();
-                    const code = weekData[dow] || weekData[legacyDayKey] || ''; 
-
+                    const code = weekData[dow] || ''; 
                     const sel = ELS.grid.querySelector(`select[data-week="${w}"][data-dow="${dow}"]`);
                     if (sel) {
                         sel.value = code;
@@ -1259,16 +1243,6 @@ window.APP = window.APP || {};
         if (ELS.btnAddWeek) {
             ELS.btnAddWeek.disabled = !pattern;
         }
-    };
-
-    // V15.5.1 Helper: Finds the correct key in the pattern data (handles "Week 1", "Week1", "week1" etc.)
-    const findWeekKey = (patternData, weekNumber) => {
-        const keys = Object.keys(patternData);
-        // Find the key that matches the week number using the robust regex
-        return keys.find(k => {
-            const match = k.match(/^Week ?(\d+)$/i);
-            return match && parseInt(match[1], 10) === weekNumber;
-        });
     };
 
     const handleFamilyChange = () => {
@@ -1285,7 +1259,7 @@ window.APP = window.APP || {};
             return;
         }
         
-        // Initialize with a standard 6-week structure (Using standard "Week N" format)
+        // Initialize with a standard 6-week structure
         const initialPattern = {};
         for (let i = 1; i <= 6; i++) {
             initialPattern[`Week ${i}`] = {};
@@ -1316,18 +1290,16 @@ window.APP = window.APP || {};
 
         // Determine the next week number
         const keys = Object.keys(pattern.pattern || {});
-        // V15.5.1 FIX: Updated regex to support "Week1" and "Week 1" (optional space)
         const weekNumbers = keys.map(k => {
-            const match = k.match(/^Week ?(\d+)$/i);
+            const match = k.match(/^Week (\d+)$/i);
             return match ? parseInt(match[1], 10) : 0;
         });
         const maxWeek = Math.max(0, ...weekNumbers);
         const nextWeek = maxWeek + 1;
 
-        // Update the pattern structure locally (Using standard "Week N" format)
+        // Update the pattern structure locally
         if (!pattern.pattern) pattern.pattern = {};
-        const nextWeekKey = `Week ${nextWeek}`;
-        pattern.pattern[nextWeekKey] = {};
+        pattern.pattern[`Week ${nextWeek}`] = {};
 
         // Save the updated structure (Auto-Save Architecture)
         const { error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: pattern.pattern }, { name: rotationName });
@@ -1338,7 +1310,7 @@ window.APP = window.APP || {};
             RotationEditor.renderGrid(); // Re-render the grid to show the new week
         } else {
             // Rollback local change if save failed
-            delete pattern.pattern[nextWeekKey];
+            delete pattern.pattern[`Week ${nextWeek}`];
         }
     };
 
@@ -1382,32 +1354,14 @@ window.APP = window.APP || {};
         
         // 1. Update the local state object
         if (!pattern.pattern) pattern.pattern = {};
-
-        // V15.5.1 FIX: Find the correct week key format or create it if missing (using standard format)
-        let weekKey = findWeekKey(pattern.pattern, parseInt(week, 10));
-        if (!weekKey) {
-            weekKey = `Week ${week}`; // Use standard format for new entries
-        }
-
+        const weekKey = `Week ${week}`;
         if (!pattern.pattern[weekKey]) pattern.pattern[weekKey] = {};
         
-        // V15.5.1: Normalize the update by removing legacy keys and using the standard numerical DOW key
-        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-        const legacyDayKey = days[parseInt(dow, 10) - 1];
-
         if (shiftCode) {
             // Ensure the shift code is stored consistently as a string
             pattern.pattern[weekKey][dow] = String(shiftCode);
-            // Remove the legacy key if it exists (Normalization)
-            if (pattern.pattern[weekKey].hasOwnProperty(legacyDayKey)) {
-                delete pattern.pattern[weekKey][legacyDayKey];
-            }
         } else {
-            // RDO (Remove the keys)
-            delete pattern.pattern[weekKey][dow]; 
-            if (pattern.pattern[weekKey].hasOwnProperty(legacyDayKey)) {
-                delete pattern.pattern[weekKey][legacyDayKey];
-            }
+            delete pattern.pattern[weekKey][dow]; // RDO (Remove the key)
         }
 
         // 2. Auto-save the entire pattern object
@@ -1914,24 +1868,14 @@ window.APP = window.APP || {};
         if (effectiveWeek === null) return { segments: [], source: 'rotation', reason: null };
         
         // Determine the day index (1-7)
-        const dayIndex = (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(dayName) + 1);
-        const dayIndexStr = dayIndex.toString();
-
+        const dayIndex = (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(dayName) + 1).toString();
 
         const pattern = APP.StateManager.getPatternByName(assignment.rotation_name);
         if (!pattern || !pattern.pattern) return { segments: [], source: 'rotation', reason: null };
         
         // Look up the shift code in the rotation pattern
-        // V15.5.1 FIX: Use the robust key finder helper
-        const weekKey = findWeekKey(pattern.pattern, effectiveWeek);
-        const weekPattern = weekKey ? pattern.pattern[weekKey] : {};
-
-        // V15.5.1 FIX: Handle legacy DOW keys (e.g., 'mon') if numerical key is missing
-        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-        const legacyDayKey = days[dayIndex - 1];
-        
-        const shiftCode = weekPattern[dayIndexStr] || weekPattern[legacyDayKey];
-
+        const weekPattern = pattern.pattern[`Week ${effectiveWeek}`] || {};
+        const shiftCode = weekPattern[dayIndex];
 
         if (!shiftCode) return { segments: [], source: 'rotation', reason: null }; // RDO
 
@@ -1946,16 +1890,6 @@ window.APP = window.APP || {};
         // Ensure segments are sorted
         const sortedRotation = JSON.parse(JSON.stringify(definition.structure)).sort((a, b) => a.start_min - b.start_min);
         return { segments: sortedRotation, source: 'rotation', reason: null };
-    };
-
-    // V15.5.1 Helper: Duplicated from RotationEditor for use in calculateSegments
-    const findWeekKey = (patternData, weekNumber) => {
-        const keys = Object.keys(patternData);
-        // Find the key that matches the week number using the robust regex
-        return keys.find(k => {
-            const match = k.match(/^Week ?(\d+)$/i);
-            return match && parseInt(match[1], 10) === weekNumber;
-        });
     };
 
     // --- INTRADAY INDICATORS (Daily View Only) ---
@@ -2073,7 +2007,7 @@ window.APP = window.APP || {};
 
     // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v15.5.1) Initializing...");
+        console.log("WFM Intelligence Platform (v15.4) Initializing...");
         
         // Initialize foundational services
         APP.Utils.cacheDOMElements();
@@ -2189,9 +2123,8 @@ window.APP = window.APP || {};
     };
 
     const updateWeek = (days) => {
-        if (!ELS.weekStart || !ELS.weekStart._flatpickr) return;
         const flatpickrInstance = ELS.weekStart._flatpickr;
-        
+        if (!flatpickrInstance) return;
         const currentDate = flatpickrInstance.selectedDates[0] || new Date();
         currentDate.setDate(currentDate.getDate() + days);
         // Set the new date and trigger the onChange event
