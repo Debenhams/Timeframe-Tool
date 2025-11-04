@@ -452,8 +452,11 @@ window.APP = window.APP || {};
         const collection = STATE[stateKey];
         if (!collection) return;
 
-        // Determine primary key (handle 'name' for patterns, 'id' otherwise)
-        const primaryKey = (tableName === 'rotation_patterns') ? 'name' : 'id';
+        // Determine primary key (patterns by name, assignments by advisor_id, else id)
+        let primaryKey = 'id';
+        if (tableName === 'rotation_patterns') primaryKey = 'name';
+        if (tableName === 'rotation_assignments') primaryKey = 'advisor_id';
+
         
         if (!record.hasOwnProperty(primaryKey)) {
             console.error("SyncRecord failed: Record missing primary key", primaryKey, record);
