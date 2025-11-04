@@ -1,13 +1,10 @@
 /**
- * WFM Intelligence Platform - Application Logic (v15.4)
+ * WFM Intelligence Platform - Application Logic (v15.5.2)
  * 
- * V15.4: Stabilization release, ensuring all modules are consolidated correctly.
- * V15.3: Restored missing SequentialBuilder module omitted in V15.2.
- * V15.1: Implementation of Phase 2 (Live Editing, Exception Handling, Hybrid Adherence).
- * V15.1: Implemented Finite Rotations (Non-repeating).
- * V15.1: Added "Add Week" feature for rotation extensibility.
- * V15.1: Visualization enhancements (06:00-20:00 range).
- * Consolidated file (includes all modules).
+ * V15.5.2: STABILITY FIX: Added robust null checks in SequentialBuilder.open/initialize 
+ *          to prevent crashes if index.html is truncated/incomplete (e.g., missing modalStartTime).
+ * V15.5.1: CRITICAL FIX: Robust Rotation Parsing.
+ * V15.1: Implementation of Phase 2 (Live Editing, Exceptions), Finite Rotations (06:00-20:00).
  */
 
 // Global Namespace Initialization
@@ -20,8 +17,7 @@ window.APP = window.APP || {};
     const Config = {};
 
     // Supabase Configuration (Centralized)
-    // SECURITY NOTE: In a production environment, these keys should be managed securely (e.g., environment variables) 
-    // and Row Level Security (RLS) should be enabled on the Supabase tables.
+    // SECURITY NOTE: RLS should be enabled on the Supabase tables in production.
     Config.SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
     Config.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 
@@ -56,7 +52,7 @@ window.APP = window.APP || {};
         ELS.notificationContainer.appendChild(toast);
         // Auto-remove the toast
         setTimeout(() => { 
-            if (toast.parentNode === ELS.notificationContainer) {
+            if (ELS.notificationContainer && toast.parentNode === ELS.notificationContainer) {
                 ELS.notificationContainer.removeChild(toast);
             }
         }, duration);
@@ -193,8 +189,9 @@ window.APP = window.APP || {};
             if (pattern && pattern.pattern && Object.keys(pattern.pattern).length > 0) {
                 const keys = Object.keys(pattern.pattern);
                 // Robust method to find the max week number defined in the pattern
+                // V15.5.1 FIX: Updated regex to support "Week1" and "Week 1" (optional space)
                 const weekNumbers = keys.map(k => {
-                    const match = k.match(/^Week (\d+)$/i);
+                    const match = k.match(/^Week ?(\d+)$/i);
                     return match ? parseInt(match[1], 10) : 0;
                 });
                 const maxWeek = Math.max(0, ...weekNumbers);
@@ -233,11 +230,12 @@ window.APP = window.APP || {};
 
     // Initialize the Supabase client
     DataService.initialize = () => {
-        const { createClient } = window.supabase;
-        if (!createClient) {
-            APP.Utils.showToast("Error: Supabase library not loaded.", "danger", 10000);
+        if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
+             APP.Utils.showToast("Error: Database library (Supabase) not loaded.", "danger", 10000);
             return false;
         }
+        const { createClient } = window.supabase;
+
         supabase = createClient(APP.Config.SUPABASE_URL, APP.Config.SUPABASE_ANON_KEY);
         return true;
     };
@@ -307,7 +305,7 @@ window.APP = window.APP || {};
 
             // Handle exceptions table load failure gracefully
             if (exceptions.error) {
-                 console.warn("Warning: Failed to load schedule_exceptions. Ensure V15 schema is applied. Live Editing will function but may not load existing exceptions.", exceptions.error);
+                 console.warn("Warning: Failed to load schedule_exceptions. Ensure V15 schema is applied.", exceptions.error);
                  // Continue initialization but without exception data
                  exceptions.data = [];
             }
@@ -329,8 +327,6 @@ window.APP = window.APP || {};
 
     APP.DataService = DataService;
 }(window.APP));
-
-
 /**
  * MODULE: APP.StateManager
  * Manages the application's state, selectors, synchronization, and history (Undo/Redo).
@@ -616,7 +612,7 @@ window.APP = window.APP || {};
             }
             
             const dateInput = row.querySelector('.assign-start-date');
-            if (dateInput) {
+            if (dateInput && typeof flatpickr !== 'undefined') {
                 // Configure Flatpickr to display and output as d/m/Y (UK format).
                 flatpickr(dateInput, {
                     dateFormat: "d/m/Y",
@@ -686,11 +682,9 @@ window.APP = window.APP || {};
     APP.Components = APP.Components || {};
     APP.Components.AssignmentManager = AssignmentManager;
 }(window.APP));
-
-
 /**
  * MODULE: APP.Components.SequentialBuilder (Shared Modal Logic)
- * V15.1: Extracted module to support both Shift Definitions and Exceptions (Live Editing).
+ * V15.5.2: Extracted module to support both Shift Definitions and Exceptions (Live Editing). Includes stability fixes.
  */
 (function(APP) {
     const SequentialBuilder = {};
@@ -723,6 +717,13 @@ window.APP = window.APP || {};
         ELS.exceptionReasonGroup = document.getElementById('exceptionReasonGroup');
         ELS.modalExceptionReason = document.getElementById('modalExceptionReason');
 
+        // V15.5.2: Check if critical elements are found during initialization
+        if (!ELS.modal || !ELS.modalSave || !ELS.modalSequenceBody || !ELS.modalStartTime) {
+            console.error("CRITICAL ERROR: SequentialBuilder failed to find necessary modal elements (e.g., modalStartTime) in index.html during initialization. Check HTML integrity.");
+            // We allow initialization to continue so the rest of the app might work, 
+            // but SequentialBuilder.open() will catch the error when trying to use it.
+        }
+
         // Event Listeners
         if (ELS.modalClose) ELS.modalClose.addEventListener('click', SequentialBuilder.close);
         if (ELS.modalAddActivity) ELS.modalAddActivity.addEventListener('click', handleAddActivity);
@@ -741,6 +742,11 @@ window.APP = window.APP || {};
 
         // Initialize Time Picker (Flatpickr)
         if (ELS.modalStartTime) {
+            // Check if flatpickr library is loaded before using it
+            if (typeof flatpickr === 'undefined') {
+                console.error("CRITICAL ERROR: flatpickr library not loaded during SequentialBuilder init.");
+                return;
+            }
             flatpickr(ELS.modalStartTime, {
                 enableTime: true,
                 noCalendar: true,
@@ -760,6 +766,13 @@ window.APP = window.APP || {};
     // config: { mode, id, title, structure, date (optional), reason (optional) }
     SequentialBuilder.open = (config) => {
         
+        // V15.5.2 FIX: Ensure modal elements exist before attempting to open.
+        if (!ELS.modal || !ELS.modalStartTime) {
+            console.error("ERROR: Attempted to open SequentialBuilder, but critical modal elements (modal or startTime) are missing. Check index.html integrity.");
+            APP.Utils.showToast("Fatal UI Error: Editor component missing. Please ensure index.html is complete.", "danger", 10000);
+            return;
+        }
+
         // 1. Convert absolute times (structure) to sequential format (segments)
         const sequentialSegments = [];
         let startTimeMin = 480; // Default 8:00 AM
@@ -790,7 +803,9 @@ window.APP = window.APP || {};
         // 3. Initialize UI
         ELS.modalTitle.textContent = config.title;
         
-        if (ELS.modalStartTime._flatpickr) {
+        // V15.5.2 FIX: Added check for ELS.modalStartTime existence before accessing _flatpickr
+        // This prevents the "Cannot read properties of null" crash if the HTML is incomplete.
+        if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
             ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
         }
 
@@ -810,7 +825,7 @@ window.APP = window.APP || {};
 
     SequentialBuilder.close = () => {
         BUILDER_STATE.isOpen = false;
-        ELS.modal.style.display = 'none';
+        if (ELS.modal) ELS.modal.style.display = 'none';
     };
 
     // Renders the dynamic sequence grid (The Ripple Effect)
@@ -1174,8 +1189,9 @@ window.APP = window.APP || {};
         if (pattern) {
              if (pattern.pattern && Object.keys(pattern.pattern).length > 0) {
                 const keys = Object.keys(pattern.pattern);
+                // V15.5.1 FIX: Updated regex to support "Week1" and "Week 1" (optional space)
                 const weekNumbers = keys.map(k => {
-                    const match = k.match(/^Week (\d+)$/i);
+                    const match = k.match(/^Week ?(\d+)$/i);
                     return match ? parseInt(match[1], 10) : 0;
                 });
                 const maxWeek = Math.max(0, ...weekNumbers);
@@ -1225,12 +1241,16 @@ window.APP = window.APP || {};
         // Set selected values (must be done after HTML insertion)
         if (pattern) {
             weeks.forEach(w => {
-                const weekKey = `Week ${w}`;
-                const weekData = patternData[weekKey] || {};
+                // V15.5.1 FIX: Need a robust way to find the week data regardless of key format
+                const weekKey = findWeekKey(patternData, w);
+                const weekData = weekKey ? patternData[weekKey] : {};
                 
                 days.forEach((d, i) => {
                     const dow = i + 1;
-                    const code = weekData[dow] || ''; 
+                    // V15.5.1 FIX: Handle legacy DOW keys (e.g., 'mon') if numerical key is missing
+                    const legacyDayKey = d.toLowerCase();
+                    const code = weekData[dow] || weekData[legacyDayKey] || ''; 
+
                     const sel = ELS.grid.querySelector(`select[data-week="${w}"][data-dow="${dow}"]`);
                     if (sel) {
                         sel.value = code;
@@ -1243,6 +1263,16 @@ window.APP = window.APP || {};
         if (ELS.btnAddWeek) {
             ELS.btnAddWeek.disabled = !pattern;
         }
+    };
+
+    // V15.5.1 Helper: Finds the correct key in the pattern data (handles "Week 1", "Week1", "week1" etc.)
+    const findWeekKey = (patternData, weekNumber) => {
+        const keys = Object.keys(patternData);
+        // Find the key that matches the week number using the robust regex
+        return keys.find(k => {
+            const match = k.match(/^Week ?(\d+)$/i);
+            return match && parseInt(match[1], 10) === weekNumber;
+        });
     };
 
     const handleFamilyChange = () => {
@@ -1259,7 +1289,7 @@ window.APP = window.APP || {};
             return;
         }
         
-        // Initialize with a standard 6-week structure
+        // Initialize with a standard 6-week structure (Using standard "Week N" format)
         const initialPattern = {};
         for (let i = 1; i <= 6; i++) {
             initialPattern[`Week ${i}`] = {};
@@ -1290,16 +1320,18 @@ window.APP = window.APP || {};
 
         // Determine the next week number
         const keys = Object.keys(pattern.pattern || {});
+        // V15.5.1 FIX: Updated regex to support "Week1" and "Week 1" (optional space)
         const weekNumbers = keys.map(k => {
-            const match = k.match(/^Week (\d+)$/i);
+            const match = k.match(/^Week ?(\d+)$/i);
             return match ? parseInt(match[1], 10) : 0;
         });
         const maxWeek = Math.max(0, ...weekNumbers);
         const nextWeek = maxWeek + 1;
 
-        // Update the pattern structure locally
+        // Update the pattern structure locally (Using standard "Week N" format)
         if (!pattern.pattern) pattern.pattern = {};
-        pattern.pattern[`Week ${nextWeek}`] = {};
+        const nextWeekKey = `Week ${nextWeek}`;
+        pattern.pattern[nextWeekKey] = {};
 
         // Save the updated structure (Auto-Save Architecture)
         const { error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: pattern.pattern }, { name: rotationName });
@@ -1310,7 +1342,7 @@ window.APP = window.APP || {};
             RotationEditor.renderGrid(); // Re-render the grid to show the new week
         } else {
             // Rollback local change if save failed
-            delete pattern.pattern[`Week ${nextWeek}`];
+            delete pattern.pattern[nextWeekKey];
         }
     };
 
@@ -1354,14 +1386,32 @@ window.APP = window.APP || {};
         
         // 1. Update the local state object
         if (!pattern.pattern) pattern.pattern = {};
-        const weekKey = `Week ${week}`;
+
+        // V15.5.1 FIX: Find the correct week key format or create it if missing (using standard format)
+        let weekKey = findWeekKey(pattern.pattern, parseInt(week, 10));
+        if (!weekKey) {
+            weekKey = `Week ${week}`; // Use standard format for new entries
+        }
+
         if (!pattern.pattern[weekKey]) pattern.pattern[weekKey] = {};
         
+        // V15.5.1: Normalize the update by removing legacy keys and using the standard numerical DOW key
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        const legacyDayKey = days[parseInt(dow, 10) - 1];
+
         if (shiftCode) {
             // Ensure the shift code is stored consistently as a string
             pattern.pattern[weekKey][dow] = String(shiftCode);
+            // Remove the legacy key if it exists (Normalization)
+            if (pattern.pattern[weekKey].hasOwnProperty(legacyDayKey)) {
+                delete pattern.pattern[weekKey][legacyDayKey];
+            }
         } else {
-            delete pattern.pattern[weekKey][dow]; // RDO (Remove the key)
+            // RDO (Remove the keys)
+            delete pattern.pattern[weekKey][dow]; 
+            if (pattern.pattern[weekKey].hasOwnProperty(legacyDayKey)) {
+                delete pattern.pattern[weekKey][legacyDayKey];
+            }
         }
 
         // 2. Auto-save the entire pattern object
@@ -1488,7 +1538,6 @@ window.APP = window.APP || {};
             
             // Calculate the current segments for this specific date to initialize the builder.
             // We must calculate the Monday for that specific date to ensure rotation calculation is correct
-            // (e.g., if we clicked on a date far in the future via the weekly view).
             const weekStartISO = APP.Utils.getMondayForDate(dateISO); 
             
             // Use the robust calculateSegments
@@ -1868,14 +1917,24 @@ window.APP = window.APP || {};
         if (effectiveWeek === null) return { segments: [], source: 'rotation', reason: null };
         
         // Determine the day index (1-7)
-        const dayIndex = (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(dayName) + 1).toString();
+        const dayIndex = (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(dayName) + 1);
+        const dayIndexStr = dayIndex.toString();
+
 
         const pattern = APP.StateManager.getPatternByName(assignment.rotation_name);
         if (!pattern || !pattern.pattern) return { segments: [], source: 'rotation', reason: null };
         
         // Look up the shift code in the rotation pattern
-        const weekPattern = pattern.pattern[`Week ${effectiveWeek}`] || {};
-        const shiftCode = weekPattern[dayIndex];
+        // V15.5.1 FIX: Use the robust key finder helper
+        const weekKey = findWeekKey(pattern.pattern, effectiveWeek);
+        const weekPattern = weekKey ? pattern.pattern[weekKey] : {};
+
+        // V15.5.1 FIX: Handle legacy DOW keys (e.g., 'mon') if numerical key is missing
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        const legacyDayKey = days[dayIndex - 1];
+        
+        const shiftCode = weekPattern[dayIndexStr] || weekPattern[legacyDayKey];
+
 
         if (!shiftCode) return { segments: [], source: 'rotation', reason: null }; // RDO
 
@@ -1890,6 +1949,16 @@ window.APP = window.APP || {};
         // Ensure segments are sorted
         const sortedRotation = JSON.parse(JSON.stringify(definition.structure)).sort((a, b) => a.start_min - b.start_min);
         return { segments: sortedRotation, source: 'rotation', reason: null };
+    };
+
+    // V15.5.1 Helper: Duplicated from RotationEditor for use in calculateSegments
+    const findWeekKey = (patternData, weekNumber) => {
+        const keys = Object.keys(patternData);
+        // Find the key that matches the week number using the robust regex
+        return keys.find(k => {
+            const match = k.match(/^Week ?(\d+)$/i);
+            return match && parseInt(match[1], 10) === weekNumber;
+        });
     };
 
     // --- INTRADAY INDICATORS (Daily View Only) ---
@@ -2007,7 +2076,7 @@ window.APP = window.APP || {};
 
     // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v15.4) Initializing...");
+        console.log("WFM Intelligence Platform (v15.5.2) Initializing...");
         
         // Initialize foundational services
         APP.Utils.cacheDOMElements();
@@ -2036,13 +2105,19 @@ window.APP = window.APP || {};
         APP.StateManager.initialize(initialData);
 
         // Initialize UI Components
-        APP.Components.ComponentManager.initialize();
-        APP.Components.AssignmentManager.initialize();
-        // V15.1: Initialize the shared builder first
-        APP.Components.SequentialBuilder.initialize(); 
-        APP.Components.ShiftDefinitionEditor.initialize();
-        APP.Components.RotationEditor.initialize();
-        APP.Components.ScheduleViewer.initialize();
+        try {
+            APP.Components.ComponentManager.initialize();
+            APP.Components.AssignmentManager.initialize();
+            // V15.1: Initialize the shared builder first
+            APP.Components.SequentialBuilder.initialize(); 
+            APP.Components.ShiftDefinitionEditor.initialize();
+            APP.Components.RotationEditor.initialize();
+            APP.Components.ScheduleViewer.initialize();
+        } catch (error) {
+            console.error("CRITICAL ERROR during UI Component Initialization:", error);
+            APP.Utils.showToast("Fatal Error during UI initialization. Check console logs.", "danger", 10000);
+            return; 
+        }
 
         // Render all components
         Core.renderAll();
@@ -2078,17 +2153,21 @@ window.APP = window.APP || {};
     const wireGlobalEvents = () => {
         // Week Navigation
         if (ELS.weekStart) {
-            // Configure Week Picker (Flatpickr)
-            flatpickr(ELS.weekStart, {
-                dateFormat: "Y-m-d", // ISO format for consistency
-                defaultDate: APP.StateManager.getState().weekStart,
-                "locale": { "firstDayOfWeek": 1 }, // Monday start
-                onChange: (selectedDates, dateStr) => {
-                    // Update state and re-render visualization on date change
-                    APP.StateManager.getState().weekStart = dateStr;
-                    APP.Components.ScheduleViewer.render();
-                }
-            });
+            if (typeof flatpickr !== 'function') {
+                console.error("CRITICAL ERROR: flatpickr library not loaded (Global Events).");
+            } else {
+                // Configure Week Picker (Flatpickr)
+                flatpickr(ELS.weekStart, {
+                    dateFormat: "Y-m-d", // ISO format for consistency
+                    defaultDate: APP.StateManager.getState().weekStart,
+                    "locale": { "firstDayOfWeek": 1 }, // Monday start
+                    onChange: (selectedDates, dateStr) => {
+                        // Update state and re-render visualization on date change
+                        APP.StateManager.getState().weekStart = dateStr;
+                        APP.Components.ScheduleViewer.render();
+                    }
+                });
+            }
         }
         if (ELS.prevWeek) ELS.prevWeek.addEventListener('click', () => updateWeek(-7));
         if (ELS.nextWeek) ELS.nextWeek.addEventListener('click', () => updateWeek(7));
@@ -2123,8 +2202,10 @@ window.APP = window.APP || {};
     };
 
     const updateWeek = (days) => {
+        if (!ELS.weekStart || !ELS.weekStart._flatpickr) return;
+
         const flatpickrInstance = ELS.weekStart._flatpickr;
-        if (!flatpickrInstance) return;
+        
         const currentDate = flatpickrInstance.selectedDates[0] || new Date();
         currentDate.setDate(currentDate.getDate() + days);
         // Set the new date and trigger the onChange event
