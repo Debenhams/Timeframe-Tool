@@ -214,7 +214,14 @@ window.APP = window.APP || {};
             console.error("Error calculating effective week:", e);
             return null;
         }
-    };
+   
+};  // <— end of APP.Utils
+
+Utils.addDaysISO = (iso, days) => {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0,10);
+};
 
     APP.Utils = Utils;
 }(window.APP));
@@ -283,6 +290,26 @@ window.APP = window.APP || {};
         if (error) return handleError(error, `Delete ${tableName}`);
         return { data: null, error: null };
     };
+// V15.2: Read effective rotation rows for a given date (YYYY-MM-DD)
+DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
+    try {
+        // We query the history table for all advisors whose row covers this date
+        const { data, error } = await supabase
+            .from('rotation_assignments_history')
+            .select('advisor_id, rotation_name, start_date, end_date')
+            .lte('start_date', isoDate)
+            .or(`end_date.is.null,end_date.gte.${isoDate}`);
+
+        if (error) return handleError(error, 'Fetch effective assignments for date');
+
+        // Build a quick lookup map: advisor_id -> record
+        const map = new Map();
+        (data || []).forEach(row => map.set(row.advisor_id, row));
+        return { data: map, error: null };
+    } catch (err) {
+        return handleError(err, 'Fetch effective assignments for date');
+    }
+};
 
     // V15.1: Load all necessary data tables
     DataService.loadCoreData = async () => {
@@ -580,26 +607,52 @@ window.APP = window.APP || {};
         if (ELS.grid) ELS.grid.addEventListener('change', handleChange);
     };
 
-    AssignmentManager.render = () => {
+    AssignmentManager.render = async () => {
         if (!ELS.grid) return;
         const STATE = APP.StateManager.getState();
         const advisors = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name));
         const patterns = STATE.rotationPatterns.sort((a,b) => a.name.localeCompare(b.name));
         const patternOpts = patterns.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+// Get the selected Week Start (YYYY-MM-DD) from the global input
+const weekStartInput = document.getElementById('weekStart');
+const weekStartISO = weekStartInput ? weekStartInput.value : null;
 
-        let html = '<table><thead><tr><th>Advisor</th><th>Assigned Rotation</th><th>Start Date (dd/mm/yyyy)</th></tr></thead><tbody>';
+// Default to current snapshot if no date picked yet
+let effectiveMap = null;
+if (weekStartISO) {
+    const res = await APP.DataService.fetchEffectiveAssignmentsForDate(weekStartISO);
+    if (!res.error) {
+        effectiveMap = res.data; // Map(advisor_id -> { rotation_name, start_date, end_date })
+    }
+}
+
+        let html = '<table><thead><tr><th>Advisor</th><th>Assigned Rotation</th><th>Start Date (dd/mm/yyyy)</th><th>Actions</th></tr></thead><tbody>';
+
 
         advisors.forEach(adv => {
-            const assignment = APP.StateManager.getAssignmentForAdvisor(adv.id);
-            // Dates are stored in State as YYYY-MM-DD. We pass this ISO string to the input value.
-            // Flatpickr handles the display conversion.
-            const startDate = (assignment && assignment.start_date) ? assignment.start_date : '';
+    const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
+
+    // If we’re looking at a specific week, prefer the effective rotation for that week
+    // Otherwise fall back to the current snapshot in rotation_assignments
+    const assignment = effective
+        ? { advisor_id: adv.id, rotation_name: effective.rotation_name, start_date: effective.start_date }
+        : APP.StateManager.getAssignmentForAdvisor(adv.id);
+
+    const startDate = (assignment && assignment.start_date) ? assignment.start_date : '';
+
             
             html += `<tr data-advisor-id="${adv.id}">
-                <td>${adv.name}</td>
-                <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
-                <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${startDate}" /></td>
-            </tr>`;
+  <td>${adv.name}</td>
+  <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
+  <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${startDate}" /></td>
+  <td>
+    <div class="btn-group">
+      <button class="btn btn-sm btn-primary act-assign-week" data-advisor-id="${adv.id}">Assign from this week</button>
+      <button class="btn btn-sm act-change-forward" data-advisor-id="${adv.id}">Change from this week forward</button>
+    </div>
+  </td>
+</tr>`;
+
         });
         html += '</tbody></table>';
         ELS.grid.innerHTML = html;
@@ -619,18 +672,75 @@ window.APP = window.APP || {};
             if (dateInput && typeof flatpickr !== 'undefined') {
                 // Configure Flatpickr to display and output as d/m/Y (UK format).
                 flatpickr(dateInput, {
-                    dateFormat: "d/m/Y",
-                    allowInput: true,
-                    "locale": { "firstDayOfWeek": 1 }, // Monday
-                    // Use onChange hook to capture the date selection event
-                    onChange: function(selectedDates, dateStr, instance) {
-                        // dateStr is in d/m/Y format here.
-                        handleAssignmentUpdate(instance.element.dataset.advisorId, 'start_date', dateStr);
-                    }
-                });
-            }
-        });
+  dateFormat: 'd/m/Y',
+  allowInput: true,
+  locale: { "firstDayOfWeek": 1 }, // Monday
+  onChange: function(selectedDates, dateStr, instance) {
+    handleAssignmentUpdate(instance.element.dataset.advisorId, 'start_date', dateStr);
+  }
+});           // <— end flatpickr
+}             // <— end: if (dateInput && typeof flatpickr !== 'undefined')
+
+// --- wire row actions (buttons) ---
+const btnAssign = ELS.grid.querySelector(`.act-assign-week[data-advisor-id="${adv.id}"]`);
+const btnChange = ELS.grid.querySelector(`.act-change-forward[data-advisor-id="${adv.id}"]`);
+
+if (btnAssign) btnAssign.addEventListener('click', () => handleRowAction('assign_from_week', adv.id));
+if (btnChange) btnChange.addEventListener('click', () => handleRowAction('change_forward', adv.id));
+
+});           // <— end: advisors.forEach(adv => { ... })
+
     };
+// Handle per-row actions (assign from this week / change forward)
+const handleRowAction = async (action, advisorId) => {
+  const weekStartInput = document.getElementById('weekStart');
+  const weekStartISO = weekStartInput ? weekStartInput.value : null;
+
+  const row = ELS.grid.querySelector(`tr[data-advisor-id="${advisorId}"]`);
+  if (!row) return;
+
+  const rotationSel = row.querySelector('.assign-rotation');
+  const dateInput   = row.querySelector('.assign-start-date');
+
+  const rotationName = rotationSel ? rotationSel.value : '';
+  const startISO = (dateInput && dateInput.value) ? dateInput.value : weekStartISO;
+
+  if (!rotationName || !startISO) {
+    APP.Utils.showToast('Please pick a rotation and a start week first.', 'warning');
+    return;
+  }
+
+  const label = action === 'assign_from_week' ? 'Assign from this week' : 'Change from this week forward';
+  if (!confirm(`${label}?\nRotation: ${rotationName}\nStart: ${startISO}`)) return;
+
+  // (1) Upsert current snapshot
+  await APP.DataService.saveRecord('rotation_assignments', {
+    advisor_id: advisorId,
+    rotation_name: rotationName,
+    start_date: startISO,
+    effective_weeks: 6
+  }, { advisor_id: advisorId });
+
+  // (2) Close any open history row (end yesterday)
+  await APP.DataService.updateRecord(
+    'rotation_assignments_history',
+    { end_date: APP.Utils.addDaysISO(startISO, -1) },
+    { advisor_id: advisorId, end_date: null }
+  );
+
+  // (3) Insert the new history row
+  await APP.DataService.saveRecord('rotation_assignments_history', {
+    advisor_id: advisorId,
+    rotation_name: rotationName,
+    start_date: startISO,
+    end_date: null,
+    effective_weeks: 6,
+    reason: (action === 'assign_from_week') ? 'assign' : 'amend'
+  });
+
+  APP.Utils.showToast('Saved.', 'success');
+  AssignmentManager.render(); // refresh view
+};
 
     const handleChange = (e) => {
         // Handle dropdown changes (Flatpickr handles its own changes via the hook)

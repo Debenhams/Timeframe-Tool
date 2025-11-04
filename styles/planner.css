@@ -748,7 +748,14 @@ tbody tr:hover {
 
 /* Specific table styles for the builder */
 .builder-grid th { font-size: 12px; padding: 10px 16px; position: sticky; top: 0; z-index: 1; }
-.builder-grid td { padding: 8px 16px; }
+
+/* Compact row action buttons in Assignments */
+.btn-group {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 /* Inline footer under rotation grid */
 .table-footer-inline {
   display: flex;
