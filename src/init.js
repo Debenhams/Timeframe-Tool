@@ -1,41 +1,22 @@
 /**
- * WFM Intelligence Platform - Initialization Script (v14.3)
+ * WFM Intelligence Platform - Initialization (v15.5.1)
  * 
- * Bootloader (Entry Point).
+ * Bootstraps the application when the DOM is ready.
  */
-(function () {
-  "use strict";
 
-  function onDOMLoaded() {
-    console.log("DOM Loaded. Initializing application...");
-
-    // Ensure the Core module (defined in planner.js) is ready before initializing
-    // We access APP.Core via the global window object.
-    if (window.APP && window.APP.Core && typeof window.APP.Core.initialize === "function") {
-      // Use a try-catch block for safety during initialization
-      try {
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if the main application logic (planner.js) has loaded and exposed the Core module
+    if (window.APP && window.APP.Core && typeof window.APP.Core.initialize === 'function') {
         window.APP.Core.initialize();
-      } catch (error) {
-        console.error("Fatal Error during APP.Core.initialize:", error);
-        displayFatalError();
-      }
     } else {
-      console.error("Fatal Error: planner.js did not load or APP.Core.initialize is not defined.");
-      displayFatalError();
+        // Fallback error handling if planner.js failed to load or is corrupted
+        console.error("Application failed to bootstrap. Core modules not found. Check planner.js integrity.");
+        // Display a user-friendly error message
+        const contentArea = document.getElementById('main-content-area');
+        if (contentArea) {
+            contentArea.innerHTML = "<h1>Fatal Error: Application modules failed to load. Please check file integrity and refresh.</h1>";
+        } else if (document.body) {
+             document.body.innerHTML = "<h1>Fatal Error: Application structure missing.</h1>";
+        }
     }
-  }
-  
-  function displayFatalError() {
-      if (document.body) {
-        document.body.innerHTML = "<h1>Fatal Error: Application failed to load. Check console for details.</h1>";
-      }
-  }
-
-  // Ensure the DOM is fully loaded before initialization
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", onDOMLoaded);
-  } else {
-    onDOMLoaded();
-  }
-
-})();
+});
