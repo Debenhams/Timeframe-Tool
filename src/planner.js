@@ -722,11 +722,16 @@ const handleRowAction = async (action, advisorId) => {
   }, { advisor_id: advisorId });
 
   // (2) Close any open history row (end yesterday)
-  await APP.DataService.updateRecord(
-    'rotation_assignments_history',
-    { end_date: APP.Utils.addDaysISO(startISO, -1) },
-    { advisor_id: advisorId, end_date: null }
-  );
+  const endYesterdayISO = (() => {
+  const d = new Date(startISO + 'T00:00:00'); d.setDate(d.getDate() - 1); return d.toISOString().slice(0,10);
+})();
+
+await APP.DataService.updateRecord(
+  'rotation_assignments_history',
+  { end_date: endYesterdayISO },
+  { advisor_id: advisorId, end_date: null }
+);
+
 
   // (3) Insert the new history row
   await APP.DataService.saveRecord('rotation_assignments_history', {
