@@ -86,7 +86,10 @@ h2 {
   flex-direction: column;
   flex-shrink: 0;
   border-right: 1px solid var(--sidebar-border);
+  height: 100vh;          /* ← add this */
+  overflow-y: auto;       /* ← and this (enables scrolling) */
 }
+
 
 .sidebar-header {
     padding: 20px 24px;
