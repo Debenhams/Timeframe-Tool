@@ -283,6 +283,17 @@ Utils.addDaysISO = (iso, days) => {
         if (error) return handleError(error, `Update ${tableName}`);
         return { data: data ? data[0] : null, error: null };
     };
+// Helper to close an open history row using IS NULL correctly
+DataService.closeOpenHistory = async (advisorId, endDateISO) => {
+  const { data, error } = await supabase
+    .from('rotation_assignments_history')
+    .update({ end_date: endDateISO })
+    .eq('advisor_id', advisorId)
+    .is('end_date', null)       // <-- correct way to match NULL
+    .select();
+  if (error) return handleError(error, 'Close open history row');
+  return { data, error: null };
+};
 
     // Generalized delete function
     DataService.deleteRecord = async (tableName, condition) => {
@@ -798,11 +809,8 @@ if (action === 'change_one_week') {
   const d = new Date(startISO + 'T00:00:00'); d.setDate(d.getDate() - 1); return d.toISOString().slice(0,10);
 })();
 
-await APP.DataService.updateRecord(
-  'rotation_assignments_history',
-  { end_date: endYesterdayISO },
-  { advisor_id: advisorId, end_date: null }
-);
+await APP.DataService.closeOpenHistory(advisorId, endYesterdayISO);
+
 
 
   // (3) Insert the new history row
