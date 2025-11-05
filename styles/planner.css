@@ -1,6 +1,6 @@
 /**
- * WFM Intelligence Platform - Styles (v15.6.1)
- * Includes Base Layout, Components, Editors, and Visualization (Daily/Weekly)
+ * WFM Intelligence Platform - Styles (v15.7)
+ * Includes Base Layout, Components, Editors, Visualization (Daily/Weekly), and Trade Center.
 */
 
 /* === VARIABLES & CONFIGURATION === */
@@ -86,7 +86,10 @@ h2 {
   flex-direction: column;
   flex-shrink: 0;
   border-right: 1px solid var(--sidebar-border);
+  height: 100vh;          /* ← add this */
+  overflow-y: auto;       /* ← and this (enables scrolling) */
 }
+
 
 .sidebar-header {
     padding: 20px 24px;
@@ -249,6 +252,12 @@ h2 {
     font-size: 13px;
 }
 
+/* V15.7: Added large button style */
+.btn-lg {
+    padding: 12px 24px;
+    font-size: 16px;
+}
+
 .btn-primary {
   background-color: var(--brand-primary);
   color: white;
@@ -256,6 +265,11 @@ h2 {
 
 .btn-primary:hover {
   background-color: var(--brand-primary-dark);
+}
+
+.btn-primary:disabled {
+    background-color: #A5B4FC; /* Lighter indigo */
+    cursor: not-allowed;
 }
 
 .btn-secondary {
@@ -693,7 +707,7 @@ tbody tr:hover {
     z-index: 10;
 }
 
-/* V15.1: Make weekly cells clickable */
+/* V15.1: Make weekly cells clickable */F
 /* We apply this to the TD element itself (using class .weekly-cell applied by JS) */
 .weekly-cell {
     cursor: pointer;
@@ -733,6 +747,73 @@ tbody tr:hover {
     font-size: 13px;
     color: #9CA3AF;
     font-weight: 500;
+}
+
+/* === V15.7: SHIFT TRADE CENTER === */
+.trade-layout {
+    display: flex;
+    align-items: stretch; /* Ensure panels are equal height */
+    gap: 24px;
+    margin-top: 24px;
+}
+
+.trade-panel {
+    flex: 1;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    /* Use a slightly off-white background for the input panels */
+    background-color: var(--color-hover-bg); 
+}
+
+.trade-swap-icon {
+    color: var(--brand-primary);
+    padding: 12px;
+    /* Ensure the icon stays centered even if panels have different heights */
+    align-self: center; 
+}
+
+.trade-preview {
+    margin-top: 16px;
+    padding: 16px;
+    background-color: white;
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+    min-height: 100px;
+    color: var(--color-text-muted);
+    flex-grow: 1; /* Allow preview to fill space */
+}
+
+.trade-preview-details {
+    color: var(--color-text);
+}
+
+.trade-preview-details h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.trade-preview-details ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.trade-preview-details li {
+    font-size: 13px;
+    margin-bottom: 4px;
+    font-family: monospace; /* Use monospace for time alignment */
+}
+
+
+.trade-actions {
+    margin-top: 32px;
+    text-align: center;
 }
 
 

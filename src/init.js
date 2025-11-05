@@ -1,5 +1,5 @@
 /**
- * WFM Intelligence Platform - Initialization (v15.6.1)
+ * WFM Intelligence Platform - Initialization (v15.7)
  * Bootloader script.
  */
 
@@ -9,6 +9,8 @@
         if (window.APP && window.APP.Core) {
             // Start the application
             window.APP.Core.initialize();
+            window.APP.Components?.ShiftTradeCenter?.initialize?.();
+
         } else {
             // If APP.Core is not available, the planner.js file failed to load or is corrupted.
             console.error("Fatal Error: Application core not found. Check planner.js loading and syntax.");
