@@ -361,35 +361,47 @@ Utils.addDaysISO = (iso, days) => {
 
     // V15.7 FIX: Updated prioritization logic to correctly handle swaps.
     // Reads effective rotation rows for a given date (YYYY-MM-DD).
-    DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
-        try {
-            // We query the history table for all advisors whose row covers this date
-            const { data, error } = await supabase
-              .from('rotation_assignments_history')
-              // V15.7: We must select created_at (or equivalent timestamp) to ensure correct ordering.
-              .select('advisor_id, rotation_name, start_date, end_date, created_at')
-              // Check if end_date is NULL OR end_date >= isoDate (the assignment is valid on this date)
-              .or(`end_date.is.null,end_date.gte.${isoDate}`)
-              // V15.7 FIX: Order by created_at DESC. This is critical. 
-              // It ensures the most recently created record (like a swap or amendment) takes precedence 
-              // over older baseline assignments, even if the start_date is the same.
-              .order('created_at', { ascending: false });
+    // Reads effective rotation rows for a given date (YYYY-MM-DD) without relying on created_at.
+DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
+  try {
+    // 1) Pull only rows that *cover* this date:
+    //    start_date <= isoDate AND (end_date IS NULL OR end_date >= isoDate)
+    const { data, error } = await supabase
+      .from('rotation_assignments_history')
+      .select('advisor_id, rotation_name, start_date, end_date, reason')
+      .lte('start_date', isoDate)
+      .or(`end_date.is.null,end_date.gte.${isoDate}`);
 
+    if (error) return handleError(error, 'Fetch effective assignments for date');
 
-            if (error) return handleError(error, 'Fetch effective assignments for date');
-
-            // Build a quick lookup map: advisor_id -> record
-            const map = new Map();
-            (data || []).forEach(row => {
-                // Keep only the newest record (due to order by created_at desc)
-                if (!map.has(row.advisor_id)) map.set(row.advisor_id, row); 
-            });
-            return { data: map, error: null };
-
-        } catch (err) {
-            return handleError(err, 'Fetch effective assignments for date');
+    // 2) For each advisor, pick the row with the *latest* start_date (closest to isoDate).
+    //    If there are ties, prefer a bounded swap (has end_date) over an open-ended row.
+    const byAdvisor = new Map();
+    (data || []).forEach(row => {
+      const existing = byAdvisor.get(row.advisor_id);
+      if (!existing) {
+        byAdvisor.set(row.advisor_id, row);
+        return;
+      }
+      // choose the row with the later start_date
+      if (row.start_date > existing.start_date) {
+        byAdvisor.set(row.advisor_id, row);
+      } else if (row.start_date === existing.start_date) {
+        // tie-breaker: prefer bounded swap (end_date not null)
+        const existingIsBounded = !!existing.end_date;
+        const rowIsBounded = !!row.end_date;
+        if (rowIsBounded && !existingIsBounded) {
+          byAdvisor.set(row.advisor_id, row);
         }
-    };
+      }
+    });
+
+    return { data: byAdvisor, error: null };
+  } catch (err) {
+    return handleError(err, 'Fetch effective assignments for date');
+  }
+};
+
 
     // V15.1: Load all necessary data tables
     DataService.loadCoreData = async () => {
@@ -967,6 +979,11 @@ Utils.addDaysISO = (iso, days) => {
       // The start date for the rotation (Week 1 Day 1) is taken from the input field.
       // It is already in ISO format (Y-m-d) due to Flatpickr configuration.
       const rotationStartISO = (dateInput && dateInput.value) ? dateInput.value.trim() : '';
+// Hard guard: ensure ISO (yyyy-mm-dd)
+if (!/^\d{4}-\d{2}-\d{2}$/.test(rotationStartISO)) {
+  APP.Utils.showToast('Start Date must be set (YYYY-MM-DD).', 'danger');
+  return;
+}
 
 
       if (!rotationName) {
