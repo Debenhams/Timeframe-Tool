@@ -902,3 +902,7 @@ tbody tr:hover {
     background-color: var(--color-danger-bg);
     border-left: 4px solid var(--color-danger);
 }
+/* Compact actions cell in Assignments grid */
+.table .actions { white-space: nowrap; }
+.table .actions .btn { margin-right: 8px; }
+.table .actions .btn:last-child { margin-right: 0; }
