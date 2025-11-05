@@ -724,7 +724,25 @@ const toISO = (val) => {
   const dateInput   = row.querySelector('.assign-start-date');
 
   const rotationName = rotationSel ? rotationSel.value : '';
-  const startISO = toISO((dateInput && dateInput.value) ? dateInput.value : weekStartISO);
+  // --- force date to ISO (yyyy-mm-dd) from either dd/mm/yyyy or ISO ---
+const rawStart = (dateInput && dateInput.value) ? (dateInput.value + '').trim() : (weekStartISO || '');
+
+const startISO = (() => {
+  if (!rawStart) return '';
+  if (rawStart.includes('/')) {
+    // convert dd/mm/yyyy -> yyyy-mm-dd safely
+    const [dd, mm, yyyy] = rawStart.split('/');
+    if (dd && mm && yyyy) return `${yyyy.padStart(4,'0')}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+  }
+  // assume already ISO like 2025-11-03
+  return rawStart;
+})();
+
+if (!/^\d{4}-\d{2}-\d{2}$/.test(startISO)) {
+  APP.Utils.showToast('Start date looks invalid. Pick a week and try again.', 'danger');
+  return;
+}
+
 
 
   if (!rotationName || !startISO) {
