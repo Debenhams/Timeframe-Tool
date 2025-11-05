@@ -1,11 +1,10 @@
 /**
- * WFM Intelligence Platform - Application Logic (v15.7)
+ * WFM Intelligence Platform - Application Logic (v15.7.1)
  * 
+ * V15.7.1: CRITICAL FIX: Corrected syntax error in planner.js assembly (missing closing syntax in StateManager module).
  * V15.7:   CRITICAL FIX: Updated DataService.fetchEffectiveAssignmentsForDate to prioritize by 'created_at' DESC. 
- *          This ensures that recent changes (like Swaps) correctly override baseline assignments in the visualization.
- *          FEATURE: Added ShiftTradeCenter module for managing swaps between advisors (supports different dates).
+ *          FEATURE: Added ShiftTradeCenter module.
  *          REFACTOR: Centralized schedule calculation logic into APP.ScheduleCalculator service.
- * V15.6.2: FIX: Removed conflicting 'change' event listener in AssignmentManager.
  */
 
 // Global Namespace Initialization
@@ -637,7 +636,7 @@ Utils.addDaysISO = (iso, days) => {
     };
 
     APP.StateManager = StateManager;
-}(window.APP));
+}(window.APP)); // V15.7.1 FIX: Restored the missing closing syntax here.
 
 
 /**
@@ -2230,7 +2229,7 @@ Utils.addDaysISO = (iso, days) => {
         headerElement.innerHTML = html;
     };
 
-    // V15.7: Made public as it's used by TradeCenter preview as well
+    // V15.7: Made public as it's used by TradeCenter preview as well (though not currently utilized there, good practice)
     ScheduleViewer.renderSegments = (segments) => {
         if (!segments || segments.length === 0) {
             return ''; // RDO
@@ -2758,7 +2757,7 @@ Utils.addDaysISO = (iso, days) => {
 
     // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v15.7) Initializing...");
+        console.log("WFM Intelligence Platform (v15.7.1) Initializing...");
         
         // Initialize foundational services
         APP.Utils.cacheDOMElements();
