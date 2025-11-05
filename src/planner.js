@@ -2927,20 +2927,23 @@ if (!/^\d{4}-\d{2}-\d{2}$/.test(rotationStartISO)) {
 
         // Tab Navigation
         if (ELS.tabNav) ELS.tabNav.addEventListener('click', handleTabNavigation);
-        // Ensure the Trade Center tab button exists in the nav
+        // Ensure the Shift Swop tab button exists in the nav
 if (ELS.tabNav && !ELS.tabNav.querySelector('[data-tab="tab-trade-center"]')) {
   const btn = document.createElement('button');
   btn.className = 'tab-link';
   btn.setAttribute('data-tab', 'tab-trade-center');
-  btn.setAttribute('title', 'Shift Trade Center');
+  btn.setAttribute('title', 'Shift Swop');
   btn.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <polyline points="16 3 21 3 21 8"></polyline>
-      <line x1="4" y1="20" x2="21" y2="3"></line>
-      <polyline points="8 21 3 21 3 16"></polyline>
-    </svg>
-    <span>Trade Center</span>
-  `;
+    <span class="tab-icon" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="16 3 21 3 21 8"></polyline>
+        <line x1="4" y1="20" x2="21" y2="3"></line>
+        <polyline points="8 21 3 21 3 16"></polyline>
+      </svg>
+    </span>
+    <span>Shift Swop</span>
+  `.trim();
+
   // Insert under the PLANNING group, just before the Rotation Editor button
   const planningGroup = ELS.tabNav.querySelector('[data-tab="tab-rotation-editor"]');
   if (planningGroup && planningGroup.parentElement) {
@@ -2949,6 +2952,7 @@ if (ELS.tabNav && !ELS.tabNav.querySelector('[data-tab="tab-trade-center"]')) {
     ELS.tabNav.appendChild(btn);
   }
 }
+
 
     };
     
