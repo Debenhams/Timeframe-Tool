@@ -1,12 +1,12 @@
 /**
- * WFM Intelligence Platform - Application Logic (v15.6.1)
+ * WFM Intelligence Platform - Application Logic (v15.6.2)
  * 
+ * V15.6.2: FIX: Removed conflicting 'change' event listener in AssignmentManager that caused dropdowns to revert 
+ *          when attempting to stage inputs for historical actions (Swaps/Amend Forward).
  * V15.6.1: FIX: Ensured robust UTC date calculations are used consistently in Utils.addDaysISO. Improved mouse tracking in Daily View.
  * V15.6:   FIX: Resolved "invalid input syntax for type date: 'null'" error using explicit filters (.is(key, null)).
  *          IMPROVEMENT: AssignmentManager now dynamically calculates and saves rotation length (effective_weeks).
  *          IMPROVEMENT: ScheduleViewer now fetches and uses historical assignment data for accurate visualization.
- * V15.5.2: STABILITY FIX: Added robust null checks in SequentialBuilder.
- * V15.5.1: CRITICAL FIX: Robust Rotation Parsing.
  */
 
 // Global Namespace Initialization
@@ -706,8 +706,13 @@ Utils.addDaysISO = (iso, days) => {
     AssignmentManager.initialize = () => {
         // Note: The weekStart change listener is handled in Core.wireGlobalEvents
         ELS.grid = document.getElementById('assignmentGrid');
-        // We listen for changes on the inputs/selects, but the primary actions are handled by the buttons.
-        if (ELS.grid) ELS.grid.addEventListener('change', handleChange);
+        
+        // V15.6.2 FIX: Removed the conflicting 'change' event listener.
+        // The previous implementation (handleChange/handleAssignmentUpdate) immediately saved changes 
+        // to the snapshot table, which interfered with the user's ability to stage inputs for 
+        // the historical action buttons (Swap/Amend Forward).
+        // Actions are now exclusively handled by the buttons via handleRowAction.
+        // if (ELS.grid) ELS.grid.addEventListener('change', handleChange);
     };
 
     // Renders the assignment grid, showing the effective rotation for the selected week.
@@ -778,6 +783,7 @@ Utils.addDaysISO = (iso, days) => {
 
             const rotSelect = row.querySelector('.assign-rotation');
             if (rotSelect) {
+                // Set the dropdown to the currently effective rotation for this week.
                 rotSelect.value = (assignment && assignment.rotation_name) ? assignment.rotation_name : '';
             }
             
@@ -792,9 +798,9 @@ Utils.addDaysISO = (iso, days) => {
                   altFormat: 'd/m/Y',             
                   allowInput: true,
                   locale: { "firstDayOfWeek": 1 }, // Monday
-                  // Changes are primarily handled by the action buttons.
+                  // V15.6.2: Changes are handled exclusively by the action buttons.
                   onChange: function(selectedDates, dateStr, instance) {
-                    // Optional: Handle immediate save if desired, but history management makes this complex.
+                    // Do nothing here.
                   }
                 });
             }
@@ -823,6 +829,7 @@ Utils.addDaysISO = (iso, days) => {
       const row = ELS.grid.querySelector(`tr[data-advisor-id="${advisorId}"]`);
       if (!row) return;
 
+      // V15.6.2: Read the values directly from the UI elements.
       const rotationSel = row.querySelector('.assign-rotation');
       const dateInput   = row.querySelector('.assign-start-date');
 
@@ -939,52 +946,8 @@ Utils.addDaysISO = (iso, days) => {
     }
 };
 
-    // Handle immediate changes to dropdowns (Snapshot behavior)
-    const handleChange = (e) => {
-        // If users manually change the inputs and expect it to save without using the action buttons,
-        // it updates the SNAPSHOT ONLY (rotation_assignments), not the history.
-        
-        if (e.target.classList.contains('assign-rotation')) {
-            handleAssignmentUpdate(e.target.dataset.advisorId, 'rotation_name', e.target.value);
-        }
-        // Note: Flatpickr date changes are not handled here as we rely on action buttons for history management.
-    };
-
-    // Updates the SNAPSHOT (rotation_assignments). This does NOT manage history.
-    const handleAssignmentUpdate = async (advisorId, field, value) => {
-        let assignment = APP.StateManager.getAssignmentForAdvisor(advisorId);
-        
-        if (!assignment) {
-            assignment = { advisor_id: advisorId, rotation_name: null, start_date: null };
-        }
-        
-        let processedValue = value || null;
-
-        // Create the record for the database operation
-        const recordToSave = { ...assignment, [field]: processedValue };
-        delete recordToSave.id; 
-
-        // V15.6: If updating rotation name, recalculate effective_weeks
-        if (field === 'rotation_name') {
-            const pattern = APP.StateManager.getPatternByName(processedValue);
-            recordToSave.effective_weeks = APP.Utils.calculateRotationLength(pattern) || 6; // Fallback to 6
-        }
-
-        // Use DataService for persistence (Upsert based on advisor_id)
-        const { data, error } = await APP.DataService.saveRecord('rotation_assignments', recordToSave, 'advisor_id');
-        
-        if (!error) {
-            APP.StateManager.syncRecord('rotation_assignments', data);
-            APP.StateManager.saveHistory('Update assignment snapshot');
-            
-            // Re-render the main schedule view
-            if (APP.Components.ScheduleViewer) {
-                APP.Components.ScheduleViewer.render();
-            }
-        } else {
-            AssignmentManager.render();
-        }
-    };
+    // V15.6.2 FIX: Removed handleChange and handleAssignmentUpdate as they implemented an auto-save
+    // behavior that conflicted with the historical assignment management strategy.
 
 
     APP.Components = APP.Components || {};
@@ -1868,6 +1831,7 @@ Utils.addDaysISO = (iso, days) => {
 
         // Also ensure Assignments tab is up-to-date if visible, as it relies on the historical data too.
         const assignmentsTab = document.getElementById('tab-advisor-assignments');
+        // V15.6.2: Ensure AssignmentManager render is called if its tab is active.
         if (assignmentsTab && assignmentsTab.classList.contains('active') && APP.Components.AssignmentManager) {
              APP.Components.AssignmentManager.render();
         }
@@ -2486,7 +2450,7 @@ Utils.addDaysISO = (iso, days) => {
 
     // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v15.6.1) Initializing...");
+        console.log("WFM Intelligence Platform (v15.6.2) Initializing...");
         
         // Initialize foundational services
         APP.Utils.cacheDOMElements();
@@ -2611,8 +2575,9 @@ Utils.addDaysISO = (iso, days) => {
             if (tabId === 'tab-schedule-view') {
                 APP.Components.ScheduleViewer.render();
             } else if (tabId === 'tab-advisor-assignments') {
-                // V15.6: Explicitly call AssignmentManager.render() when switching to its tab.
-                APP.Components.AssignmentManager.render();
+                // V15.6.2: When switching to the Assignments tab, we must ensure the data is loaded and rendered.
+                // ScheduleViewer.render() handles the coordination of fetching data and rendering the AssignmentManager if the tab is active.
+                APP.Components.ScheduleViewer.render();
             }
         }
     };
@@ -2642,6 +2607,7 @@ Utils.addDaysISO = (iso, days) => {
         // AssignmentManager.render() is implicitly called by ScheduleViewer.render() coordination
         APP.Components.ShiftDefinitionEditor.render();
         APP.Components.RotationEditor.render();
+        // ScheduleViewer.render() coordinates historical data fetch and rendering of both Viewer and Assignments tabs.
         APP.Components.ScheduleViewer.render();
     };
 
