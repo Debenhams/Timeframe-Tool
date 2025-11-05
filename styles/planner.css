@@ -906,3 +906,13 @@ tbody tr:hover {
 .table .actions { white-space: nowrap; }
 .table .actions .btn { margin-right: 8px; }
 .table .actions .btn:last-child { margin-right: 0; }
+/* Tidy layout for Advisor Assignments */
+#assignmentGrid table { table-layout: fixed; width: 100%; }
+#assignmentGrid th:nth-child(1), #assignmentGrid td:nth-child(1) { width: 22rem; }
+#assignmentGrid th:nth-child(2), #assignmentGrid td:nth-child(2) { width: 12rem; }
+#assignmentGrid th:nth-child(3), #assignmentGrid td:nth-child(3) { width: 12rem; }
+#assignmentGrid th:nth-child(4), #assignmentGrid td:nth-child(4) { width: auto; }
+#assignmentGrid .form-select { width: 100%; }
+#assignmentGrid .form-input  { width: 100%; max-width: 12rem; }
+#assignmentGrid td:last-child { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+#assignmentGrid td:last-child .btn { white-space: nowrap; }

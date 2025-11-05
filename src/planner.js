@@ -404,6 +404,109 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
 
 
     // V15.1: Load all necessary data tables
+    // --- Rotation write helpers used by Assignments UI ---------------------------
+
+// Overwrite from a given week forward (delete future rows and start a new base row)
+DataService.assignFromWeek = async (advisorId, rotationName, startISO) => {
+  try {
+    // Delete any future rows at/after the chosen week
+    const { error: delErr } = await supabase
+      .from('rotation_assignments_history')
+      .delete()
+      .eq('advisor_id', advisorId)
+      .gte('start_date', startISO);
+    if (delErr) return handleError(delErr, 'assignFromWeek/delete');
+
+    // Insert the new open-ended base row
+    const { error: insErr } = await supabase
+      .from('rotation_assignments_history')
+      .insert([{
+        advisor_id: advisorId,
+        rotation_name: rotationName,
+        start_date: startISO,
+        end_date: null
+      }]);
+    if (insErr) return handleError(insErr, 'assignFromWeek/insert');
+
+    // Keep snapshot aligned for “current” view
+    await supabase
+      .from('rotation_assignments')
+      .upsert({ advisor_id: advisorId, rotation_name: rotationName, start_date: startISO }, { onConflict: 'advisor_id' });
+
+    APP.StateManager.clearEffectiveAssignmentsCache();
+    return { data: true, error: null };
+  } catch (e) {
+    return handleError(e, 'assignFromWeek');
+  }
+};
+
+// Change rotation from this week forward (do NOT create a new 6-week block)
+DataService.changeForwardWithinWindow = async (advisorId, rotationName, startISO) => {
+  try {
+    // Remove any rows that start at/after this week
+    const { error: delErr } = await supabase
+      .from('rotation_assignments_history')
+      .delete()
+      .eq('advisor_id', advisorId)
+      .gte('start_date', startISO);
+    if (delErr) return handleError(delErr, 'changeForwardWithinWindow/delete');
+
+    // New open-ended row from this week
+    const { error: insErr } = await supabase
+      .from('rotation_assignments_history')
+      .insert([{
+        advisor_id: advisorId,
+        rotation_name: rotationName,
+        start_date: startISO,
+        end_date: null
+      }]);
+    if (insErr) return handleError(insErr, 'changeForwardWithinWindow/insert');
+
+    // Snapshot sync
+    await supabase
+      .from('rotation_assignments')
+      .upsert({ advisor_id: advisorId, rotation_name: rotationName, start_date: startISO }, { onConflict: 'advisor_id' });
+
+    APP.StateManager.clearEffectiveAssignmentsCache();
+    return { data: true, error: null };
+  } catch (e) {
+    return handleError(e, 'changeForwardWithinWindow');
+  }
+};
+
+// Change only the selected week (bounded 7 days)
+DataService.changeOnlyWeek = async (advisorId, rotationName, weekISO) => {
+  try {
+    const endISO = APP.Utils.addDaysISO(weekISO, 6); // Mon..Sun inclusive
+
+    // Clear any exact-start overrides for that week
+    const { error: delErr } = await supabase
+      .from('rotation_assignments_history')
+      .delete()
+      .eq('advisor_id', advisorId)
+      .eq('start_date', weekISO)
+      .lte('end_date', endISO);
+    if (delErr) return handleError(delErr, 'changeOnlyWeek/delete');
+
+    // Insert bounded one-week override
+    const { error: insErr } = await supabase
+      .from('rotation_assignments_history')
+      .insert([{
+        advisor_id: advisorId,
+        rotation_name: rotationName,
+        start_date: weekISO,
+        end_date: endISO
+      }]);
+    if (insErr) return handleError(insErr, 'changeOnlyWeek/insert');
+
+    APP.StateManager.clearEffectiveAssignmentsCache();
+    return { data: true, error: null };
+  } catch (e) {
+    return handleError(e, 'changeOnlyWeek');
+  }
+};
+// ---------------------------------------------------------------------------
+
     DataService.loadCoreData = async () => {
         try {
             // Fetch tables in parallel for efficiency
@@ -444,6 +547,114 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
             return null;
         }
     };
+// --- V15.7.1 — Rotation changes via history table ---
+
+// Assign the selected rotation starting at the currently-viewed week.
+// Closes any open row that overlaps and opens a new base row from weekStart forward.
+DataService.assignFromWeek = async (advisorId, rotationName, weekStartISO) => {
+  try {
+    // 1) Close any open-ended row that overlaps this date
+    await supabase
+      .from('rotation_assignments_history')
+      .update({ end_date: APP.Utils.addDaysISO(weekStartISO, -1), reason: 'closed_by_assign' })
+      .eq('advisor_id', advisorId)
+      .is('end_date', null)
+      .lte('start_date', weekStartISO);
+
+    // 2) Insert the new base row (open-ended)
+    const { data, error } = await supabase
+      .from('rotation_assignments_history')
+      .insert({
+        advisor_id: advisorId,
+        rotation_name: rotationName,
+        start_date: weekStartISO,
+        end_date: null,
+        reason: 'assign_from_week'
+      })
+      .select()
+      .single();
+
+    if (error) return handleError(error, 'assign_from_week');
+
+    // Keep the snapshot table (rotation_assignments) aligned for “current” view
+    await supabase
+      .from('rotation_assignments')
+      .upsert({ advisor_id: advisorId, rotation_name: rotationName, start_date: weekStartISO }, { onConflict: 'advisor_id' });
+
+    // Clear effective cache so recalculations use new rows
+    APP.StateManager.clearEffectiveAssignmentsCache();
+    return { data, error: null };
+  } catch (e) {
+    return handleError(e, 'assign_from_week');
+  }
+};
+
+// Change rotation from THIS week forward (overwrite future of the **current 6-week window**).
+// This closes any overlapping open row at week start, then opens a new base row.
+DataService.changeForwardWithinWindow = async (advisorId, rotationName, weekStartISO) => {
+  try {
+    // Close any row currently covering this week
+    await supabase
+      .from('rotation_assignments_history')
+      .update({ end_date: APP.Utils.addDaysISO(weekStartISO, -1), reason: 'closed_by_change_forward' })
+      .eq('advisor_id', advisorId)
+      .is('end_date', null)
+      .lte('start_date', weekStartISO);
+
+    // New row from this week forward
+    const { data, error } = await supabase
+      .from('rotation_assignments_history')
+      .insert({
+        advisor_id: advisorId,
+        rotation_name: rotationName,
+        start_date: weekStartISO,
+        end_date: null,
+        reason: 'change_forward'
+      })
+      .select()
+      .single();
+
+    if (error) return handleError(error, 'change_forward');
+
+    // Keep snapshot in sync
+    await supabase
+      .from('rotation_assignments')
+      .upsert({ advisor_id: advisorId, rotation_name: rotationName, start_date: weekStartISO }, { onConflict: 'advisor_id' });
+
+    APP.StateManager.clearEffectiveAssignmentsCache();
+    return { data, error: null };
+  } catch (e) {
+    return handleError(e, 'change_forward');
+  }
+};
+
+// Change ONLY the currently-viewed week (one-week swap).
+// Inserts a bounded row for just this week; base row remains.
+DataService.changeOnlyWeek = async (advisorId, rotationName, weekStartISO) => {
+  try {
+    const weekEndISO = APP.Utils.addDaysISO(weekStartISO, 6); // inclusive week
+
+    const { data, error } = await supabase
+      .from('rotation_assignments_history')
+      .insert({
+        advisor_id: advisorId,
+        rotation_name: rotationName,
+        start_date: weekStartISO,
+        end_date: weekEndISO,
+        reason: 'one_week_swap'
+      })
+      .select()
+      .single();
+
+    if (error) return handleError(error, 'change_only_week');
+
+    // Snapshot does NOT change for one-week swaps
+    APP.StateManager.clearEffectiveAssignmentsCache();
+    return { data, error: null };
+  } catch (e) {
+    return handleError(e, 'change_only_week');
+  }
+};
 
     APP.DataService = DataService;
 }(window.APP));
@@ -1005,42 +1216,24 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
     const windowEnd   = APP.Utils.addDaysISO(windowStart, 41); // 6*7 - 1
 
     // Route to the correct DB helper
-    let res;
-    if (action === 'assign_from_week') {
-      res = await APP.DataService.assignFromWeek({
-        advisor_id: advisorId,
-        rotation_name: rotationName,
-        start_date: startISO
-      });
-    } else if (action === 'change_forward') {
-      res = await APP.DataService.changeForwardWithinWindow({
-        advisor_id: advisorId,
-        rotation_name: rotationName,
-        window_start: windowStart,
-        window_end: windowEnd,
-        start_date: startISO
-      });
-    } else if (action === 'change_one_week') {
-      res = await APP.DataService.changeOnlyWeek({
-        advisor_id: advisorId,
-        rotation_name: rotationName,
-        week_start: startISO,
-        week_end: APP.Utils.addDaysISO(startISO, 6)
-      });
-    } else {
-      return APP.Utils.showToast('Unknown action.', 'danger');
-    }
+    let result;
+if (action === 'assign_from_week') {
+  result = await APP.DataService.assignFromWeek(advisorId, rotationName, startISO);
+} else if (action === 'change_forward') {
+  result = await APP.DataService.changeForwardWithinWindow(advisorId, rotationName, startISO);
+} else if (action === 'change_one_week') {
+  result = await APP.DataService.changeOnlyWeek(advisorId, rotationName, startISO);
+} else {
+  return APP.Utils.showToast('Unknown action.', 'danger');
+}
+if (result?.error) return;
 
-    if (res?.error) {
-      console.error(res.error);
-      return APP.Utils.showToast('Save failed. See console.', 'danger');
-    }
+// refresh data + both views instantly
+await APP.DataService.loadCoreData();
+APP.Components.AssignmentManager?.render?.();
+APP.Components.ScheduleViewer?.render?.();
+APP.Utils.showToast('Saved.', 'success');
 
-    // Refresh state + both views so changes are instant
-    await APP.DataService.loadCoreData();
-    if (APP.Components.AssignmentManager) APP.Components.AssignmentManager.render();
-    if (APP.Components.ScheduleViewer)     APP.Components.ScheduleViewer.render();
-    APP.Utils.showToast('Saved.', 'success');
   } catch (e) {
     console.error(e);
     APP.Utils.showToast('Unexpected error. See console.', 'danger');
@@ -1053,46 +1246,29 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
  * MODULE: APP.Components.ShiftTradeCenter
  * Very first version – renders a simple placeholder table.
  */
-(function (APP) {
+// MODULE: ShiftTradeCenter (Shift Swop)
+(function(APP){
   const ShiftTradeCenter = {};
   const ELS = {};
-
   ShiftTradeCenter.initialize = () => {
-    // Cache the grid container
-    ELS.grid = document.getElementById('shiftTradeGrid');
+    ELS.root = document.getElementById('shiftTradeGrid');
   };
-
   ShiftTradeCenter.render = () => {
-    // Re-query if needed (tab might re-render after first init)
-    if (!ELS.grid) ELS.grid = document.getElementById('shiftTradeGrid');
-    if (!ELS.grid) return;
-
-    // Simple placeholder UI (you can replace with real fields later)
-    ELS.grid.innerHTML = `
-      <div class="table-container">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Requestor</th>
-              <th>Current Shift</th>
-              <th>Proposed Swap</th>
-              <th>Week</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="swapRows">
-            <tr>
-              <td colspan="5" class="helper-text">No swap requests yet.</td>
-            </tr>
-          </tbody>
-        </table>
+    if (!ELS.root) ELS.root = document.getElementById('shiftTradeGrid');
+    if (!ELS.root) return;
+    const wk = document.getElementById('weekStart')?.value || '';
+    ELS.root.innerHTML = `
+      <div class="helper-text" style="margin-bottom:12px;">
+        <strong>Week:</strong> ${wk || '(pick a week)'}
       </div>
-    `;
+      <div class="table-container">
+        <p>No swaps yet — placeholder content.</p>
+      </div>`;
   };
-
   APP.Components = APP.Components || {};
   APP.Components.ShiftTradeCenter = ShiftTradeCenter;
 })(window.APP);
+
 
 }(window.APP));
 
@@ -2917,7 +3093,9 @@ if (ELS.tabNav && !ELS.tabNav.querySelector('[data-tab="tab-trade-center"]')) {
     };
     
     const handleTabNavigation = (e) => {
+        
         const target = e.target.closest('.tab-link');
+        
         if (target && !target.classList.contains('disabled')) {
             const tabId = target.dataset.tab;
             
