@@ -1094,6 +1094,51 @@ if (!/^\d{4}-\d{2}-\d{2}$/.test(rotationStartISO)) {
 
     APP.Components = APP.Components || {};
     APP.Components.AssignmentManager = AssignmentManager;
+    /** 
+ * MODULE: APP.Components.ShiftTradeCenter
+ * Very first version – renders a simple placeholder table.
+ */
+(function (APP) {
+  const ShiftTradeCenter = {};
+  const ELS = {};
+
+  ShiftTradeCenter.initialize = () => {
+    // Cache the grid container
+    ELS.grid = document.getElementById('shiftTradeGrid');
+  };
+
+  ShiftTradeCenter.render = () => {
+    // Re-query if needed (tab might re-render after first init)
+    if (!ELS.grid) ELS.grid = document.getElementById('shiftTradeGrid');
+    if (!ELS.grid) return;
+
+    // Simple placeholder UI (you can replace with real fields later)
+    ELS.grid.innerHTML = `
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Requestor</th>
+              <th>Current Shift</th>
+              <th>Proposed Swap</th>
+              <th>Week</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="swapRows">
+            <tr>
+              <td colspan="5" class="helper-text">No swap requests yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+  };
+
+  APP.Components = APP.Components || {};
+  APP.Components.ShiftTradeCenter = ShiftTradeCenter;
+})(window.APP);
+
 }(window.APP));
 
 /**
