@@ -608,6 +608,9 @@ return { data: map, error: null };
     const ELS = {};
 
     AssignmentManager.initialize = () => {
+        const wk = document.getElementById('weekStart');
+if (wk) wk.addEventListener('change', () => AssignmentManager.render());
+
         ELS.grid = document.getElementById('assignmentGrid');
         if (ELS.grid) ELS.grid.addEventListener('change', handleChange);
     };
@@ -703,6 +706,14 @@ if (btnWeek)   btnWeek.addEventListener('click',   () => handleRowAction('change
     };
 // Handle per-row actions (assign from this week / change forward)
 const handleRowAction = async (action, advisorId) => {
+    // convert "dd/mm/yyyy" to "yyyy-mm-dd" if needed
+const toISO = (val) => {
+  if (!val) return val;
+  return val.includes('/')
+    ? (APP.Utils.parseDateInput ? APP.Utils.parseDateInput(val) : val)  // prefer existing parser if present
+    : val;
+};
+
   const weekStartInput = document.getElementById('weekStart');
   const weekStartISO = weekStartInput ? weekStartInput.value : null;
 
@@ -713,7 +724,8 @@ const handleRowAction = async (action, advisorId) => {
   const dateInput   = row.querySelector('.assign-start-date');
 
   const rotationName = rotationSel ? rotationSel.value : '';
-  const startISO = (dateInput && dateInput.value) ? dateInput.value : weekStartISO;
+  const startISO = toISO((dateInput && dateInput.value) ? dateInput.value : weekStartISO);
+
 
   if (!rotationName || !startISO) {
     APP.Utils.showToast('Please pick a rotation and a start week first.', 'warning');
@@ -747,11 +759,12 @@ if (action === 'change_one_week') {
 
   // (1) Upsert current snapshot
   await APP.DataService.saveRecord('rotation_assignments', {
-    advisor_id: advisorId,
-    rotation_name: rotationName,
-    start_date: startISO,
-    effective_weeks: 6
-  }, { advisor_id: advisorId });
+  advisor_id: advisorId,
+  rotation_name: rotationName,
+  start_date: startISO,
+  effective_weeks: 6
+}, 'advisor_id'); // onConflict target
+
 
   // (2) Close any open history row (end yesterday)
   const endYesterdayISO = (() => {
