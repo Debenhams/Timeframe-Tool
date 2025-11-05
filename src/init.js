@@ -1,5 +1,5 @@
 /**
- * WFM Intelligence Platform - Initialization (v15.5)
+ * WFM Intelligence Platform - Initialization (v15.6.1)
  * Bootloader script.
  */
 

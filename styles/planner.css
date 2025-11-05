@@ -1,7 +1,6 @@
 /**
- * WFM Intelligence Platform - Styles (v15.5)
+ * WFM Intelligence Platform - Styles (v15.6.1)
  * Includes Base Layout, Components, Editors, and Visualization (Daily/Weekly)
- * V15.4/15.5: Restored missing base styles (Layout, Sidebar, Forms, Tables) omitted in V15.0.
 */
 
 /* === VARIABLES & CONFIGURATION === */
@@ -184,14 +183,19 @@ h2 {
 }
 
 /* === CONTENT AREA & TABS === */
+/* V15.6.1: Improved Layout Handling */
 .content-area {
   flex-grow: 1;
-  overflow: auto; /* Allows content area to scroll if content overflows */
+  overflow: hidden; /* Manage scrolling within tabs */
+  display: flex;
+  flex-direction: column;
 }
 
 .tab-content {
   display: none;
   padding: 24px;
+  flex-grow: 1;
+  overflow-y: auto; /* Default scrolling behavior for tabs */
 }
 
 .tab-content.active {
@@ -365,9 +369,11 @@ tbody tr:hover {
 
 /* === SCHEDULE VIEW (Layout) === */
 
-/* Ensures the schedule view takes the full available height */
+/* V15.6.1: Ensures the schedule view takes the full available height */
 .planner-section {
   height: 100%;
+  /* Override parent tab scrolling behavior */
+  overflow: hidden; 
 }
 
 .planner-layout {
@@ -382,6 +388,7 @@ tbody tr:hover {
   flex-direction: column;
   gap: 16px;
   overflow-y: auto; /* Allows tree view to scroll if it gets long */
+  height: 100%;
 }
 
 /* Hierarchical Tree View */
@@ -423,6 +430,7 @@ tbody tr:hover {
   flex-direction: column;
   overflow: hidden; /* Critical for the visualization container */
   padding: 0; /* Remove padding from the card container itself */
+  height: 100%;
 }
 
 .planner-header {
@@ -754,13 +762,6 @@ tbody tr:hover {
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
-}
-
-/* Inline footer under rotation grid */
-.table-footer-inline {
-  display: flex;
-  justify-content: center;
-  padding: 12px 0 4px;
 }
 
 /* Inline footer under rotation grid */

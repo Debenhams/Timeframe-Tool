@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WFM Intelligence Platform (v15.5.2)</title>
+  <title>WFM Intelligence Platform (v15.6.1)</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./styles/planner.css?v=15.5.2" />
+  <link rel="stylesheet" href="./styles/planner.css?v=15.6.1" />
 </head>
 <body>
 
@@ -131,7 +131,7 @@
             </div>
             <div class="editor-buttons">
                 <span id="autoSaveStatus" class="auto-save-status"></span>
-                <button id="btnAddWeek" class="btn btn-secondary">[+] Add Week</button>
+                <button id="btnAddWeek" class="btn btn-secondary" disabled>[+] Add Week (Top)</button>
                 <button id="btnNewRotation" class="btn btn-primary">[+] New Rotation</button>
                 <button id="btnDeleteRotation" class="btn btn-danger">
                 Delete Rotation
@@ -204,7 +204,7 @@
                 <label for="modalStartTime">Shift Start Time</label>
                 <input type="text" id="modalStartTime" class="form-input time-picker-input" placeholder="Select time..." />
             </div>
-            <button id="modalAddActivity" class="btn btn-secondary">[+] Add Activity</button>
+            <button id="modalAddActivity" class="btn btn-secondary">[+] Add Activity (Bottom)</button>
         </div>
         
         <div class="builder-grid-container">
@@ -234,62 +234,11 @@
       </div>
     </div>
   </div>
+  
   <div id="notification-container"></div>
 
-  <script src="./src/planner.js?v=15.5.2"></script>
-  <script src="./src/init.js?v=15.5.2"></script>
-  <!-- Modal markup (must exist for the builder) -->
-<div id="shiftBuilderModal" class="modal modal-lg" style="display:none;">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h3 id="modalTitle">Sequential Builder</h3>
-      <button id="modalClose" class="btn btn-secondary modal-close">Close</button>
-    </div>
-    <div class="modal-body">
-      <div class="sequential-layout">
-        <div class="builder-controls">
-          <div>
-            <label for="modalStartTime">Start time</label>
-            <input id="modalStartTime" class="form-input time-picker-input" placeholder="08:00" />
-          </div>
-          <button id="modalAddActivity" class="btn btn-secondary">[+] Add Activity</button>
-        </div>
-
-        <div id="exceptionReasonGroup" class="exception-reason-group" style="display:none;">
-          <label for="modalExceptionReason">Reason (for exception)</label>
-          <input id="modalExceptionReason" class="form-input" placeholder="e.g., sickness, swap, training" />
-        </div>
-
-        <div class="builder-grid-container table-container">
-          <table class="builder-grid">
-            <thead>
-              <tr><th>#</th><th>Component</th><th>Duration (min)</th><th>Start</th><th>End</th><th>Actions</th></tr>
-            </thead>
-            <tbody id="modalSequenceBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <div class="editor-summary">
-        <span>Total: <strong id="modalTotalTime">0h 00m</strong></span>
-        &nbsp;&nbsp;•&nbsp;&nbsp;
-        <span>Paid: <strong id="modalPaidTime">0h 00m</strong></span>
-      </div>
-      <button id="modalSaveStructure" class="btn btn-primary">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- Toast container -->
-<div id="notification-container"></div>
-
-<!-- Flatpickr JS (you only had CSS) -->
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-
-<!-- App scripts (order matters) -->
-<script src="./scripts/planner.js?v=15.5.2"></script>
-<script src="./scripts/init.js?v=15.5"></script>
+  <script src="./scripts/planner.js?v=15.6.1"></script>
+  <script src="./scripts/init.js?v=15.6.1"></script>
 
 </body>
 </html>
