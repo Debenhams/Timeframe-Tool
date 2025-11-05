@@ -682,13 +682,18 @@ if (weekStartISO) {
             if (dateInput && typeof flatpickr !== 'undefined') {
                 // Configure Flatpickr to display and output as d/m/Y (UK format).
                 flatpickr(dateInput, {
-  dateFormat: 'd/m/Y',
+  // Store as ISO for safety, show as dd/mm/yyyy for planners
+  dateFormat: 'Y-m-d',           // value in the input becomes yyyy-mm-dd
+  altInput: true,                 // show a pretty display field
+  altFormat: 'd/m/Y',             // display as dd/mm/yyyy
   allowInput: true,
   locale: { "firstDayOfWeek": 1 }, // Monday
   onChange: function(selectedDates, dateStr, instance) {
+    // dateStr is NOW ISO (yyyy-mm-dd) — perfect for DB + date math
     handleAssignmentUpdate(instance.element.dataset.advisorId, 'start_date', dateStr);
   }
-});           // <— end flatpickr
+});
+           // <— end flatpickr
 }             // <— end: if (dateInput && typeof flatpickr !== 'undefined')
 
 // --- wire row actions (buttons) ---
@@ -724,24 +729,28 @@ const toISO = (val) => {
   const dateInput   = row.querySelector('.assign-start-date');
 
   const rotationName = rotationSel ? rotationSel.value : '';
-  // --- force date to ISO (yyyy-mm-dd) from either dd/mm/yyyy or ISO ---
-const rawStart = (dateInput && dateInput.value) ? (dateInput.value + '').trim() : (weekStartISO || '');
+ // --- force ISO (yyyy-mm-dd) — supports flatpickr ISO or a manual dd/mm/yyyy ---
+const rawStart = (dateInput && typeof dateInput.value === 'string' && dateInput.value.trim())
+  ? dateInput.value.trim()
+  : (weekStartISO || '');
 
 const startISO = (() => {
   if (!rawStart) return '';
-  if (rawStart.includes('/')) {
-    // convert dd/mm/yyyy -> yyyy-mm-dd safely
+  // dd/mm/yyyy -> yyyy-mm-dd
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(rawStart)) {
     const [dd, mm, yyyy] = rawStart.split('/');
-    if (dd && mm && yyyy) return `${yyyy.padStart(4,'0')}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+    return `${yyyy}-${mm}-${dd}`;
   }
-  // assume already ISO like 2025-11-03
-  return rawStart;
+  // already ISO yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawStart)) return rawStart;
+  return '';
 })();
 
-if (!/^\d{4}-\d{2}-\d{2}$/.test(startISO)) {
-  APP.Utils.showToast('Start date looks invalid. Pick a week and try again.', 'danger');
+if (!startISO) {
+  APP.Utils.showToast('Pick a valid Start Date or set Week Start.', 'danger');
   return;
 }
+
 
 
 
