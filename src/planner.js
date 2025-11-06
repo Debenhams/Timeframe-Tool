@@ -557,11 +557,18 @@ Utils.addDaysISO = (iso, days) => {
             const { data: historyData, error: insertError } = await DataService.saveRecord(HISTORY_TABLE, newRecord, 'advisor_id, start_date');
             
             // Handle missing table gracefully during insert
-            if (insertError && (insertError.error.includes('PGRST116') || insertError.error.includes('42P01'))) {
-                 console.warn("History table missing during insert. Proceeding with snapshot only.");
-            } else if (insertError) {
-                throw new Error("Failed to insert new assignment history.");
-            }
+            // This is the CORRECTED patch
+// It properly checks the 'insertError' STRING directly.
+if (insertError && (insertError.includes('PGRST116') ||
+    insertError.includes('42P01') ||
+    insertError.includes('42P10'))) {
+     // The 42P10 check is added to gracefully warn instead of crash
+     // if the DB fix hasn't been applied yet.
+     console.warn(`DataService Warning: ${insertError}. Proceeding with snapshot only.`);
+} else if (insertError) {
+     // The error was not one of the known "safe" ones, so re-throw it.
+     throw new Error(insertError);
+}
 
             // 3. Update the snapshot table
             await updateSnapshotAssignment(advisor_id);
