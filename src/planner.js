@@ -1,12 +1,10 @@
 /**
- * WFM Intelligence Platform - Application Logic (v15.6.2)
+ * WFM Intelligence Platform - Application Logic (v15.7.1)
  * 
- * V15.6.2: FIX: Removed conflicting 'change' event listener in AssignmentManager that caused dropdowns to revert 
- *          when attempting to stage inputs for historical actions (Swaps/Amend Forward).
- * V15.6.1: FIX: Ensured robust UTC date calculations are used consistently in Utils.addDaysISO. Improved mouse tracking in Daily View.
- * V15.6:   FIX: Resolved "invalid input syntax for type date: 'null'" error using explicit filters (.is(key, null)).
- *          IMPROVEMENT: AssignmentManager now dynamically calculates and saves rotation length (effective_weeks).
- *          IMPROVEMENT: ScheduleViewer now fetches and uses historical assignment data for accurate visualization.
+ * V15.7.1: CRITICAL FIX: Corrected syntax error in planner.js assembly (missing closing syntax in StateManager module).
+ * V15.7:   CRITICAL FIX: Updated DataService.fetchEffectiveAssignmentsForDate to prioritize by 'created_at' DESC. 
+ *          FEATURE: Added ShiftTradeCenter module.
+ *          REFACTOR: Centralized schedule calculation logic into APP.ScheduleCalculator service.
  */
 
 // Global Namespace Initialization
@@ -19,7 +17,6 @@ window.APP = window.APP || {};
     const Config = {};
 
     // Supabase Configuration (Centralized)
-    // SECURITY NOTE: RLS should be enabled on the Supabase tables in production.
     Config.SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
     Config.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 
@@ -155,13 +152,36 @@ window.APP = window.APP || {};
 
     // V15.1: Helper to get the Monday ISO date for any given ISO date
     Utils.getMondayForDate = (isoDateStr) => {
+        // V15.7: Added robust check for invalid input
+        if (!isoDateStr || typeof isoDateStr !== 'string' || isoDateStr.split('-').length !== 3) {
+            console.error("Invalid ISO date string provided to getMondayForDate:", isoDateStr);
+            return null;
+        }
         const [y, m, d] = isoDateStr.split('-').map(Number);
         const date = new Date(y, m - 1, d);
+         if (isNaN(date.getTime())) {
+            console.error("Invalid Date object created in getMondayForDate:", isoDateStr);
+            return null;
+        }
         const day = date.getDay();
         // Calculate difference to Monday (1 for Monday, 0 for Sunday)
         const diff = date.getDate() - day + (day === 0 ? -6 : 1); 
         const monday = new Date(date.setDate(diff));
         return Utils.formatDateToISO(monday);
+    };
+
+     // V15.7: Helper to get the Day Name from an ISO Date
+    Utils.getDayNameFromISO = (isoDateStr) => {
+        if (!isoDateStr) return null;
+        try {
+            const [y, m, d] = isoDateStr.split('-').map(Number);
+            // Use UTC to ensure consistent day name regardless of client timezone
+            const dateObj = new Date(Date.UTC(y, m - 1, d));
+            return dateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+         } catch (err) {
+             console.error("Error parsing date for getDayNameFromISO:", isoDateStr, err);
+             return null;
+         }
     };
 
     // V15.6 Helper: Calculate the length (in weeks) of a rotation pattern
@@ -309,8 +329,6 @@ Utils.addDaysISO = (iso, days) => {
 
     // Generalized update function
     // V15.6 FIX: Replaced .match(condition) with explicit filters (.eq/.is) for robust NULL handling in conditions.
-    // The Supabase client's .match() can sometimes serialize JS null as the string "null" in the API request, 
-    // causing PostgreSQL errors like 'invalid input syntax for type date: "null"'.
     DataService.updateRecord = async (tableName, updates, condition) => {
         let query = supabase.from(tableName).update(updates);
 
@@ -341,18 +359,21 @@ Utils.addDaysISO = (iso, days) => {
         return { data: null, error: null };
     };
 
-    // V15.2: Read effective rotation rows for a given date (YYYY-MM-DD)
+    // V15.7 FIX: Updated prioritization logic to correctly handle swaps.
+    // Reads effective rotation rows for a given date (YYYY-MM-DD).
     DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
         try {
             // We query the history table for all advisors whose row covers this date
             const { data, error } = await supabase
-      .from('rotation_assignments_history')
-      .select('advisor_id, rotation_name, start_date, end_date')
-      // The assignment must have started on or before the date we are checking (Removed based on V15.6 logic review)
-      // .lte('start_date', isoDate) 
-      // Check if end_date is NULL OR end_date >= isoDate
-      .or(`end_date.is.null,end_date.gte.${isoDate}`)
-      .order('start_date', { ascending: false });   // newest first
+              .from('rotation_assignments_history')
+              // V15.7: We must select created_at (or equivalent timestamp) to ensure correct ordering.
+              .select('advisor_id, rotation_name, start_date, end_date, created_at')
+              // Check if end_date is NULL OR end_date >= isoDate (the assignment is valid on this date)
+              .or(`end_date.is.null,end_date.gte.${isoDate}`)
+              // V15.7 FIX: Order by created_at DESC. This is critical. 
+              // It ensures the most recently created record (like a swap or amendment) takes precedence 
+              // over older baseline assignments, even if the start_date is the same.
+              .order('created_at', { ascending: false });
 
 
             if (error) return handleError(error, 'Fetch effective assignments for date');
@@ -360,7 +381,7 @@ Utils.addDaysISO = (iso, days) => {
             // Build a quick lookup map: advisor_id -> record
             const map = new Map();
             (data || []).forEach(row => {
-                // Keep only the newest record (due to order by start_date desc)
+                // Keep only the newest record (due to order by created_at desc)
                 if (!map.has(row.advisor_id)) map.set(row.advisor_id, row); 
             });
             return { data: map, error: null };
@@ -581,6 +602,13 @@ Utils.addDaysISO = (iso, days) => {
         if (tableName === 'rotation_assignments') primaryKey = 'advisor_id';
 
         
+        // V15.7: Handle sync for exceptions which might use 'id' or the composite key (advisor_id, exception_date)
+        // Since we rely on upsert for exceptions, the returned record always has the 'id'.
+        if (tableName === 'schedule_exceptions') {
+            primaryKey = 'id'; 
+        }
+
+        
         if (!record.hasOwnProperty(primaryKey)) {
             console.error("SyncRecord failed: Record missing primary key", primaryKey, record);
             return;
@@ -608,6 +636,112 @@ Utils.addDaysISO = (iso, days) => {
     };
 
     APP.StateManager = StateManager;
+}(window.APP)); // V15.7.1 FIX: Restored the missing closing syntax here.
+
+
+/**
+ * MODULE: APP.ScheduleCalculator (V15.7 Refactor)
+ * Centralized service for calculating effective schedules based on Hybrid Adherence (Exceptions + History).
+ */
+(function(APP) {
+    const ScheduleCalculator = {};
+
+    // Helper: Finds the correct key in the pattern data (handles "Week 1", "Week1", "week1" etc.)
+    const findWeekKey = (patternData, weekNumber) => {
+        const keys = Object.keys(patternData);
+        // Find the key that matches the week number using the robust regex
+        return keys.find(k => {
+            const match = k.match(/^Week ?(\d+)$/i);
+            return match && parseInt(match[1], 10) === weekNumber;
+        });
+    };
+
+    // V15.7: Calculates the schedule for an advisor on a specific day.
+    // Returns { segments, source, reason }
+    ScheduleCalculator.calculateSegments = (advisorId, dayName, weekStartISO = null) => {
+        const STATE = APP.StateManager.getState();
+        // Use the provided context or the global state context
+        const effectiveWeekStart = weekStartISO || STATE.weekStart;
+        
+        if (!effectiveWeekStart) return { segments: [], source: null, reason: null };
+
+        // 1. Determine the specific date
+        const dateISO = APP.Utils.getISODateForDayName(effectiveWeekStart, dayName);
+        if (!dateISO) return { segments: [], source: null, reason: null };
+
+        // 2. Check for an Exception (Priority 1)
+        const exception = APP.StateManager.getExceptionForAdvisorDate(advisorId, dateISO);
+        if (exception && exception.structure) {
+            // If an exception exists, use its structure.
+            // Handle RDO via exception (empty structure)
+            if (exception.structure.length === 0) {
+                return { segments: [], source: 'exception', reason: exception.reason };
+            }
+            // Ensure segments are sorted (critical for visualization and comparison)
+            const sortedSegments = JSON.parse(JSON.stringify(exception.structure)).sort((a, b) => a.start_min - b.start_min);
+            return { segments: sortedSegments, source: 'exception', reason: exception.reason };
+        }
+
+        // 3. Calculate based on Rotation (Priority 2)
+        
+        // V15.6: Use the EFFECTIVE assignment from the cache for this specific week.
+        // V15.7: This now uses the correctly prioritized data from DataService.
+        const effectiveMap = STATE.effectiveAssignmentsCache.get(effectiveWeekStart);
+        let assignment = null;
+
+        if (effectiveMap && effectiveMap.has(advisorId)) {
+            assignment = effectiveMap.get(advisorId);
+        } else {
+            // Fallback: If history failed to load or advisor wasn't present, use the current snapshot.
+            assignment = APP.StateManager.getAssignmentForAdvisor(advisorId);
+        }
+
+        
+        if (!assignment || !assignment.rotation_name || !assignment.start_date) {
+            return { segments: [], source: 'rotation', reason: null };
+        }
+
+        // Calculate the effective week number using the finite rotation logic
+        const effectiveWeek = APP.Utils.getEffectiveWeek(assignment.start_date, effectiveWeekStart, assignment, APP.StateManager.getPatternByName);
+        
+        // If null, the advisor is outside their finite rotation period or hasn't started yet.
+        if (effectiveWeek === null) return { segments: [], source: 'rotation', reason: null };
+        
+        // Determine the day index (1-7)
+        const dayIndex = (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(dayName) + 1);
+        const dayIndexStr = dayIndex.toString();
+
+
+        const pattern = APP.StateManager.getPatternByName(assignment.rotation_name);
+        if (!pattern || !pattern.pattern) return { segments: [], source: 'rotation', reason: null };
+        
+        // Look up the shift code in the rotation pattern
+        const weekKey = findWeekKey(pattern.pattern, effectiveWeek);
+        const weekPattern = weekKey ? pattern.pattern[weekKey] : {};
+
+        // Handle legacy DOW keys (e.g., 'mon') if numerical key is missing
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        const legacyDayKey = days[dayIndex - 1];
+        
+        const shiftCode = weekPattern[dayIndexStr] || weekPattern[legacyDayKey];
+
+
+        if (!shiftCode) return { segments: [], source: 'rotation', reason: null }; // RDO
+
+        // Find the shift definition corresponding to the code
+        const definition = APP.StateManager.getShiftDefinitionByCode(shiftCode);
+        
+        if (!definition || !definition.structure) {
+            console.warn(`Shift Definition not found or invalid for Code: '${shiftCode}' (Advisor ${advisorId} on ${dayName}, Week ${effectiveWeek})`);
+            return { segments: [], source: 'rotation', reason: null };
+        }
+
+        // Ensure segments are sorted
+        const sortedRotation = JSON.parse(JSON.stringify(definition.structure)).sort((a, b) => a.start_min - b.start_min);
+        return { segments: sortedRotation, source: 'rotation', reason: null };
+    };
+
+    APP.ScheduleCalculator = ScheduleCalculator;
 }(window.APP));
 
 
@@ -708,11 +842,7 @@ Utils.addDaysISO = (iso, days) => {
         ELS.grid = document.getElementById('assignmentGrid');
         
         // V15.6.2 FIX: Removed the conflicting 'change' event listener.
-        // The previous implementation (handleChange/handleAssignmentUpdate) immediately saved changes 
-        // to the snapshot table, which interfered with the user's ability to stage inputs for 
-        // the historical action buttons (Swap/Amend Forward).
         // Actions are now exclusively handled by the buttons via handleRowAction.
-        // if (ELS.grid) ELS.grid.addEventListener('change', handleChange);
     };
 
     // Renders the assignment grid, showing the effective rotation for the selected week.
@@ -868,9 +998,8 @@ Utils.addDaysISO = (iso, days) => {
       // Calculate the end date (start of week + 6 days)
       const weekEndISO = APP.Utils.addDaysISO(weekStartISO, 6);
 
-      // NOTE: The definition of the history table makes this slightly ambiguous.
       // We are saving the rotation details (name, week 1 start date) but bounding its validity (end_date).
-      // We rely on the ScheduleViewer logic (fetchEffectiveAssignmentsForDate) to correctly interpret this bounded entry.
+      // V15.7: The DataService now correctly prioritizes this swap based on created_at timestamp.
       const { error } = await APP.DataService.saveRecord('rotation_assignments_history', {
         advisor_id: advisorId,
         rotation_name: rotationName,
@@ -918,7 +1047,6 @@ Utils.addDaysISO = (iso, days) => {
         }
 
         // V15.6 FIX: DataService.updateRecord is now robust against NULL condition errors.
-        // This specifically addresses the 'invalid input syntax for type date: "null"' error.
         await APP.DataService.updateRecord(
           'rotation_assignments_history',
           { end_date: endYesterdayISO },
@@ -945,9 +1073,6 @@ Utils.addDaysISO = (iso, days) => {
         }
     }
 };
-
-    // V15.6.2 FIX: Removed handleChange and handleAssignmentUpdate as they implemented an auto-save
-    // behavior that conflicted with the historical assignment management strategy.
 
 
     APP.Components = APP.Components || {};
@@ -1270,6 +1395,17 @@ Utils.addDaysISO = (iso, days) => {
         // 1. Convert sequential format (segments) back to absolute time format (structure)
         const absoluteTimeSegments = [];
         let currentTime = startTimeMin;
+
+        // If there are no segments, this is an RDO/Absence exception or an empty definition
+        if (segments.length === 0) {
+             if (mode === 'definition') {
+                 // Allow saving empty definitions
+             } else if (mode === 'exception') {
+                if (!confirm("This will clear the schedule for the selected day (RDO/Absence). Proceed?")) {
+                    return;
+                }
+             }
+        }
 
         for (const seg of segments) {
             if (!seg.component_id) {
@@ -1823,15 +1959,15 @@ Utils.addDaysISO = (iso, days) => {
         const STATE = APP.StateManager.getState();
         if (STATE.weekStart) {
             // Pre-load the effective assignments for the selected week start date.
+            // V15.7: This now uses the corrected DataService query.
             await APP.StateManager.loadEffectiveAssignments(STATE.weekStart);
         }
         
         renderTree();
         renderPlannerContent();
 
-        // Also ensure Assignments tab is up-to-date if visible, as it relies on the historical data too.
+        // Also ensure Assignments tab is up-to-date if visible
         const assignmentsTab = document.getElementById('tab-advisor-assignments');
-        // V15.6.2: Ensure AssignmentManager render is called if its tab is active.
         if (assignmentsTab && assignmentsTab.classList.contains('active') && APP.Components.AssignmentManager) {
              APP.Components.AssignmentManager.render();
         }
@@ -1873,29 +2009,23 @@ Utils.addDaysISO = (iso, days) => {
              if (cell && cell.dataset.advisorId && cell.dataset.date) {
                  advisorId = cell.dataset.advisorId;
                  dateISO = cell.dataset.date;
-                 // Calculate dayName from dateISO (primarily for the modal title)
-                 // Use UTC to ensure correct date parsing across timezones
-                 try {
-                    const [y, m, d] = dateISO.split('-').map(Number);
-                    const dateObj = new Date(Date.UTC(y, m - 1, d));
-                    dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
-                 } catch (err) {
-                     console.error("Error parsing date for visualization click:", dateISO, err);
-                     return;
-                 }
+                 // V15.7: Use utility function for consistency
+                 dayName = APP.Utils.getDayNameFromISO(dateISO);
              }
         }
 
-        if (advisorId && dateISO) {
+        if (advisorId && dateISO && dayName) {
             const advisor = APP.StateManager.getAdvisorById(advisorId);
             if (!advisor) return;
             
-            // Calculate the current segments for this specific date to initialize the builder.
-            // We must calculate the Monday for that specific date to ensure rotation calculation is correct
+            // Calculate the Monday for that specific date
             const weekStartISO = APP.Utils.getMondayForDate(dateISO); 
             
-            // Use the robust calculateSegments
-            const { segments, reason } = calculateSegments(advisorId, dayName, weekStartISO);
+            // V15.7: Use the centralized ScheduleCalculator
+            // NOTE: This relies on the historical data for weekStartISO being loaded. 
+            // In the context of Live Editing (especially from Weekly view), this might require an async fetch if not already cached.
+            // For now, we assume the data for the currently viewed week is loaded.
+            const { segments, reason } = APP.ScheduleCalculator.calculateSegments(advisorId, dayName, weekStartISO);
 
             // Open the Sequential Builder in 'exception' mode
             if (APP.Components.SequentialBuilder) {
@@ -2058,8 +2188,8 @@ Utils.addDaysISO = (iso, days) => {
                 
             let html = '';
             advisorsToRender.forEach(adv => {
-                // V15.1: Calculate segments AND determine source (Hybrid Adherence)
-                const { segments, source } = calculateSegments(adv.id, STATE.selectedDay);
+                // V15.7: Use the centralized ScheduleCalculator
+                const { segments, source } = APP.ScheduleCalculator.calculateSegments(adv.id, STATE.selectedDay);
                 
                 // V15.1: Add exception styling class if source is 'exception'
                 const rowClass = (source === 'exception') ? 'is-exception' : '';
@@ -2099,7 +2229,8 @@ Utils.addDaysISO = (iso, days) => {
         headerElement.innerHTML = html;
     };
 
-    const renderSegments = (segments) => {
+    // V15.7: Made public as it's used by TradeCenter preview as well (though not currently utilized there, good practice)
+    ScheduleViewer.renderSegments = (segments) => {
         if (!segments || segments.length === 0) {
             return ''; // RDO
         }
@@ -2130,6 +2261,8 @@ Utils.addDaysISO = (iso, days) => {
             `;
         }).join('');
     };
+    // Alias for internal use
+    const renderSegments = ScheduleViewer.renderSegments;
 
     // --- WEEKLY VIEW ---
 
@@ -2176,8 +2309,8 @@ Utils.addDaysISO = (iso, days) => {
                 html += `<tr><td>${adv.name}</td>`;
                 
                 daysOfWeek.forEach(day => {
-                    // V15.1: Calculate segments and source (Hybrid Adherence)
-                    const { segments, source } = calculateSegments(adv.id, day);
+                    // V15.7: Use the centralized ScheduleCalculator
+                    const { segments, source } = APP.ScheduleCalculator.calculateSegments(adv.id, day);
                     
                     // V15.1: Determine class and get the specific date for this cell
                     const cellClass = (source === 'exception') ? 'is-exception' : '';
@@ -2235,100 +2368,6 @@ Utils.addDaysISO = (iso, days) => {
         `;
     };
 
-
-    // --- CORE CALCULATION (Hybrid Adherence + History) ---
-
-    // V15.6: Calculates the schedule for an advisor on a specific day, prioritizing exceptions and using historical data.
-    // Returns { segments, source, reason }
-    const calculateSegments = (advisorId, dayName, weekStartISO = null) => {
-        const STATE = APP.StateManager.getState();
-        // Use the provided context or the global state context
-        const effectiveWeekStart = weekStartISO || STATE.weekStart;
-        
-        if (!effectiveWeekStart) return { segments: [], source: null, reason: null };
-
-        // 1. Determine the specific date
-        const dateISO = APP.Utils.getISODateForDayName(effectiveWeekStart, dayName);
-        if (!dateISO) return { segments: [], source: null, reason: null };
-
-        // 2. Check for an Exception (Priority 1)
-        const exception = APP.StateManager.getExceptionForAdvisorDate(advisorId, dateISO);
-        if (exception && exception.structure && exception.structure.length > 0) {
-            // If an exception exists, use its structure.
-            // Ensure segments are sorted (critical for visualization and comparison)
-            const sortedSegments = JSON.parse(JSON.stringify(exception.structure)).sort((a, b) => a.start_min - b.start_min);
-            return { segments: sortedSegments, source: 'exception', reason: exception.reason };
-        }
-
-        // 3. Calculate based on Rotation (Priority 2)
-        
-        // V15.6: Use the EFFECTIVE assignment from the cache for this specific week.
-        const effectiveMap = STATE.effectiveAssignmentsCache.get(effectiveWeekStart);
-        let assignment = null;
-
-        if (effectiveMap && effectiveMap.has(advisorId)) {
-            assignment = effectiveMap.get(advisorId);
-        } else {
-            // Fallback: If history failed to load or advisor wasn't present, use the current snapshot.
-            // This provides resilience but might be inaccurate for past dates if history is unavailable.
-            assignment = APP.StateManager.getAssignmentForAdvisor(advisorId);
-        }
-
-        
-        if (!assignment || !assignment.rotation_name || !assignment.start_date) {
-            return { segments: [], source: 'rotation', reason: null };
-        }
-
-        // Calculate the effective week number using the finite rotation logic
-        const effectiveWeek = APP.Utils.getEffectiveWeek(assignment.start_date, effectiveWeekStart, assignment, APP.StateManager.getPatternByName);
-        
-        // If null, the advisor is outside their finite rotation period or hasn't started yet.
-        if (effectiveWeek === null) return { segments: [], source: 'rotation', reason: null };
-        
-        // Determine the day index (1-7)
-        const dayIndex = (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(dayName) + 1);
-        const dayIndexStr = dayIndex.toString();
-
-
-        const pattern = APP.StateManager.getPatternByName(assignment.rotation_name);
-        if (!pattern || !pattern.pattern) return { segments: [], source: 'rotation', reason: null };
-        
-        // Look up the shift code in the rotation pattern
-        // V15.5.1 FIX: Use the robust key finder helper
-        const weekKey = findWeekKey(pattern.pattern, effectiveWeek);
-        const weekPattern = weekKey ? pattern.pattern[weekKey] : {};
-
-        // V15.5.1 FIX: Handle legacy DOW keys (e.g., 'mon') if numerical key is missing
-        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-        const legacyDayKey = days[dayIndex - 1];
-        
-        const shiftCode = weekPattern[dayIndexStr] || weekPattern[legacyDayKey];
-
-
-        if (!shiftCode) return { segments: [], source: 'rotation', reason: null }; // RDO
-
-        // Find the shift definition corresponding to the code
-        const definition = APP.StateManager.getShiftDefinitionByCode(shiftCode);
-        
-        if (!definition || !definition.structure) {
-            console.warn(`Shift Definition not found or invalid for Code: '${shiftCode}' (Advisor ${advisorId} on ${dayName}, Week ${effectiveWeek})`);
-            return { segments: [], source: 'rotation', reason: null };
-        }
-
-        // Ensure segments are sorted
-        const sortedRotation = JSON.parse(JSON.stringify(definition.structure)).sort((a, b) => a.start_min - b.start_min);
-        return { segments: sortedRotation, source: 'rotation', reason: null };
-    };
-
-    // V15.5.1 Helper: Duplicated from RotationEditor for use in calculateSegments
-    const findWeekKey = (patternData, weekNumber) => {
-        const keys = Object.keys(patternData);
-        // Find the key that matches the week number using the robust regex
-        return keys.find(k => {
-            const match = k.match(/^Week ?(\d+)$/i);
-            return match && parseInt(match[1], 10) === weekNumber;
-        });
-    };
 
     // --- INTRADAY INDICATORS (Daily View Only) ---
     
@@ -2441,6 +2480,274 @@ Utils.addDaysISO = (iso, days) => {
 
 
 /**
+ * MODULE: APP.Components.ShiftTradeCenter (V15.7)
+ * Manages the interface and logic for swapping shifts between two advisors.
+ */
+(function(APP) {
+    const ShiftTradeCenter = {};
+    const ELS = {};
+
+    // Local state for the trade center
+    const TRADE_STATE = {
+        advisor1: null,
+        date1: null,
+        schedule1: null,
+        advisor2: null,
+        date2: null,
+        schedule2: null,
+        reason: null,
+    };
+
+    ShiftTradeCenter.initialize = () => {
+        ELS.advisor1 = document.getElementById('tradeAdvisor1');
+        ELS.date1 = document.getElementById('tradeDate1');
+        ELS.preview1 = document.getElementById('tradePreview1');
+        ELS.advisor2 = document.getElementById('tradeAdvisor2');
+        ELS.date2 = document.getElementById('tradeDate2');
+        ELS.preview2 = document.getElementById('tradePreview2');
+        ELS.btnExecuteTrade = document.getElementById('btnExecuteTrade');
+        ELS.reasonInput = document.getElementById('tradeReason');
+
+        // Event Listeners
+        if (ELS.advisor1) ELS.advisor1.addEventListener('change', (e) => handleSelectionChange('1', 'advisor', e.target.value));
+        if (ELS.advisor2) ELS.advisor2.addEventListener('change', (e) => handleSelectionChange('2', 'advisor', e.target.value));
+        if (ELS.btnExecuteTrade) ELS.btnExecuteTrade.addEventListener('click', executeTrade);
+        if (ELS.reasonInput) ELS.reasonInput.addEventListener('input', (e) => {
+            TRADE_STATE.reason = e.target.value;
+            validateTrade();
+        });
+
+
+        // Initialize Date Pickers (Flatpickr)
+        if (typeof flatpickr !== 'undefined') {
+            if (ELS.date1) {
+                flatpickr(ELS.date1, {
+                    dateFormat: 'Y-m-d',
+                    altInput: true,
+                    altFormat: 'D, d M Y', // Friendly display format
+                    onChange: (selectedDates, dateStr) => handleSelectionChange('1', 'date', dateStr)
+                });
+            }
+            if (ELS.date2) {
+                 flatpickr(ELS.date2, {
+                    dateFormat: 'Y-m-d',
+                    altInput: true,
+                    altFormat: 'D, d M Y',
+                    onChange: (selectedDates, dateStr) => handleSelectionChange('2', 'date', dateStr)
+                });
+            }
+        }
+    };
+
+    ShiftTradeCenter.render = () => {
+        renderAdvisorDropdowns();
+        // Previews are rendered dynamically on selection change
+    };
+
+    const renderAdvisorDropdowns = () => {
+        // Check if already populated to prevent redundant rendering
+        if (ELS.advisor1 && ELS.advisor1.options.length > 1) return;
+
+        const STATE = APP.StateManager.getState();
+        const advisors = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name));
+        
+        let opts = '<option value="">-- Select Advisor --</option>';
+        advisors.forEach(adv => {
+            opts += `<option value="${adv.id}">${adv.name}</option>`;
+        });
+
+        if (ELS.advisor1) ELS.advisor1.innerHTML = opts;
+        if (ELS.advisor2) ELS.advisor2.innerHTML = opts;
+    };
+
+    const handleSelectionChange = async (slot, type, value) => {
+        TRADE_STATE[`${type}${slot}`] = value || null;
+        
+        const advisorId = TRADE_STATE[`advisor${slot}`];
+        const dateISO = TRADE_STATE[`date${slot}`];
+
+        if (advisorId && dateISO) {
+            // Fetch and render the schedule preview
+            TRADE_STATE[`schedule${slot}`] = await fetchScheduleForDate(advisorId, dateISO);
+            renderPreview(slot);
+        } else {
+            // Clear the preview
+            TRADE_STATE[`schedule${slot}`] = null;
+            renderPreview(slot);
+        }
+        validateTrade();
+    };
+
+    // Helper to fetch the schedule for a specific advisor and date.
+    const fetchScheduleForDate = async (advisorId, dateISO) => {
+        try {
+            // 1. Determine Day Name and Week Start
+            const weekStartISO = APP.Utils.getMondayForDate(dateISO);
+
+            // Check if date calculation was successful
+            if (!weekStartISO) {
+                console.error("Could not determine week start for date:", dateISO);
+                return null;
+            }
+
+            const dayName = APP.Utils.getDayNameFromISO(dateISO);
+            
+
+            // 2. Ensure historical data is loaded for that specific week start
+            // This leverages the StateManager's caching mechanism.
+            await APP.StateManager.loadEffectiveAssignments(weekStartISO);
+
+            // 3. Use the centralized calculation logic.
+             const result = APP.ScheduleCalculator.calculateSegments(advisorId, dayName, weekStartISO);
+             return result;
+
+        } catch (e) {
+            console.error("Error fetching schedule for trade preview:", e);
+            return null;
+        }
+    };
+
+    // Renders the preview panel for the specified slot
+    const renderPreview = (slot) => {
+        const previewEl = ELS[`preview${slot}`];
+        const schedule = TRADE_STATE[`schedule${slot}`];
+
+        if (!previewEl) return;
+
+        if (!schedule) {
+            previewEl.innerHTML = 'Select advisor and date to preview schedule.';
+            return;
+        }
+
+        if (schedule.segments.length === 0) {
+            previewEl.innerHTML = `<div class="trade-preview-details"><h4>Rest Day Off (RDO)</h4></div>`;
+            return;
+        }
+
+        const startMin = schedule.segments[0].start_min;
+        const endMin = schedule.segments[schedule.segments.length - 1].end_min;
+        const timeString = `${APP.Utils.formatMinutesToTime(startMin)} - ${APP.Utils.formatMinutesToTime(endMin)}`;
+
+        let html = `<div class="trade-preview-details">
+            <h4>${timeString} (${schedule.source === 'exception' ? 'Exception' : 'Rotation'})</h4>
+            <ul>`;
+        
+        schedule.segments.forEach(seg => {
+            const component = APP.StateManager.getComponentById(seg.component_id);
+            const duration = seg.end_min - seg.start_min;
+            html += `<li>${APP.Utils.formatMinutesToTime(seg.start_min)}: ${component ? component.name : 'Unknown'} (${duration}m)</li>`;
+        });
+
+        html += `</ul></div>`;
+        previewEl.innerHTML = html;
+    };
+
+    // Validates if the trade is possible and enables/disables the button
+    const validateTrade = () => {
+        const { advisor1, date1, schedule1, advisor2, date2, schedule2, reason } = TRADE_STATE;
+        
+        let isValid = true;
+
+        // 1. All inputs must be selected and reason provided
+        if (!advisor1 || !date1 || !advisor2 || !date2 || !reason || reason.trim() === '') {
+            isValid = false;
+        }
+
+        // 2. Schedules must be successfully loaded
+        else if (!schedule1 || !schedule2) {
+             isValid = false;
+        }
+
+        // 3. Cannot trade with oneself on the same day
+        else if (advisor1 === advisor2 && date1 === date2) {
+             isValid = false;
+        }
+        
+        if (ELS.btnExecuteTrade) {
+            ELS.btnExecuteTrade.disabled = !isValid;
+        }
+        return isValid;
+    };
+
+    const executeTrade = async () => {
+        if (!validateTrade()) return;
+
+        const { advisor1, date1, schedule1, advisor2, date2, schedule2, reason } = TRADE_STATE;
+
+        const adv1Name = APP.StateManager.getAdvisorById(advisor1)?.name || advisor1;
+        const adv2Name = APP.StateManager.getAdvisorById(advisor2)?.name || advisor2;
+
+        if (!confirm(`Confirm Trade:\n\n${adv1Name} on ${APP.Utils.convertISOToUKDate(date1)} will receive ${adv2Name}'s schedule from ${APP.Utils.convertISOToUKDate(date2)}.\n\n${adv2Name} on ${APP.Utils.convertISOToUKDate(date2)} will receive ${adv1Name}'s schedule from ${APP.Utils.convertISOToUKDate(date1)}.\n\nReason: ${reason}\n\nProceed?`)) {
+            return;
+        }
+
+        // Create the two exceptions
+        // Exception 1: Advisor 1 gets Schedule 2 on Date 1
+        const exception1 = {
+            advisor_id: advisor1,
+            exception_date: date1,
+            // Must use a deep copy of the segments (handle RDO by setting structure to empty array)
+            structure: schedule2.segments.length > 0 ? JSON.parse(JSON.stringify(schedule2.segments)) : [], 
+            reason: `${reason} (Trade with ${adv2Name} on ${APP.Utils.convertISOToUKDate(date2)})`
+        };
+
+        // Exception 2: Advisor 2 gets Schedule 1 on Date 2
+        const exception2 = {
+            advisor_id: advisor2,
+            exception_date: date2,
+            // Must use a deep copy of the segments
+            structure: schedule1.segments.length > 0 ? JSON.parse(JSON.stringify(schedule1.segments)) : [],
+            reason: `${reason} (Trade with ${adv1Name} on ${APP.Utils.convertISOToUKDate(date1)})`
+        };
+
+        // Save both exceptions (ideally in a transaction, but sequentially here)
+        const res1 = await APP.DataService.saveRecord('schedule_exceptions', exception1, 'advisor_id, exception_date');
+        const res2 = await APP.DataService.saveRecord('schedule_exceptions', exception2, 'advisor_id, exception_date');
+
+        if (!res1.error && !res2.error) {
+            APP.StateManager.syncRecord('schedule_exceptions', res1.data);
+            APP.StateManager.syncRecord('schedule_exceptions', res2.data);
+            APP.StateManager.saveHistory("Execute Shift Trade");
+            APP.Utils.showToast("Shift trade executed successfully.", "success");
+            
+            // Clear the form and re-render previews
+            clearTradeForm();
+            
+            // Re-render the main schedule view if it's currently active
+            if (APP.Components.ScheduleViewer) {
+                 APP.Components.ScheduleViewer.render();
+            }
+            
+        } else {
+            APP.Utils.showToast("Error executing trade. Please check console logs.", "danger");
+            if (res1.error) console.error("Trade Error (Part 1):", res1.error);
+            if (res2.error) console.error("Trade Error (Part 2):", res2.error);
+        }
+    };
+
+    const clearTradeForm = () => {
+        // Reset state
+        Object.keys(TRADE_STATE).forEach(key => TRADE_STATE[key] = null);
+        
+        // Reset UI elements
+        if (ELS.advisor1) ELS.advisor1.value = "";
+        if (ELS.advisor2) ELS.advisor2.value = "";
+        if (ELS.date1 && ELS.date1._flatpickr) ELS.date1._flatpickr.clear();
+        if (ELS.date2 && ELS.date2._flatpickr) ELS.date2._flatpickr.clear();
+        if (ELS.reasonInput) ELS.reasonInput.value = '';
+        
+        renderPreview('1');
+        renderPreview('2');
+        validateTrade();
+    };
+
+
+    APP.Components = APP.Components || {};
+    APP.Components.ShiftTradeCenter = ShiftTradeCenter;
+}(window.APP));
+
+
+/**
  * MODULE: APP.Core
  * The main application controller responsible for initialization, global event wiring, and rendering coordination.
  */
@@ -2450,7 +2757,7 @@ Utils.addDaysISO = (iso, days) => {
 
     // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v15.6.2) Initializing...");
+        console.log("WFM Intelligence Platform (v15.7.1) Initializing...");
         
         // Initialize foundational services
         APP.Utils.cacheDOMElements();
@@ -2487,6 +2794,10 @@ Utils.addDaysISO = (iso, days) => {
             APP.Components.ShiftDefinitionEditor.initialize();
             APP.Components.RotationEditor.initialize();
             APP.Components.ScheduleViewer.initialize();
+            // V15.7: Initialize the new Trade Center
+            if (APP.Components.ShiftTradeCenter) {
+                APP.Components.ShiftTradeCenter.initialize();
+            }
         } catch (error) {
             console.error("CRITICAL ERROR during UI Component Initialization:", error);
             APP.Utils.showToast("Fatal Error during UI initialization. Check console logs.", "danger", 10000);
@@ -2578,6 +2889,11 @@ Utils.addDaysISO = (iso, days) => {
                 // V15.6.2: When switching to the Assignments tab, we must ensure the data is loaded and rendered.
                 // ScheduleViewer.render() handles the coordination of fetching data and rendering the AssignmentManager if the tab is active.
                 APP.Components.ScheduleViewer.render();
+            } else if (tabId === 'tab-trade-center') {
+                // V15.7: Ensure Trade Center is rendered when activated
+                if (APP.Components.ShiftTradeCenter) {
+                    APP.Components.ShiftTradeCenter.render();
+                }
             }
         }
     };
@@ -2600,13 +2916,19 @@ Utils.addDaysISO = (iso, days) => {
     };
 
     // Expose function to trigger a full application re-render
-    // V15.6: Updated to ensure coordinated rendering where necessary.
+    // V15.7: Updated to include the Trade Center.
     Core.renderAll = () => {
         if (!APP.StateManager.getState().isBooted) return;
         APP.Components.ComponentManager.render();
         // AssignmentManager.render() is implicitly called by ScheduleViewer.render() coordination
         APP.Components.ShiftDefinitionEditor.render();
         APP.Components.RotationEditor.render();
+        
+        // V15.7: Render the new Trade Center
+        if (APP.Components.ShiftTradeCenter) {
+             APP.Components.ShiftTradeCenter.render();
+        }
+
         // ScheduleViewer.render() coordinates historical data fetch and rendering of both Viewer and Assignments tabs.
         APP.Components.ScheduleViewer.render();
     };
