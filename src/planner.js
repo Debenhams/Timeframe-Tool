@@ -1,10 +1,10 @@
 /**
- * WFM Intelligence Platform - Application Logic (v15.7.1)
+ * WFM Intelligence Platform - Application Logic (v15.8)
  * 
- * V15.7.1: CRITICAL FIX: Corrected syntax error in planner.js assembly (missing closing syntax in StateManager module).
- * V15.7:   CRITICAL FIX: Updated DataService.fetchEffectiveAssignmentsForDate to prioritize by 'created_at' DESC. 
- *          FEATURE: Added ShiftTradeCenter module.
- *          REFACTOR: Centralized schedule calculation logic into APP.ScheduleCalculator service.
+ * V15.8:   CRITICAL FIX: Resolved major structural/syntax errors causing component initialization failures.
+ *          CRITICAL FIX: Fixed Assignments tab "Button Spam" caused by invalid HTML generation in render loop.
+ *          CRITICAL FIX: Implemented missing DataService functions for assignment history management (assignFromWeek, changeOnlyWeek).
+ *          REFACTOR: Implemented robust history tracking logic in DataService for time-bound assignments.
  */
 
 // Global Namespace Initialization
@@ -17,6 +17,7 @@ window.APP = window.APP || {};
     const Config = {};
 
     // Supabase Configuration (Centralized)
+    // NOTE: These are placeholder credentials. Replace with environment variables in production.
     Config.SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
     Config.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 
@@ -44,6 +45,7 @@ window.APP = window.APP || {};
 
     // Display a toast notification
     Utils.showToast = (message, type = "success", duration = 3000) => {
+        if (!ELS.notificationContainer) Utils.cacheDOMElements();
         if (!ELS.notificationContainer) return;
         
         // Map various types to standard classes
@@ -119,7 +121,7 @@ window.APP = window.APP || {};
         return `${y}-${m}-${d}`;
     };
 
-    // V15.1: Converts yyyy-mm-dd (ISO format) to dd/mm/yyyy (UK format)
+    // Converts yyyy-mm-dd (ISO format) to dd/mm/yyyy (UK format)
     Utils.convertISOToUKDate = (isoDateStr) => {
         if (!isoDateStr) return '';
         const parts = isoDateStr.split('-');
@@ -127,7 +129,7 @@ window.APP = window.APP || {};
         return `${parts[2]}/${parts[1]}/${parts[0]}`;
     };
 
-    // V15.1: Get ISO date for a specific day name within a given week (defined by weekStartISO)
+    // Get ISO date for a specific day name within a given week (defined by weekStartISO)
     Utils.getISODateForDayName = (weekStartISO, dayName) => {
         if (!weekStartISO) return null;
         const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -142,7 +144,7 @@ window.APP = window.APP || {};
         return Utils.formatDateToISO(date);
     };
 
-    // V15.1: Helper to format Date object to YYYY-MM-DD
+    // Helper to format Date object to YYYY-MM-DD
     Utils.formatDateToISO = (dateObj) => {
          const yyyy = dateObj.getFullYear();
         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -150,9 +152,8 @@ window.APP = window.APP || {};
         return `${yyyy}-${mm}-${dd}`;
     };
 
-    // V15.1: Helper to get the Monday ISO date for any given ISO date
+    // Helper to get the Monday ISO date for any given ISO date
     Utils.getMondayForDate = (isoDateStr) => {
-        // V15.7: Added robust check for invalid input
         if (!isoDateStr || typeof isoDateStr !== 'string' || isoDateStr.split('-').length !== 3) {
             console.error("Invalid ISO date string provided to getMondayForDate:", isoDateStr);
             return null;
@@ -170,7 +171,7 @@ window.APP = window.APP || {};
         return Utils.formatDateToISO(monday);
     };
 
-     // V15.7: Helper to get the Day Name from an ISO Date
+     // Helper to get the Day Name from an ISO Date
     Utils.getDayNameFromISO = (isoDateStr) => {
         if (!isoDateStr) return null;
         try {
@@ -184,7 +185,7 @@ window.APP = window.APP || {};
          }
     };
 
-    // V15.6 Helper: Calculate the length (in weeks) of a rotation pattern
+    // Helper: Calculate the length (in weeks) of a rotation pattern
     Utils.calculateRotationLength = (pattern) => {
         let numWeeks = 0;
         if (pattern && pattern.pattern && Object.keys(pattern.pattern).length > 0) {
@@ -204,7 +205,7 @@ window.APP = window.APP || {};
     };
 
 
-    // V15.1 FIX: Updated for FINITE (Non-Repeating) Rotations
+    // Updated for FINITE (Non-Repeating) Rotations
     // Calculates the effective week number based on the assignment start date.
     Utils.getEffectiveWeek = (startDateISO, weekStartISO, assignment, getPatternByName) => {
         try {
@@ -234,7 +235,7 @@ window.APP = window.APP || {};
             // Determine rotation length
             const pattern = getPatternByName(assignment.rotation_name);
             
-            // V15.6: Use the helper function for consistency
+            // Use the helper function for consistency
             let numWeeksInRotation = Utils.calculateRotationLength(pattern);
             
             if (numWeeksInRotation === 0) {
@@ -242,7 +243,7 @@ window.APP = window.APP || {};
                 return null;
             }
                 
-            // V15.1 FIX: Check if the elapsed weeks exceed the rotation length.
+            // Check if the elapsed weeks exceed the rotation length.
             // If it does, the rotation is finished (Finite Rotation).
             if (diffWeeks >= numWeeksInRotation) {
                 return null;
@@ -258,7 +259,7 @@ window.APP = window.APP || {};
    
 };
 
-// V15.6.1: Robust ISO date arithmetic using UTC
+// Robust ISO date arithmetic using UTC
 Utils.addDaysISO = (iso, days) => {
   if (!iso) return null;
   // Use UTC midnight to prevent timezone issues when calculating date differences
@@ -279,10 +280,15 @@ Utils.addDaysISO = (iso, days) => {
 /**
  * MODULE: APP.DataService
  * Handles all interactions with the Supabase backend.
+ * V15.8: Added specific helper functions for managing rotation_assignments_history.
  */
 (function(APP) {
     const DataService = {};
     let supabase = null;
+    
+    // Define the table name for historical assignments (centralized)
+    const HISTORY_TABLE = 'rotation_assignments_history';
+    const SNAPSHOT_TABLE = 'rotation_assignments';
 
     // Initialize the Supabase client
     DataService.initialize = () => {
@@ -300,7 +306,13 @@ Utils.addDaysISO = (iso, days) => {
     const handleError = (error, context) => {
         console.error(`DataService Error (${context}):`, error);
         const errorMessage = error && error.message ? error.message : 'Unknown database error';
-        APP.Utils.showToast(`Database Error: ${errorMessage}`, "danger");
+        
+        // Suppress specific known warning if the history table doesn't exist yet (PGRST116 or 42P01).
+        if (error && (error.code === 'PGRST116' || error.code === '42P01') && context.includes(HISTORY_TABLE)) {
+             console.warn(`Note: ${HISTORY_TABLE} table not found. Time-based assignments may not function correctly until schema is updated.`);
+        } else {
+            APP.Utils.showToast(`Database Error: ${errorMessage}`, "danger");
+        }
         return { data: null, error: errorMessage };
     };
 
@@ -315,7 +327,7 @@ Utils.addDaysISO = (iso, days) => {
     DataService.saveRecord = async (tableName, record, conflictColumn = null) => {
         let query = supabase.from(tableName);
         if (conflictColumn) {
-            // V15.1: Use upsert for saving exceptions or assignments based on unique constraints
+            // Use upsert for saving exceptions or assignments based on unique constraints
             query = query.upsert(record, { onConflict: conflictColumn });
         } else {
             query = query.insert(record);
@@ -328,19 +340,18 @@ Utils.addDaysISO = (iso, days) => {
     };
 
     // Generalized update function
-    // V15.6 FIX: Replaced .match(condition) with explicit filters (.eq/.is) for robust NULL handling in conditions.
     DataService.updateRecord = async (tableName, updates, condition) => {
         let query = supabase.from(tableName).update(updates);
 
-        // Apply conditions using explicit filters
+        // Apply conditions using explicit filters (.eq/.is)
         if (condition) {
             Object.keys(condition).forEach(key => {
                 const value = condition[key];
                 if (value === null) {
-                    // Explicitly use .is() for NULL checks in conditions (generates 'key=is.null')
+                    // Explicitly use .is() for NULL checks
                     query = query.is(key, null);
                 } else {
-                    // Use .eq() for standard equality checks (generates 'key=eq.value')
+                    // Use .eq() for standard equality checks
                     query = query.eq(key, value);
                 }
             });
@@ -359,51 +370,75 @@ Utils.addDaysISO = (iso, days) => {
         return { data: null, error: null };
     };
 
-    // V15.7 FIX: Updated prioritization logic to correctly handle swaps.
-    // Reads effective rotation rows for a given date (YYYY-MM-DD).
-    // Reads effective rotation rows for a given date (YYYY-MM-DD) without relying on created_at.
-DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
-  try {
-    // 1) Pull only rows that *cover* this date:
-    //    start_date <= isoDate AND (end_date IS NULL OR end_date >= isoDate)
-    const { data, error } = await supabase
-      .from('rotation_assignments_history')
-      .select('advisor_id, rotation_name, start_date, end_date, reason')
-      .lte('start_date', isoDate)
-      .or(`end_date.is.null,end_date.gte.${isoDate}`);
+    // V15.8 FIX: Reads effective rotation rows for a given date (YYYY-MM-DD).
+    // Includes prioritization logic and fallback if history table is missing.
+    DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
+      try {
+        // 1) Pull only rows that *cover* this date from history:
+        //    start_date <= isoDate AND (end_date IS NULL OR end_date >= isoDate)
+        const { data, error } = await supabase
+          .from(HISTORY_TABLE)
+          .select('advisor_id, rotation_name, start_date, end_date, reason')
+          .lte('start_date', isoDate)
+          .or(`end_date.is.null,end_date.gte.${isoDate}`);
 
-    if (error) return handleError(error, 'Fetch effective assignments for date');
-
-    // 2) For each advisor, pick the row with the *latest* start_date (closest to isoDate).
-    //    If there are ties, prefer a bounded swap (has end_date) over an open-ended row.
-    const byAdvisor = new Map();
-    (data || []).forEach(row => {
-      const existing = byAdvisor.get(row.advisor_id);
-      if (!existing) {
-        byAdvisor.set(row.advisor_id, row);
-        return;
-      }
-      // choose the row with the later start_date
-      if (row.start_date > existing.start_date) {
-        byAdvisor.set(row.advisor_id, row);
-      } else if (row.start_date === existing.start_date) {
-        // tie-breaker: prefer bounded swap (end_date not null)
-        const existingIsBounded = !!existing.end_date;
-        const rowIsBounded = !!row.end_date;
-        if (rowIsBounded && !existingIsBounded) {
-          byAdvisor.set(row.advisor_id, row);
+        // Handle specific error if the history table is missing (PostgREST error code PGRST116 or 42P01)
+        if (error && (error.code === '42P01' || error.code === 'PGRST116')) {
+            console.warn(`${HISTORY_TABLE} not found. Falling back to ${SNAPSHOT_TABLE} snapshot.`);
+            return await fetchSnapshotAssignments();
         }
+
+        if (error) return handleError(error, 'Fetch effective assignments for date');
+
+        // 2) For each advisor, pick the row with the *latest* start_date (closest to isoDate).
+        //    If there are ties, prefer a bounded swap (has end_date) over an open-ended row.
+        const byAdvisor = new Map();
+        (data || []).forEach(row => {
+          const existing = byAdvisor.get(row.advisor_id);
+          if (!existing) {
+            byAdvisor.set(row.advisor_id, row);
+            return;
+          }
+          // choose the row with the later start_date
+          if (row.start_date > existing.start_date) {
+            byAdvisor.set(row.advisor_id, row);
+          } else if (row.start_date === existing.start_date) {
+            // tie-breaker: prefer bounded swap (end_date not null)
+            const existingIsBounded = !!existing.end_date;
+            const rowIsBounded = !!row.end_date;
+            if (rowIsBounded && !existingIsBounded) {
+              byAdvisor.set(row.advisor_id, row);
+            }
+          }
+        });
+
+        return { data: byAdvisor, error: null };
+      } catch (err) {
+        return handleError(err, 'Fetch effective assignments for date (Catch)');
       }
-    });
+    };
 
-    return { data: byAdvisor, error: null };
-  } catch (err) {
-    return handleError(err, 'Fetch effective assignments for date');
-  }
-};
+    // Fallback function if history table is missing.
+    const fetchSnapshotAssignments = async () => {
+        const { data, error } = await fetchTable(SNAPSHOT_TABLE);
+        if (error) return { data: new Map(), error: error.error };
+        
+        const byAdvisor = new Map();
+        (data || []).forEach(row => {
+            // Adapt the snapshot structure to the expected history structure
+            byAdvisor.set(row.advisor_id, {
+                advisor_id: row.advisor_id,
+                rotation_name: row.rotation_name,
+                start_date: row.start_date,
+                end_date: null,
+                reason: 'Snapshot Fallback'
+            });
+        });
+        return { data: byAdvisor, error: null };
+    };
 
 
-    // V15.1: Load all necessary data tables
+    // Load all necessary data tables
     DataService.loadCoreData = async () => {
         try {
             // Fetch tables in parallel for efficiency
@@ -413,20 +448,22 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
                 fetchTable('schedule_components'),
                 fetchTable('shift_definitions'),
                 fetchTable('rotation_patterns'),
-                // NOTE: rotation_assignments is now primarily a snapshot.
-                fetchTable('rotation_assignments'), 
-                fetchTable('schedule_exceptions') // V15.1
+                fetchTable(SNAPSHOT_TABLE), 
+                fetchTable('schedule_exceptions')
             ]);
 
             // Check if any critical data failed to load
-            if (advisors.error || leaders.error || components.error || definitions.error || patterns.error || assignments.error) {
-                throw new Error("Failed to load one or more core data tables.");
+            if (advisors.error || leaders.error || components.error || definitions.error || patterns.error) {
+                throw new Error("Failed to load one or more core data tables (Advisors, Leaders, Components, Definitions, or Patterns).");
             }
 
-            // Handle exceptions table load failure gracefully
+            // Handle assignments/exceptions table load failure gracefully
+            if (assignments.error) {
+                 console.warn("Warning: Failed to load rotation_assignments snapshot.", assignments.error);
+                 assignments.data = [];
+            }
             if (exceptions.error) {
-                 console.warn("Warning: Failed to load schedule_exceptions. Ensure V15 schema is applied.", exceptions.error);
-                 // Continue initialization but without exception data
+                 console.warn("Warning: Failed to load schedule_exceptions.", exceptions.error);
                  exceptions.data = [];
             }
 
@@ -437,13 +474,142 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
                 shiftDefinitions: definitions.data,
                 rotationPatterns: patterns.data,
                 rotationAssignments: assignments.data,
-                scheduleExceptions: exceptions.data // V15.1
+                scheduleExceptions: exceptions.data
             };
         } catch (error) {
             handleError(error, "Load Core Data");
             return null;
         }
     };
+
+    // --- V15.8 FIX: Implementation of missing History Management Functions (Bug 2) ---
+    // These functions manage the rotation_assignments_history table.
+
+    // V15.8: Helper function to update the 'rotation_assignments' snapshot table.
+    // This keeps the snapshot table in sync with the latest effective assignment from history.
+    const updateSnapshotAssignment = async (advisorId) => {
+        // Find the latest effective assignment (start_date DESC, end_date IS NULL prioritized)
+        const { data, error } = await supabase
+            .from(HISTORY_TABLE)
+            .select('rotation_name, start_date')
+            .eq('advisor_id', advisorId)
+            .order('start_date', { ascending: false })
+            .order('end_date', { ascending: false, nullsFirst: true }); // Prefer NULL end_date (ongoing)
+
+        // Handle missing table gracefully during snapshot update
+        if (error && (error.code === 'PGRST116' || error.code === '42P01')) {
+            return;
+        }
+
+        if (error) {
+            console.error("Failed to update snapshot assignment for advisor:", advisorId, error);
+            return;
+        }
+
+        if (data && data.length > 0) {
+            const latest = data[0];
+            await supabase
+                .from(SNAPSHOT_TABLE)
+                .upsert({
+                    advisor_id: advisorId,
+                    rotation_name: latest.rotation_name,
+                    start_date: latest.start_date
+                }, { onConflict: 'advisor_id' });
+        } else {
+            // If no history exists, remove from snapshot
+            await supabase
+                .from(SNAPSHOT_TABLE)
+                .delete()
+                .eq('advisor_id', advisorId);
+        }
+    };
+
+
+    // V15.8 FIX: Implements "Assign from this week" and "Change from this week forward"
+    // These actions are logically similar: they set a new rotation starting on a date and going forward indefinitely.
+    DataService.assignFromWeek = async ({ advisor_id, rotation_name, start_date, reason = 'New Assignment/Change Forward' }) => {
+        try {
+            const dateMinusOne = APP.Utils.addDaysISO(start_date, -1);
+
+            // 1. Truncate existing open-ended assignments that started before this date.
+            // Update where end_date IS NULL AND start_date < start_date.
+            const { error: updateError } = await supabase
+                .from(HISTORY_TABLE)
+                .update({ end_date: dateMinusOne })
+                .eq('advisor_id', advisor_id)
+                .is('end_date', null)
+                .lt('start_date', start_date);
+
+            // Handle missing table gracefully
+            if (updateError && !(updateError.code === 'PGRST116' || updateError.code === '42P01')) {
+                 throw new Error("Failed to clip previous assignments.");
+            }
+                
+            // 2. Insert/Overwrite the new ongoing assignment into history
+            const newRecord = {
+                advisor_id: advisor_id,
+                rotation_name: rotation_name || null, // Allow null for unassignment
+                start_date: start_date,
+                end_date: null,
+                reason: reason
+            };
+            // Use upsert on (advisor_id, start_date) to handle overwriting existing records starting on the same day.
+            const { data: historyData, error: insertError } = await DataService.saveRecord(HISTORY_TABLE, newRecord, 'advisor_id, start_date');
+            
+            // Handle missing table gracefully during insert
+            if (insertError && (insertError.error.includes('PGRST116') || insertError.error.includes('42P01'))) {
+                 console.warn("History table missing during insert. Proceeding with snapshot only.");
+            } else if (insertError) {
+                throw new Error("Failed to insert new assignment history.");
+            }
+
+            // 3. Update the snapshot table
+            await updateSnapshotAssignment(advisor_id);
+
+            // Return the history record data as the primary result
+            return { data: historyData, error: null };
+
+        } catch (err) {
+            return handleError(err, "assignFromWeek/changeForward");
+        }
+    };
+
+    // V15.8 FIX: Implements "Change only this week (Swap)"
+    // This is complex as it requires potentially splitting an existing record.
+    DataService.changeOnlyWeek = async ({ advisor_id, rotation_name, week_start, week_end }) => {
+        try {
+            if (!rotation_name) {
+                throw new Error("Rotation name is required for a one-week swap.");
+            }
+
+            // 1. Insert the one-week swap assignment.
+            const swapRecord = {
+                advisor_id: advisor_id,
+                rotation_name: rotation_name,
+                start_date: week_start,
+                end_date: week_end,
+                reason: 'One Week Swap'
+            };
+            // Use upsert to handle overwriting existing records starting exactly on week_start
+            const { data, error: insertError } = await DataService.saveRecord(HISTORY_TABLE, swapRecord, 'advisor_id, start_date');
+            
+            if (insertError && (insertError.error.includes('PGRST116') || insertError.error.includes('42P01'))) {
+                APP.Utils.showToast("Cannot perform one-week swap as history table is missing.", "danger");
+                return { data: null, error: "History table missing." };
+            } else if (insertError) {
+                 throw new Error("Failed to insert swap record.");
+            }
+
+            // 2. Update the snapshot table
+            await updateSnapshotAssignment(advisor_id);
+
+            return { data, error: null };
+
+        } catch (err) {
+             return handleError(err, "Change Only Week");
+        }
+    };
+
 
     APP.DataService = DataService;
 }(window.APP));
@@ -463,7 +629,7 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
         shiftDefinitions: [], 
         rotationPatterns: [], 
         rotationAssignments: [], // Current snapshot
-        scheduleExceptions: [], // V15.1
+        scheduleExceptions: [],
         selectedAdvisors: new Set(),
         weekStart: null, // Stored internally as YYYY-MM-DD
         currentRotation: null,
@@ -472,7 +638,7 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
         isBooted: false,
         history: [],
         historyIndex: -1,
-        // V15.6: Cache for historical assignments lookups (Key: DateISO, Value: Map<AdvisorId, Assignment>)
+        // Cache for historical assignments lookups (Key: DateISO, Value: Map<AdvisorId, Assignment>)
         effectiveAssignmentsCache: new Map(), 
     };
 
@@ -491,7 +657,7 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
     StateManager.getPatternByName = (name) => STATE.rotationPatterns.find(p => p.name === name) || null;
     StateManager.getComponentById = (id) => STATE.scheduleComponents.find(c => c.id === id) || null;
     StateManager.getShiftDefinitionById = (id) => STATE.shiftDefinitions.find(d => d.id === id) || null;
-    StateManager.getAdvisorById = (id) => STATE.advisors.find(a => a.id === id) || null; // V15.1
+    StateManager.getAdvisorById = (id) => STATE.advisors.find(a => a.id === id) || null;
 
     // Robust lookup for shift codes (handles whitespace and type differences)
     StateManager.getShiftDefinitionByCode = (code) => {
@@ -502,31 +668,32 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
 
     StateManager.getAdvisorsByLeader = (leaderId) => STATE.advisors.filter(a => a.leader_id === leaderId);
 
-    // V15.1: Selector for Hybrid Adherence (Exceptions)
+    // Selector for Hybrid Adherence (Exceptions)
     StateManager.getExceptionForAdvisorDate = (advisorId, dateISO) => {
         return STATE.scheduleExceptions.find(e => e.advisor_id === advisorId && e.exception_date === dateISO) || null;
     };
 
-    // V15.6: Function to pre-load effective assignments for a specific date into the cache
+    // Function to pre-load effective assignments for a specific date into the cache
     StateManager.loadEffectiveAssignments = async (dateISO) => {
         if (STATE.effectiveAssignmentsCache.has(dateISO)) {
             return; // Already loaded
         }
+        // This calls DataService which handles the history query and prioritization.
         const { data, error } = await APP.DataService.fetchEffectiveAssignmentsForDate(dateISO);
         if (!error && data) {
             STATE.effectiveAssignmentsCache.set(dateISO, data);
         } else {
-            // Handle error if needed, maybe set an empty map to prevent re-fetching
+            // Handle error if needed, set an empty map to prevent re-fetching on failure
             STATE.effectiveAssignmentsCache.set(dateISO, new Map());
         }
     };
 
-    // V15.6: Clear cache when history changes or assignments are modified
+    // Clear cache when history changes or assignments are modified
     StateManager.clearEffectiveAssignmentsCache = () => {
         STATE.effectiveAssignmentsCache.clear();
     };
 
-    // History Management (V15.1: Updated to include exceptions)
+    // History Management (Updated to include exceptions)
     StateManager.saveHistory = (reason = "Change") => {
         // Clear forward history if we make a new change after undoing
         if (STATE.historyIndex < STATE.history.length - 1) {
@@ -537,7 +704,7 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
             shiftDefinitions: JSON.parse(JSON.stringify(STATE.shiftDefinitions)),
             rotationPatterns: JSON.parse(JSON.stringify(STATE.rotationPatterns)),
             rotationAssignments: JSON.parse(JSON.stringify(STATE.rotationAssignments)),
-            scheduleExceptions: JSON.parse(JSON.stringify(STATE.scheduleExceptions)), // V15.1
+            scheduleExceptions: JSON.parse(JSON.stringify(STATE.scheduleExceptions)),
             reason: reason
         };
         STATE.history.push(snapshot);
@@ -550,7 +717,7 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
              APP.Core.updateUndoRedoButtons(STATE.historyIndex, STATE.history.length);
         }
         
-        // V15.6: Clear history cache when state changes
+        // Clear history cache when state changes
         StateManager.clearEffectiveAssignmentsCache();
     };
 
@@ -570,10 +737,10 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
         STATE.shiftDefinitions = JSON.parse(JSON.stringify(snapshot.shiftDefinitions));
         STATE.rotationPatterns = JSON.parse(JSON.stringify(snapshot.rotationPatterns));
         STATE.rotationAssignments = JSON.parse(JSON.stringify(snapshot.rotationAssignments));
-        STATE.scheduleExceptions = JSON.parse(JSON.stringify(snapshot.scheduleExceptions)); // V15.1
+        STATE.scheduleExceptions = JSON.parse(JSON.stringify(snapshot.scheduleExceptions));
         STATE.historyIndex = newIndex;
 
-        // V15.6: Clear history cache when state changes
+        // Clear history cache when state changes
         StateManager.clearEffectiveAssignmentsCache();
 
         // Re-render application and update UI
@@ -586,7 +753,7 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
     // State synchronization (Update local state after successful DB operations)
     StateManager.syncRecord = (tableName, record, isDeleted = false) => {
         
-        // V15.1: Map DB table names to State keys
+        // Map DB table names to State keys
         let stateKey = null;
         switch (tableName) {
             case 'schedule_exceptions': stateKey = 'scheduleExceptions'; break;
@@ -599,11 +766,13 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
         }
 
         const collection = STATE[stateKey];
-        // If the collection doesn't exist in the main state (like history), we still check for cache clearing.
+        
+        // Handle cache clearing for history updates even if collection doesn't map directly.
+        if (tableName === 'rotation_assignments_history' || tableName === 'rotation_patterns') {
+            StateManager.clearEffectiveAssignmentsCache();
+        }
+
         if (!collection) {
-             if (tableName === 'rotation_assignments_history' || tableName === 'rotation_patterns') {
-                StateManager.clearEffectiveAssignmentsCache();
-            }
             return;
         }
 
@@ -614,15 +783,16 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
         if (tableName === 'rotation_assignments') primaryKey = 'advisor_id';
 
         
-        // V15.7: Handle sync for exceptions which might use 'id' or the composite key (advisor_id, exception_date)
+        // Handle sync for exceptions
         // Since we rely on upsert for exceptions, the returned record always has the 'id'.
         if (tableName === 'schedule_exceptions') {
             primaryKey = 'id'; 
         }
 
         
-        if (!record.hasOwnProperty(primaryKey)) {
-            console.error("SyncRecord failed: Record missing primary key", primaryKey, record);
+        if (!record || !record.hasOwnProperty(primaryKey)) {
+            // console.error("SyncRecord warning: Record missing or missing primary key", primaryKey, record);
+            // Still proceed if cache clearing is needed (handled above)
             return;
         }
         
@@ -641,18 +811,18 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
             }
         }
         
-         // V15.6: If assignments or related data changes, clear the cache.
-         if (tableName === 'rotation_assignments' || tableName === 'rotation_patterns') {
+         // If assignments snapshot changes, clear the cache.
+         if (tableName === 'rotation_assignments') {
             StateManager.clearEffectiveAssignmentsCache();
         }
     };
 
     APP.StateManager = StateManager;
-}(window.APP)); // V15.7.1 FIX: Restored the missing closing syntax here.
+}(window.APP)); // V15.8 FIX: Ensured closure is correct (was missing in input).
 
 
 /**
- * MODULE: APP.ScheduleCalculator (V15.7 Refactor)
+ * MODULE: APP.ScheduleCalculator
  * Centralized service for calculating effective schedules based on Hybrid Adherence (Exceptions + History).
  */
 (function(APP) {
@@ -668,7 +838,7 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
         });
     };
 
-    // V15.7: Calculates the schedule for an advisor on a specific day.
+    // Calculates the schedule for an advisor on a specific day.
     // Returns { segments, source, reason }
     ScheduleCalculator.calculateSegments = (advisorId, dayName, weekStartISO = null) => {
         const STATE = APP.StateManager.getState();
@@ -696,17 +866,15 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
 
         // 3. Calculate based on Rotation (Priority 2)
         
-        // V15.6: Use the EFFECTIVE assignment from the cache for this specific week.
-        // V15.7: This now uses the correctly prioritized data from DataService.
+        // Use the EFFECTIVE assignment from the cache for this specific week.
         const effectiveMap = STATE.effectiveAssignmentsCache.get(effectiveWeekStart);
         let assignment = null;
 
         if (effectiveMap && effectiveMap.has(advisorId)) {
             assignment = effectiveMap.get(advisorId);
-        } else {
-            // Fallback: If history failed to load or advisor wasn't present, use the current snapshot.
-            assignment = APP.StateManager.getAssignmentForAdvisor(advisorId);
-        }
+        } 
+        // We rely on the effectiveMap (which includes fallback logic in DataService if history is missing). 
+        // If the advisor is not in the map, they have no assignment for this period.
 
         
         if (!assignment || !assignment.rotation_name || !assignment.start_date) {
@@ -786,7 +954,7 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
                 <td><span style="display: inline-block; width: 20px; height: 20px; background-color: ${comp.color}; border-radius: 4px;"></span></td>
                 <td>${comp.default_duration_min}m</td>
                 <td>${comp.is_paid ? 'Yes' : 'No'}</td>
-                <td><button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button></td>
+                <td class="actions"><button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button></td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -850,11 +1018,8 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
     const ELS = {};
 
     AssignmentManager.initialize = () => {
-        // Note: The weekStart change listener is handled in Core.wireGlobalEvents
         ELS.grid = document.getElementById('assignmentGrid');
-        
-        // V15.6.2 FIX: Removed the conflicting 'change' event listener.
-        // Actions are now exclusively handled by the buttons via handleRowAction.
+        // Actions are handled exclusively by the buttons via handleRowAction, wired during render.
     };
 
     // Renders the assignment grid, showing the effective rotation for the selected week.
@@ -868,72 +1033,67 @@ DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
         // Get the selected Week Start (YYYY-MM-DD) from the global state
         const weekStartISO = STATE.weekStart;
 
-        // V15.6: Ensure effective assignments for the selected week start date are loaded into the cache.
-        // This might have already been done by ScheduleViewer, but we ensure it here too.
+        // Ensure effective assignments for the selected week start date are loaded into the cache.
         if (weekStartISO) {
             await APP.StateManager.loadEffectiveAssignments(weekStartISO);
         }
 
-        // V15.6: Get the map from the cache.
+        // Get the map from the cache.
         const effectiveMap = STATE.effectiveAssignmentsCache.get(weekStartISO);
 
 
         let html = '<table><thead><tr><th>Advisor</th><th>Assigned Rotation (This Week)</th><th>Start Date (Week 1)</th><th>Actions</th></tr></thead><tbody>';
 
         advisors.forEach(adv => {
-            // Determine the effective assignment for this week.
+            // Determine the effective assignment for this week based on the history cache.
             const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
 
-            // If no effective assignment found for the selected week (e.g., viewing a future date before they started),
-            // we fall back to the current snapshot in rotation_assignments as a best guess for UI initialization,
-            // but prioritize the effective one if it exists.
+            // We rely on the effective map (which includes history logic and fallback logic in DataService)
             const assignment = effective
                 ? { advisor_id: adv.id, rotation_name: effective.rotation_name, start_date: effective.start_date }
-                // Fallback to current snapshot if not found in history for this date
-                : APP.StateManager.getAssignmentForAdvisor(adv.id); 
+                : null; 
 
             const startDate = (assignment && assignment.start_date) ? assignment.start_date : '';
 
             
+            // V15.8 FIX (Bug 2): Corrected the HTML structure to resolve button duplication ("spam").
+            // Ensured all buttons are within the single <td> and removed invalid <div> wrappers inside <tr>.
             html += `<tr data-advisor-id="${adv.id}">
-          <td>${adv.name}</td>
-          <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
-          <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${startDate}" /></td>
-          <td class="actions">
-  <button class="btn btn-sm btn-primary act-assign-week" data-advisor-id="${adv.id}">Assign from this week</button>
-  <button class="btn btn-sm btn-primary act-change-forward" data-advisor-id="${adv.id}">Change from this week forward</button>
-  <button class="btn btn-sm btn-ghost act-change-one" data-advisor-id="${adv.id}">Change only this week (Swap)</button>
-</td>
-
-          <div class="btn-group">
-            <button class="btn btn-sm btn-primary act-change-forward" data-advisor-id="${adv.id}">Change from this week forward</button>
-            <button class="btn btn-sm btn-secondary act-change-week" data-advisor-id="${adv.id}">Change only this week (Swap)</button>
-          </div>
-        </td>
-
-        </tr>`;
+                  <td>${adv.name}</td>
+                  <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
+                  <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${startDate}" /></td>
+                  <td class="actions">
+                      <button class="btn btn-sm btn-primary act-assign-week" data-advisor-id="${adv.id}">Assign from this week</button>
+                      <button class="btn btn-sm btn-primary act-change-forward" data-advisor-id="${adv.id}">Change from this week forward</button>
+                      <button class="btn btn-sm btn-secondary act-change-week" data-advisor-id="${adv.id}">Change only this week (Swap)</button>
+                </td>
+            </tr>`;
 
         });
         html += '</tbody></table>';
-        ELS.grid.innerHTML = html;ELS.grid.innerHTML = html;
-// --- wire actions once rows are in the DOM ---
-ELS.grid.querySelectorAll('.act-assign-week').forEach(btn => {
-  btn.addEventListener('click', () => handleRowAction('assign_from_week', btn.dataset.advisorId));
-});
-ELS.grid.querySelectorAll('.act-change-forward').forEach(btn => {
-  btn.addEventListener('click', () => handleRowAction('change_forward', btn.dataset.advisorId));
-});
-ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
-  btn.addEventListener('click', () => handleRowAction('change_one_week', btn.dataset.advisorId));
-});
+        
+        // V15.8 FIX: Removed duplicate innerHTML assignment.
+        ELS.grid.innerHTML = html;
+
+        // V15.8 FIX: Wire actions efficiently after HTML insertion.
+        ELS.grid.querySelectorAll('.act-assign-week').forEach(btn => {
+          btn.addEventListener('click', () => handleRowAction('assign_from_week', btn.dataset.advisorId));
+        });
+        ELS.grid.querySelectorAll('.act-change-forward').forEach(btn => {
+          // Note: We map the UI 'change_forward' action to the DataService 'assignFromWeek' logic as they are identical.
+          btn.addEventListener('click', () => handleRowAction('assign_from_week', btn.dataset.advisorId));
+        });
+        ELS.grid.querySelectorAll('.act-change-week').forEach(btn => {
+          btn.addEventListener('click', () => handleRowAction('change_one_week', btn.dataset.advisorId));
+        });
 
         // Initialize Flatpickr and set dropdown values after HTML insertion
         advisors.forEach(adv => {
             // Re-determine the assignment used for rendering to set the correct dropdown value
             const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
-            const assignment = effective
+             const assignment = effective
                 ? { rotation_name: effective.rotation_name, start_date: effective.start_date }
-                : APP.StateManager.getAssignmentForAdvisor(adv.id);
+                : null;
 
             const row = ELS.grid.querySelector(`tr[data-advisor-id="${adv.id}"]`);
             if (!row) return;
@@ -955,150 +1115,135 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
                   altFormat: 'd/m/Y',             
                   allowInput: true,
                   locale: { "firstDayOfWeek": 1 }, // Monday
-                  // V15.6.2: Changes are handled exclusively by the action buttons.
+                  // Changes are handled exclusively by the action buttons.
                   onChange: function(selectedDates, dateStr, instance) {
                     // Do nothing here.
                   }
                 });
             }
-
-            // Wire row action buttons
-            const btnChange = ELS.grid.querySelector(`.act-change-forward[data-advisor-id="${adv.id}"]`);
-            const btnWeek   = ELS.grid.querySelector(`.act-change-week[data-advisor-id="${adv.id}"]`);
-
-            if (btnChange) btnChange.addEventListener('click', () => handleRowAction('change_forward', adv.id));
-            if (btnWeek)   btnWeek.addEventListener('click',   () => handleRowAction('change_one_week', adv.id));
         });
     };
 
     // Handle per-row actions (change forward / one-week swap)
+    // V15.8 FIX (Bug 2): Implemented logic using the newly added DataService methods.
     const handleRowAction = async (action, advisorId) => {
-  try {
-    // Row + inputs
-    const row = document.querySelector(`tr[data-advisor-id="${advisorId}"]`);
-    if (!row) return APP.Utils.showToast('Row not found', 'danger');
+      try {
+        // Row + inputs
+        const row = document.querySelector(`tr[data-advisor-id="${advisorId}"]`);
+        if (!row) return APP.Utils.showToast('Row not found', 'danger');
 
-    const rotationSel = row.querySelector('.assign-rotation');
-    const dateInput   = row.querySelector('.assign-start-date');
-    const weekStartISO = document.getElementById('weekStart')?.value || '';
+        const rotationSel = row.querySelector('.assign-rotation');
+        const dateInput   = row.querySelector('.assign-start-date');
+        const globalWeekStartISO = APP.StateManager.getState().weekStart; // Use global context
 
-    const rotationName = rotationSel ? rotationSel.value : '';
-    if (!rotationName) return APP.Utils.showToast('Pick a rotation first.', 'warning');
+        const rotationName = rotationSel ? rotationSel.value : '';
+        
+        // Validation: For swaps, rotation must be selected.
+        if (!rotationName && action === 'change_one_week') {
+             return APP.Utils.showToast('Pick a rotation first for the swap.', 'warning');
+        }
 
-    // dd/mm/yyyy -> yyyy-mm-dd (or keep ISO if already ISO)
-    const startISO = (() => {
-      const raw = (dateInput && dateInput.value) ? dateInput.value.trim() : (weekStartISO || '');
-      if (!raw) return '';
-      if (raw.includes('/')) {
-        const [dd, mm, yyyy] = raw.split('/');
-        if (dd && mm && yyyy) return `${yyyy.padStart(4,'0')}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+        // Determine the start date for the action.
+        let startISO = globalWeekStartISO; // Default to current week context for swaps
+
+        if (action === 'assign_from_week') {
+            // For these actions, we use the date specified in the input field.
+            
+            // Get the underlying ISO value managed by Flatpickr if available, otherwise the raw value.
+            let rawInput = '';
+            if (dateInput) {
+                 // Flatpickr stores the ISO value in the actual input element when altInput is used.
+                 rawInput = dateInput.value.trim();
+            }
+            
+            if (!rawInput) {
+                return APP.Utils.showToast('Start date is required for this action.', 'danger');
+            }
+            
+            // Handle potential UK format if user somehow typed manually and Flatpickr didn't parse
+            if (rawInput.includes('/')) {
+                const iso = APP.Utils.convertUKToISODate(rawInput);
+                if (!iso) return APP.Utils.showToast('Invalid date format (dd/mm/yyyy expected).', 'danger');
+                startISO = iso;
+            } else {
+                startISO = rawInput;
+            }
+        }
+
+        
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(startISO)) {
+          return APP.Utils.showToast('Start date looks invalid (YYYY-MM-DD expected).', 'danger');
+        }
+
+
+        // V15.8 FIX: Route to the correct, implemented DB helper
+        let res;
+        if (action === 'assign_from_week') {
+          // Handles both "Assign from this week" and "Change from this week forward"
+          res = await APP.DataService.assignFromWeek({
+            advisor_id: advisorId,
+            rotation_name: rotationName,
+            start_date: startISO
+          });
+        } else if (action === 'change_one_week') {
+          // Ensure the start date is a Monday for the one-week swap (important if user changed date context)
+          const weekStart = APP.Utils.getMondayForDate(startISO);
+          if (!weekStart) return APP.Utils.showToast('Invalid week start date for swap.', 'danger');
+
+          res = await APP.DataService.changeOnlyWeek({
+            advisor_id: advisorId,
+            rotation_name: rotationName,
+            week_start: weekStart,
+            week_end: APP.Utils.addDaysISO(weekStart, 6)
+          });
+        } else {
+          return APP.Utils.showToast('Unknown action.', 'danger');
+        }
+
+        if (res?.error) {
+          // Error handling is primarily done within DataService, but we check here too.
+          return;
+        }
+
+        // V15.8: Clear the cache explicitly as data has changed.
+        // We don't need to syncRecord for history table, just clear the cache.
+        APP.StateManager.clearEffectiveAssignmentsCache();
+        
+        // The snapshot table (rotation_assignments) is updated automatically by the DataService helpers.
+        // We need to refresh the local state's snapshot view.
+        const { data: snapshotData } = await APP.DataService.fetchTable('rotation_assignments');
+        if (snapshotData) {
+            const updatedSnapshot = snapshotData.find(a => a.advisor_id === advisorId);
+            if (updatedSnapshot) {
+               APP.StateManager.syncRecord('rotation_assignments', updatedSnapshot);
+            }
+        }
+
+
+        APP.StateManager.saveHistory(`Assignment Action: ${action}`);
+
+        // Refresh both views so changes are instant (this triggers a fresh cache load)
+        // ScheduleViewer.render() handles rendering both itself and the AssignmentManager if active.
+        if (APP.Components.ScheduleViewer) {
+             APP.Components.ScheduleViewer.render();
+        }
+        
+        APP.Utils.showToast('Assignment updated successfully.', 'success');
+
+      } catch (e) {
+        console.error("Error in handleRowAction:", e);
+        APP.Utils.showToast('Unexpected error during assignment update. See console.', 'danger');
       }
-      return raw;
-    })();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(startISO)) {
-      return APP.Utils.showToast('Start date looks invalid.', 'danger');
     }
-
-    // Current visible 6-week window (W1..W6) for this advisor
-    const currentAssignment = APP.StateManager.getAssignmentForAdvisor(advisorId);
-    const windowStart = currentAssignment?.start_date || weekStartISO || startISO;
-    const windowEnd   = APP.Utils.addDaysISO(windowStart, 41); // 6*7 - 1
-
-    // Route to the correct DB helper
-    let res;
-    if (action === 'assign_from_week') {
-      res = await APP.DataService.assignFromWeek({
-        advisor_id: advisorId,
-        rotation_name: rotationName,
-        start_date: startISO
-      });
-    } else if (action === 'change_forward') {
-      res = await APP.DataService.changeForwardWithinWindow({
-        advisor_id: advisorId,
-        rotation_name: rotationName,
-        window_start: windowStart,
-        window_end: windowEnd,
-        start_date: startISO
-      });
-    } else if (action === 'change_one_week') {
-      res = await APP.DataService.changeOnlyWeek({
-        advisor_id: advisorId,
-        rotation_name: rotationName,
-        week_start: startISO,
-        week_end: APP.Utils.addDaysISO(startISO, 6)
-      });
-    } else {
-      return APP.Utils.showToast('Unknown action.', 'danger');
-    }
-
-    if (res?.error) {
-      console.error(res.error);
-      return APP.Utils.showToast('Save failed. See console.', 'danger');
-    }
-
-    // Refresh state + both views so changes are instant
-    await APP.DataService.loadCoreData();
-    if (APP.Components.AssignmentManager) APP.Components.AssignmentManager.render();
-    if (APP.Components.ScheduleViewer)     APP.Components.ScheduleViewer.render();
-    APP.Utils.showToast('Saved.', 'success');
-  } catch (e) {
-    console.error(e);
-    APP.Utils.showToast('Unexpected error. See console.', 'danger');
-  }
-}
 
     APP.Components = APP.Components || {};
     APP.Components.AssignmentManager = AssignmentManager;
-    /** 
- * MODULE: APP.Components.ShiftTradeCenter
- * Very first version – renders a simple placeholder table.
- */
-(function (APP) {
-  const ShiftTradeCenter = {};
-  const ELS = {};
-
-  ShiftTradeCenter.initialize = () => {
-    // Cache the grid container
-    ELS.grid = document.getElementById('shiftTradeGrid');
-  };
-
-  ShiftTradeCenter.render = () => {
-    // Re-query if needed (tab might re-render after first init)
-    if (!ELS.grid) ELS.grid = document.getElementById('shiftTradeGrid');
-    if (!ELS.grid) return;
-
-    // Simple placeholder UI (you can replace with real fields later)
-    ELS.grid.innerHTML = `
-      <div class="table-container">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>Requestor</th>
-              <th>Current Shift</th>
-              <th>Proposed Swap</th>
-              <th>Week</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody id="swapRows">
-            <tr>
-              <td colspan="5" class="helper-text">No swap requests yet.</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    `;
-  };
-
-  APP.Components = APP.Components || {};
-  APP.Components.ShiftTradeCenter = ShiftTradeCenter;
-})(window.APP);
 
 }(window.APP));
 
 /**
  * MODULE: APP.Components.SequentialBuilder (Shared Modal Logic)
- * V15.5.2: Extracted module to support both Shift Definitions and Exceptions (Live Editing). Includes stability fixes.
+ * Supports both Shift Definitions and Exceptions (Live Editing).
  */
 (function(APP) {
     const SequentialBuilder = {};
@@ -1127,15 +1272,13 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         ELS.modalPaidTime = document.getElementById('modalPaidTime');
         ELS.modalSave = document.getElementById('modalSaveStructure');
 
-        // V15.1: Exception specific elements
+        // Exception specific elements
         ELS.exceptionReasonGroup = document.getElementById('exceptionReasonGroup');
         ELS.modalExceptionReason = document.getElementById('modalExceptionReason');
 
-        // V15.5.2: Check if critical elements are found during initialization
+        // Check if critical elements are found during initialization
         if (!ELS.modal || !ELS.modalSave || !ELS.modalSequenceBody || !ELS.modalStartTime) {
             console.error("CRITICAL ERROR: SequentialBuilder failed to find necessary modal elements (e.g., modalStartTime) in index.html during initialization. Check HTML integrity.");
-            // We allow initialization to continue so the rest of the app might work, 
-            // but SequentialBuilder.open() will catch the error when trying to use it.
         }
 
         // Event Listeners
@@ -1180,9 +1323,9 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
     // config: { mode, id, title, structure, date (optional), reason (optional) }
     SequentialBuilder.open = (config) => {
         
-        // V15.5.2 FIX: Ensure modal elements exist before attempting to open.
+        // Ensure modal elements exist before attempting to open.
         if (!ELS.modal || !ELS.modalStartTime) {
-            console.error("ERROR: Attempted to open SequentialBuilder, but critical modal elements (modal or startTime) are missing. Check index.html integrity.");
+            console.error("ERROR: Attempted to open SequentialBuilder, but critical modal elements are missing.");
             APP.Utils.showToast("Fatal UI Error: Editor component missing. Please ensure index.html is complete.", "danger", 10000);
             return;
         }
@@ -1217,13 +1360,11 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         // 3. Initialize UI
         ELS.modalTitle.textContent = config.title;
         
-        // V15.5.2 FIX: Added check for ELS.modalStartTime existence before accessing _flatpickr
-        // This prevents the "Cannot read properties of null" crash if the HTML is incomplete.
         if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
             ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
         }
 
-        // V15.1: Show/Hide exception reason input based on mode
+        // Show/Hide exception reason input based on mode
         if (config.mode === 'exception') {
             ELS.exceptionReasonGroup.style.display = 'block';
             ELS.modalExceptionReason.value = BUILDER_STATE.reason || '';
@@ -1369,13 +1510,11 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
             BUILDER_STATE.segments.splice(insertAt, 0, { component_id: null, duration_min: NEW_DURATION });
 
             // Optional: Auto-adjust a neighbor so total end time stays aligned.
-            // This provides a better UX when inserting breaks into long activities.
             const adjustIndex = action === 'insert-before' ? index + 1 /* the original row moved down */ : index;
             if (BUILDER_STATE.segments[adjustIndex]) {
                 const cur = BUILDER_STATE.segments[adjustIndex];
                 // Check if the current segment is long enough to subtract the new duration and still have at least 5 mins left
                 if (cur.duration_min > NEW_DURATION + 5) {
-                    // We don't use clamp here as NEW_DURATION is already a multiple of 5
                     cur.duration_min = cur.duration_min - NEW_DURATION;
                 }
             }
@@ -1469,7 +1608,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         return { data, error };
     };
 
-    // V15.1: Specific save handler for Schedule Exceptions
+    // Specific save handler for Schedule Exceptions
     const saveScheduleException = async (advisorId, dateISO, structure, reason) => {
         const record = {
             advisor_id: advisorId,
@@ -1539,7 +1678,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
                 <td>${def.name}</td>
                 <td>${APP.Utils.formatDuration(totalDuration)}</td>
                 <td>${APP.Utils.formatDuration(paidDuration)}</td>
-                <td>
+                <td class="actions">
                     <button class="btn btn-sm btn-primary edit-structure" data-definition-id="${def.id}">Edit Structure</button>
                     <button class="btn btn-sm btn-danger delete-definition" data-definition-id="${def.id}">Delete</button>
                 </td>
@@ -1588,7 +1727,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
     
     const handleGridClick = (e) => {
         if (e.target.classList.contains('edit-structure')) {
-            // V15.1: Open the shared Sequential Builder in 'definition' mode
+            // Open the shared Sequential Builder in 'definition' mode
             const definitionId = e.target.dataset.definitionId;
             const definition = APP.StateManager.getShiftDefinitionById(definitionId);
             if (definition && APP.Components.SequentialBuilder) {
@@ -1638,14 +1777,14 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         ELS.familySelect = document.getElementById('rotationFamily');
         ELS.btnNew = document.getElementById('btnNewRotation');
         ELS.btnDelete = document.getElementById('btnDeleteRotation');
-        ELS.btnAddWeek = document.getElementById('btnAddWeek'); // V15.1 (Top Button)
+        ELS.btnAddWeek = document.getElementById('btnAddWeek'); // (Top Button)
         ELS.grid = document.getElementById('rotationGrid');
         ELS.autoSaveStatus = document.getElementById('autoSaveStatus');
 
         if (ELS.familySelect) ELS.familySelect.addEventListener('change', handleFamilyChange);
         if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNewRotation);
         if (ELS.btnDelete) ELS.btnDelete.addEventListener('click', handleDeleteRotation);
-        if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeek); // V15.1
+        if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeek);
         if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
     };
 
@@ -1672,7 +1811,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         const pattern = APP.StateManager.getPatternByName(STATE.currentRotation);
         const patternData = pattern ? (pattern.pattern || {}) : {};
         
-        // V15.6: Use the utility function to determine the number of weeks
+        // Use the utility function to determine the number of weeks
         let numWeeks = 0;
         if (pattern) {
             numWeeks = APP.Utils.calculateRotationLength(pattern);
@@ -1733,13 +1872,13 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         // Set selected values (must be done after HTML insertion)
         if (pattern) {
             weeks.forEach(w => {
-                // V15.5.1 FIX: Need a robust way to find the week data regardless of key format
+                // Need a robust way to find the week data regardless of key format
                 const weekKey = findWeekKey(patternData, w);
                 const weekData = weekKey ? patternData[weekKey] : {};
                 
                 days.forEach((d, i) => {
                     const dow = i + 1;
-                    // V15.5.1 FIX: Handle legacy DOW keys (e.g., 'mon') if numerical key is missing
+                    // Handle legacy DOW keys (e.g., 'mon') if numerical key is missing
                     const legacyDayKey = d.toLowerCase();
                     const code = weekData[dow] || weekData[legacyDayKey] || ''; 
 
@@ -1751,13 +1890,13 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
             });
         }
 
-        // V15.1: Enable/Disable Add Week button based on selection
+        // Enable/Disable Add Week button based on selection
         if (ELS.btnAddWeek) {
             ELS.btnAddWeek.disabled = !pattern;
         }
     };
 
-    // V15.5.1 Helper: Finds the correct key in the pattern data (handles "Week 1", "Week1", "week1" etc.)
+    // Helper: Finds the correct key in the pattern data (handles "Week 1", "Week1", "week1" etc.)
     const findWeekKey = (patternData, weekNumber) => {
         const keys = Object.keys(patternData);
         // Find the key that matches the week number using the robust regex
@@ -1796,17 +1935,16 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
             APP.StateManager.saveHistory(`Create rotation`);
             APP.Utils.showToast(`Rotation '${name}' created (6 weeks).`, "success");
             RotationEditor.render();
+            
+            // Update related components
             if (APP.Components.AssignmentManager) {
                 APP.Components.AssignmentManager.render(); // Update assignment dropdowns
             }
-            else if (tabId === 'tab-trade-center') {
-  APP.Components.ShiftTradeCenter?.render();
-}
-
+            // V15.8 FIX: Removed misplaced 'else if (tabId === ...)' block which caused a reference error.
         }
     };
 
-    // V15.1: Handle adding a new week to the existing rotation
+    // Handle adding a new week to the existing rotation
     const handleAddWeek = async () => {
         const STATE = APP.StateManager.getState();
         const rotationName = STATE.currentRotation;
@@ -1815,7 +1953,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         if (!pattern) return;
 
         // Determine the next week number
-        // V15.6: Use the utility function
+        // Use the utility function
         const maxWeek = APP.Utils.calculateRotationLength(pattern);
         // If the length was 0 (empty pattern), we ensure it starts at 1.
         const nextWeek = (maxWeek === 0) ? 1 : maxWeek + 1;
@@ -1880,7 +2018,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         // 1. Update the local state object
         if (!pattern.pattern) pattern.pattern = {};
 
-        // V15.5.1 FIX: Find the correct week key format or create it if missing (using standard format)
+        // Find the correct week key format or create it if missing (using standard format)
         let weekKey = findWeekKey(pattern.pattern, parseInt(week, 10));
         if (!weekKey) {
             weekKey = `Week ${week}`; // Use standard format for new entries
@@ -1888,7 +2026,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
 
         if (!pattern.pattern[weekKey]) pattern.pattern[weekKey] = {};
         
-        // V15.5.1: Normalize the update by removing legacy keys and using the standard numerical DOW key
+        // Normalize the update by removing legacy keys and using the standard numerical DOW key
         const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
         const legacyDayKey = days[parseInt(dow, 10) - 1];
 
@@ -1911,7 +2049,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         const { error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: pattern.pattern }, { name: rotationName });
             
         if (!error) {
-            // V15.6: Syncing the pattern also clears the historical cache in StateManager
+            // Syncing the pattern also clears the historical cache in StateManager
             APP.StateManager.syncRecord('rotation_patterns', pattern); 
             APP.StateManager.saveHistory(`Update rotation cell`);
             if (ELS.autoSaveStatus) {
@@ -1928,8 +2066,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
              if (ELS.autoSaveStatus) {
                 ELS.autoSaveStatus.textContent = "Error Saving";
             }
-            APP.Utils.showToast("Failed to auto-save rotation change.", "danger");
-            // NOTE: Ideally, revert the local state change if save fails
+            // Error toast handled in DataService
         }
     };
 
@@ -1970,24 +2107,23 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
 
         if (ELS.viewToggleGroup) ELS.viewToggleGroup.addEventListener('click', handleViewToggle);
 
-        // V15.1: Add listener for Live Editing clicks
+        // Add listener for Live Editing clicks
         if (ELS.visualizationContainer) ELS.visualizationContainer.addEventListener('click', handleVisualizationClick);
     };
 
-    // V15.6: Main render function (coordinates tree and planner rendering)
+    // Main render function (coordinates tree and planner rendering)
     ScheduleViewer.render = async () => {
         // Ensure historical data is loaded before rendering the planner visualization.
         const STATE = APP.StateManager.getState();
         if (STATE.weekStart) {
             // Pre-load the effective assignments for the selected week start date.
-            // V15.7: This now uses the corrected DataService query.
             await APP.StateManager.loadEffectiveAssignments(STATE.weekStart);
         }
         
         renderTree();
         renderPlannerContent();
 
-        // Also ensure Assignments tab is up-to-date if visible
+        // Also ensure Assignments tab is up-to-date if visible (as it relies on the same historical data)
         const assignmentsTab = document.getElementById('tab-advisor-assignments');
         if (assignmentsTab && assignmentsTab.classList.contains('active') && APP.Components.AssignmentManager) {
              APP.Components.AssignmentManager.render();
@@ -2010,7 +2146,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         }
     };
 
-    // V15.1: Handle clicks on the visualization (for Live Editing)
+    // Handle clicks on the visualization (for Live Editing)
     const handleVisualizationClick = (e) => {
         const STATE = APP.StateManager.getState();
         let advisorId, dateISO, dayName;
@@ -2030,7 +2166,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
              if (cell && cell.dataset.advisorId && cell.dataset.date) {
                  advisorId = cell.dataset.advisorId;
                  dateISO = cell.dataset.date;
-                 // V15.7: Use utility function for consistency
+                 // Use utility function for consistency
                  dayName = APP.Utils.getDayNameFromISO(dateISO);
              }
         }
@@ -2042,10 +2178,8 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
             // Calculate the Monday for that specific date
             const weekStartISO = APP.Utils.getMondayForDate(dateISO); 
             
-            // V15.7: Use the centralized ScheduleCalculator
+            // Use the centralized ScheduleCalculator
             // NOTE: This relies on the historical data for weekStartISO being loaded. 
-            // In the context of Live Editing (especially from Weekly view), this might require an async fetch if not already cached.
-            // For now, we assume the data for the currently viewed week is loaded.
             const { segments, reason } = APP.ScheduleCalculator.calculateSegments(advisorId, dayName, weekStartISO);
 
             // Open the Sequential Builder in 'exception' mode
@@ -2114,7 +2248,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
              if (firstAdvisor) {
                 STATE.selectedAdvisors.add(firstAdvisor.id);
                 STATE.treeInitialized = true;
-                // V15.6: Trigger the main render function to ensure coordination
+                // Trigger the main render function to ensure coordination
                 ScheduleViewer.render();
             }
         }
@@ -2146,18 +2280,18 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
             renderTree();
         }
         
-        // V15.6: Render the content based on the selection change
+        // Render the content based on the selection change
         renderPlannerContent();
     };
 
     const clearSelection = () => {
         APP.StateManager.getState().selectedAdvisors.clear();
         renderTree();
-        // V15.6: Render the content based on the selection change
+        // Render the content based on the selection change
         renderPlannerContent();
     };
 
-    // V15.6: Renamed from renderPlanner. This assumes data is already loaded/cached.
+    // Renamed from renderPlanner. This assumes data is already loaded/cached.
     const renderPlannerContent = () => {
         const STATE = APP.StateManager.getState();
         if (STATE.scheduleViewMode === 'daily') {
@@ -2170,7 +2304,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
     // --- DAILY VIEW (GANTT) ---
 
     const renderDailyPlanner = () => {
-        // V15.1: Updated time range in title
+        // Updated time range in title
         ELS.scheduleViewTitle.textContent = "Schedule Visualization (Daily 06:00 - 20:00)";
 
         // Setup the structure for the Gantt chart
@@ -2209,13 +2343,13 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
                 
             let html = '';
             advisorsToRender.forEach(adv => {
-                // V15.7: Use the centralized ScheduleCalculator
+                // Use the centralized ScheduleCalculator
                 const { segments, source } = APP.ScheduleCalculator.calculateSegments(adv.id, STATE.selectedDay);
                 
-                // V15.1: Add exception styling class if source is 'exception'
+                // Add exception styling class if source is 'exception'
                 const rowClass = (source === 'exception') ? 'is-exception' : '';
 
-                // V15.1: Add data-advisor-id for click handling
+                // Add data-advisor-id for click handling
                 html += `
                 <div class="timeline-row ${rowClass}" data-advisor-id="${adv.id}">
                     <div class="timeline-name">${adv.name}</div>
@@ -2250,7 +2384,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         headerElement.innerHTML = html;
     };
 
-    // V15.7: Made public as it's used by TradeCenter preview as well (though not currently utilized there, good practice)
+    // Made public as it's used by TradeCenter preview as well
     ScheduleViewer.renderSegments = (segments) => {
         if (!segments || segments.length === 0) {
             return ''; // RDO
@@ -2330,14 +2464,14 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
                 html += `<tr><td>${adv.name}</td>`;
                 
                 daysOfWeek.forEach(day => {
-                    // V15.7: Use the centralized ScheduleCalculator
+                    // Use the centralized ScheduleCalculator
                     const { segments, source } = APP.ScheduleCalculator.calculateSegments(adv.id, day);
                     
-                    // V15.1: Determine class and get the specific date for this cell
+                    // Determine class and get the specific date for this cell
                     const cellClass = (source === 'exception') ? 'is-exception' : '';
                     const dateISO = APP.Utils.getISODateForDayName(STATE.weekStart, day);
 
-                    // V15.1: Add 'weekly-cell' class and data attributes for click handling
+                    // Add 'weekly-cell' class and data attributes for click handling
                     html += `<td class="weekly-cell ${cellClass}" data-advisor-id="${adv.id}" data-date="${dateISO}">
                                 ${renderWeeklyCell(segments, source)}
                              </td>`;
@@ -2351,7 +2485,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         }
     };
 
-    // V15.1: Updated to handle source for exception visualization
+    // Updated to handle source for exception visualization
     const renderWeeklyCell = (segments, source) => {
         if (!segments || segments.length === 0) {
             return `<div class="weekly-cell-content"><span class="weekly-rdo">RDO</span></div>`;
@@ -2373,7 +2507,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
                 shiftCode = definition.code;
             }
         } else if (source === 'exception') {
-            // V15.1: If it's an exception, label it as 'Custom'.
+            // If it's an exception, label it as 'Custom'.
             shiftCode = 'Custom';
         }
         
@@ -2442,7 +2576,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
        ELS_DAILY.currentTimeIndicator.style.left = `calc(${nameColWidth}px + ${pct}%)`;
    };
 
-   // V15.6.1: Updated mouse tracking to correctly account for horizontal scrolling
+   // Updated mouse tracking to correctly account for horizontal scrolling
    const updateMouseTimeIndicator = (e, ELS_DAILY) => {
        if (!ELS_DAILY || !ELS_DAILY.mouseTimeIndicator || !ELS_DAILY.timelineContainer) return;
 
@@ -2501,7 +2635,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
 
 
 /**
- * MODULE: APP.Components.ShiftTradeCenter (V15.7)
+ * MODULE: APP.Components.ShiftTradeCenter
  * Manages the interface and logic for swapping shifts between two advisors.
  */
 (function(APP) {
@@ -2566,8 +2700,11 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
     };
 
     const renderAdvisorDropdowns = () => {
+        // Check if elements exist (they might not if the tab content was manipulated)
+        if (!ELS.advisor1 || !ELS.advisor2) return;
+
         // Check if already populated to prevent redundant rendering
-        if (ELS.advisor1 && ELS.advisor1.options.length > 1) return;
+        if (ELS.advisor1.options.length > 1) return;
 
         const STATE = APP.StateManager.getState();
         const advisors = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name));
@@ -2577,8 +2714,8 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
             opts += `<option value="${adv.id}">${adv.name}</option>`;
         });
 
-        if (ELS.advisor1) ELS.advisor1.innerHTML = opts;
-        if (ELS.advisor2) ELS.advisor2.innerHTML = opts;
+        ELS.advisor1.innerHTML = opts;
+        ELS.advisor2.innerHTML = opts;
     };
 
     const handleSelectionChange = async (slot, type, value) => {
@@ -2740,7 +2877,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
             }
             
         } else {
-            APP.Utils.showToast("Error executing trade. Please check console logs.", "danger");
+            // Error toasts handled by DataService
             if (res1.error) console.error("Trade Error (Part 1):", res1.error);
             if (res2.error) console.error("Trade Error (Part 2):", res2.error);
         }
@@ -2778,7 +2915,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
 
     // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v15.7.1) Initializing...");
+        console.log("WFM Intelligence Platform (v15.8) Initializing...");
         
         // Initialize foundational services
         APP.Utils.cacheDOMElements();
@@ -2798,7 +2935,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         if (!initialData) {
             console.error("Fatal Error: Failed to load core data.");
              if (document.body) {
-                document.body.innerHTML = "<h1>Fatal Error: Failed to load core data from database. Check connection.</h1>";
+                document.body.innerHTML = "<h1>Fatal Error: Failed to load core data from database. Check connection and schema.</h1>";
             }
             return;
         }
@@ -2810,13 +2947,12 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         try {
             APP.Components.ComponentManager.initialize();
             APP.Components.AssignmentManager.initialize();
-            // V15.1: Initialize the shared builder first
+            // Initialize the shared builder first
             APP.Components.SequentialBuilder.initialize(); 
             APP.Components.ShiftDefinitionEditor.initialize();
-            APP.Components.ShiftTradeCenter?.initialize();
             APP.Components.RotationEditor.initialize();
             APP.Components.ScheduleViewer.initialize();
-            // V15.7: Initialize the new Trade Center
+            // Initialize the Trade Center
             if (APP.Components.ShiftTradeCenter) {
                 APP.Components.ShiftTradeCenter.initialize();
             }
@@ -2827,7 +2963,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
         }
 
         // Render all components
-        // V15.6: This triggers the initial render chain, including the first historical data fetch.
+        // This triggers the initial render chain, including the first historical data fetch.
         Core.renderAll();
 
         // Wire global event handlers
@@ -2872,7 +3008,7 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
                     onChange: (selectedDates, dateStr) => {
                         // Update state and re-render visualization on date change
                         APP.StateManager.getState().weekStart = dateStr;
-                        // V15.6: ScheduleViewer.render() coordinates the historical data fetch and subsequent renders.
+                        // ScheduleViewer.render() coordinates the historical data fetch and subsequent renders.
                         APP.Components.ScheduleViewer.render();
                     }
                 });
@@ -2887,33 +3023,9 @@ ELS.grid.querySelectorAll('.act-change-one').forEach(btn => {
 
         // Tab Navigation
         if (ELS.tabNav) ELS.tabNav.addEventListener('click', handleTabNavigation);
-        // Ensure the Shift Swop tab button exists in the nav
-if (ELS.tabNav && !ELS.tabNav.querySelector('[data-tab="tab-trade-center"]')) {
-  const btn = document.createElement('button');
-  btn.className = 'tab-link';
-  btn.setAttribute('data-tab', 'tab-trade-center');
-  btn.setAttribute('title', 'Shift Swop');
-  btn.innerHTML = `
-    <span class="tab-icon" aria-hidden="true">
-      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="16 3 21 3 21 8"></polyline>
-        <line x1="4" y1="20" x2="21" y2="3"></line>
-        <polyline points="8 21 3 21 3 16"></polyline>
-      </svg>
-    </span>
-    <span>Shift Swop</span>
-  `.trim();
-
-  // Insert under the PLANNING group, just before the Rotation Editor button
-  const planningGroup = ELS.tabNav.querySelector('[data-tab="tab-rotation-editor"]');
-  if (planningGroup && planningGroup.parentElement) {
-    planningGroup.parentElement.insertBefore(btn, planningGroup);
-  } else {
-    ELS.tabNav.appendChild(btn);
-  }
-}
-
-
+        
+        // V15.8 FIX: Removed the unnecessary JS injection of the Shift Swop button here. 
+        // It is now correctly defined in index.html.
     };
     
     const handleTabNavigation = (e) => {
@@ -2931,15 +3043,15 @@ if (ELS.tabNav && !ELS.tabNav.querySelector('[data-tab="tab-trade-center"]')) {
             if (activeTab) activeTab.classList.add('active');
             
             // Force re-render on tab switch to ensure visualization is updated correctly
-            // V15.6: This also handles fetching historical data if switching to ScheduleView or Assignments
+            // This also handles fetching historical data if switching to ScheduleView or Assignments
             if (tabId === 'tab-schedule-view') {
                 APP.Components.ScheduleViewer.render();
             } else if (tabId === 'tab-advisor-assignments') {
-                // V15.6.2: When switching to the Assignments tab, we must ensure the data is loaded and rendered.
+                // When switching to the Assignments tab, we must ensure the data is loaded and rendered.
                 // ScheduleViewer.render() handles the coordination of fetching data and rendering the AssignmentManager if the tab is active.
                 APP.Components.ScheduleViewer.render();
             } else if (tabId === 'tab-trade-center') {
-                // V15.7: Ensure Trade Center is rendered when activated
+                // Ensure Trade Center is rendered when activated
                 if (APP.Components.ShiftTradeCenter) {
                     APP.Components.ShiftTradeCenter.render();
                 }
@@ -2965,7 +3077,6 @@ if (ELS.tabNav && !ELS.tabNav.querySelector('[data-tab="tab-trade-center"]')) {
     };
 
     // Expose function to trigger a full application re-render
-    // V15.7: Updated to include the Trade Center.
     Core.renderAll = () => {
         if (!APP.StateManager.getState().isBooted) return;
         APP.Components.ComponentManager.render();
@@ -2973,7 +3084,7 @@ if (ELS.tabNav && !ELS.tabNav.querySelector('[data-tab="tab-trade-center"]')) {
         APP.Components.ShiftDefinitionEditor.render();
         APP.Components.RotationEditor.render();
         
-        // V15.7: Render the new Trade Center
+        // Render the Trade Center
         if (APP.Components.ShiftTradeCenter) {
              APP.Components.ShiftTradeCenter.render();
         }

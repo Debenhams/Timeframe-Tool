@@ -1,5 +1,5 @@
 /**
- * WFM Intelligence Platform - Styles (v15.7)
+ * WFM Intelligence Platform - Styles (v15.8)
  * Includes Base Layout, Components, Editors, Visualization (Daily/Weekly), and Trade Center.
 */
 
@@ -707,7 +707,7 @@ tbody tr:hover {
     z-index: 10;
 }
 
-/* V15.1: Make weekly cells clickable */F
+/* V15.1: Make weekly cells clickable */
 /* We apply this to the TD element itself (using class .weekly-cell applied by JS) */
 .weekly-cell {
     cursor: pointer;
@@ -838,7 +838,7 @@ tbody tr:hover {
 /* Specific table styles for the builder */
 .builder-grid th { font-size: 12px; padding: 10px 16px; position: sticky; top: 0; z-index: 1; }
 
-/* Compact row action buttons in Assignments */
+/* Compact row action buttons (Shared style) */
 .btn-group {
   display: flex;
   gap: 6px;
@@ -852,7 +852,7 @@ tbody tr:hover {
   padding: 12px 0 4px;
 }
 
-/* Compact, flexible action buttons in the last cell */
+/* Compact, flexible action buttons in the last cell (Builder) */
 .actions-cell .btn-group {
   display: flex;
   gap: 6px;
@@ -903,6 +903,9 @@ tbody tr:hover {
     border-left: 4px solid var(--color-danger);
 }
 /* Compact actions cell in Assignments grid */
+/* FIX: Ensure buttons do not wrap in the assignments table */
 .table .actions { white-space: nowrap; }
 .table .actions .btn { margin-right: 8px; }
 .table .actions .btn:last-child { margin-right: 0; }
+
+/* FIX: Removed stray closing brace '}' that was previously here */

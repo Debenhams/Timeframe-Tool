@@ -1,5 +1,5 @@
 /**
- * WFM Intelligence Platform - Initialization (v15.7)
+ * WFM Intelligence Platform - Initialization (v15.8)
  * Bootloader script.
  */
 
@@ -8,8 +8,8 @@
     document.addEventListener('DOMContentLoaded', () => {
         if (window.APP && window.APP.Core) {
             // Start the application
+            // Core.initialize() handles the initialization of all sub-components.
             window.APP.Core.initialize();
-            window.APP.Components?.ShiftTradeCenter?.initialize?.();
 
         } else {
             // If APP.Core is not available, the planner.js file failed to load or is corrupted.

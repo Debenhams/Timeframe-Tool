@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WFM Intelligence Platform (v15.7)</title>
+  <title>WFM Intelligence Platform (v15.8)</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./styles/planner.css?v=15.7" />
+  <link rel="stylesheet" href="./styles/planner.css?v=15.8" />
 </head>
 <body>
 
@@ -27,9 +27,10 @@
         
         <div class="nav-separator">PLANNING</div>
 
-        <<button class="tab-link" data-tab="tab-trade-center" title="Shift Swop">
-  <span>Shift Swop</span>
-</button>
+        <button class="tab-link" data-tab="tab-trade-center" title="Shift Swop">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
+            <span>Shift Swop</span>
+        </button>
 
 
         <button class="tab-link" data-tab="tab-rotation-editor" title="Rotation Editor">
@@ -178,8 +179,6 @@
             </div>
         </div>
       </section>
-
-
       <section id="tab-rotation-editor" class="tab-content">
         <div class="card">
             <div class="editor-controls">
@@ -219,29 +218,28 @@
       <section id="tab-advisor-assignments" class="tab-content">
         <div class="card">
             <h2>Advisor Assignments</h2>
-            <p class="helper-text">Assign a rotation. The 'Start Date' defines the exact calendar date corresponding to 'Week 1, Day 1' of the rotation for that advisor.</p>
+            <p class="helper-text">Manage rotation assignments and swaps. Use the action buttons to apply changes for specific periods.</p>
             <div class="table-container" id="assignmentGrid">
                 </div>
         </div>
         
       </section>
 
-      <!-- === TAB: Shift Trade Center === -->
-<section id="tab-trade-center" class="tab-content">
-  <div class="card">
-    <div class="card-header">
-      <h2>Shift Swop</h2>
-    </div>
-    <div class="card-body">
-      <!-- Grid/controls the JS will render into -->
-      <div id="shiftTradeGrid"></div>
-    </div>
-  </div>
-</section>
-<!-- === /TAB: Shift Trade Center === -->
+      <section id="tab-component-manager" class="tab-content">
+        <div class="card">
+            <div class="editor-controls">
+                <h2>Schedule Components</h2>
+                <div class="editor-buttons">
+                    <button id="btnNewComponent" class="btn btn-primary">[+] New Component</button>
+                </div>
+            </div>
+            <p class="helper-text">Manage the building blocks for shifts (Activities, Breaks, Lunch, etc.).</p>
+            <div class="table-container" id="componentManagerGrid">
+            </div>
+        </div>
+      </section>
 
-
-    </main>
+      </main>
   </div> 
 
   <div class="modal-backdrop" id="shiftBuilderModal">
@@ -297,8 +295,8 @@
   
   <div id="notification-container"></div>
 
-  <script src="./scripts/planner.js?v=15.7"></script>
-  <script src="./scripts/init.js?v=15.7"></script>
+  <script src="./scripts/planner.js?v=15.8"></script>
+  <script src="./scripts/init.js?v=15.8"></script>
 
 </body>
 </html>
