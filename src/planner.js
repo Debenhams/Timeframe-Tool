@@ -608,8 +608,28 @@ Utils.addDaysISO = (iso, days) => {
         } catch (err) {
              return handleError(err, "Change Only Week");
         }
+        
     };
 
+// V15.8 FIX: Helper to fetch the current snapshot record for a specific advisor.
+    DataService.fetchSnapshotForAdvisor = async (advisorId) => {
+        // Ensure supabase client is initialized
+        if (!supabase) return { data: null, error: "Database not initialized." };
+
+        // Efficiently fetch only the required record using maybeSingle()
+        const { data, error } = await supabase.from(SNAPSHOT_TABLE).select('*').eq('advisor_id', advisorId).maybeSingle();
+        
+        // Handle missing table gracefully during fetch (PGRST116 or 42P01)
+        if (error && (error.code === 'PGRST116' || error.code === '42P01')) {
+             // If the snapshot table is missing, it's not a critical error, just return null data.
+             return { data: null, error: null };
+        }
+        
+        if (error) return handleError(error, `Fetch Snapshot ${advisorId}`);
+        
+        // Returns data (which might be null if the record doesn't exist) and null error
+        return { data, error: null };
+    };
 
     APP.DataService = DataService;
 }(window.APP));
@@ -1209,14 +1229,22 @@ Utils.addDaysISO = (iso, days) => {
         // We don't need to syncRecord for history table, just clear the cache.
         APP.StateManager.clearEffectiveAssignmentsCache();
         
-        // The snapshot table (rotation_assignments) is updated automatically by the DataService helpers.
-        // We need to refresh the local state's snapshot view.
-        const { data: snapshotData } = await APP.DataService.fetchTable('rotation_assignments');
-        if (snapshotData) {
-            const updatedSnapshot = snapshotData.find(a => a.advisor_id === advisorId);
-            if (updatedSnapshot) {
-               APP.StateManager.syncRecord('rotation_assignments', updatedSnapshot);
-            }
+        // The snapshot table (rotation_assignments) is updated automatically by the DataService helpers in the DB.
+        // We need to refresh the local state's snapshot view (STATE.rotationAssignments) for history tracking.
+
+        // Fetch the updated snapshot specifically for this advisor using the new public function.
+        const { data: updatedSnapshot, error: snapshotError } = await APP.DataService.fetchSnapshotForAdvisor(advisorId);
+
+        if (snapshotError) {
+            console.warn("Failed to refresh local assignment snapshot after update.", snapshotError);
+            // We continue anyway, as the history cache is cleared and the UI will mostly rely on that.
+        } else if (updatedSnapshot) {
+            // If a record exists (data is not null), update the local state
+            APP.StateManager.syncRecord('rotation_assignments', updatedSnapshot);
+        } else {
+            // If the record is null (and no error), it means the advisor is now unassigned (removed from snapshot).
+            // We sync this deletion locally.
+            APP.StateManager.syncRecord('rotation_assignments', { advisor_id: advisorId }, true);
         }
 
 
