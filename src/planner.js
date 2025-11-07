@@ -1823,6 +1823,53 @@ ELS.grid = document.getElementById('rotationGrid');
 if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeek);
 if (ELS.btnRemoveWeek) ELS.btnRemoveWeek.addEventListener('click', handleRemoveWeek); // ADD THIS LINE
 if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
+// --- TEMPORARY FORCE-LOADER ---
+    // This will run 2 seconds after the page loads and check for the button
+    setTimeout(() => {
+        console.log("--- Running temporary force-loader ---");
+        
+        // Check if the button is missing from the page
+        if (!document.getElementById('btnRemoveWeek')) {
+            console.warn("FORCE-LOADER: 'btnRemoveWeek' was NOT found in the HTML. Creating it now.");
+            
+            let addBtn = document.getElementById('btnAddWeek');
+            
+            if (addBtn) {
+                // 1. Create the button
+                let removeBtn = document.createElement('button');
+                removeBtn.id = 'btnRemoveWeek';
+                removeBtn.className = 'btn btn-danger';
+                removeBtn.innerText = '[–] Remove Week';
+                
+                // 2. Add it to the page
+                addBtn.after(removeBtn);
+                
+                // 3. Manually add the listener, since the original one failed
+                removeBtn.addEventListener('click', handleRemoveWeek);
+                
+                // 4. Manually add the styles
+                let style = document.createElement('style');
+                style.innerHTML = `
+                    #btnRemoveWeek.btn-danger {
+                        background-color: #dc3545; border-color: #dc3545;
+                        color: white; cursor: pointer;
+                    }
+                    #btnRemoveWeek.btn-danger:hover {
+                        background-color: #c82333; border-color: #bd2130;
+                    }
+                `;
+                document.head.appendChild(style);
+                
+                console.log("FORCE-LOADER: Button and styles have been injected.");
+                
+            } else {
+                console.error("FORCE-LOADER: Failed. Could not find 'btnAddWeek' to attach to.");
+            }
+        } else {
+            console.log("FORCE-LOADER: 'btnRemoveWeek' was found. No action needed.");
+        }
+    }, 2000); // Run this 2 seconds after the page loads
+    // --- END OF TEMPORARY FORCE-LOADER ---
     };
 
     RotationEditor.render = () => {
