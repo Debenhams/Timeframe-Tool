@@ -1,12 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
-...
-<!DOCTYPE html>
-<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WFM Intelligence Platform (v15.8)</title>
+  <title>WFM Intelligence Platform (v15.8.1)</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
@@ -14,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./styles/planner.css?v=15.8" />
+  <link rel="stylesheet" href="./styles/planner.css?v=15.8.1" />
 </head>
 <body>
 
@@ -30,7 +27,6 @@
         
         <div class="nav-separator">PLANNING</div>
 
-        <!-- This is the button that was not appearing due to cache -->
         <button class="tab-link" data-tab="tab-trade-center" title="Shift Swop">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
             <span>Shift Swop</span>
@@ -98,8 +94,7 @@
                 <input type="text" id="treeSearch" class="form-input" placeholder="Filter leaders/advisors...">
                 <button id="btnClearSelection" class="btn btn-secondary btn-sm" style="margin-top: 8px;">Clear All</button>
                 <div class="schedules-tree" id="schedulesTree">
-                    <!-- Tree renders here -->
-                </div>
+                    </div>
             </div>
             <div class="planner-viewer card">
                 <div class="planner-header">
@@ -127,14 +122,12 @@
                 </div>
                 
                 <div class="visualization-container" id="visualizationContainer">
-                    <!-- Visualization renders here -->
-                </div>
+                    </div>
                 
             </div>
         </div>
       </section>
 
-      <!-- This is the panel that corresponds to the button -->
       <section id="tab-trade-center" class="tab-content">
         <div class="card">
             <h2>Shift Swop</h2>
@@ -186,7 +179,7 @@
             </div>
         </div>
       </section>
-      
+
       <section id="tab-rotation-editor" class="tab-content">
         <div class="card">
             <div class="editor-controls">
@@ -197,7 +190,6 @@
             <div class="editor-buttons">
                 <span id="autoSaveStatus" class="auto-save-status"></span>
                 <button id="btnAddWeek" class="btn btn-secondary" disabled>[+] Add Week (Top)</button>
-<button id="btnRemoveWeek" class="btn btn-danger">[–] Remove Week</button>
                 <button id="btnNewRotation" class="btn btn-primary">[+] New Rotation</button>
                 <button id="btnDeleteRotation" class="btn btn-danger">
                 Delete Rotation
@@ -206,8 +198,7 @@
             </div>
             <p class="helper-text">Select a predefined Shift Definition for each day. Changes are saved automatically. Rotations are finite and do not repeat.</p>
             <div class="table-container" id="rotationGrid">
-                <!-- Rotation Grid Renders Here -->
-            </div>
+                </div>
         </div>
       </section>
 
@@ -221,8 +212,7 @@
             </div>
             <p class="helper-text">Define available shifts. Click 'Edit Structure' to configure using the Sequential Builder.</p>
             <div class="table-container" id="shiftDefinitionsGrid">
-                <!-- Shift Definitions Grid Renders Here -->
-            </div>
+                </div>
         </div>
       </section>
       
@@ -231,8 +221,7 @@
             <h2>Advisor Assignments</h2>
             <p class="helper-text">Manage rotation assignments and swaps. Use the action buttons to apply changes for specific periods.</p>
             <div class="table-container" id="assignmentGrid">
-                <!-- Assignment Grid Renders Here -->
-            </div>
+                </div>
         </div>
         
       </section>
@@ -254,7 +243,6 @@
       </main>
   </div> 
 
-  <!-- Modal for Sequential Builder -->
   <div class="modal-backdrop" id="shiftBuilderModal">
     <div class="modal-content modal-lg">
       <div class="modal-header">
@@ -291,8 +279,7 @@
                     </tr>
                 </thead>
                 <tbody id="modalSequenceBody">
-                    <!-- Rows render here -->
-                </tbody>
+                    </tbody>
             </table>
         </div>
 
@@ -309,8 +296,8 @@
   
   <div id="notification-container"></div>
 
-  <script src="./scripts/planner.js?v=15.8"></script>
-  <script src="./scripts/init.js?v=15.8"></script>
+  <script src="./scripts/planner.js?v=15.8.1"></script>
+  <script src="./scripts/init.js?v=15.8.1"></script>
 
 </body>
 </html>
