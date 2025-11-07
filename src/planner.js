@@ -1,10 +1,12 @@
 /**
- * WFM Intelligence Platform - Application Logic (v15.8)
+ * WFM Intelligence Platform - Application Logic (v15.8.1)
  * 
- * V15.8:   CRITICAL FIX: Resolved major structural/syntax errors causing component initialization failures.
- *          CRITICAL FIX: Fixed Assignments tab "Button Spam" caused by invalid HTML generation in render loop.
- *          CRITICAL FIX: Implemented missing DataService functions for assignment history management (assignFromWeek, changeOnlyWeek).
- *          REFACTOR: Implemented robust history tracking logic in DataService for time-bound assignments.
+ * V15.8.1: Added "Delete Last Week" functionality to Rotation Editor.
+ *          Incorporated AssignmentManager sync fix (fetchSnapshotForAdvisor).
+ *          Fixed error handling logic in DataService (insertError check).
+ * V15.8:   CRITICAL FIX: Resolved major structural/syntax errors.
+ *          CRITICAL FIX: Fixed Assignments tab "Button Spam".
+ *          CRITICAL FIX: Implemented missing DataService functions for assignment history.
  */
 
 // Global Namespace Initialization
@@ -316,7 +318,7 @@ Utils.addDaysISO = (iso, days) => {
         return { data: null, error: errorMessage };
     };
 
-    // Generic table fetch
+    // Generic table fetch (Private)
     const fetchTable = async (tableName) => {
         const { data, error } = await supabase.from(tableName).select('*');
         if (error) return handleError(error, `Fetch ${tableName}`);
@@ -418,7 +420,7 @@ Utils.addDaysISO = (iso, days) => {
       }
     };
 
-    // Fallback function if history table is missing.
+    // Fallback function if history table is missing. (Private)
     const fetchSnapshotAssignments = async () => {
         const { data, error } = await fetchTable(SNAPSHOT_TABLE);
         if (error) return { data: new Map(), error: error.error };
@@ -485,7 +487,7 @@ Utils.addDaysISO = (iso, days) => {
     // --- V15.8 FIX: Implementation of missing History Management Functions (Bug 2) ---
     // These functions manage the rotation_assignments_history table.
 
-    // V15.8: Helper function to update the 'rotation_assignments' snapshot table.
+    // V15.8: Helper function to update the 'rotation_assignments' snapshot table. (Private)
     // This keeps the snapshot table in sync with the latest effective assignment from history.
     const updateSnapshotAssignment = async (advisorId) => {
         // Find the latest effective assignment (start_date DESC, end_date IS NULL prioritized)
@@ -557,18 +559,12 @@ Utils.addDaysISO = (iso, days) => {
             const { data: historyData, error: insertError } = await DataService.saveRecord(HISTORY_TABLE, newRecord, 'advisor_id, start_date');
             
             // Handle missing table gracefully during insert
-            // This is the CORRECTED patch
-// It properly checks the 'insertError' STRING directly.
-if (insertError && (insertError.includes('PGRST116') ||
-    insertError.includes('42P01') ||
-    insertError.includes('42P10'))) {
-     // The 42P10 check is added to gracefully warn instead of crash
-     // if the DB fix hasn't been applied yet.
-     console.warn(`DataService Warning: ${insertError}. Proceeding with snapshot only.`);
-} else if (insertError) {
-     // The error was not one of the known "safe" ones, so re-throw it.
-     throw new Error(insertError);
-}
+            // V15.8.1 FIX: insertError is the error string itself, not an object with an .error property.
+            if (insertError && (insertError.includes('PGRST116') || insertError.includes('42P01'))) {
+                 console.warn("History table missing during insert. Proceeding with snapshot only.");
+            } else if (insertError) {
+                throw new Error("Failed to insert new assignment history.");
+            }
 
             // 3. Update the snapshot table
             await updateSnapshotAssignment(advisor_id);
@@ -600,7 +596,8 @@ if (insertError && (insertError.includes('PGRST116') ||
             // Use upsert to handle overwriting existing records starting exactly on week_start
             const { data, error: insertError } = await DataService.saveRecord(HISTORY_TABLE, swapRecord, 'advisor_id, start_date');
             
-            if (insertError && (insertError.error.includes('PGRST116') || insertError.error.includes('42P01'))) {
+            // V15.8.1 FIX: insertError is the error string itself, not an object with an .error property.
+            if (insertError && (insertError.includes('PGRST116') || insertError.includes('42P01'))) {
                 APP.Utils.showToast("Cannot perform one-week swap as history table is missing.", "danger");
                 return { data: null, error: "History table missing." };
             } else if (insertError) {
@@ -615,10 +612,9 @@ if (insertError && (insertError.includes('PGRST116') ||
         } catch (err) {
              return handleError(err, "Change Only Week");
         }
-        
     };
 
-// V15.8 FIX: Helper to fetch the current snapshot record for a specific advisor.
+    // V15.8.1 FIX: Helper to fetch the current snapshot record for a specific advisor. (Public)
     DataService.fetchSnapshotForAdvisor = async (advisorId) => {
         // Ensure supabase client is initialized
         if (!supabase) return { data: null, error: "Database not initialized." };
@@ -637,6 +633,7 @@ if (insertError && (insertError.includes('PGRST116') ||
         // Returns data (which might be null if the record doesn't exist) and null error
         return { data, error: null };
     };
+
 
     APP.DataService = DataService;
 }(window.APP));
@@ -845,7 +842,7 @@ if (insertError && (insertError.includes('PGRST116') ||
     };
 
     APP.StateManager = StateManager;
-}(window.APP)); // V15.8 FIX: Ensured closure is correct (was missing in input).
+}(window.APP));
 
 
 /**
@@ -1236,6 +1233,7 @@ if (insertError && (insertError.includes('PGRST116') ||
         // We don't need to syncRecord for history table, just clear the cache.
         APP.StateManager.clearEffectiveAssignmentsCache();
         
+        // V15.8.1 FIX: Corrected synchronization logic (Replaced fetchTable with fetchSnapshotForAdvisor)
         // The snapshot table (rotation_assignments) is updated automatically by the DataService helpers in the DB.
         // We need to refresh the local state's snapshot view (STATE.rotationAssignments) for history tracking.
 
@@ -1812,65 +1810,15 @@ if (insertError && (insertError.includes('PGRST116') ||
         ELS.familySelect = document.getElementById('rotationFamily');
         ELS.btnNew = document.getElementById('btnNewRotation');
         ELS.btnDelete = document.getElementById('btnDeleteRotation');
-ELS.btnAddWeek = document.getElementById('btnAddWeek'); // (Top Button)
-ELS.btnRemoveWeek = document.getElementById('btnRemoveWeek'); // ADD THIS LINE
-ELS.grid = document.getElementById('rotationGrid');
+        ELS.btnAddWeek = document.getElementById('btnAddWeek'); // (Top Button)
+        ELS.grid = document.getElementById('rotationGrid');
         ELS.autoSaveStatus = document.getElementById('autoSaveStatus');
 
         if (ELS.familySelect) ELS.familySelect.addEventListener('change', handleFamilyChange);
         if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNewRotation);
         if (ELS.btnDelete) ELS.btnDelete.addEventListener('click', handleDeleteRotation);
-if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeek);
-if (ELS.btnRemoveWeek) ELS.btnRemoveWeek.addEventListener('click', handleRemoveWeek); // ADD THIS LINE
-if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
-// --- TEMPORARY FORCE-LOADER ---
-    // This will run 2 seconds after the page loads and check for the button
-    // (Line 1252 is now GONE)
-    setTimeout(() => {
-        console.log("--- Running temporary force-loader ---");
-        
-        // Check if the button is missing from the page
-        if (!document.getElementById('btnRemoveWeek')) {
-            console.warn("FORCE-LOADER: 'btnRemoveWeek' was NOT found in the HTML. Creating it now.");
-            
-            let addBtn = document.getElementById('btnAddWeek');
-            
-            if (addBtn) {
-                // 1. Create the button
-                let removeBtn = document.createElement('button');
-                removeBtn.id = 'btnRemoveWeek';
-                removeBtn.className = 'btn btn-danger';
-                removeBtn.innerText = '[–] Remove Week';
-                
-                // 2. Add it to the page
-                addBtn.after(removeBtn);
-                
-                // 3. Manually add the listener, since the original one failed
-                removeBtn.addEventListener('click', handleRemoveWeek);
-                
-                // 4. Manually add the styles
-                let style = document.createElement('style');
-                style.innerHTML = `
-                    #btnRemoveWeek.btn-danger {
-                        background-color: #dc3545; border-color: #dc3545;
-                        color: white; cursor: pointer;
-                    }
-                    #btnRemoveWeek.btn-danger:hover {
-                        background-color: #c82333; border-color: #bd2130;
-                    }
-                `;
-                document.head.appendChild(style);
-                
-                console.log("FORCE-LOADER: Button and styles have been injected.");
-                
-            } else {
-                console.error("FORCE-LOADER: Failed. Could not find 'btnAddWeek' to attach to.");
-            }
-        } else {
-            console.log("FORCE-LOADER: 'btnRemoveWeek' was found. No action needed.");
-        }
-    }, 2000); // Run this 2 seconds after the page loads
-    // --- END OF TEMPORARY FORCE-LOADER ---
+        if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeek);
+        if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
     };
 
     RotationEditor.render = () => {
@@ -1933,11 +1881,13 @@ if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
         });
         html += '</tbody></table>';
 
-        // Inline "Add Week" (only when a rotation is selected)
+        // V15.8.1: Added "Delete Last Week" button
+        // Inline "Add Week" and "Delete Week" (only when a rotation is selected)
         if (pattern) {
           html += `
             <div class="table-footer-inline">
               <button id="btnAddWeekInline" class="btn btn-secondary">[+] Add Week (Bottom)</button>
+              <button id="btnDeleteWeekInline" class="btn btn-danger" ${numWeeks === 0 ? 'disabled' : ''}>[-] Delete Last Week</button>
             </div>
           `;
         }
@@ -1950,9 +1900,14 @@ if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
         ELS.grid.innerHTML = html;
 
 
-        // Wire inline Add Week button (appears under the table)
+        // Wire inline buttons (appears under the table)
         const inlineAdd = document.getElementById('btnAddWeekInline');
         if (inlineAdd) inlineAdd.addEventListener('click', handleAddWeek);
+
+        // V15.8.1: Wire the new Delete Last Week button
+        const inlineDelete = document.getElementById('btnDeleteWeekInline');
+        if (inlineDelete) inlineDelete.addEventListener('click', handleDeleteLastWeek);
+
 
         // Set selected values (must be done after HTML insertion)
         if (pattern) {
@@ -2025,7 +1980,6 @@ if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
             if (APP.Components.AssignmentManager) {
                 APP.Components.AssignmentManager.render(); // Update assignment dropdowns
             }
-            // V15.8 FIX: Removed misplaced 'else if (tabId === ...)' block which caused a reference error.
         }
     };
 
@@ -2062,6 +2016,55 @@ if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
         }
     };
 
+    // V15.8.1: Handle deleting the last week from the existing rotation
+    const handleDeleteLastWeek = async () => {
+        const STATE = APP.StateManager.getState();
+        const rotationName = STATE.currentRotation;
+        const pattern = APP.StateManager.getPatternByName(rotationName);
+
+        if (!pattern || !pattern.pattern) return;
+
+        // Determine the current maximum week number
+        const maxWeek = APP.Utils.calculateRotationLength(pattern);
+
+        if (maxWeek === 0) {
+            APP.Utils.showToast("Rotation is already empty.", "warning");
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete Week ${maxWeek} from ${rotationName}? This cannot be undone easily.`)) {
+            return;
+        }
+
+        // Find the key for the last week
+        const lastWeekKey = findWeekKey(pattern.pattern, maxWeek);
+
+        if (!lastWeekKey) {
+            console.error("Error: Could not find the key for the last week, even though length > 0.");
+            return;
+        }
+
+        // Store the week data for potential rollback if the save fails
+        const deletedWeekData = JSON.parse(JSON.stringify(pattern.pattern[lastWeekKey]));
+
+        // 1. Delete the week locally
+        delete pattern.pattern[lastWeekKey];
+
+        // 2. Save the updated structure (Auto-Save Architecture)
+        const { error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: pattern.pattern }, { name: rotationName });
+
+        if (!error) {
+            APP.StateManager.saveHistory(`Delete Week ${maxWeek}`);
+            APP.Utils.showToast(`Week ${maxWeek} deleted from rotation.`, "success");
+            RotationEditor.renderGrid(); // Re-render the grid to show the change
+        } else {
+            // Rollback local change if save failed
+            pattern.pattern[lastWeekKey] = deletedWeekData;
+            // Error toast is shown by DataService
+        }
+    };
+
+
     const handleDeleteRotation = async () => {
         const STATE = APP.StateManager.getState();
         const rotationName = STATE.currentRotation;
@@ -2081,23 +2084,7 @@ if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
             }
         }
     };
-const handleRemoveWeek = () => {
-    if (!ELS.grid) return; // Safety check
 
-    // Find all rows in the grid, which represent the weeks
-    const weekElements = ELS.grid.querySelectorAll('.ag-row[role="row"]');
-
-    // Only remove if there is at least one row
-    if (weekElements.length > 0) {
-        // Get the very last week row and remove it
-        weekElements[weekElements.length - 1].remove();
-        console.log("Removed last week row.");
-    } else {
-        console.warn("Cannot remove: No week rows found in grid.");
-    }
-    // Note: You may need to update your data model here as well,
-    // this code only removes the row from the screen.
-};
     // Auto-save functionality for grid cell changes
     const handleGridChange = async (e) => {
         if (!e.target.classList.contains('rotation-grid-select')) return;
@@ -3016,7 +3003,7 @@ const handleRemoveWeek = () => {
 
     // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v15.8) Initializing...");
+        console.log("WFM Intelligence Platform (v15.8.1) Initializing...");
         
         // Initialize foundational services
         APP.Utils.cacheDOMElements();
@@ -3081,55 +3068,6 @@ const handleRemoveWeek = () => {
         ELS.btnRedo = document.getElementById('btnRedo');
         ELS.tabNav = document.getElementById('main-navigation');
         ELS.tabs = document.querySelectorAll('.tab-content');
-        
-    if (ELS.tabNav) ELS.tabNav.addEventListener('click', handleTabNavigation);
-        
-        // --- BEGIN CACHE-BYPASS FIX ---
-        // This code forcefully injects the "Shift Swop" button if 
-        // a stale, cached index.html file is loaded without it.
-        try {
-            if (ELS.tabNav) {
-                const tradeButtonExists = ELS.tabNav.querySelector('[data-tab="tab-trade-center"]');
-                
-                if (!tradeButtonExists) {
-                    console.warn("WFM: 'Shift Swop' button not found in HTML. Injecting manually to bypass cache...");
-
-                    // 1. This is the HTML for the button from your index.html file
-                    const buttonHTML = `
-                    <button class="tab-link" data-tab="tab-trade-center" title="Shift Swop">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
-                        <span>Shift Swop</span>
-                    </button>
-                    `;
-
-                    // 2. Find the "PLANNING" separator
-                    let planningSeparator = null;
-                    ELS.tabNav.querySelectorAll('.nav-separator').forEach(sep => {
-                        if (sep.textContent.trim().toUpperCase() === 'PLANNING') {
-                            planningSeparator = sep;
-                        }
-                    });
-
-                    // 3. Insert the button HTML directly after the "PLANNING" separator
-                    if (planningSeparator) {
-                        planningSeparator.insertAdjacentHTML('afterend', buttonHTML);
-                        console.log("WFM: Successfully injected 'Shift Swop' button.");
-                    } else {
-                        // Fallback in case the separator isn't found
-                        console.error("WFM: Could not find 'PLANNING' separator. Adding button to end of nav.");
-                        ELS.tabNav.insertAdjacentHTML('beforeend', buttonHTML);
-                    }
-                } else {
-                    console.log("WFM: 'Shift Swop' button found in HTML. Cache appears to be correct.");
-                }
-            }
-        } catch (e) {
-            console.error("WFM: Error during button injection fix:", e);
-        }
-        // --- END CACHE-BYPASS FIX ---
-
-        // V15.8 FIX: Removed the unnecessary JS injection of the Shift Swop button here. 
-        // It is now correctly defined in index.html.
     };
 
     // Set the default week view to the Monday of the current week.
@@ -3145,146 +3083,36 @@ const handleRemoveWeek = () => {
     };
 
     const wireGlobalEvents = () => {
-    // Week Navigation
-    if (ELS.weekStart) {
-        if (typeof flatpickr !== 'function') {
-            console.error("CRITICAL ERROR: flatpickr library not loaded (Global Events)."); //
-        } else {
-            // Configure Week Picker (Flatpickr)
-            flatpickr(ELS.weekStart, {
-                dateFormat: "Y-m-d", // ISO format for consistency
-                defaultDate: APP.StateManager.getState().weekStart,
-          
-                "locale": { "firstDayOfWeek": 1 }, // Monday start
-                onChange: (selectedDates, dateStr) => {
-                    // Update state and re-render visualization on date change
-                    APP.StateManager.getState().weekStart = dateStr;
- 
-                    // ScheduleViewer.render() coordinates the historical data fetch and subsequent renders.
-                    APP.Components.ScheduleViewer.render(); //
-                }
-            });
-        }
-    }
-    if (ELS.prevWeek) ELS.prevWeek.addEventListener('click', () => updateWeek(-7)); //
-    if (ELS.nextWeek) ELS.nextWeek.addEventListener('click', () => updateWeek(7)); //
-
-    // Undo/Redo
-    if (ELS.btnUndo) ELS.btnUndo.addEventListener('click', () => APP.StateManager.applyHistory('undo')); //
-    if (ELS.btnRedo) ELS.btnRedo.addEventListener('click', () => APP.StateManager.applyHistory('redo')); //
-
-    // Tab Navigation
-    if (ELS.tabNav) ELS.tabNav.addEventListener('click', handleTabNavigation); //
-
-    // --- BEGIN CACHE-BYPASS FIX (v2) ---
-    // Forcefully injects the 'Shift Swop' button AND panel if 
-    // a stale, cached index.html file is loaded without them.
-    try {
-        // 1. INJECT THE BUTTON (if missing)
-        if (ELS.tabNav) {
-            const tradeButtonExists = ELS.tabNav.querySelector('[data-tab="tab-trade-center"]');
-            if (!tradeButtonExists) {
-                console.warn("WFM: 'Shift Swop' button not found. Injecting manually...");
-                
-                const buttonHTML = `
-                <button class="tab-link" data-tab="tab-trade-center" title="Shift Swop">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
-                    <span>Shift Swop</span>
-                </button>
-                `;
-
-                let planningSeparator = null;
-                ELS.tabNav.querySelectorAll('.nav-separator').forEach(sep => {
-                    if (sep.textContent.trim().toUpperCase() === 'PLANNING') {
-                        planningSeparator = sep;
+        // Week Navigation
+        if (ELS.weekStart) {
+            if (typeof flatpickr !== 'function') {
+                console.error("CRITICAL ERROR: flatpickr library not loaded (Global Events).");
+            } else {
+                // Configure Week Picker (Flatpickr)
+                flatpickr(ELS.weekStart, {
+                    dateFormat: "Y-m-d", // ISO format for consistency
+                    defaultDate: APP.StateManager.getState().weekStart,
+                    "locale": { "firstDayOfWeek": 1 }, // Monday start
+                    onChange: (selectedDates, dateStr) => {
+                        // Update state and re-render visualization on date change
+                        APP.StateManager.getState().weekStart = dateStr;
+                        // ScheduleViewer.render() coordinates the historical data fetch and subsequent renders.
+                        APP.Components.ScheduleViewer.render();
                     }
                 });
-
-                if (planningSeparator) {
-                    planningSeparator.insertAdjacentHTML('afterend', buttonHTML);
-                    console.log("WFM: Successfully injected 'Shift Swop' button.");
-                }
             }
         }
+        if (ELS.prevWeek) ELS.prevWeek.addEventListener('click', () => updateWeek(-7));
+        if (ELS.nextWeek) ELS.nextWeek.addEventListener('click', () => updateWeek(7));
 
-        // 2. INJECT THE PANEL (if missing)
-        const tradePanelExists = document.getElementById('tab-trade-center');
-        if (!tradePanelExists) {
-            console.warn("WFM: 'Shift Swop' panel not found. Injecting manually...");
-            
-            // This is the full HTML for the panel, copied from your correct index.html file
-            const panelHTML = `
-            <section id="tab-trade-center" class="tab-content">
-              <div class="card">
-                <h2>Shift Swop</h2>
-                <p class="helper-text">Select two advisors and the corresponding dates to trade their schedules. This creates exceptions for the selected dates only.</p>
-                <div class="trade-layout">
-                  <div class="trade-panel">
-                    <h3>Trade Slot 1</h3>
-                    <div class="form-group">
-                      <label for="tradeAdvisor1">Advisor 1</label>
-                      <select id="tradeAdvisor1" class="form-select trade-advisor"></select>
-                    </div>
-                    <div class="form-group">
-                      <label for="tradeDate1">Date 1</label>
-                      <input type="text" id="tradeDate1" class="form-input trade-date-picker" placeholder="Select date...">
-                    </div>
-                    <div class="trade-preview" id="tradePreview1">Select advisor and date to preview schedule.</div>
-                  </div>
-                  <div class="trade-swap-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
-                  </div>
-                  <div class="trade-panel">
-                    <h3>Trade Slot 2</h3>
-                    <div class="form-group">
-                      <label for="tradeAdvisor2">Advisor 2</label>
-                      <select id="tradeAdvisor2" class="form-select trade-advisor"></select>
-                    </div>
-                    <div class="form-group">
-                      <label for="tradeDate2">Date 2</label>
-                      <input type="text" id="tradeDate2" class="form-input trade-date-picker" placeholder="Select date...">
-                    </div>
-                    <div class="trade-preview" id="tradePreview2">Select advisor and date to preview schedule.</div>
-                  </div>
-                </div>
-                <div class="trade-actions">
-                  <div class="form-group" style="max-width: 500px; margin: 0 auto 16px auto;">
-                    <label for="tradeReason">Reason for Trade (Required)</label>
-                    <input type="text" id="tradeReason" class="form-input" placeholder="e.g., Mutual agreement, Operational need...">
-                  </div>
-                  <button id="btnExecuteTrade" class="btn btn-primary btn-lg" disabled>Execute Trade</button>
-                </div>
-              </div>
-            </section>
-            `;
+        // Undo/Redo
+        if (ELS.btnUndo) ELS.btnUndo.addEventListener('click', () => APP.StateManager.applyHistory('undo'));
+        if (ELS.btnRedo) ELS.btnRedo.addEventListener('click', () => APP.StateManager.applyHistory('redo'));
 
-            const mainContentArea = document.getElementById('main-content-area'); //
-            
-            if (mainContentArea) {
-                mainContentArea.insertAdjacentHTML('beforeend', panelHTML);
-                console.log("WFM: Successfully injected 'Shift Swop' panel.");
-                
-                // 3. CRITICAL: Re-run the initialize for that specific component
-                // This wires up all the new buttons and dropdowns inside the panel.
-                if (APP.Components.ShiftTradeCenter) {
-                    APP.Components.ShiftTradeCenter.initialize(); //
-                    console.log("WFM: Re-initialized ShiftTradeCenter component.");
-                }
-                
-                // 4. CRITICAL: Re-cache the ELS.tabs NodeList so the tab switcher works
-                ELS.tabs = document.querySelectorAll('.tab-content'); //
-            } else {
-                console.error("WFM: Could not find 'main-content-area' to inject panel.");
-            }
-        }
-    } catch (e) {
-        console.error("WFM: Error during cache-bypass fix:", e);
-    }
-    // --- END CACHE-BYPASS FIX ---
-
-    // V15.8 FIX: Removed the unnecessary JS injection of the Shift Swop button here.
-    // It is now correctly defined in index.html.
-};
+        // Tab Navigation
+        if (ELS.tabNav) ELS.tabNav.addEventListener('click', handleTabNavigation);
+        
+    };
     
     const handleTabNavigation = (e) => {
         const target = e.target.closest('.tab-link');
