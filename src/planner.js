@@ -1825,6 +1825,7 @@ if (ELS.btnRemoveWeek) ELS.btnRemoveWeek.addEventListener('click', handleRemoveW
 if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
 // --- TEMPORARY FORCE-LOADER ---
     // This will run 2 seconds after the page loads and check for the button
+    // (Line 1252 is now GONE)
     setTimeout(() => {
         console.log("--- Running temporary force-loader ---");
         
