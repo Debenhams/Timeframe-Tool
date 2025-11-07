@@ -922,3 +922,15 @@ tbody tr:hover {
     background-color: #c82333; /* Darker red */
     border-color: #bd2130;
 }
+/* Styling for the new Remove Week button */
+#btnRemoveWeek.btn-danger {
+    background-color: #dc3545; /* Red */
+    border-color: #dc3545;
+    color: white;
+    cursor: pointer; /* Show hand cursor */
+}
+
+#btnRemoveWeek.btn-danger:hover {
+    background-color: #c82333; /* Darker red */
+    border-color: #bd2130;     /* <--- THIS IS THE FIXED LINE */
+}
