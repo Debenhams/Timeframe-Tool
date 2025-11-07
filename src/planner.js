@@ -3111,7 +3111,35 @@ Utils.addDaysISO = (iso, days) => {
 
         // Tab Navigation
         if (ELS.tabNav) ELS.tabNav.addEventListener('click', handleTabNavigation);
+        // V15.8.2: Forced Injection Workaround for Deployment Caching Issues (Shift Swop Button)
+        // This ensures the button appears even if index.html is cached incorrectly by the host.
         
+        // Use ELS.tabNav as it's already cached reference to the navigation container
+        if (ELS.tabNav) {
+            // Check if the button is missing
+            const tradeCenterButton = ELS.tabNav.querySelector('[data-tab="tab-trade-center"]');
+            // Find the button it should appear before (Rotation Editor)
+            const rotationEditorButton = ELS.tabNav.querySelector('[data-tab="tab-rotation-editor"]');
+
+            // If the Shift Swop button is missing AND we found the Rotation Editor button
+            if (!tradeCenterButton && rotationEditorButton) {
+                console.warn("Shift Swop button missing in HTML. Injecting manually due to potential caching issues.");
+
+                // Create the button element programmatically
+                const newButton = document.createElement('button');
+                newButton.className = 'tab-link';
+                newButton.dataset.tab = 'tab-trade-center';
+                newButton.title = 'Shift Swop';
+                newButton.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
+                    <span>Shift Swop</span>
+                `;
+                
+                // Insert the new button right before the Rotation Editor button
+                ELS.tabNav.insertBefore(newButton, rotationEditorButton);
+            }
+        }
+        // End of Workaround
     };
     
     const handleTabNavigation = (e) => {
