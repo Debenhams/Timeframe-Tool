@@ -3015,6 +3015,55 @@ if (insertError && (insertError.includes('PGRST116') ||
         ELS.btnRedo = document.getElementById('btnRedo');
         ELS.tabNav = document.getElementById('main-navigation');
         ELS.tabs = document.querySelectorAll('.tab-content');
+        
+    if (ELS.tabNav) ELS.tabNav.addEventListener('click', handleTabNavigation);
+        
+        // --- BEGIN CACHE-BYPASS FIX ---
+        // This code forcefully injects the "Shift Swop" button if 
+        // a stale, cached index.html file is loaded without it.
+        try {
+            if (ELS.tabNav) {
+                const tradeButtonExists = ELS.tabNav.querySelector('[data-tab="tab-trade-center"]');
+                
+                if (!tradeButtonExists) {
+                    console.warn("WFM: 'Shift Swop' button not found in HTML. Injecting manually to bypass cache...");
+
+                    // 1. This is the HTML for the button from your index.html file
+                    const buttonHTML = `
+                    <button class="tab-link" data-tab="tab-trade-center" title="Shift Swop">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
+                        <span>Shift Swop</span>
+                    </button>
+                    `;
+
+                    // 2. Find the "PLANNING" separator
+                    let planningSeparator = null;
+                    ELS.tabNav.querySelectorAll('.nav-separator').forEach(sep => {
+                        if (sep.textContent.trim().toUpperCase() === 'PLANNING') {
+                            planningSeparator = sep;
+                        }
+                    });
+
+                    // 3. Insert the button HTML directly after the "PLANNING" separator
+                    if (planningSeparator) {
+                        planningSeparator.insertAdjacentHTML('afterend', buttonHTML);
+                        console.log("WFM: Successfully injected 'Shift Swop' button.");
+                    } else {
+                        // Fallback in case the separator isn't found
+                        console.error("WFM: Could not find 'PLANNING' separator. Adding button to end of nav.");
+                        ELS.tabNav.insertAdjacentHTML('beforeend', buttonHTML);
+                    }
+                } else {
+                    console.log("WFM: 'Shift Swop' button found in HTML. Cache appears to be correct.");
+                }
+            }
+        } catch (e) {
+            console.error("WFM: Error during button injection fix:", e);
+        }
+        // --- END CACHE-BYPASS FIX ---
+
+        // V15.8 FIX: Removed the unnecessary JS injection of the Shift Swop button here. 
+        // It is now correctly defined in index.html.
     };
 
     // Set the default week view to the Monday of the current week.
