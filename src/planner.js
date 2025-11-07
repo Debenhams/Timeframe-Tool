@@ -3082,65 +3082,148 @@ Utils.addDaysISO = (iso, days) => {
         APP.StateManager.getState().weekStart = APP.Utils.formatDateToISO(localMonday);
     };
 
-    const wireGlobalEvents = () => {
-        // Week Navigation
-        if (ELS.weekStart) {
-            if (typeof flatpickr !== 'function') {
-                console.error("CRITICAL ERROR: flatpickr library not loaded (Global Events).");
-            } else {
-                // Configure Week Picker (Flatpickr)
-                flatpickr(ELS.weekStart, {
-                    dateFormat: "Y-m-d", // ISO format for consistency
-                    defaultDate: APP.StateManager.getState().weekStart,
-                    "locale": { "firstDayOfWeek": 1 }, // Monday start
-                    onChange: (selectedDates, dateStr) => {
-                        // Update state and re-render visualization on date change
-                        APP.StateManager.getState().weekStart = dateStr;
-                        // ScheduleViewer.render() coordinates the historical data fetch and subsequent renders.
-                        APP.Components.ScheduleViewer.render();
-                    }
-                });
-            }
+    // This is the NEW code to paste
+const wireGlobalEvents = () => {
+    // Week Navigation
+    if (ELS.weekStart) {
+        if (typeof flatpickr !== 'function') {
+            console.error("CRITICAL ERROR: flatpickr library not loaded (Global Events)."); //
+        } else {
+            // Configure Week Picker (Flatpickr)
+            flatpickr(ELS.weekStart, {
+                dateFormat: "Y-m-d", // ISO format for consistency
+                defaultDate: APP.StateManager.getState().weekStart,
+          
+                "locale": { "firstDayOfWeek": 1 }, // Monday start
+                onChange: (selectedDates, dateStr) => {
+                    // Update state and re-render visualization on date change
+                    APP.StateManager.getState().weekStart = dateStr;
+ 
+                    // ScheduleViewer.render() coordinates the historical data fetch and subsequent renders.
+                    APP.Components.ScheduleViewer.render(); //
+                }
+            });
         }
-        if (ELS.prevWeek) ELS.prevWeek.addEventListener('click', () => updateWeek(-7));
-        if (ELS.nextWeek) ELS.nextWeek.addEventListener('click', () => updateWeek(7));
+    }
+    if (ELS.prevWeek) ELS.prevWeek.addEventListener('click', () => updateWeek(-7)); //
+    if (ELS.nextWeek) ELS.nextWeek.addEventListener('click', () => updateWeek(7)); //
 
-        // Undo/Redo
-        if (ELS.btnUndo) ELS.btnUndo.addEventListener('click', () => APP.StateManager.applyHistory('undo'));
-        if (ELS.btnRedo) ELS.btnRedo.addEventListener('click', () => APP.StateManager.applyHistory('redo'));
+    // Undo/Redo
+    if (ELS.btnUndo) ELS.btnUndo.addEventListener('click', () => APP.StateManager.applyHistory('undo')); //
+    if (ELS.btnRedo) ELS.btnRedo.addEventListener('click', () => APP.StateManager.applyHistory('redo')); //
 
-        // Tab Navigation
-        if (ELS.tabNav) ELS.tabNav.addEventListener('click', handleTabNavigation);
-        // V15.8.2: Forced Injection Workaround for Deployment Caching Issues (Shift Swop Button)
-        // This ensures the button appears even if index.html is cached incorrectly by the host.
-        
-        // Use ELS.tabNav as it's already cached reference to the navigation container
+    // Tab Navigation
+    if (ELS.tabNav) ELS.tabNav.addEventListener('click', handleTabNavigation); //
+
+    // --- BEGIN CACHE-BYPASS FIX (v2) ---
+    // Forcefully injects the 'Shift Swop' button AND panel if 
+    // a stale, cached index.html file is loaded without them.
+    try {
+        // 1. INJECT THE BUTTON (if missing)
         if (ELS.tabNav) {
-            // Check if the button is missing
-            const tradeCenterButton = ELS.tabNav.querySelector('[data-tab="tab-trade-center"]');
-            // Find the button it should appear before (Rotation Editor)
-            const rotationEditorButton = ELS.tabNav.querySelector('[data-tab="tab-rotation-editor"]');
-
-            // If the Shift Swop button is missing AND we found the Rotation Editor button
-            if (!tradeCenterButton && rotationEditorButton) {
-                console.warn("Shift Swop button missing in HTML. Injecting manually due to potential caching issues.");
-
-                // Create the button element programmatically
-                const newButton = document.createElement('button');
-                newButton.className = 'tab-link';
-                newButton.dataset.tab = 'tab-trade-center';
-                newButton.title = 'Shift Swop';
-                newButton.innerHTML = `
+            const tradeButtonExists = ELS.tabNav.querySelector('[data-tab="tab-trade-center"]');
+            if (!tradeButtonExists) {
+                console.warn("WFM: 'Shift Swop' button not found. Injecting manually...");
+                
+                const buttonHTML = `
+                <button class="tab-link" data-tab="tab-trade-center" title="Shift Swop">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
                     <span>Shift Swop</span>
+                </button>
                 `;
-                
-                // Insert the new button right before the Rotation Editor button
-                ELS.tabNav.insertBefore(newButton, rotationEditorButton);
+
+                let planningSeparator = null;
+                ELS.tabNav.querySelectorAll('.nav-separator').forEach(sep => {
+                    if (sep.textContent.trim().toUpperCase() === 'PLANNING') {
+                        planningSeparator = sep;
+                    }
+                });
+
+                if (planningSeparator) {
+                    planningSeparator.insertAdjacentHTML('afterend', buttonHTML);
+                    console.log("WFM: Successfully injected 'Shift Swop' button.");
+                }
             }
         }
-        // End of Workaround
-    };
+
+        // 2. INJECT THE PANEL (if missing)
+        const tradePanelExists = document.getElementById('tab-trade-center');
+        if (!tradePanelExists) {
+            console.warn("WFM: 'Shift Swop' panel not found. Injecting manually...");
+            
+            // This is the full HTML for the panel, copied from your correct index.html file
+            const panelHTML = `
+            <section id="tab-trade-center" class="tab-content">
+              <div class="card">
+                <h2>Shift Swop</h2>
+                <p class="helper-text">Select two advisors and the corresponding dates to trade their schedules. This creates exceptions for the selected dates only.</p>
+                <div class="trade-layout">
+                  <div class="trade-panel">
+                    <h3>Trade Slot 1</h3>
+                    <div class="form-group">
+                      <label for="tradeAdvisor1">Advisor 1</label>
+                      <select id="tradeAdvisor1" class="form-select trade-advisor"></select>
+                    </div>
+                    <div class="form-group">
+                      <label for="tradeDate1">Date 1</label>
+                      <input type="text" id="tradeDate1" class="form-input trade-date-picker" placeholder="Select date...">
+                    </div>
+                    <div class="trade-preview" id="tradePreview1">Select advisor and date to preview schedule.</div>
+                  </div>
+                  <div class="trade-swap-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
+                  </div>
+                  <div class="trade-panel">
+                    <h3>Trade Slot 2</h3>
+                    <div class="form-group">
+                      <label for="tradeAdvisor2">Advisor 2</label>
+                      <select id="tradeAdvisor2" class="form-select trade-advisor"></select>
+                    </div>
+                    <div class="form-group">
+                      <label for="tradeDate2">Date 2</label>
+                      <input type="text" id="tradeDate2" class="form-input trade-date-picker" placeholder="Select date...">
+                    </div>
+                    <div class="trade-preview" id="tradePreview2">Select advisor and date to preview schedule.</div>
+                  </div>
+                </div>
+                <div class="trade-actions">
+                  <div class="form-group" style="max-width: 500px; margin: 0 auto 16px auto;">
+                    <label for="tradeReason">Reason for Trade (Required)</label>
+                    <input type="text" id="tradeReason" class="form-input" placeholder="e.g., Mutual agreement, Operational need...">
+                  </div>
+                  <button id="btnExecuteTrade" class="btn btn-primary btn-lg" disabled>Execute Trade</button>
+                </div>
+              </div>
+            </section>
+            `;
+
+            const mainContentArea = document.getElementById('main-content-area'); //
+            
+            if (mainContentArea) {
+                mainContentArea.insertAdjacentHTML('beforeend', panelHTML);
+                console.log("WFM: Successfully injected 'Shift Swop' panel.");
+                
+                // 3. CRITICAL: Re-run the initialize for that specific component
+                // This wires up all the new buttons and dropdowns inside the panel.
+                if (APP.Components.ShiftTradeCenter) {
+                    APP.Components.ShiftTradeCenter.initialize(); //
+                    console.log("WFM: Re-initialized ShiftTradeCenter component.");
+                }
+                
+                // 4. CRITICAL: Re-cache the ELS.tabs NodeList so the tab switcher works
+                ELS.tabs = document.querySelectorAll('.tab-content'); //
+            } else {
+                console.error("WFM: Could not find 'main-content-area' to inject panel.");
+            }
+        }
+    } catch (e) {
+        console.error("WFM: Error during cache-bypass fix:", e);
+    }
+    // --- END CACHE-BYPASS FIX ---
+
+    // V15.8 FIX: Removed the unnecessary JS injection of the Shift Swop button here.
+    // It is now correctly defined in index.html.
+};
     
     const handleTabNavigation = (e) => {
         const target = e.target.closest('.tab-link');
