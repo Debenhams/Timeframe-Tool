@@ -909,3 +909,16 @@ tbody tr:hover {
 .table .actions .btn:last-child { margin-right: 0; }
 
 /* FIX: Removed stray closing brace '}' that was previously here */
+
+/* Styling for the new Remove Week button */
+#btnRemoveWeek.btn-danger {
+    background-color: #dc3545; /* Red */
+    border-color: #dc3545;
+    color: white;
+    cursor: pointer; /* Show hand cursor */
+}
+
+#btnRemoveWeek.btn-danger:hover {
+    background-color: #c82333; /* Darker red */
+    border-color: #bd2130;
+}

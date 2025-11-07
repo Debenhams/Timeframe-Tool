@@ -1812,15 +1812,17 @@ if (insertError && (insertError.includes('PGRST116') ||
         ELS.familySelect = document.getElementById('rotationFamily');
         ELS.btnNew = document.getElementById('btnNewRotation');
         ELS.btnDelete = document.getElementById('btnDeleteRotation');
-        ELS.btnAddWeek = document.getElementById('btnAddWeek'); // (Top Button)
-        ELS.grid = document.getElementById('rotationGrid');
+ELS.btnAddWeek = document.getElementById('btnAddWeek'); // (Top Button)
+ELS.btnRemoveWeek = document.getElementById('btnRemoveWeek'); // ADD THIS LINE
+ELS.grid = document.getElementById('rotationGrid');
         ELS.autoSaveStatus = document.getElementById('autoSaveStatus');
 
         if (ELS.familySelect) ELS.familySelect.addEventListener('change', handleFamilyChange);
         if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNewRotation);
         if (ELS.btnDelete) ELS.btnDelete.addEventListener('click', handleDeleteRotation);
-        if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeek);
-        if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
+if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeek);
+if (ELS.btnRemoveWeek) ELS.btnRemoveWeek.addEventListener('click', handleRemoveWeek); // ADD THIS LINE
+if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
     };
 
     RotationEditor.render = () => {
@@ -2031,7 +2033,23 @@ if (insertError && (insertError.includes('PGRST116') ||
             }
         }
     };
+const handleRemoveWeek = () => {
+    if (!ELS.grid) return; // Safety check
 
+    // Find all rows in the grid, which represent the weeks
+    const weekElements = ELS.grid.querySelectorAll('.ag-row[role="row"]');
+
+    // Only remove if there is at least one row
+    if (weekElements.length > 0) {
+        // Get the very last week row and remove it
+        weekElements[weekElements.length - 1].remove();
+        console.log("Removed last week row.");
+    } else {
+        console.warn("Cannot remove: No week rows found in grid.");
+    }
+    // Note: You may need to update your data model here as well,
+    // this code only removes the row from the screen.
+};
     // Auto-save functionality for grid cell changes
     const handleGridChange = async (e) => {
         if (!e.target.classList.contains('rotation-grid-select')) return;
