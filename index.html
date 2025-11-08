@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WFM Intelligence Platform (v15.8.1)</title>
+  <title>WFM Intelligence Platform (v15.8.2)</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   
@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./styles/planner.css?v=15.8.1" />
+  <link rel="stylesheet" href="./styles/planner.css?v=15.8.2" />
 </head>
 <body>
 
@@ -296,18 +296,16 @@
   
   <div id="notification-container"></div>
 
-  <!-- Temporary fallback config so the app has main keys immediately (remove later) -->
 <script>
   window.APP = window.APP || {};
   window.APP.Config = window.APP.Config || {};
-  // ----> Replace the values below with your MAIN Supabase values:
-  window.APP.Config.SUPABASE_URL = "https://YOUR_MAIN_PROJECT_REF.supabase.co";
-  window.APP.Config.SUPABASE_ANON_KEY = "YOUR_MAIN_ANON_KEY";
+  // Keys from the provided .env file are inserted here:
+  window.APP.Config.SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
+  window.APP.Config.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 </script>
 
-<!-- Load scripts as ES modules so import.meta is supported -->
-<script type="module" src="./src/planner.js?v=15.5.2"></script>
-<script type="module" src="./src/init.js?v=15.5.2"></script>
+<script type="module" src="./src/planner.js?v=15.8.2"></script>
+<script type="module" src="./src/init.js?v=15.8.2"></script>
 
 
 </body>
