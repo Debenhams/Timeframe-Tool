@@ -1,7 +1,6 @@
 /**
- * WFM Intelligence Platform - Application Logic (v15.8.2)
+ * WFM Intelligence Platform - Application Logic (v15.8.1)
  * 
- * V15.8.2: FIX: Removed import.meta.env usage (incompatible with direct browser loading). Configuration now relies on index.html injection. Added config validation check in DataService.initialize and Core.initialize.
  * V15.8.1: Added "Delete Last Week" functionality to Rotation Editor.
  *          Incorporated AssignmentManager sync fix (fetchSnapshotForAdvisor).
  *          Fixed error handling logic in DataService (insertError check).
@@ -17,20 +16,18 @@ window.APP = window.APP || {};
  * MODULE: APP.Config
  */
 (function(APP) {
-    // Initialize Config by referencing the existing window.APP.Config (injected via index.html)
-    const Config = APP.Config || {};
+    const Config = {};
 
     // Supabase Configuration (Centralized)
-    // FIX (v15.8.2): Removed import.meta.env usage. 
-    // SUPABASE_URL and SUPABASE_ANON_KEY are expected to be set by index.html injection.
-
+    // NOTE: These are placeholder credentials. Replace with environment variables in production.
+    Config.SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
+    Config.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 
     // Timeline Visualization Constants (06:00-20:00)
     Config.TIMELINE_START_MIN = 6 * 60; // 06:00
     Config.TIMELINE_END_MIN = 20 * 60; // 20:00
     Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_MIN; // 14 hours
 
-    // Re-assign back to APP.Config to ensure it contains all constants
     APP.Config = Config;
 }(window.APP));
 
@@ -301,15 +298,6 @@ Utils.addDaysISO = (iso, days) => {
              APP.Utils.showToast("Error: Database library (Supabase) not loaded.", "danger", 10000);
             return false;
         }
-
-        // FIX (v15.8.2): Check if configuration is loaded and valid before attempting connection
-        if (!APP.Config.SUPABASE_URL || !APP.Config.SUPABASE_ANON_KEY || APP.Config.SUPABASE_URL.includes("YOUR_MAIN_PROJECT_REF") || APP.Config.SUPABASE_ANON_KEY.includes("YOUR_MAIN_ANON_KEY")) {
-            // Configuration is missing or still using placeholder values.
-            // Error message will be handled by Core.initialize if this returns false.
-            console.error("Supabase configuration missing or contains placeholders. Ensure index.html injects the keys correctly.");
-            return false;
-        }
-        
         const { createClient } = window.supabase;
 
         supabase = createClient(APP.Config.SUPABASE_URL, APP.Config.SUPABASE_ANON_KEY);
@@ -332,7 +320,6 @@ Utils.addDaysISO = (iso, days) => {
 
     // Generic table fetch (Private)
     const fetchTable = async (tableName) => {
-        if (!supabase) return handleError({ message: "Database client not initialized." }, `Fetch ${tableName}`);
         const { data, error } = await supabase.from(tableName).select('*');
         if (error) return handleError(error, `Fetch ${tableName}`);
         return { data, error: null };
@@ -340,7 +327,6 @@ Utils.addDaysISO = (iso, days) => {
 
     // Generalized save/upsert function
     DataService.saveRecord = async (tableName, record, conflictColumn = null) => {
-        if (!supabase) return handleError({ message: "Database client not initialized." }, `Save ${tableName}`);
         let query = supabase.from(tableName);
         if (conflictColumn) {
             // Use upsert for saving exceptions or assignments based on unique constraints
@@ -357,7 +343,6 @@ Utils.addDaysISO = (iso, days) => {
 
     // Generalized update function
     DataService.updateRecord = async (tableName, updates, condition) => {
-        if (!supabase) return handleError({ message: "Database client not initialized." }, `Update ${tableName}`);
         let query = supabase.from(tableName).update(updates);
 
         // Apply conditions using explicit filters (.eq/.is)
@@ -382,7 +367,6 @@ Utils.addDaysISO = (iso, days) => {
 
     // Generalized delete function
     DataService.deleteRecord = async (tableName, condition) => {
-        if (!supabase) return handleError({ message: "Database client not initialized." }, `Delete ${tableName}`);
         const { error } = await supabase.from(tableName).delete().match(condition);
         if (error) return handleError(error, `Delete ${tableName}`);
         return { data: null, error: null };
@@ -392,8 +376,6 @@ Utils.addDaysISO = (iso, days) => {
     // Includes prioritization logic and fallback if history table is missing.
     DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
       try {
-        if (!supabase) return handleError({ message: "Database client not initialized." }, 'Fetch effective assignments for date');
-
         // 1) Pull only rows that *cover* this date from history:
         //    start_date <= isoDate AND (end_date IS NULL OR end_date >= isoDate)
         const { data, error } = await supabase
@@ -508,8 +490,6 @@ Utils.addDaysISO = (iso, days) => {
     // V15.8: Helper function to update the 'rotation_assignments' snapshot table. (Private)
     // This keeps the snapshot table in sync with the latest effective assignment from history.
     const updateSnapshotAssignment = async (advisorId) => {
-        if (!supabase) return; // Should not happen if called from other DataService methods
-
         // Find the latest effective assignment (start_date DESC, end_date IS NULL prioritized)
         const { data, error } = await supabase
             .from(HISTORY_TABLE)
@@ -3023,23 +3003,12 @@ Utils.addDaysISO = (iso, days) => {
 
     // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v15.8.2) Initializing...");
+        console.log("WFM Intelligence Platform (v15.8.1) Initializing...");
         
         // Initialize foundational services
         APP.Utils.cacheDOMElements();
-
-        // FIX (v15.8.2): Check DataService initialization result and handle failure gracefully.
         if (!APP.DataService.initialize()) {
-            console.error("Fatal Error: DataService failed to initialize (Check configuration in index.html).");
-            // Display user-friendly error if initialization fails (e.g., missing keys)
-            const mainArea = document.getElementById('main-content-area');
-            if (mainArea) {
-                mainArea.innerHTML = `<div class="card" style="text-align: center; padding: 50px; margin: 24px;">
-                    <h1>Initialization Failed</h1>
-                    <p>The application could not connect to the database.</p>
-                    <p>Please ensure the Supabase configuration (URL and Key) in <strong>index.html</strong> is correct and the database is accessible.</p>
-                </div>`;
-            }
+            console.error("Fatal Error: DataService failed to initialize.");
             return;
         }
 

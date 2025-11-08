@@ -934,4 +934,3 @@ tbody tr:hover {
     background-color: #c82333; /* Darker red */
     border-color: #bd2130;     /* <--- THIS IS THE FIXED LINE */
 }
-/* FIX (v15.8.2): Removed the extra closing brace '}' that was present at the end of the original file. */
