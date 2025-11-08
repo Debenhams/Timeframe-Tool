@@ -20,8 +20,9 @@ window.APP = window.APP || {};
 
     // Supabase Configuration (Centralized)
     // NOTE: These are placeholder credentials. Replace with environment variables in production.
-    Config.SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
-    Config.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
+    Config.SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+Config.SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
 
     // Timeline Visualization Constants (06:00-20:00)
     Config.TIMELINE_START_MIN = 6 * 60; // 06:00
