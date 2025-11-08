@@ -296,8 +296,19 @@
   
   <div id="notification-container"></div>
 
-  <script src="./scripts/planner.js?v=15.8.1"></script>
-  <script src="./scripts/init.js?v=15.8.1"></script>
+  <!-- Temporary fallback config so the app has main keys immediately (remove later) -->
+<script>
+  window.APP = window.APP || {};
+  window.APP.Config = window.APP.Config || {};
+  // ----> Replace the values below with your MAIN Supabase values:
+  window.APP.Config.SUPABASE_URL = "https://YOUR_MAIN_PROJECT_REF.supabase.co";
+  window.APP.Config.SUPABASE_ANON_KEY = "YOUR_MAIN_ANON_KEY";
+</script>
+
+<!-- Load scripts as ES modules so import.meta is supported -->
+<script type="module" src="./src/planner.js?v=15.5.2"></script>
+<script type="module" src="./src/init.js?v=15.5.2"></script>
+
 
 </body>
 </html>
