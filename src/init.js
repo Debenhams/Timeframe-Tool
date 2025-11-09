@@ -8,7 +8,7 @@
     const AUTH_CONFIG = {
         // NOTE: This is a client-side password for demonstration purposes ONLY.
         // In a production environment, this MUST be replaced with secure backend authentication.
-        REQUIRED_PASSWORD: "WFM_Auth_2025", // <<< SET THE PASSWORD HERE
+        REQUIRED_PASSWORD: "WFMintel123!", // <<< SET THE PASSWORD HERE
         SESSION_KEY: "wfm_session_authenticated"
     };
 
