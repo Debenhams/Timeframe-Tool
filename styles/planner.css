@@ -431,42 +431,13 @@ tbody tr:hover {
     font-weight: 600;
     color: var(--brand-primary);
     background-color: #EEF2FF; /* Light indigo background */
-
-    /* --- ADD THESE 3 LINES --- */
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap; /* Ensures it can wrap if needed on small screens */
 }
 
-.tree-node-leader label .team-brand {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--color-text); /* Use the standard dark text color */
-    background-color: var(--color-border); /* Light grey tag background */
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin-left: auto; /* <-- This is the magic line */
-}
-
-/* --- END OF NEW BLOCK --- */
 /* Styling for the Advisor nodes (indented) */
 .tree-node-advisor label {
     padding-left: 32px;
 }
 
-/* --- ADD THIS NEW BLOCK --- */
-.tree-node-leader label .team-brand {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--color-text-muted);
-    background-color: var(--color-border);
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin-left: 8px; /* Adds space next to the leader's name */
-}
-
-
-/* --- END OF NEW BLOCK --- */
 
 .planner-viewer {
   display: flex;
@@ -558,7 +529,7 @@ tbody tr:hover {
   border-bottom: 1px solid var(--color-border);
   position: sticky;
   top: 0;
-  z-index: 5; /* Ensures header stays above content */
+  z-index: 100; /* Ensures header stays above content */
 }
 
 .header-name { 
@@ -650,7 +621,6 @@ tbody tr:hover {
   display: grid;
   grid-template-columns: var(--timeline-name-col) 1fr;
   height: var(--timeline-row-height);
-  margin-bottom: 4px;
   border-bottom: 1px solid var(--color-border);
   /* V15.1: Make rows clickable for Live Editing */
   cursor: pointer; 
@@ -679,7 +649,7 @@ tbody tr:hover {
     /* Sticky positioning for the name column body */
     position: sticky;
     left: 0;
-    z-index: 15;
+    z-index: 10;
     background-color: inherit; /* Inherits the alternating row color */
 }
 
@@ -696,7 +666,7 @@ tbody tr:hover {
   align-items: center;
   overflow: hidden;
   border-radius: 0; /* Square edges */
-  z-index: 10;
+  border-right: 1px solid rgba(255,255,255,0.3); /* Subtle separator between segments */
 }
 
 /* Visualization Styles (Matching Screenshot Request) */
@@ -963,105 +933,4 @@ tbody tr:hover {
 #btnRemoveWeek.btn-danger:hover {
     background-color: #c82333; /* Darker red */
     border-color: #bd2130;     /* <--- THIS IS THE FIXED LINE */
-}
-/* --- PASTE THIS AT THE END OF PLANNER.CSS --- */
-
-/* === FORM & BUTTON WIDTH FIXES === */
-/* This makes the login inputs fill the modal */
-.form-group {
-    margin-bottom: 16px;
-}
-.form-input, .form-select {
-    width: 100%;
-}
-.btn {
-    width: 100%; /* Make buttons full-width by default */
-}
-/* Override for specific buttons that should NOT be full-width */
-.btn-sm, .btn-secondary, .btn-danger, .btn-icon, .btn-toggle,
-.table .actions .btn, .editor-buttons .btn {
-    width: auto;
-}
-/* Visually hide labels but keep for screen readers */
-.sr-only {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
-    border: 0;
-}
-
-
-/* === NEW LOGIN MODAL STYLES === */
-#login-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    /* Use your dark sidebar color with transparency */
-    background-color: rgba(17, 24, 39, 0.8); 
-    backdrop-filter: blur(5px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 3000;
-    opacity: 1;
-    transition: opacity 0.3s ease;
-}
-
-/* Add a class to hide the overlay */
-#login-overlay.hidden {
-    opacity: 0;
-    pointer-events: none;
-}
-
-.login-modal {
-    background-color: var(--color-panel-bg);
-    padding: 32px 40px;
-    border-radius: var(--border-radius);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-    width: 100%;
-    max-width: 400px;
-    text-align: center;
-    /* Fancy pop-in animation */
-    transform: scale(0.95);
-    opacity: 0;
-    animation: fadeInScale 0.2s ease-out forwards;
-}
-
-@keyframes fadeInScale {
-    to {
-        transform: scale(1);
-        opacity: 1;
-    }
-}
-
-.login-modal .login-title {
-    color: var(--color-text);
-    font-weight: 700;
-    font-size: 22px;
-}
-
-.login-modal p {
-    color: var(--color-text-muted);
-    margin-bottom: 24px;
-}
-
-#loginPassword {
-    text-align: center;
-    font-size: 16px;
-    padding-top: 10px;
-    padding-bottom: 10px;
-}
-
-#login-error-message {
-    color: var(--color-danger);
-    font-size: 13px;
-    font-weight: 500;
-    margin-top: 8px;
-    display: none; /* Hidden by default */
 }
