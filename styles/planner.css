@@ -621,6 +621,7 @@ tbody tr:hover {
   display: grid;
   grid-template-columns: var(--timeline-name-col) 1fr;
   height: var(--timeline-row-height);
+  margin-bottom: 4px;
   border-bottom: 1px solid var(--color-border);
   /* V15.1: Make rows clickable for Live Editing */
   cursor: pointer; 
@@ -667,6 +668,7 @@ tbody tr:hover {
   overflow: hidden;
   border-radius: 0; /* Square edges */
   border-right: 1px solid rgba(255,255,255,0.3); /* Subtle separator between segments */
+  z-index: 5;
 }
 
 /* Visualization Styles (Matching Screenshot Request) */
