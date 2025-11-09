@@ -1191,3 +1191,44 @@ tbody tr:hover {
     background-color: #c82333; /* Darker red */
     border-color: #bd2130;     /* <--- THIS IS THE FIXED LINE */
 }
+/* --- FIX FOR DEBENHAMS LOGO --- */
+
+/* This finds the parent container for the logo 
+  and centers it perfectly in the teal area.
+*/
+.banner-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* This tells the text container ("Debenhams" + "GROUP")
+  to stack its children vertically.
+*/
+.dg-text {
+  display: flex;
+  flex-direction: column;
+}
+
+/* This styles the main "Debenhams" text.
+  (It uses the Playfair Display font you have in your HTML).
+*/
+.dg-main-text {
+  font-family: 'Playfair Display', serif;
+  font-weight: 700;
+  font-size: 36px; /* Adjust if needed */
+  color: #333; /* Adjust color if needed */
+}
+
+/* This styles the smaller "GROUP" text and
+  aligns it to the right, just like the original design.
+*/
+.dg-sub-text {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  font-size: 14px; /* Adjust if needed */
+  color: #333; /* Adjust color if needed */
+  align-self: flex-end; /* This is the key to align it right */
+}
