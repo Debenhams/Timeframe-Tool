@@ -431,8 +431,24 @@ tbody tr:hover {
     font-weight: 600;
     color: var(--brand-primary);
     background-color: #EEF2FF; /* Light indigo background */
+
+    /* --- ADD THESE 3 LINES --- */
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap; /* Ensures it can wrap if needed on small screens */
 }
 
+.tree-node-leader label .team-brand {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text); /* Use the standard dark text color */
+    background-color: var(--color-border); /* Light grey tag background */
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: auto; /* <-- This is the magic line */
+}
+
+/* --- END OF NEW BLOCK --- */
 /* Styling for the Advisor nodes (indented) */
 .tree-node-advisor label {
     padding-left: 32px;
