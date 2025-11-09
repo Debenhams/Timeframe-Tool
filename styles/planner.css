@@ -157,7 +157,7 @@ body.authenticated .app-main-content {
     background-size: 90px 90px;
     /* Optional: subtle animation for a fancy effect */
     animation: subtle-pan 250s linear infinite;
-    opacity: 0.3; /
+    opacity: 0.6; /
 }
 
 @keyframes subtle-pan {
