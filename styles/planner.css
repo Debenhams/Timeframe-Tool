@@ -667,7 +667,6 @@ tbody tr:hover {
   align-items: center;
   overflow: hidden;
   border-radius: 0; /* Square edges */
-  border-right: 1px solid rgba(255,255,255,0.3); /* Subtle separator between segments */
   z-index: 5;
 }
 
