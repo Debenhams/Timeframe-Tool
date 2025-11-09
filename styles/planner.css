@@ -156,7 +156,7 @@ h2 {
 .top-bar {
   height: var(--top-bar-height);
   background-color: var(--color-panel-bg);
-  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 4px; /* This creates the 4px gap you want */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -431,13 +431,40 @@ tbody tr:hover {
     font-weight: 600;
     color: var(--brand-primary);
     background-color: #EEF2FF; /* Light indigo background */
+
+    /* --- ADD THESE 3 LINES --- */
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap; /* Ensures it can wrap if needed on small screens */
 }
+/* --- PASTE THIS ENTIRE NEW BLOCK --- */
+
+.tree-node-leader label .team-brand {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text); /* Use the standard dark text color */
+    background-color: var(--color-border); /* Light grey tag background */
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: auto; /* <-- This is the magic line */
+}
+
+/* --- END OF NEW BLOCK --- */
 
 /* Styling for the Advisor nodes (indented) */
 .tree-node-advisor label {
     padding-left: 32px;
 }
 
+.tree-node-leader label .team-brand {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    background-color: var(--color-border);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px; /* Adds space next to the leader's name */
+}
 
 .planner-viewer {
   display: flex;
@@ -529,7 +556,7 @@ tbody tr:hover {
   border-bottom: 1px solid var(--color-border);
   position: sticky;
   top: 0;
-  z-index: 100; /* Ensures header stays above content */
+  z-index: 5; /* Ensures header stays above content */
 }
 
 .header-name { 
@@ -621,6 +648,7 @@ tbody tr:hover {
   display: grid;
   grid-template-columns: var(--timeline-name-col) 1fr;
   height: var(--timeline-row-height);
+  margin-bottom: 4px; /*
   border-bottom: 1px solid var(--color-border);
   /* V15.1: Make rows clickable for Live Editing */
   cursor: pointer; 
@@ -649,7 +677,7 @@ tbody tr:hover {
     /* Sticky positioning for the name column body */
     position: sticky;
     left: 0;
-    z-index: 10;
+    z-index: 15;
     background-color: inherit; /* Inherits the alternating row color */
 }
 
@@ -666,7 +694,7 @@ tbody tr:hover {
   align-items: center;
   overflow: hidden;
   border-radius: 0; /* Square edges */
-  border-right: 1px solid rgba(255,255,255,0.3); /* Subtle separator between segments */
+  z-index: 10; 
 }
 
 /* Visualization Styles (Matching Screenshot Request) */
