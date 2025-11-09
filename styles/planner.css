@@ -1,6 +1,7 @@
 /**
  * WFM Intelligence Platform - Styles (v15.8)
  * Includes Base Layout, Components, Editors, Visualization (Daily/Weekly), and Trade Center.
+ * MODIFIED: Added Authentication Overlay Styles.
 */
 
 /* === VARIABLES & CONFIGURATION === */
@@ -46,6 +47,10 @@
   --timeline-bar-height: 34px; 
   --timeline-grid-color: #E5E7EB;
   --timeline-header-bg: #F3F4F6;
+
+  /* Debenhams Branding (Approximated from image) */
+  --debenhams-teal: #70E6D6;
+  --debenhams-dark: #000000;
 }
 
 /* === BASE STYLES & LAYOUT === */
@@ -77,17 +82,241 @@ h2 {
     font-size: 20px;
 }
 
+/* === AUTHENTICATION OVERLAY (New Section) === */
+
+/* Hide main application components initially */
+.app-sidebar, .app-main-content {
+  display: none;
+}
+
+/* Reveal them when the 'authenticated' class is added to the body by init.js */
+body.authenticated .app-sidebar {
+  display: flex;
+}
+body.authenticated .app-main-content {
+  display: flex;
+}
+
+.auth-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #F3F4F6; /* Light background for the surrounding area */
+  /* Display is managed by init.js (flex when shown, none when hidden) */
+  display: none; 
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  opacity: 1;
+  transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+}
+
+.auth-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.auth-container {
+  display: flex;
+  width: 880px;
+  max-width: 90%;
+  height: 550px;
+  background-color: white;
+  border-radius: 16px;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden; /* Keeps the split design contained */
+}
+
+/* --- Banner Side (Left) --- */
+.auth-banner {
+  width: 50%;
+  background-color: var(--debenhams-teal); 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Recreating the subtle pattern background using an embedded SVG */
+.auth-banner::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    /* SVG pattern mimicking the geometric style of the banner image */
+     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cdefs%3E%3Cstyle%3E.bee%7Bfill:none;stroke:rgba(255,255,255,0.35);stroke-width:2;%7D%3C/style%3E%3C/defs%3E%3Cg transform='translate(50 50) rotate(5)'%3E%3C!-- Body --%3E%3Cpolygon class='bee' points='0,-12 12,-6 12,6 0,12 -12,6 -12,-6'/%3E%3C!-- Stripes (approximated) --%3E%3Cline class='bee' x1='-6' y1='-9' x2='-6' y2='9'/%3E%3Cline class='bee' x1='0' y1='-12' x2='0' y2='12'/%3E%3Cline class='bee' x1='6' y1='-9' x2='6' y2='9'/%3E%3C!-- Wings (approximated shape) --%3E%3Cpolygon class='bee' points='0,-12 18,-30 30,-18 12,-6'/%3E%3Cpolygon class='bee' points='0,-12 -18,-30 -30,-18 -12,-6'/%3E%3C/g%3E%3C/svg%3E");
+    background-size: 90px 90px;
+    /* Optional: subtle animation for a fancy effect */
+    animation: subtle-pan 180s linear infinite;
+}
+
+@keyframes subtle-pan {
+  0% { background-position: 0 0; }
+  100% { background-position: 100% 100%; }
+}
+
+.banner-content {
+    position: relative;
+    z-index: 1;
+    padding: 40px;
+}
+
+/* Debenhams Group Logo Recreation (CSS approximation) */
+.dg-logo {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  color: var(--debenhams-dark);
+}
+
+.dg-monogram {
+  font-size: 72px;
+  font-weight: 900; /* Black weight */
+  line-height: 1;
+  position: relative;
+  /* Using Playfair Display (added in HTML) for the serif look */
+  font-family: 'Playfair Display', serif; 
+}
+
+/* The bar over the G in the logo, characteristic of the branding */
+.dg-monogram::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  /* Positioned over the 'G' part of the monogram */
+  right: 0; 
+  width: 45%;
+  height: 10px;
+  background-color: var(--debenhams-dark);
+}
+
+.dg-text {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+}
+
+.dg-main-text {
+  font-size: 42px;
+  font-weight: 700;
+  font-family: 'Playfair Display', serif;
+  letter-spacing: -1px;
+}
+
+.dg-sub-text {
+  font-size: 18px;
+  font-weight: 600;
+  font-family: var(--font-family); /* Back to Inter */
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+/* --- Form Side (Right) --- */
+.auth-form-panel {
+  width: 50%;
+  padding: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.auth-form-panel h2 {
+  font-size: 36px;
+  font-weight: 700;
+  /* Using the app's primary color for the WFM title */
+  color: var(--brand-primary); 
+  margin-bottom: 16px;
+}
+
+.auth-form-panel p {
+  color: var(--color-text-muted);
+  margin-bottom: 40px;
+}
+
+.auth-form label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+#passwordInput {
+  padding: 14px 18px;
+  font-size: 16px;
+}
+
+/* Override default focus style to use the brand color */
+#passwordInput:focus {
+  border-color: var(--debenhams-dark); 
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.2);
+}
+
+.btn-login {
+  padding: 14px 18px;
+  font-size: 18px;
+  font-weight: 600;
+  /* Using black to match the Debenhams logo style */
+  background-color: var(--debenhams-dark); 
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-top: 16px;
+}
+
+.btn-login:hover {
+  background-color: #333;
+}
+
+.error-message {
+    margin-top: 24px;
+    font-weight: 500;
+    color: var(--color-danger);
+    display: none; /* Hidden by default, shown by JS */
+}
+
+.auth-footer {
+    margin-top: auto;
+    padding-top: 24px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    border-top: 1px solid var(--color-border);
+}
+
+/* Responsive adjustments for the password screen */
+@media (max-width: 768px) {
+  .auth-container {
+    flex-direction: column;
+    width: 90%;
+    max-width: 450px;
+    height: auto;
+  }
+  .auth-banner, .auth-form-panel {
+    width: 100%;
+  }
+  .auth-banner {
+    padding: 40px 0;
+    min-height: 200px;
+  }
+  .auth-form-panel {
+      padding: 40px 30px;
+  }
+}
+
+
 /* === SIDEBAR NAVIGATION === */
 .app-sidebar {
   width: var(--sidebar-width);
   background-color: var(--sidebar-bg);
   color: var(--sidebar-text);
-  display: flex;
+  /* display: flex; (Handled by authentication visibility logic) */
   flex-direction: column;
   flex-shrink: 0;
   border-right: 1px solid var(--sidebar-border);
-  height: 100vh;          /* ← add this */
-  overflow-y: auto;       /* ← and this (enables scrolling) */
+  height: 100vh;
+  overflow-y: auto;
 }
 
 
@@ -148,7 +377,7 @@ h2 {
 /* === MAIN CONTENT & TOP BAR === */
 .app-main-content {
   flex-grow: 1;
-  display: flex;
+  /* display: flex; (Handled by authentication visibility logic) */
   flex-direction: column;
   overflow: hidden; /* Important for internal scrolling */
 }

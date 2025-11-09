@@ -6,6 +6,8 @@
   <title>WFM Intelligence Platform (v15.8.1)</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+
   
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
@@ -15,6 +17,39 @@
 </head>
 <body>
 
+  <div id="auth-overlay" class="auth-overlay">
+    <div class="auth-container">
+      <div class="auth-banner">
+        <div class="banner-content">
+            <div class="dg-logo">
+                <div class="dg-monogram">DG</div>
+                <div class="dg-text">
+                    <span class="dg-main-text">Debenhams</span>
+                    <span class="dg-sub-text">GROUP</span>
+                </div>
+            </div>
+        </div>
+      </div>
+      <div class="auth-form-panel">
+        <h2>WFM Intelligence</h2>
+        <p>Welcome. Please authenticate to access the platform.</p>
+        
+        <form id="auth-form" class="auth-form">
+            <div class="form-group">
+                <label for="passwordInput">Access Key</label>
+                <input type="password" id="passwordInput" class="form-input" placeholder="Enter your key" autofocus>
+            </div>
+            <button type="submit" class="btn btn-login">Authenticate</button>
+        </form>
+        
+        <p id="authErrorMessage" class="error-message">Invalid Access Key.</p>
+        
+        <div class="auth-footer">
+            WFM Intelligence Platform (v15.8.1)
+        </div>
+      </div>
+    </div>
+  </div>
   <aside class="app-sidebar">
     <div class="sidebar-header">
         WFM Intelligence
