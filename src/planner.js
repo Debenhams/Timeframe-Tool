@@ -446,7 +446,7 @@ Utils.addDaysISO = (iso, days) => {
             // Fetch tables in parallel for efficiency
             const [advisors, leaders, components, definitions, patterns, assignments, exceptions] = await Promise.all([
                 fetchTable('advisors'),
-                fetchTable('leaders'),
+                supabase.from('leaders').select('*, sites(name)'),
                 fetchTable('schedule_components'),
                 fetchTable('shift_definitions'),
                 fetchTable('rotation_patterns'),
@@ -2306,10 +2306,16 @@ Utils.addDaysISO = (iso, days) => {
                 // Check if all advisors in the team are currently selected
                 const allSelected = teamAdvisors.every(a => STATE.selectedAdvisors.has(a.id));
 
+                // Get the site name (if it exists) from the data we fetched in Fix 1
+                const site = leader.sites ? leader.sites.name : '';
+                const siteHTML = site ? `<span class="team-brand">${site}</span>` : '';
+
                 html += `<div class="tree-node-leader">
                     <label>
-                        <input type="checkbox" class="select-leader" data-leader-id="${leader.id}" ${allSelected ? 'checked' : ''} />
+                   
+                     <input type="checkbox" class="select-leader" data-leader-id="${leader.id}" ${allSelected ? 'checked' : ''} />
                         ${leader.name} (Team Leader)
+                        ${siteHTML}
                     </label>
                 </div>`;
 
