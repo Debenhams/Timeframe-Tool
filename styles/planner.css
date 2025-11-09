@@ -438,6 +438,19 @@ tbody tr:hover {
     padding-left: 32px;
 }
 
+/* --- ADD THIS NEW BLOCK --- */
+.tree-node-leader label .team-brand {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-muted);
+    background-color: var(--color-border);
+    padding: 2px 6px;
+    border-radius: 4px;
+    margin-left: 8px; /* Adds space next to the leader's name */
+}
+
+
+/* --- END OF NEW BLOCK --- */
 
 .planner-viewer {
   display: flex;
@@ -529,7 +542,7 @@ tbody tr:hover {
   border-bottom: 1px solid var(--color-border);
   position: sticky;
   top: 0;
-  z-index: 100; /* Ensures header stays above content */
+  z-index: 5; /* Ensures header stays above content */
 }
 
 .header-name { 
@@ -650,7 +663,7 @@ tbody tr:hover {
     /* Sticky positioning for the name column body */
     position: sticky;
     left: 0;
-    z-index: 10;
+    z-index: 15;
     background-color: inherit; /* Inherits the alternating row color */
 }
 
@@ -667,7 +680,7 @@ tbody tr:hover {
   align-items: center;
   overflow: hidden;
   border-radius: 0; /* Square edges */
-  z-index: 5;
+  z-index: 10;
 }
 
 /* Visualization Styles (Matching Screenshot Request) */
