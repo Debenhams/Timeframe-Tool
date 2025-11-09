@@ -15,9 +15,27 @@
 </head>
 <body>
 
-  <aside class="app-sidebar">
+  <!-- === NEW LOGIN MODAL === -->
+  <!-- This overlay will cover the entire page until the user logs in -->
+  <div id="login-overlay">
+    <div class="login-modal">
+        <h2 class="login-title">Debenhams WFM Intelligence</h2>
+        <p>Please enter the password to continue.</p>
+        <div class="form-group">
+            <label for="loginPassword" class="sr-only">Password</label>
+            <input type="password" id="loginPassword" class="form-input" placeholder="Password...">
+            <div id="login-error-message">Incorrect password. Please try again.</div>
+        </div>
+        <button id="loginButton" class="btn btn-primary">Login</button>
+    </div>
+  </div>
+  <!-- === END OF NEW LOGIN MODAL === -->
+
+
+  <!-- Your app is now hidden by default -->
+  <aside class="app-sidebar" style="display: none;">
     <div class="sidebar-header">
-        WFM Intelligence Dev
+        WFM Intelligence
     </div>
     <nav class="tab-nav" id="main-navigation">
         <button class="tab-link active" data-tab="tab-schedule-view" title="Schedule View">
@@ -51,13 +69,14 @@
          <div class="nav-separator">ADMINISTRATION</div>
 
         <button class="tab-link" data-tab="tab-component-manager" title="Components">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0 2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             <span>Components</span>
         </button>
     </nav>
   </aside>
   
-  <div class="app-main-content">
+  <!-- Your app is now hidden by default -->
+  <div class="app-main-content" style="display: none;">
     
     <header class="top-bar">
         <div class="top-bar-controls">
@@ -94,7 +113,8 @@
                 <input type="text" id="treeSearch" class="form-input" placeholder="Filter leaders/advisors...">
                 <button id="btnClearSelection" class="btn btn-secondary btn-sm" style="margin-top: 8px;">Clear All</button>
                 <div class="schedules-tree" id="schedulesTree">
-                    </div>
+                    <!-- Tree is rendered by JS -->
+                </div>
             </div>
             <div class="planner-viewer card">
                 <div class="planner-header">
@@ -122,7 +142,8 @@
                 </div>
                 
                 <div class="visualization-container" id="visualizationContainer">
-                    </div>
+                    <!-- Visualization is rendered by JS -->
+                </div>
                 
             </div>
         </div>
@@ -198,7 +219,8 @@
             </div>
             <p class="helper-text">Select a predefined Shift Definition for each day. Changes are saved automatically. Rotations are finite and do not repeat.</p>
             <div class="table-container" id="rotationGrid">
-                </div>
+                <!-- Grid is rendered by JS -->
+            </div>
         </div>
       </section>
 
@@ -212,7 +234,8 @@
             </div>
             <p class="helper-text">Define available shifts. Click 'Edit Structure' to configure using the Sequential Builder.</p>
             <div class="table-container" id="shiftDefinitionsGrid">
-                </div>
+                <!-- Grid is rendered by JS -->
+            </div>
         </div>
       </section>
       
@@ -221,7 +244,8 @@
             <h2>Advisor Assignments</h2>
             <p class="helper-text">Manage rotation assignments and swaps. Use the action buttons to apply changes for specific periods.</p>
             <div class="table-container" id="assignmentGrid">
-                </div>
+                <!-- Grid is rendered by JS -->
+            </div>
         </div>
         
       </section>
@@ -236,6 +260,7 @@
             </div>
             <p class="helper-text">Manage the building blocks for shifts (Activities, Breaks, Lunch, etc.).</p>
             <div class="table-container" id="componentManagerGrid">
+                <!-- Grid is rendered by JS -->
             </div>
         </div>
       </section>
@@ -279,7 +304,8 @@
                     </tr>
                 </thead>
                 <tbody id="modalSequenceBody">
-                    </tbody>
+                    <!-- Rows are rendered by JS -->
+                </tbody>
             </table>
         </div>
 
@@ -296,8 +322,9 @@
   
   <div id="notification-container"></div>
 
+  <!-- Note: I've updated these paths to 'src/' based on our previous fix -->
   <script src="./src/planner.js?v=15.8.1"></script>
-<script src="./src/init.js?v=15.8.1"></script>
+  <script src="./src/init.js?v=15.8.1"></script>
 
 </body>
 </html>
