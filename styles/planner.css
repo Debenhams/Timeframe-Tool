@@ -1191,21 +1191,3 @@ tbody tr:hover {
     background-color: #c82333; /* Darker red */
     border-color: #bd2130;     /* <--- THIS IS THE FIXED LINE */
 }
-/*
-This new style centers the text block 
-where the monogram used to be.
-*/
-.dg-logo {
-    justify-content: center;
-    width: 100%;
-}
-
-/*
-This new style changes the text from side-by-side
-to stacked (column) and centers it horizontally.
-*/
-.dg-text {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
