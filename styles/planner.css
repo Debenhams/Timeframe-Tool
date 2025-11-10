@@ -138,7 +138,7 @@ body.authenticated .app-main-content {
 /* --- Banner Side (Left) --- */
 .auth-banner {
   /* width: 50%; CHANGED to 65% */
-  width: 75%;
+  width: 65%;
   background-color: var(--debenhams-teal); 
   display: flex;
   justify-content: center;
@@ -156,8 +156,7 @@ body.authenticated .app-main-content {
      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cdefs%3E%3Cstyle%3E.bee%7Bfill:none;stroke:rgba(255,255,255,0.35);stroke-width:2;%7D%3C/style%3E%3C/defs%3E%3Cg transform='translate(50 50) rotate(5)'%3E%3C!-- Body --%3E%3Cpolygon class='bee' points='0,-12 12,-6 12,6 0,12 -12,6 -12,-6'/%3E%3C!-- Stripes (approximated) --%3E%3Cline class='bee' x1='-6' y1='-9' x2='-6' y2='9'/%3E%3Cline class='bee' x1='0' y1='-12' x2='0' y2='12'/%3E%3Cline class='bee' x1='6' y1='-9' x2='6' y2='9'/%3E%3C!-- Wings (approximated shape) --%3E%3Cpolygon class='bee' points='0,-12 18,-30 30,-18 12,-6'/%3E%3Cpolygon class='bee' points='0,-12 -18,-30 -30,-18 -12,-6'/%3E%3C/g%3E%3C/svg%3E");
     background-size: 90px 90px;
     /* Optional: subtle animation for a fancy effect */
-    animation: subtle-pan 250s linear infinite;
-    opacity: 0.7; /
+    animation: subtle-pan 180s linear infinite;
 }
 
 @keyframes subtle-pan {
@@ -171,16 +170,6 @@ body.authenticated .app-main-content {
     padding: 40px;
     /* ADDED: Center the content */
     text-align: center;
-}
-/* NEW: Subtle Motto Style */
-.dg-motto {
-  font-size: 18px; /* Smaller and more subtle */
-  font-weight: 400; /* Regular weight, not bold */
-  font-family: var(--font-family);
-  color: var(--debenhams-dark);
-  margin-top: 30px; /* Space below the tagline */
-  line-height: 1.5; /* Good readability */
-  letter-spacing: 0.5px; /* Just a touch of spacing */
 }
 
 /* Debenhams Group Logo Recreation (CSS approximation) */
@@ -206,7 +195,7 @@ body.authenticated .app-main-content {
 
 .dg-main-text {
   /* font-size: 42px; CHANGED to 96px */
-  font-size: 110px;
+  font-size: 96px;
   font-weight: 700;
   /* font-family: 'Playfair Display', serif; CHANGED to Sans-Serif to match photo style */
   font-family: var(--font-family);
@@ -217,7 +206,7 @@ body.authenticated .app-main-content {
 
 .dg-sub-text {
   /* font-size: 18px; CHANGED to 36px */
-  font-size: 40px;
+  font-size: 36px;
   font-weight: 600;
   font-family: var(--font-family); /* Back to Inter */
   text-transform: uppercase;
@@ -227,7 +216,7 @@ body.authenticated .app-main-content {
 
 /* NEW: Tagline Styling */
 .dg-tagline {
-    font-size: 40px;
+    font-size: 32px;
     font-weight: 400; /* 'FOR EVERYONE' is bolded in HTML, the rest is regular */
     font-family: var(--font-family);
     text-transform: uppercase;
@@ -239,7 +228,7 @@ body.authenticated .app-main-content {
 /* --- Form Side (Right) --- */
 .auth-form-panel {
   /* width: 50%; CHANGED to 35% */
-  width: 25%;
+  width: 35%;
   padding: 60px;
   display: flex;
   flex-direction: column;
@@ -330,20 +319,7 @@ body.authenticated .app-main-content {
     /* border-top: 1px solid var(--color-border); CHANGED */
     border-top: 1px solid var(--login-input-border);
 }
-/* NEW: Inspirational Quote Blockquote */
-.auth-form-panel blockquote {
-  margin: 40px 0; /* Adds breathing room */
-  padding-left: 20px; /* Indents the text from the bar */
-  border-left: 4px solid var(--debenhams-teal); /* The teal accent bar */
-  font-style: italic; /* Makes it feel like a quote */
-  font-size: 18px; /* Made bigger, as you requested */
-  color: var(--login-text-muted); /* Softer than bright white */
-  line-height: 1.6; /* Makes it easier to read */
-}
 
-.auth-form-panel blockquote p {
-  margin: 0; /* Removes default paragraph spacing */
-}
 /* Responsive adjustments for the password screen */
 @media (max-width: 1200px) {
   /* Adjust font sizes slightly on smaller desktop screens */
