@@ -331,7 +331,7 @@ body.authenticated .app-main-content {
   padding-left: 0;
   border-left: none; /* No bar */
   font-style: italic;
-  font-size: 22px; /* Made "larger within reason" */
+  font-size: 28px; /* Made "larger within reason" */
   color: var(--login-text-muted);
   line-height: 1.6;
 }
