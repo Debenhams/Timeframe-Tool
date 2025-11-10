@@ -270,16 +270,6 @@ body.authenticated .app-main-content {
   margin-bottom: 24px; /* Sits 1 line above the form */
 }
 
-.auth-motto {
-  margin-top: 0;
-  margin-bottom: 8px; /* Small space after motto */
-}
-
-.auth-welcome {
-  margin-top: 0;
-  margin-bottom: 60px; /* This is the large space you wanted */
-}
-
 .auth-form label {
     display: block;
     font-weight: 500; /* Slightly less bold than 600 */
