@@ -323,13 +323,7 @@ body.authenticated .app-main-content {
     font-weight: 500;
     color: var(--color-danger);
     display: none; /* Hidden by default, shown by JS */
-}
-/* NEW: Motto under title */
-.auth-motto {
-  font-size: 14px; /* Matches the 'Welcome' text */
-  color: var(--login-text-muted); /* Matches the 'Welcome' text */
-  margin-top: 0;
-  margin-bottom: 40px; /* This pushes the login form down */
+
 }
 /* NEW: Inspirational Quote Blockquote (No Bar) */
 .auth-form-panel blockquote {
