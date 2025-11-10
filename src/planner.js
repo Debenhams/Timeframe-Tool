@@ -2468,7 +2468,7 @@ Utils.addDaysISO = (iso, days) => {
         
         let html = '';
         // Loop through each hour in the range
-        for (let h = startHour; h < endHour; h++) {
+        for (let h = startHour; h <= endHour; h++) {
             const pct = (h - startHour) / totalHours * 100;
             const label = h.toString().padStart(2, '0') + ':00';
             html += `<div class="time-tick" style="left: ${pct}%;">${label}</div>`;
