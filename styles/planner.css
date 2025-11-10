@@ -259,7 +259,7 @@ body.authenticated .app-main-content {
 
 /* This styles your Motto and adds the BIG GAP */
 .auth-motto {
-  font-size: 14px;
+  font-size: 24px;
   margin-top: 0; /* Tucked up */
   margin-bottom: 32px; /* Removed the large gap */
 }
