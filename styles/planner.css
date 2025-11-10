@@ -157,7 +157,7 @@ body.authenticated .app-main-content {
     background-size: 90px 90px;
     /* Optional: subtle animation for a fancy effect */
     animation: subtle-pan 250s linear infinite;
-    opacity: 0.7; */
+    opacity: 0.7; /
 }
 
 @keyframes subtle-pan {
@@ -245,7 +245,7 @@ body.authenticated .app-main-content {
   font-size: 24px;
   font-weight: 600;
   color: var(--login-text); 
-  margin-bottom: 4px; /* Tucked up */
+  margin-bottom: 16px;
   font-family: var(--font-family);
 }
 
@@ -259,9 +259,9 @@ body.authenticated .app-main-content {
 
 /* This styles your Motto and adds the BIG GAP */
 .auth-motto {
-  font-size: 24px;
-  margin-top: 0; /* Tucked up */
-  margin-bottom: 32px; /* Removed the large gap */
+  font-size: 14px;
+  margin-top: 8px; /* Small space after the title */
+  margin-bottom: 60px; /* This is your "4 spaces" gap */
 }
 
 /* This styles the "Welcome" text inside the form */
@@ -327,11 +327,11 @@ body.authenticated .app-main-content {
 }
 /* NEW: Inspirational Quote Blockquote (No Bar) */
 .auth-form-panel blockquote {
-  margin: 24px 0 40px 0; /* Reduced top margin */
+  margin: 40px 0; /* Space above and below */
   padding-left: 0;
   border-left: none; /* No bar */
   font-style: italic;
-  font-size: 28px; /* Made "larger within reason" */
+  font-size: 18px; /* Slightly larger as requested */
   color: var(--login-text-muted);
   line-height: 1.6;
 }
@@ -1291,11 +1291,4 @@ tbody tr:hover {
 #btnRemoveWeek.btn-danger:hover {
     background-color: #c82333; /* Darker red */
     border-color: #bd2130;     /* <--- THIS IS THE FIXED LINE */
-}
-/* Crisp login panel fix for blur over moving backgrounds */
-.login-panel {
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  transform: translateZ(0);
-  will-change: transform;
 }
