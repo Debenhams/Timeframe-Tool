@@ -157,7 +157,7 @@ body.authenticated .app-main-content {
     background-size: 90px 90px;
     /* Optional: subtle animation for a fancy effect */
     animation: subtle-pan 250s linear infinite;
-    opacity: 0.5; /
+    opacity: 0.7; /
 }
 
 @keyframes subtle-pan {
@@ -250,10 +250,24 @@ body.authenticated .app-main-content {
 }
 
 
+/* This styles the text inside the panel */
 .auth-form-panel p {
-  /* color: var(--color-text-muted); CHANGED */
   color: var(--login-text-muted);
-  margin-bottom: 24px;
+  font-size: 14px;
+  margin: 0; /* Reset margins first */
+}
+
+/* This styles your Motto and adds the BIG GAP */
+.auth-motto {
+  font-size: 14px;
+  margin-top: 8px; /* Small space after the title */
+  margin-bottom: 60px; /* This is your "4 spaces" gap */
+}
+
+/* This styles the "Welcome" text inside the form */
+.auth-welcome {
+  font-size: 14px;
+  margin-bottom: 24px; /* Sits 1 line above the form */
 }
 
 .auth-motto {
