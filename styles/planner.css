@@ -242,7 +242,7 @@ body.authenticated .app-main-content {
 
 .auth-title {
   /* Styling to match "Access People" (White, Inter font, no symbol) */
-  font-size: 6px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--login-text); 
   margin-bottom: 16px;
@@ -263,8 +263,8 @@ body.authenticated .app-main-content {
 /* This styles your Motto and adds the BIG GAP */
 .auth-motto {
   font-size: 14px;
-  margin-top: 0px; /* Small space after the title */
-  margin-bottom: 32px; /* This is your "4 spaces" gap */
+  margin-top: 8px; /* Small space after the title */
+  margin-bottom: 60px; /* This is your "4 spaces" gap */
 }
 
 /* This styles the "Welcome" text inside the form */
