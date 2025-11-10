@@ -138,7 +138,7 @@ body.authenticated .app-main-content {
 /* --- Banner Side (Left) --- */
 .auth-banner {
   /* width: 50%; CHANGED to 65% */
-  width: 65%;
+  width: 75%;
   background-color: var(--debenhams-teal); 
   display: flex;
   justify-content: center;
@@ -195,7 +195,7 @@ body.authenticated .app-main-content {
 
 .dg-main-text {
   /* font-size: 42px; CHANGED to 96px */
-  font-size: 96px;
+  font-size: 115px;
   font-weight: 700;
   /* font-family: 'Playfair Display', serif; CHANGED to Sans-Serif to match photo style */
   font-family: var(--font-family);
@@ -206,7 +206,7 @@ body.authenticated .app-main-content {
 
 .dg-sub-text {
   /* font-size: 18px; CHANGED to 36px */
-  font-size: 36px;
+  font-size: 45px;
   font-weight: 600;
   font-family: var(--font-family); /* Back to Inter */
   text-transform: uppercase;
@@ -216,7 +216,7 @@ body.authenticated .app-main-content {
 
 /* NEW: Tagline Styling */
 .dg-tagline {
-    font-size: 32px;
+    font-size: 45px;
     font-weight: 400; /* 'FOR EVERYONE' is bolded in HTML, the rest is regular */
     font-family: var(--font-family);
     text-transform: uppercase;
@@ -228,7 +228,7 @@ body.authenticated .app-main-content {
 /* --- Form Side (Right) --- */
 .auth-form-panel {
   /* width: 50%; CHANGED to 35% */
-  width: 35%;
+  width: 25%;
   padding: 60px;
   display: flex;
   flex-direction: column;
@@ -252,7 +252,7 @@ body.authenticated .app-main-content {
 .auth-form-panel p {
   /* color: var(--color-text-muted); CHANGED */
   color: var(--login-text-muted);
-  margin-bottom: 40px;
+  margin-bottom: 16px;
 }
 
 .auth-form label {
@@ -309,7 +309,27 @@ body.authenticated .app-main-content {
     color: var(--color-danger);
     display: none; /* Hidden by default, shown by JS */
 }
+/* NEW: Motto under title */
+.auth-motto {
+  font-size: 14px; /* Matches the 'Welcome' text */
+  color: var(--login-text-muted); /* Matches the 'Welcome' text */
+  margin-top: 0;
+  margin-bottom: 40px; /* This pushes the login form down */
+}
+/* NEW: Inspirational Quote Blockquote (No Bar) */
+.auth-form-panel blockquote {
+  margin: 40px 0; /* Space above and below */
+  padding-left: 0;
+  border-left: none; /* No bar */
+  font-style: italic;
+  font-size: 18px; /* Slightly larger as requested */
+  color: var(--login-text-muted);
+  line-height: 1.6;
+}
 
+.auth-form-panel blockquote p {
+  margin: 0;
+}
 .auth-footer {
     margin-top: auto;
     padding-top: 24px;
