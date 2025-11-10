@@ -6,10 +6,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <style>
-    /* === VARIABLES & CONFIGURATION (Based on WFM Intelligence Platform Styles) === */
+    /* === VARIABLES & CONFIGURATION (Aligned with WFM Intelligence Platform) === */
     :root {
       /* Modern Enterprise Palette (Indigo/Emerald) */
       --brand-primary: #4F46E5; /* Indigo 600 */
@@ -22,6 +22,13 @@
       --color-panel-bg: #FFFFFF;
       --color-border: #E5E7EB;
       --color-hover-bg: #F3F4F6;
+
+       /* Sidebar (Dark) - Matching Planner Portal */
+      --sidebar-bg: #111827;
+      --sidebar-text: #D1D5DB;
+      --sidebar-text-hover: #FFFFFF;
+      --sidebar-border: #1F2937;
+      --sidebar-width: 240px;
       
       --font-family: 'Inter', system-ui, Segoe UI, Roboto, Arial, sans-serif;
       --border-radius: 8px;
@@ -30,12 +37,11 @@
       --emails:#10B981; --mirakl:#F59E0B; --social:#8B5CF6; --whatsapp: #25D366;
       --overtime:#EF4444; --meeting:#3B82F6; --break:#94A3B8; --lunch:#64748B;
       --admin: #6366F1; --default:#475569;
+      --rdo-bg: #F3F4F6;
 
-      /* Debenhams Branding (From planner css.txt) */
+      /* Debenhams Branding (For Login Screen) */
       --debenhams-teal: #70E6D6;
       --debenhams-dark: #000000;
-
-      /* Login Screen Styling (From planner css.txt) */
       --login-bg: #000000;
       --login-text: #FFFFFF;
       --login-text-muted: #9CA3AF;
@@ -44,30 +50,33 @@
       --login-button-green: #22C55E;
     }
 
-    /* === BASE STYLES === */
+    /* === BASE STYLES & LAYOUT === */
     html, body {
         height: 100%;
-        overflow: hidden; /* Prevent scroll on body during auth */
+        margin: 0;
+        overflow: hidden; /* Prevent scroll on body and rely on internal scrolling */
     }
     *{box-sizing:border-box}
-    body{margin:0;background:var(--color-bg);color:var(--color-text);font:14px/1.5 var(--font-family)}
+    body{
+        background:var(--color-bg);
+        color:var(--color-text);
+        font:14px/1.5 var(--font-family);
+        display: flex;
+    }
 
-    /* === AUTHENTICATION OVERLAY (Copied/Adapted from planner css.txt) === */
+    /* === AUTHENTICATION OVERLAY (Identical to Planner) === */
     
     /* Hide main application components initially */
-    #appHeader, #appWrap {
+    .app-sidebar, .app-main-content {
       display: none;
     }
 
     /* Reveal them when the 'authenticated' class is added to the body by JS */
-    body.authenticated #appHeader {
-      display: block;
+    body.authenticated .app-sidebar {
+      display: flex;
     }
-    body.authenticated #appWrap {
-        display: block;
-    }
-    body.authenticated {
-        overflow-y: auto; /* Allow scrolling when app is active */
+    body.authenticated .app-main-content {
+        display: flex;
     }
 
     /* Hide the auth overlay when authenticated */
@@ -75,309 +84,226 @@
         display: none;
     }
 
-    .auth-overlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 9999;
-      display: flex; /* Ensure it's visible when not authenticated */
-    }
-
-    .auth-container {
-      display: flex;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-    }
-
-    /* --- Banner Side (Left) --- */
-    .auth-banner {
-      width: 75%;
-      background-color: var(--debenhams-teal); 
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      position: relative;
-      overflow: hidden;
-    }
-
-    /* Subtle pattern background */
-    .auth-banner::before {
-        content: '';
-        position: absolute;
-        top: 0; left: 0; right: 0; bottom: 0;
-        /* SVG pattern mimicking the geometric style of the banner image (From planner css.txt) */
-        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cdefs%3E%3Cstyle%3E.bee%7Bfill:none;stroke:rgba(255,255,255,0.35);stroke-width:2;%7D%3C/style%3E%3C/defs%3E%3Cg transform='translate(50 50) rotate(5)'%3E%3Cpolygon class='bee' points='0,-12 12,-6 12,6 0,12 -12,6 -12,-6'/%3E%3Cline class='bee' x1='-6' y1='-9' x2='-6' y2='9'/%3E%3Cline class='bee' x1='0' y1='-12' x2='0' y2='12'/%3E%3Cline class='bee' x1='6' y1='-9' x2='6' y2='9'/%3E%3Cpolygon class='bee' points='0,-12 18,-30 30,-18 12,-6'/%3E%3Cpolygon class='bee' points='0,-12 -18,-30 -30,-18 -12,-6'/%3E%3C/g%3E%3C/svg%3E");
-        background-size: 90px 90px;
-        opacity: 0.7;
-    }
-
-    .banner-content {
-        position: relative;
-        z-index: 1;
-        padding: 40px;
-        text-align: center;
-    }
-
-    /* Debenhams Group Logo Recreation */
-    .dg-logo {
-      color: var(--debenhams-dark);
-      margin-bottom: 50px;
-    }
-
-    .dg-text {
-      text-align: center;
-      display: block;
-    }
-
-    .dg-main-text {
-      font-size: 72px;
-      font-weight: 700;
-      font-family: var(--font-family);
-      letter-spacing: -2px;
-      line-height: 1;
-      display: block;
-    }
-
-    .dg-sub-text {
-      font-size: 28px;
-      font-weight: 600;
-      text-transform: uppercase;
-      margin-top: 5px;
-      display: block;
-    }
-
-    .dg-tagline {
-        font-size: 24px;
-        font-weight: 400;
-        text-transform: uppercase;
-        line-height: 1.3;
-        color: var(--debenhams-dark);
-    }
-
-    /* --- Form Side (Right) --- */
-    .auth-form-panel {
-      width: 25%;
-      padding: 60px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      background-color: var(--login-bg);
-      color: var(--login-text);
-    }
-
-    .auth-title {
-      font-size: 24px;
-      font-weight: 600;
-      color: var(--login-text); 
-      margin-bottom: 16px;
-      margin-top: 0;
-    }
-
-    .auth-form-panel p {
-      color: var(--login-text-muted);
-      font-size: 14px;
-      margin: 0;
-    }
-
-    .auth-motto {
-      margin-top: 8px;
-      margin-bottom: 60px;
-    }
-
-    .auth-welcome {
-      margin-bottom: 24px;
-    }
-
-    .form-group {
-        margin-bottom: 16px;
-    }
-
-    .auth-form label {
-        display: block;
-        font-weight: 500;
-        margin-bottom: 8px;
-        color: var(--login-text-muted);
-    }
-
-    /* Input styles for dark mode */
-    .auth-form .form-input {
-      width: 100%;
-      padding: 12px 16px;
-      font-size: 16px;
-      background-color: var(--login-input-bg);
-      border: 1px solid var(--login-input-border);
-      color: var(--login-text);
-      border-radius: var(--border-radius);
-      font-family: var(--font-family);
-    }
-
-    .auth-form .form-input:focus {
-      outline: none;
-      border-color: #FFFFFF; 
-      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
-    }
-
-    .btn-login {
-      padding: 12px 18px;
-      font-size: 16px;
-      font-weight: 600;
-      background-color: var(--login-button-green); 
-      color: white;
-      border: none;
-      border-radius: 30px; /* Pill shape */
-      cursor: pointer;
-      transition: background-color 0.2s;
-      margin-top: 16px;
-      width: 100%;
-    }
-
-    .btn-login:hover {
-      background-color: #16A34A;
-    }
-    .btn-login:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-    }
-
-    /* Improved Feedback Messages */
-    .auth-notice {
-        margin-top: 24px;
-        padding: 12px;
-        border-radius: var(--border-radius);
-        display: none;
-        font-size: 14px;
-    }
-    .auth-notice.success {
-        background-color: #ECFDF5;
-        color: #065F46;
-        border: 1px solid #A7F3D0;
-    }
-    .auth-notice.error {
-        background-color: #FEE2E2;
-        color: #991B1B;
-        border: 1px solid #FCA5A5;
-    }
-
-    .auth-form-panel blockquote {
-      margin: 40px 0;
-      padding-left: 0;
-      border-left: none;
-      font-style: italic;
-      font-size: 16px;
-      color: var(--login-text-muted);
-      line-height: 1.6;
-    }
-
-    .auth-form-panel blockquote p {
-      margin: 0;
-    }
-
-    .auth-footer {
-        margin-top: auto;
-        padding-top: 24px;
-        font-size: 12px;
-        color: var(--login-text-muted);
-        border-top: 1px solid var(--login-input-border);
-    }
-
-    /* Responsive adjustments for the password screen (From planner css.txt) */
-    @media (max-width: 1200px) {
-      .dg-main-text { font-size: 72px; }
-      .dg-sub-text { font-size: 28px; }
-      .dg-tagline { font-size: 24px; }
-    }
+    /* Auth Styling (Condensed for Brevity, matches Planner CSS) */
+    .auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; display: flex; }
+    .auth-container { display: flex; width: 100%; height: 100%; overflow: hidden; }
+    .auth-banner { width: 75%; background-color: var(--debenhams-teal); display: flex; justify-content: center; align-items: center; position: relative; }
+    .auth-banner::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.7; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cdefs%3E%3Cstyle%3E.bee%7Bfill:none;stroke:rgba(255,255,255,0.35);stroke-width:2;%7D%3C/style%3E%3C/defs%3E%3Cg transform='translate(50 50) rotate(5)'%3E%3Cpolygon class='bee' points='0,-12 12,-6 12,6 0,12 -12,6 -12,-6'/%3E%3Cline class='bee' x1='-6' y1='-9' x2='-6' y2='9'/%3E%3Cline class='bee' x1='0' y1='-12' x2='0' y2='12'/%3E%3Cline class='bee' x1='6' y1='-9' x2='6' y2='9'/%3E%3Cpolygon class='bee' points='0,-12 18,-30 30,-18 12,-6'/%3E%3Cpolygon class='bee' points='0,-12 -18,-30 -30,-18 -12,-6'/%3E%3C/g%3E%3C/svg%3E"); background-size: 90px 90px; }
+    .banner-content { position: relative; z-index: 1; text-align: center; color: var(--debenhams-dark); }
+    .dg-main-text { font-size: 72px; font-weight: 700; letter-spacing: -2px; line-height: 1; display: block; }
+    .dg-sub-text { font-size: 28px; font-weight: 600; text-transform: uppercase; margin-top: 5px; display: block; }
+    .dg-tagline { font-size: 24px; font-weight: 400; text-transform: uppercase; margin-top: 50px; }
+    .auth-form-panel { width: 25%; padding: 60px; display: flex; flex-direction: column; justify-content: center; background-color: var(--login-bg); color: var(--login-text); }
+    .auth-title { font-size: 24px; font-weight: 600; margin-bottom: 16px; margin-top: 0; }
+    .auth-form-panel p, .auth-form label { color: var(--login-text-muted); font-size: 14px; }
+    .auth-motto { margin-top: 8px; margin-bottom: 60px; }
+    .auth-welcome { margin-bottom: 24px; }
+    .form-group { margin-bottom: 16px; }
+    .auth-form .form-input { width: 100%; padding: 12px 16px; font-size: 16px; background-color: var(--login-input-bg); border: 1px solid var(--login-input-border); color: var(--login-text); border-radius: var(--border-radius); font-family: var(--font-family); }
+    .auth-form .form-input:focus { outline: none; border-color: #FFF; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2); }
+    .btn-login { padding: 12px 18px; font-size: 16px; font-weight: 600; background-color: var(--login-button-green); color: white; border: none; border-radius: 30px; cursor: pointer; margin-top: 16px; width: 100%; }
+    .btn-login:hover { background-color: #16A34A; }
+    .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+    .auth-notice { margin-top: 24px; padding: 12px; border-radius: var(--border-radius); display: none; font-size: 14px; }
+    .auth-notice.error { background-color: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+    .auth-footer { margin-top: auto; padding-top: 24px; font-size: 12px; color: var(--login-text-muted); border-top: 1px solid var(--login-input-border); }
 
     @media (max-width: 992px) {
       .auth-banner { width: 50%; }
       .auth-form-panel { width: 50%; padding: 40px; }
     }
-
     @media (max-width: 768px) {
-      .auth-container { flex-direction: column; height: 100%; }
+      .auth-container { flex-direction: column; }
       .auth-banner, .auth-form-panel { width: 100%; }
-      .auth-banner { padding: 40px 0; min-height: 40vh; height: auto; }
-      .auth-form-panel { padding: 40px 30px; flex-grow: 1; }
-      .dg-main-text { font-size: 64px; }
-      .dg-sub-text { font-size: 24px; }
-      .dg-tagline { font-size: 20px; }
+      .auth-banner { min-height: 30vh; height: auto; }
+      .dg-main-text { font-size: 48px; }
     }
 
 
-    /* === APPLICATION STYLES === */
-    #appHeader{background:var(--brand-primary);color:#fff;padding:16px 24px;font-weight:600;font-size: 16px;box-shadow: 0 2px 4px rgba(0,0,0,.1);}
-    #appWrap{max-width:1400px;margin:24px auto;padding:0 16px}
+    /* === APPLICATION LAYOUT (Sidebar/Main) === */
     
-    /* === COMPONENTS === */
-    .card{background:var(--color-panel-bg);border:1px solid var(--color-border);border-radius:var(--border-radius);box-shadow:0 1px 3px rgba(0,0,0,.1);padding:20px}
-    .btn{background:var(--brand-accent);color:#fff;border:0;padding:10px 14px;border-radius:var(--border-radius);font-weight:600;cursor:pointer; transition: background 0.2s;}
-    .btn:hover{background: #067550;}
-    .btn:disabled{opacity: 0.6; cursor: not-allowed;}
-    .btn.secondary{background:#E0E7FF;color:var(--brand-primary); border: 1px solid #C7D2FE;}
-    .btn.secondary:hover{background: #C7D2FE;}
-    .btn.ghost{background:#fff;color:var(--color-text-muted);border:1px solid var(--color-border)}
-    .btn.ghost:hover{background: var(--color-hover-bg);}
-    input[type="date"]{border:1px solid var(--color-border);border-radius:var(--border-radius);padding:10px 12px;min-width:200px; font-family: var(--font-family);}
-    .notice{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;padding:12px;border-radius:var(--border-radius);margin:16px 0}
-    .notice.success{background:#ECFDF5;border-color:#A7F3D0;color:#065F46;}
-    .tag{background:#E0E7FF;color:var(--brand-primary);border-radius:999px;padding:6px 12px;font-weight:600; font-size: 13px;}
-    
-    /* === LAYOUT & TOP BAR === */
-    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px; flex-wrap: wrap; gap: 10px;}
-    .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
-    
-    /* === VIEW TOGGLE === */
-    .view-toggle-group {
+    /* --- Sidebar --- */
+    .app-sidebar {
+        width: var(--sidebar-width);
+        background-color: var(--sidebar-bg);
+        color: var(--sidebar-text);
+        flex-direction: column;
+        flex-shrink: 0;
+        border-right: 1px solid var(--sidebar-border);
+        height: 100vh;
+        overflow-y: auto;
+    }
+
+    .sidebar-header {
+        padding: 20px 24px;
+        font-size: 16px;
+        font-weight: 700;
+        color: white;
+        border-bottom: 1px solid var(--sidebar-border);
+    }
+
+    .sidebar-profile {
+        padding: 16px 24px;
+        border-bottom: 1px solid var(--sidebar-border);
+        background-color: rgba(255, 255, 255, 0.03);
+    }
+    #advisorName {
+        font-weight: 600;
+        color: white;
+        display: block;
+    }
+    #userEmail, #teamName {
+        font-size: 13px;
+        color: var(--sidebar-text);
+        display: block;
+    }
+
+    .sidebar-nav {
         display: flex;
-        border: 1px solid var(--color-border);
-        border-radius: var(--border-radius);
-        overflow: hidden;
-        margin-bottom: 20px;
+        flex-direction: column;
+        padding: 16px;
+        gap: 4px;
+        flex-grow: 1;
     }
-    .btn-toggle {
-        padding: 8px 16px;
+
+    .nav-link {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 16px;
         font-size: 14px;
         font-weight: 500;
-        background-color: var(--color-panel-bg);
-        color: var(--color-text-muted);
+        color: var(--sidebar-text);
+        background-color: transparent;
         border: none;
+        border-radius: var(--border-radius);
         cursor: pointer;
-        transition: background 0.2s, color 0.2s;
+        text-align: left;
+        transition: background-color 0.15s, color 0.15s;
     }
-    .btn-toggle:disabled {
-        cursor: not-allowed;
-        opacity: 0.6;
+
+    .nav-link:hover:not(.disabled) {
+        background-color: rgba(255, 255, 255, 0.05);
+        color: var(--sidebar-text-hover);
     }
-    .btn-toggle:hover:not(:disabled) {
-        background-color: var(--color-hover-bg);
-    }
-    .btn-toggle.active {
+
+    .nav-link.active {
         background-color: var(--brand-primary);
         color: white;
     }
 
-    /* === MY ROTA VIEW (Vertical List Layout) === */
-    #myRotaView {
+    .nav-link.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+    .nav-link.disabled .coming-soon-tag {
+        font-style: italic;
+        font-size: 10px;
+        margin-left: auto;
+        background: var(--brand-accent);
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: white;
+    }
+
+    .nav-separator {
+        margin: 16px 16px 8px 16px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #6B7280;
+        text-transform: uppercase;
+    }
+
+    .sidebar-footer {
+        padding: 16px;
+        border-top: 1px solid var(--sidebar-border);
+        margin-top: auto;
+    }
+
+    /* --- Main Content --- */
+    .app-main-content {
+        flex-grow: 1;
+        flex-direction: column;
+        overflow: hidden; /* Important for internal scrolling */
+        height: 100vh;
+    }
+
+    /* Top Bar within Main Content */
+    .top-bar {
+        background-color: var(--color-panel-bg);
+        border-bottom: 1px solid var(--color-border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 24px;
+        flex-shrink: 0;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    /* Content Area (Scrollable) */
+    .content-area {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 24px;
+    }
+
+    .tab-content {
+        display: none;
+    }
+    .tab-content.active {
+        display: block;
+    }
+
+    /* === COMPONENTS === */
+    .card{background:var(--color-panel-bg);border:1px solid var(--color-border);border-radius:var(--border-radius);box-shadow:0 1px 3px rgba(0,0,0,.05);padding:20px}
+    .btn{background:var(--brand-accent);color:#fff;border:0;padding:10px 14px;border-radius:var(--border-radius);font-weight:600;cursor:pointer; transition: background 0.2s; font-family: var(--font-family);}
+    .btn:hover{background: #067550;}
+    .btn:disabled{opacity: 0.6; cursor: not-allowed;}
+    .btn.secondary{background:#E0E7FF;color:var(--brand-primary); border: 1px solid #C7D2FE;}
+    .btn.secondary:hover{background: #C7D2FE;}
+    .btn.ghost{background:transparent;color:var(--sidebar-text);border:1px solid var(--sidebar-border)}
+    .btn.ghost:hover{background: rgba(255,255,255,0.1); color: white;}
+    
+    input[type="date"]{border:1px solid var(--color-border);border-radius:var(--border-radius);padding:10px 12px;min-width:200px; font-family: var(--font-family);}
+    
+    .notice{padding:12px;border-radius:var(--border-radius);margin:16px 0}
+    .notice.success{background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;}
+    .notice.info{background:#EFF6FF;border:1px solid #93C5FD;color:#1E40AF;}
+
+    .tag{background:#E0E7FF;color:var(--brand-primary);border-radius:999px;padding:4px 12px;font-weight:600; font-size: 13px; display: inline-block;}
+    
+    .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+
+    /* === MY ROTA VIEW (Advanced Calendar Grid) === */
+    #myRotaGrid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); /* Creates a responsive grid of cards */
-        gap: 20px;
+        grid-template-columns: repeat(7, 1fr); /* 7 columns for the week */
+        gap: 12px;
     }
     .day-card {
         background: var(--color-panel-bg);
         border: 1px solid var(--color-border);
         border-radius: var(--border-radius);
-        padding: 16px;
-        box-shadow: 0 1px 2px rgba(0,0,0,.05);
+        box-shadow: 0 1px 3px rgba(0,0,0,.05);
+        display: flex;
+        flex-direction: column;
+        min-height: 200px;
     }
+
+    /* Highlight for today's date */
+    .day-card.today {
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
+    }
+
     .day-header {
+        background-color: var(--color-hover-bg);
+        padding: 12px 16px;
         border-bottom: 1px solid var(--color-border);
-        padding-bottom: 12px;
-        margin-bottom: 12px;
+        text-align: center;
     }
     .day-title {
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 700;
         margin: 0;
     }
@@ -385,75 +311,60 @@
         color: var(--color-text-muted);
         font-size: 14px;
     }
+    .day-content {
+        padding: 16px;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
     .rdo-note {
-        padding: 30px 0;
         text-align: center;
         color: var(--color-text-muted);
         font-style: italic;
+        margin: auto;
     }
 
-    /* Timeline Visualization (Horizontal bar within the day card) */
+    .shift-summary {
+        font-size: 18px;
+        font-weight: 800;
+        text-align: center;
+        margin-bottom: 16px;
+        color: var(--color-text);
+    }
+
+     /* Timeline Visualization (Small bar at the bottom) */
     .timeline-viz {
         position: relative;
-        height: 20px;
-        background: #F3F4F6;
-        border-radius: 10px;
-        margin: 16px 0 8px 0;
+        height: 10px;
+        background: #E5E7EB;
+        border-radius: 5px;
+        margin-top: auto;
         overflow: hidden;
     }
     .timeline-segment {
         position: absolute;
         height: 100%;
     }
-    .timeline-labels {
-        display: flex;
-        justify-content: space-between;
-        font-size: 12px;
-        color: var(--color-text-muted);
-    }
 
-    /* Schedule Details List */
-    .schedule-list {
-        list-style: none;
-        padding: 0;
-        margin: 16px 0 0 0;
-    }
-    .schedule-item {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 8px 0;
-        border-top: 1px dashed var(--color-border);
-    }
-    .item-time {
-        font-weight: 600;
-        font-family: monospace;
-        flex-shrink: 0;
-    }
-    .item-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-    }
-    .item-name {
-        flex-grow: 1;
-    }
 
     /* === TEAM SCHEDULE VIEW (Grid) === */
     #teamScheduleView {
         overflow-x: auto;
-        border-top: 1px solid var(--color-border);
-        margin-top: 20px;
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius);
+        background-color: white;
+        box-shadow: 0 1px 3px rgba(0,0,0,.05);
     }
     .team-grid {
         width: 100%;
         border-collapse: collapse;
-        background-color: white;
     }
     .team-grid th, .team-grid td {
         padding: 12px 16px;
         text-align: left;
-        border: 1px solid var(--color-border);
+        border-bottom: 1px solid var(--color-border);
+        border-right: 1px solid var(--color-border);
         min-width: 150px;
         vertical-align: top;
     }
@@ -461,24 +372,8 @@
         background-color: var(--color-hover-bg);
         font-weight: 600;
         color: var(--color-text-muted);
-        position: sticky;
-        top: 0;
-        z-index: 2;
     }
-    /* Sticky first column for better navigation */
-    .team-grid th:first-child, .team-grid td:first-child {
-        position: sticky;
-        left: 0;
-        background-color: var(--color-panel-bg);
-        z-index: 1;
-        min-width: 200px;
-        box-shadow: 2px 0 5px -2px rgba(0,0,0,0.05);
-    }
-    .team-grid th:first-child {
-      background-color: var(--color-hover-bg);
-      z-index: 3;
-    }
-    .team-grid tbody tr:hover td:first-child,
+    
     .team-grid tbody tr:hover {
         background-color: var(--color-hover-bg);
     }
@@ -490,7 +385,7 @@
         display: block;
     }
     .weekly-shift-details {
-        font-size: 12px;
+        font-size: 13px;
         color: var(--color-text-muted);
     }
     .weekly-rdo {
@@ -499,21 +394,41 @@
         font-weight: 500;
     }
 
-    /* === RESPONSIVE (App View) === */
+    /* === Placeholder Content === */
+    .placeholder-content {
+        text-align: center;
+        padding: 50px;
+        border: 2px dashed var(--color-border);
+        border-radius: var(--border-radius);
+        color: var(--color-text-muted);
+    }
+
+
+    /* === RESPONSIVE === */
+    @media (max-width: 1024px) {
+        #myRotaGrid {
+            /* Switch to 3 columns on tablets */
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
     @media (max-width: 768px) {
-        .topbar {
-            flex-direction: column;
-            align-items: stretch;
-        }
-        .bar {
-            justify-content: space-between;
-        }
-        .view-toggle-group {
-            width: 100%;
-        }
-        .btn-toggle {
-            flex-grow: 1;
-            text-align: center;
+      /* App Layout Responsive (Mobile view - Sidebar hidden) */
+      .app-sidebar {
+          display: none !important;
+      }
+      .top-bar {
+          flex-direction: column;
+          align-items: stretch;
+          gap: 10px;
+      }
+      .bar {
+          justify-content: space-between;
+          width: 100%;
+      }
+       #myRotaGrid {
+            /* Switch to single column list view on mobile */
+            grid-template-columns: 1fr;
         }
     }
   </style>
@@ -524,12 +439,8 @@
     <div class="auth-container">
       <div class="auth-banner">
         <div class="banner-content">
-            <div class="dg-logo">
-                <div class="dg-text">
-                    <span class="dg-main-text">Debenhams</span>
-                    <span class="dg-sub-text">GROUP</span>
-                </div>
-            </div>
+            <span class="dg-main-text">Debenhams</span>
+            <span class="dg-sub-text">GROUP</span>
             <div class="dg-tagline">
                 FASHION. BEAUTY. LIFESTYLE.<br>
                 <strong>FOR EVERYONE.</strong>
@@ -541,65 +452,128 @@
         <p class="auth-motto">Powered by WFM Intelligence</p>
 
         <form id="auth-form" class="auth-form">
-            <p class="auth-welcome">Welcome. Please sign in using your work email.</p>
+            <p class="auth-welcome">Welcome. Please sign in.</p>
 
             <div class="form-group">
                 <label for="emailInput">Email Address</label>
                 <input type="email" id="emailInput" class="form-input" placeholder="Enter your work email" autofocus>
             </div>
-            <button type="submit" id="sendLinkBtn" class="btn-login">Send Magic Link</button>
+            <div class="form-group">
+                <label for="passwordInput">Password</label>
+                <input type="password" id="passwordInput" class="form-input" placeholder="Enter your password">
+            </div>
+            <button type="submit" id="signInBtn" class="btn-login">Sign In</button>
         </form>
 
         <div id="authNotice" class="auth-notice"></div>
 
-        <blockquote>
-          <p>"Clarity and communication are the foundations of great service."</p>
-        </blockquote>
-
         <div class="auth-footer">
-            WFM Advisor Portal (v2)
+            WFM Advisor Portal (v4)
         </div>
       </div>
     </div>
   </div>
 
-  <header id="appHeader">WFM Advisor Portal</header>
-  
-  <div id="appWrap">
-    <div id="appBox" class="card" style="padding: 20px;">
-      
-      <div class="topbar">
+  <aside class="app-sidebar">
+    <div class="sidebar-header">
+        WFM Advisor
+    </div>
+    <div class="sidebar-profile">
+        <span id="advisorName">Loading...</span>
+        <span id="teamName" style="display:none;"></span>
+    </div>
+    <nav class="sidebar-nav" id="main-navigation">
+        
+        <div class="nav-separator">SCHEDULE</div>
+
+        <button class="nav-link active" data-tab="tab-my-schedule" title="My Schedule">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <span>My Schedule</span>
+        </button>
+
+        <button class="nav-link" data-tab="tab-team-schedule" id="teamToggleBtn" title="Team Schedule">
+             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <span>Team Schedule</span>
+        </button>
+
+         <div class="nav-separator">REQUESTS &amp; BALANCES</div>
+
+         <button class="nav-link disabled" data-tab="tab-time-off" title="Time Off">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path></svg>
+            <span>Holidays</span>
+            <span class="coming-soon-tag">SOON</span>
+        </button>
+
+        <button class="nav-link disabled" data-tab="tab-shift-swap" title="Shift Swap">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
+            <span>Shift Swap</span>
+            <span class="coming-soon-tag">SOON</span>
+        </button>
+
+        <div class="nav-separator">PERFORMANCE</div>
+        <button class="nav-link disabled" data-tab="tab-metrics" title="My Metrics">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            <span>My Metrics</span>
+            <span class="coming-soon-tag">SOON</span>
+        </button>
+
+    </nav>
+    <div class="sidebar-footer">
+        <button id="signOutBtn" class="btn ghost" style="width: 100%;">Sign out</button>
+    </div>
+  </aside>
+
+  <main class="app-main-content">
+    
+    <div class="top-bar">
         <div class="bar">
-          <span id="userEmail" class="tag"></span>
-          <span id="advisorName" class="tag"></span>
-          <span id="teamName" class="tag" style="display:none;"></span>
+          <h2 style="margin: 0;" id="viewTitle">My Schedule</h2>
         </div>
         <div class="bar">
           <input id="weekStart" type="date" />
-          <button id="prevBtn" class="btn secondary">◀ Prev</button>
-          <button id="nextBtn" class="btn secondary">Next ▶</button>
-          <button id="signOutBtn" class="btn ghost">Sign out</button>
+          <button id="prevBtn" class="btn secondary">◀ Prev Week</button>
+          <button id="nextBtn" class="btn secondary">Next Week ▶</button>
         </div>
-      </div>
+    </div>
+
+    <div class="content-area">
 
        <div id="realtimeNote" class="notice success" style="display:none;">
-            Live Update: The schedule for this week was just updated.
+            Live Update: The schedule data was just updated.
        </div>
+       <div id="infoNote" class="notice info" style="display:none;"></div>
 
-      <div class="view-toggle-group" id="viewToggleGroup">
-            <button class="btn-toggle active" data-view="my-rota">My Rota</button>
-            <button class="btn-toggle" data-view="team-schedule" id="teamToggleBtn">Team Schedule</button>
-      </div>
+        <div id="tab-my-schedule" class="tab-content active">
+            <div id="myRotaGrid">
+                </div>
+        </div>
 
-      <div id="myRotaView" class="view-container">
-          </div>
-      
-      <div id="teamScheduleView" class="view-container" style="display:none;">
-            </div>
+        <div id="tab-team-schedule" class="tab-content">
+             <div id="teamScheduleView">
+                </div>
+        </div>
 
-      <div id="infoNote" class="notice" style="display:none;"></div>
+        <div id="tab-time-off" class="tab-content">
+             <div class="placeholder-content">
+                <h2>Time Off Management (Coming Soon)</h2>
+                <p>View balances and request holidays here in the future.</p>
+             </div>
+         </div>
+         <div id="tab-shift-swap" class="tab-content">
+             <div class="placeholder-content">
+                <h2>Shift Swap (Coming Soon)</h2>
+                <p>Trade shifts with colleagues here in the future.</p>
+             </div>
+         </div>
+          <div id="tab-metrics" class="tab-content">
+             <div class="placeholder-content">
+                <h2>My Metrics (Coming Soon)</h2>
+                <p>View your performance statistics here in the future.</p>
+             </div>
+         </div>
+
     </div>
-  </div>
+  </main>
 
 <script>
 // --- Configuration ---
@@ -608,37 +582,40 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- DOM Elements (ELS) ---
-// Mapped to the new structure
 const ELS = {
-    // Auth Elements
-    authOverlay: document.getElementById("auth-overlay"),
+    // Auth
     authForm: document.getElementById("auth-form"),
     emailInput: document.getElementById("emailInput"),
-    sendLinkBtn: document.getElementById("sendLinkBtn"),
+    passwordInput: document.getElementById("passwordInput"),
+    signInBtn: document.getElementById("signInBtn"),
     authNotice: document.getElementById("authNotice"),
 
-    // App Elements
-    appBox: document.getElementById("appBox"),
-    userEmailTag: document.getElementById("userEmail"),
+    // App Layout & Nav
+    mainNavigation: document.getElementById("main-navigation"),
+    viewTitle: document.getElementById("viewTitle"),
+    
+    // Profile/Header
     advisorNamePill: document.getElementById("advisorName"),
     teamNamePill: document.getElementById("teamName"),
     weekStartInput: document.getElementById("weekStart"),
     prevBtn: document.getElementById("prevBtn"),
     nextBtn: document.getElementById("nextBtn"),
     signOutBtn: document.getElementById("signOutBtn"),
-    myRotaView: document.getElementById("myRotaView"),
-    teamScheduleView: document.getElementById("teamScheduleView"),
-    viewToggleGroup: document.getElementById("viewToggleGroup"),
     teamToggleBtn: document.getElementById("teamToggleBtn"),
+    
+    // Views
+    myRotaGrid: document.getElementById("myRotaGrid"),
+    teamScheduleView: document.getElementById("teamScheduleView"),
     infoNote: document.getElementById("infoNote"),
     realtimeNote: document.getElementById("realtimeNote"),
 };
 
 // --- Constants & Helpers ---
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-// Visualization time range for My Rota view (7 AM to 9 PM)
 const VIZ_START_H = 7, VIZ_END_H = 21;
 const VIZ_DURATION_MIN = (VIZ_END_H - VIZ_START_H) * 60;
+// Get today's date in ISO format for comparison (using local time)
+const TODAY_ISO = new Date().toLocaleDateString('en-CA', {year: 'numeric', month: '2-digit', day: '2-digit'});
 
 // Date Helpers
 function toMonday(d){
@@ -649,11 +626,10 @@ function toMonday(d){
   return x;
 }
 function fmtDateLocal(d){
-  // en-CA locale provides reliable YYYY-MM-DD format
   return d.toLocaleDateString('en-CA', {year: 'numeric', month: '2-digit', day: '2-digit'});
 }
 function fmtDateFriendly(d) {
-    return d.toLocaleDateString("en-GB", { month: "long", day: "numeric" });
+    return d.toLocaleDateString("en-GB", { month: "short", day: "numeric" });
 }
 function addDays(d,n){ const x=new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate()+n); return x; }
 function hhmmToMinutes(t){ 
@@ -661,8 +637,10 @@ function hhmmToMinutes(t){
     const [h,m]=(t.split(":")||["0","0"]).map(Number); 
     return h*60+m; 
 }
+const m2t = m => `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
 
-// Map activity codes to colors
+
+// Color mapping
 function colorForCode(code){
   const k = (code||"").toLowerCase();
   if (k.includes("email")) return "var(--emails)";
@@ -686,41 +664,97 @@ const STATE = {
     teamMembers: [],
     teamMemberIds: new Set(),
     monday: toMonday(new Date()),
-    templates: {},
-    currentView: 'my-rota',
+    definitions: {}, // Centralized store for ALL shift definitions (templates, shift_templates)
+    components: {}, // Store for schedule components (for structure format)
+    currentTab: 'tab-my-schedule',
     currentWeekData: null,
     rotaRealtimeChannel: null,
 };
 
-/* ---- Data Normalization ---- */
+/* ---- Data Normalization (Comprehensive Fix) ---- */
+// Converts templates/shift_templates into detailed segments
 function tplToSegments(t){
-  if(!t || !t.start_time || !t.finish_time) return [];
-  const mins = s => { const [h,m]=String(s).slice(0,5).split(":").map(Number); return h*60+m; };
-  const m2t = m => `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
-  const s = mins(t.start_time), e = mins(t.finish_time);
+  const startTime = t.start_time;
+  const endTime = t.finish_time || t.end_time; 
+
+  if(!t || !startTime || !endTime) return [];
+
+  const mins = s => { 
+    if (!s) return NaN;
+    const [h,m]=String(s).slice(0,5).split(":").map(Number); 
+    return h*60+m; 
+  };
+  
+  const s = mins(startTime), e = mins(endTime);
+  if (isNaN(s) || isNaN(e)) return [];
+
   const breaks = [];
-  // Assuming standard break durations
-  if(t.break1) breaks.push({ at: mins(t.break1), dur: 15, code: "Break" });
-  if(t.lunch)  breaks.push({ at: mins(t.lunch),  dur: 30, code: "Lunch" });
-  if(t.break2) breaks.push({ at: mins(t.break2), dur: 15, code: "Break" });
+  if(t.break1 && !isNaN(mins(t.break1))) breaks.push({ at: mins(t.break1), dur: 15, code: "Break" });
+  if(t.lunch && !isNaN(mins(t.lunch)))  breaks.push({ at: mins(t.lunch),  dur: 30, code: "Lunch" });
+  if(t.break2 && !isNaN(mins(t.break2))) breaks.push({ at: mins(t.break2), dur: 15, code: "Break" });
   
   const events = [{t:s, type:"start"}, ...breaks.map(b=>({t:b.at, type:"pause", dur:b.dur, code:b.code})), {t:e, type:"end"}]
     .sort((a,b)=>a.t-b.t);
+  
   const out=[]; let cur=s;
+  const workCode = t.work_code || "Activity";
+
   for(const ev of events){
-    if(ev.t>cur) out.push({ code: t.work_code || "Activity", start: m2t(cur), end: m2t(ev.t) });
-    if(ev.type==="pause"){ out.push({ code:ev.code, start:m2t(ev.t), end:m2t(ev.t+ev.dur) }); cur=ev.t+ev.dur; }
+    if(ev.t>cur) out.push({ code: workCode, start: m2t(cur), end: m2t(ev.t) });
+    if(ev.type==="pause"){ 
+        out.push({ code:ev.code, start:m2t(ev.t), end:m2t(ev.t+ev.dur) }); 
+        cur=ev.t+ev.dur; 
+    }
   }
   return out;
 }
 
+// Converts planner-style structures (using component_id) into display format
+function structureToSegments(structure) {
+    if (!Array.isArray(structure)) return [];
+    
+    // Ensure sorting by start time
+    const sortedStructure = structure.sort((a, b) => (a.start_min || 0) - (b.start_min || 0));
+
+    return sortedStructure.map(item => {
+        const component = STATE.components[item.component_id];
+        const code = component ? component.name : "Unknown Activity";
+        const start = m2t(item.start_min || 0);
+        
+        let endMin = item.end_min;
+        // Calculate end time if only duration is provided
+        if (endMin === undefined && item.duration_min !== undefined) {
+            endMin = (item.start_min || 0) + item.duration_min;
+        }
+        const end = m2t(endMin || 0);
+
+        return { code, start, end };
+    });
+}
+
+// Ensures rota data is always normalized, handling all potential formats
 function normalizeDayValue(dayVal){
-  if(dayVal && typeof dayVal==="object" && Array.isArray(dayVal.segments)) return dayVal;
-  if(typeof dayVal==="string" && dayVal.trim() !== ""){
-    const tpl = STATE.templates[dayVal.trim()];
-    if(!tpl) return { segments: [] };
-    return { segments: tplToSegments(tpl) };
+  // 1. Handle Planner App/Exception format ({"structure": [...]})
+  if(dayVal && typeof dayVal==="object" && Array.isArray(dayVal.structure)) {
+      return { segments: structureToSegments(dayVal.structure) };
   }
+
+  // 2. Handle legacy/simple segment format ({"segments": [...]})
+  if(dayVal && typeof dayVal==="object" && Array.isArray(dayVal.segments)) {
+      return dayVal;
+  }
+
+  // 3. Handle Template Names or Shift Codes (e.g., "Early" or "8B")
+  if(typeof dayVal==="string" && dayVal.trim() !== ""){
+    const def = STATE.definitions[dayVal.trim()];
+    if(!def) {
+        // console.warn(`Definition not found: ${dayVal.trim()}`);
+        return { segments: [] }; 
+    }
+    return { segments: tplToSegments(def) };
+  }
+  
+  // 4. Handle RDO or empty
   return { segments: [] };
 }
 
@@ -729,15 +763,14 @@ async function init(){
   // 1. Setup Auth UI Events
   setupAuthUIEvents();
 
-  // 2. Load Templates
-  await loadTemplates();
+  // 2. Load Definitions (CRITICAL FIX: Load all required data sources)
+  await Promise.all([loadAllDefinitions(), loadComponents()]);
 
   // 3. Authentication Check
   await supabase.auth.getSession();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user){
-    // Show auth overlay if not authenticated
     document.body.classList.remove('authenticated');
     return;
   }
@@ -757,21 +790,29 @@ async function init(){
 }
 
 function showApp() {
-    // Add 'authenticated' class to body to hide the overlay and show the app content
     document.body.classList.add('authenticated');
-    ELS.userEmailTag.textContent = STATE.user.email;
-    ELS.advisorNamePill.textContent = STATE.advisorName || (STATE.advisorId ? "ID Linked" : "Not Linked");
+    ELS.advisorNamePill.textContent = STATE.advisorName || "Profile Not Linked";
     ELS.weekStartInput.value = fmtDateLocal(STATE.monday);
 }
 
-async function loadTemplates() {
-    const { data, error } = await supabase.from("templates").select("*");
-    if (error) {
-        console.error("Error loading templates:", error);
-    } else {
-      (data||[]).forEach(t=>STATE.templates[t.name]=t);
-    }
+// Load definitions from 'templates' AND 'shift_templates'
+async function loadAllDefinitions() {
+    const [templatesRes, shiftTemplatesRes] = await Promise.all([
+        supabase.from("templates").select("*"),
+        supabase.from("shift_templates").select("*")
+    ]);
+
+    // Merge into STATE.definitions using appropriate keys
+    (templatesRes.data || []).forEach(t => STATE.definitions[t.name] = t);
+    (shiftTemplatesRes.data || []).forEach(t => STATE.definitions[t.code] = t);
 }
+
+// Load components to interpret planner-style structures
+async function loadComponents() {
+    const { data } = await supabase.from("schedule_components").select("id, name");
+    (data||[]).forEach(c => STATE.components[c.id] = c);
+}
+
 
 async function identifyAdvisorAndTeam(user) {
     // 1. Identify Advisor ID
@@ -786,10 +827,11 @@ async function identifyAdvisorAndTeam(user) {
 
     if (!STATE.advisorId) {
         ELS.teamToggleBtn.disabled = true;
+        ELS.teamToggleBtn.classList.add('disabled');
         return;
     }
 
-    // 2. Fetch Advisor Details and Leader ID
+    // 2. Fetch Advisor Details
     const { data: advisorDetails } = await supabase.from("advisors").select("name, leader_id").eq("id", STATE.advisorId).maybeSingle();
 
     if (advisorDetails) {
@@ -799,6 +841,7 @@ async function identifyAdvisorAndTeam(user) {
 
     if (!STATE.leaderId) {
         ELS.teamToggleBtn.disabled = true;
+        ELS.teamToggleBtn.classList.add('disabled');
         return;
     }
 
@@ -820,14 +863,13 @@ async function identifyAdvisorAndTeam(user) {
 
     if (STATE.teamMembers.length <= 1) {
         ELS.teamToggleBtn.disabled = true;
-        ELS.teamToggleBtn.title = "Team view unavailable.";
+        ELS.teamToggleBtn.classList.add('disabled');
     }
 }
 
 function setupAuthUIEvents() {
-    // Use form submission for better accessibility and reliability
     if (ELS.authForm) {
-        ELS.authForm.addEventListener('submit', handleSendLink);
+        ELS.authForm.addEventListener('submit', handleSignInWithPassword);
     }
 }
 
@@ -845,16 +887,34 @@ function setupAppUIEvents() {
         }
     };
 
-    // View Toggle Logic
-    ELS.viewToggleGroup.addEventListener('click', (e) => {
-        const target = e.target.closest('.btn-toggle');
-        if (target && !target.classList.contains('active') && !target.disabled) {
-            STATE.currentView = target.dataset.view;
-            ELS.viewToggleGroup.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active'));
-            target.classList.add('active');
-            renderView();
+    // Navigation Logic (Sidebar)
+    ELS.mainNavigation.addEventListener('click', (e) => {
+        const target = e.target.closest('.nav-link');
+        if (target && !target.classList.contains('active') && !target.classList.contains('disabled')) {
+            const tabId = target.dataset.tab;
+            switchTab(tabId);
         }
     });
+}
+
+function switchTab(tabId) {
+    STATE.currentTab = tabId;
+    // Update navigation active state
+    document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+    const activeLink = document.querySelector(`.nav-link[data-tab="${tabId}"]`);
+    if (activeLink) activeLink.classList.add('active');
+
+    // Update content visibility
+    document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+    const activeTabContent = document.getElementById(tabId);
+    if (activeTabContent) activeTabContent.classList.add('active');
+
+    // Update View Title in Header
+    if (activeLink) {
+         // Find the primary span text (ignoring coming soon tags)
+         const titleSpan = Array.from(activeLink.children).find(el => el.tagName === 'SPAN' && !el.classList.contains('coming-soon-tag'));
+         if (titleSpan) ELS.viewTitle.textContent = titleSpan.textContent;
+    }
 }
 
 function changeWeek(days) {
@@ -864,80 +924,65 @@ function changeWeek(days) {
     restartRealtime();
 }
 
-async function handleSendLink(event){
-  event.preventDefault(); // Prevent form submission navigation
+// Handle Email/Password Sign In
+async function handleSignInWithPassword(event){
+  event.preventDefault();
   ELS.authNotice.style.display = 'none';
   const email = ELS.emailInput.value.trim();
+  const password = ELS.passwordInput.value;
   
-  // Basic validation
-  if (!email || !email.includes('@')) {
-    ELS.authNotice.textContent = "Please enter a valid work email.";
+  if (!email || !password) {
+    ELS.authNotice.textContent = "Please enter both email and password.";
     ELS.authNotice.className = 'auth-notice error';
     ELS.authNotice.style.display = 'block';
     return;
   }
   
-  ELS.sendLinkBtn.disabled = true;
-  ELS.sendLinkBtn.textContent = "Sending...";
+  ELS.signInBtn.disabled = true;
+  ELS.signInBtn.textContent = "Signing In...";
 
   try{
-    // Determine the redirect URL robustly
-    let redirectUrl = undefined;
-    // Handle local file:// protocol where location.origin might be "null"
-    if (location.origin && location.origin !== "null" && location.protocol !== 'file:') {
-        redirectUrl = location.origin + location.pathname;
-    }
-    // If running locally via file://, we omit the redirect URL; the link will still be valid but won't redirect automatically.
-
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: redirectUrl ? { emailRedirectTo: redirectUrl } : undefined
+    const { error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
     });
 
     if (error) throw error;
 
-    // Success
-    ELS.authNotice.textContent = "Magic link sent. Check your inbox (and spam folder).";
-    ELS.authNotice.className = 'auth-notice success';
-    ELS.authNotice.style.display = 'block';
-    ELS.emailInput.value = ''; // Clear input
+    // Success: Reload the page to trigger init() 
+    location.reload();
 
   }catch(e){ 
-    // Failure
-    console.error("Authentication error:", e);
-    let errorMessage = e.message;
-    // User-friendly messages for common errors
-    if (e.message.includes("Rate limit exceeded")) {
-        errorMessage = "Too many requests. Please wait 60 seconds and try again.";
-    }
-    
-    ELS.authNotice.textContent = "Error: " + errorMessage + " (Check SMTP configuration if this persists)";
+    let errorMessage = e.message.includes("Invalid login credentials") ? "Invalid email or password." : e.message;
+    ELS.authNotice.textContent = "Error: " + errorMessage;
     ELS.authNotice.className = 'auth-notice error';
     ELS.authNotice.style.display = 'block';
   }
   finally{ 
-    ELS.sendLinkBtn.disabled = false;
-    ELS.sendLinkBtn.textContent = "Send Magic Link";
+    ELS.signInBtn.disabled = false;
+    ELS.signInBtn.textContent = "Sign In";
   }
 }
 
 async function handleSignOut(){
     await stopRealtime();
     await supabase.auth.signOut();
-    location.href = location.pathname; // Reload page to return to auth screen
+    location.reload();
 }
 
 // --- Main Data Loading Logic ---
 async function loadAndRender(){
     ELS.infoNote.style.display="none";
     if (!STATE.advisorId){
-        ELS.myRotaView.innerHTML = `<div class="notice">Your account isn’t linked to an advisor profile. Please contact the planning team.</div>`;
+        const msg = `<div class="notice info">Your account isn’t linked to an advisor profile. Please contact the planning team.</div>`;
+        ELS.myRotaGrid.innerHTML = msg;
         return;
     }
   
     // Show loading state
-    ELS.myRotaView.innerHTML = `<div class="notice">Loading schedule data...</div>`;
-    ELS.teamScheduleView.innerHTML = `<div class="notice">Loading schedule data...</div>`;
+    const loadingMsg = `<div class="notice info">Loading schedule data...</div>`;
+    ELS.myRotaGrid.innerHTML = loadingMsg;
+    ELS.teamScheduleView.innerHTML = loadingMsg;
 
     const mondayISO = fmtDateLocal(STATE.monday);
 
@@ -951,7 +996,7 @@ async function loadAndRender(){
         advisorIdsToFetch.push(STATE.advisorId);
     }
 
-    // 3. Fetch all relevant rotas in a single query
+    // 3. Fetch all relevant rotas
     const { data: rotas, error } = await supabase
         .from("rotas_published")
         .select("advisor_id, data")
@@ -964,10 +1009,9 @@ async function loadAndRender(){
         ELS.infoNote.style.display = "block";
     }
                 
-    // 4. Normalize the fetched data
+    // 4. Normalize the fetched data (Using the comprehensive normalization)
     (rotas || []).forEach(r => {
         const normalised = {};
-        // Check if r.data exists before iteration
         if (r.data) {
             DAYS.forEach(d => {
                 normalised[d] = normalizeDayValue(r.data[d]);
@@ -987,57 +1031,81 @@ async function loadAndRender(){
         mondayISO: mondayISO
     };
 
-    // 6. Render the currently active view
-    renderView();
+    // 6. Render views
+    renderViews();
 }
 
-// Renders the appropriate view
-function renderView() {
+// Renders the views
+function renderViews() {
     if (!STATE.currentWeekData) return;
 
-    if (STATE.currentView === 'my-rota') {
-        ELS.myRotaView.style.display = 'grid';
-        ELS.teamScheduleView.style.display = 'none';
-        drawMyRotaVertical(STATE.currentWeekData.myRota);
-    } else if (STATE.currentView === 'team-schedule') {
-        ELS.myRotaView.style.display = 'none';
-        ELS.teamScheduleView.style.display = 'block';
-        drawTeamScheduleGrid(STATE.currentWeekData.teamRotas);
-    }
+    drawMyRotaCalendar(STATE.currentWeekData.myRota);
+    drawTeamScheduleGrid(STATE.currentWeekData.teamRotas);
 }
 
-// --- My Rota (Vertical View) Rendering ---
-function drawMyRotaVertical(rotaData){
-  let html = '';
+
+// --- My Rota (Calendar View) Rendering ---
+function drawMyRotaCalendar(rotaData){
   
-  // Check if the object is empty (no rota found for the user for this week)
   if (Object.keys(rotaData).length === 0) {
-      ELS.myRotaView.innerHTML = `<div class="notice">No rota published for this week yet.</div>`;
+      ELS.myRotaGrid.innerHTML = `<div class="notice info">No rota published for this week yet. Check back later.</div>`;
       return;
   }
 
+  let html = '';
+
   DAYS.forEach((dayName, i) => {
     const date = addDays(STATE.monday, i);
+    const dateISO = fmtDateLocal(date);
     const dayData = rotaData[dayName] || { segments: [] };
+    const isToday = dateISO === TODAY_ISO;
     
-    html += `<div class="day-card">
+    html += `<div class="day-card ${isToday ? 'today' : ''}">
                 <div class="day-header">
                     <h2 class="day-title">${dayName}</h2>
                     <p class="day-date">${fmtDateFriendly(date)}</p>
                 </div>
-                ${renderDayContent(dayData.segments)}
+                <div class="day-content">
+                    ${renderDayContent(dayData.segments)}
+                </div>
             </div>`;
   });
 
-  ELS.myRotaView.innerHTML = html;
+  ELS.myRotaGrid.innerHTML = html;
+}
+
+// Helper to determine the main activity summary
+function getMainActivitySummary(segments) {
+    const mainActivities = segments.filter(s => {
+        const code = s.code.toLowerCase();
+        return !code.includes('break') && !code.includes('lunch');
+    }).map(s => s.code);
+    
+    if (mainActivities.length === 0) return "Breaks";
+    
+    if (mainActivities.every(val => val === mainActivities[0])) {
+        return mainActivities[0];
+    } else {
+        return "Mixed Activities";
+    }
 }
 
 function renderDayContent(segments) {
     if (segments.length === 0) {
-        return `<div class="rdo-note">Rest Day Off (RDO)</div>`;
+        return `<div class="rdo-note">RDO</div>`;
     }
 
-    // 1. Timeline Visualization
+    const start = segments[0].start;
+    const end = segments[segments.length - 1].end;
+    const summary = getMainActivitySummary(segments);
+
+    // 1. Summary Block
+    let contentHtml = `<div class="shift-summary">
+                        ${start} - ${end}
+                       </div>
+                       <p style="text-align:center; color: var(--color-text-muted);">${summary}</p>`;
+
+    // 2. Timeline Visualization Bar (Small)
     let vizHtml = `<div class="timeline-viz" title="Visualization from ${VIZ_START_H}:00 to ${VIZ_END_H}:00">`;
     segments.forEach(seg => {
         const startMin = hhmmToMinutes(seg.start);
@@ -1050,27 +1118,12 @@ function renderDayContent(segments) {
         const widthPct = endPct - startPct;
 
         if (widthPct > 0) {
-            vizHtml += `<div class="timeline-segment" style="left: ${startPct}%; width: ${widthPct}%; background: ${colorForCode(seg.code)};" title="${seg.code} (${seg.start} - ${seg.end})"></div>`;
+            vizHtml += `<div class="timeline-segment" style="left: ${startPct}%; width: ${widthPct}%; background: ${colorForCode(seg.code)};"></div>`;
         }
     });
     vizHtml += `</div>`;
-    vizHtml += `<div class="timeline-labels">
-                    <span>${VIZ_START_H.toString().padStart(2,'0')}:00</span>
-                    <span>${VIZ_END_H.toString().padStart(2,'0')}:00</span>
-                </div>`;
 
-    // 2. Detailed List
-    let listHtml = `<ul class="schedule-list">`;
-    segments.forEach(seg => {
-        listHtml += `<li class="schedule-item">
-                        <span class="item-time">${seg.start} - ${seg.end}</span>
-                        <span class="item-dot" style="background: ${colorForCode(seg.code)};"></span>
-                        <span class="item-name">${seg.code}</span>
-                    </li>`;
-    });
-    listHtml += `</ul>`;
-
-    return vizHtml + listHtml;
+    return contentHtml + vizHtml;
 }
 
 // --- Team Schedule (Grid View) Rendering ---
@@ -1086,7 +1139,9 @@ function drawTeamScheduleGrid(teamRotas) {
     // Body Rows
     STATE.teamMembers.forEach(member => {
         const advisorRota = teamRotas[member.id];
-        html += `<tr><td>${member.name}</td>`;
+        // Highlight the current user's row
+        const isCurrentUser = member.id === STATE.advisorId;
+        html += `<tr style="${isCurrentUser ? 'background-color: #F0F9FF;' : ''}"><td>${member.name} ${isCurrentUser ? '<span class="tag">(You)</span>' : ''}</td>`;
         
         if (!advisorRota) {
             DAYS.forEach(() => html += `<td><span class="weekly-rdo">N/A</span></td>`);
@@ -1110,21 +1165,7 @@ function renderTeamGridCell(segments) {
 
     const start = segments[0].start;
     const end = segments[segments.length - 1].end;
-    
-    // Identify main activities
-    const mainActivities = segments.filter(s => {
-        const code = s.code.toLowerCase();
-        return !code.includes('break') && !code.includes('lunch');
-    }).map(s => s.code);
-    
-    let summary = "Activity";
-    if (mainActivities.length > 0) {
-        if (mainActivities.every(val => val === mainActivities[0])) {
-            summary = mainActivities[0];
-        } else {
-            summary = "Mixed Activities";
-        }
-    }
+    const summary = getMainActivitySummary(segments);
 
     return `
         <span class="weekly-shift-time">${start} - ${end}</span>
@@ -1155,11 +1196,7 @@ async function startRealtime(){
           setTimeout(()=>ELS.realtimeNote.style.display="none", 5000);
       }
     })
-    .subscribe((status) => {
-        if (status !== 'SUBSCRIBED') {
-            console.warn('Realtime subscription status:', status);
-        }
-    });
+    .subscribe();
 }
 
 async function stopRealtime() {
