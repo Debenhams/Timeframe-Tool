@@ -172,14 +172,15 @@ body.authenticated .app-main-content {
     /* ADDED: Center the content */
     text-align: center;
 }
-.dg-pre-header {
-  font-size: 24px;
-  font-weight: 500;
+/* NEW: Subtle Motto Style */
+.dg-motto {
+  font-size: 18px; /* Smaller and more subtle */
+  font-weight: 400; /* Regular weight, not bold */
   font-family: var(--font-family);
   color: var(--debenhams-dark);
-  margin-bottom: 24px; /* Space between it and the logo */
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  margin-top: 30px; /* Space below the tagline */
+  line-height: 1.5; /* Good readability */
+  letter-spacing: 0.5px; /* Just a touch of spacing */
 }
 
 /* Debenhams Group Logo Recreation (CSS approximation) */
