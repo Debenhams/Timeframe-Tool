@@ -245,7 +245,7 @@ body.authenticated .app-main-content {
   font-size: 24px;
   font-weight: 600;
   color: var(--login-text); 
-  margin-bottom: 16px;
+  margin-bottom: 4px; /* Tucked up */
   font-family: var(--font-family);
 }
 
@@ -260,8 +260,8 @@ body.authenticated .app-main-content {
 /* This styles your Motto and adds the BIG GAP */
 .auth-motto {
   font-size: 14px;
-  margin-top: 8px; /* Small space after the title */
-  margin-bottom: 60px; /* This is your "4 spaces" gap */
+  margin-top: 0; /* Tucked up */
+  margin-bottom: 32px; /* Removed the large gap */
 }
 
 /* This styles the "Welcome" text inside the form */
@@ -327,11 +327,11 @@ body.authenticated .app-main-content {
 }
 /* NEW: Inspirational Quote Blockquote (No Bar) */
 .auth-form-panel blockquote {
-  margin: 40px 0; /* Space above and below */
+  margin: 24px 0 40px 0; /* Reduced top margin */
   padding-left: 0;
   border-left: none; /* No bar */
   font-style: italic;
-  font-size: 18px; /* Slightly larger as requested */
+  font-size: 22px; /* Made "larger within reason" */
   color: var(--login-text-muted);
   line-height: 1.6;
 }
