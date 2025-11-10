@@ -251,13 +251,10 @@ body.authenticated .app-main-content {
 
 
 /* This styles the text inside the panel */
-.auth-form-panel p.auth-motto {
-  margin-top: 0;
-  margin-bottom: 32px !important; /* Force your 4-space gap */
-}
-
-.auth-title {
-  margin-bottom: 6px; /* small gap between title & motto */
+.auth-form-panel p {
+  color: var(--login-text-muted);
+  font-size: 14px;
+  margin: 0; /* Reset margins first */
 }
 
 /* This styles your Motto and adds the BIG GAP */
