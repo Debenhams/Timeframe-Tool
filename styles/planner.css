@@ -255,7 +255,6 @@ body.authenticated .app-main-content {
   color: var(--login-text-muted);
   margin-bottom: 24px;
 }
-}
 
 .auth-motto {
   margin-top: 0;
