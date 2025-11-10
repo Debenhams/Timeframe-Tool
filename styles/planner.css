@@ -250,10 +250,11 @@ body.authenticated .app-main-content {
 }
 
 
-/* Replaced old .auth-form-panel p rule */
 .auth-form-panel p {
+  /* color: var(--color-text-muted); CHANGED */
   color: var(--login-text-muted);
-  font-size: 14px;
+  margin-bottom: 24px;
+}
 }
 
 .auth-motto {
