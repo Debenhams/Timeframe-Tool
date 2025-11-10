@@ -2,226 +2,572 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Advisor Portal – Weekly Rota</title>
+  <title>WFM Advisor Portal</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <style>
-    :root{
-      --primary:#0d47a1; --bg:#f5f7fb; --card:#ffffff; --text:#1d2433; --muted:#7b8aa0; --border:#e5e9f2; --accent:#00c853;
-      --emails:#2ecc71; --mirakl:#ffb300; --social:#5e35b1; --overtime:#e53935; --meeting:#ffd700; --break:#90a4ae; --lunch:#ff8f00;
+    /* === VARIABLES & CONFIGURATION (Based on WFM Intelligence Platform Styles) === */
+    :root {
+      /* Modern Enterprise Palette (Indigo/Emerald) */
+      --brand-primary: #4F46E5; /* Indigo 600 */
+      --brand-primary-dark: #4338CA;
+      --brand-accent: #059669; /* Emerald 600 */
+      
+      /* Neutrals (Cool Gray) */
+      --color-text: #111827;
+      --color-text-muted: #6B7280;
+      --color-bg: #F9FAFB; 
+      --color-panel-bg: #FFFFFF;
+      --color-border: #E5E7EB;
+      --color-hover-bg: #F3F4F6;
+      
+      --font-family: 'Inter', system-ui, Segoe UI, Roboto, Arial, sans-serif;
+      --border-radius: 8px;
+
+      /* Schedule Colors (Mapped from common activities in the provided data) */
+      --emails:#10B981; /* Emerald 500 */
+      --mirakl:#F59E0B; /* Amber 500 */
+      --social:#8B5CF6; /* Violet 500 */
+      --whatsapp: #25D366; /* Green */
+      --overtime:#EF4444; /* Red 500 */
+      --meeting:#3B82F6; /* Blue 500 */
+      --break:#94A3B8;  /* Slate 400 */
+      --lunch:#64748B;  /* Slate 500 */
+      --admin: #6366F1; /* Indigo 500 */
+      --default:#475569; /* Slate 600 */
     }
+
+    /* === BASE STYLES === */
     *{box-sizing:border-box}
-    body{margin:0;background:var(--bg);color:var(--text);font:14px/1.4 system-ui,Segoe UI,Roboto,Inter,Arial,sans-serif}
-    header{background:var(--primary);color:#fff;padding:14px 18px;font-weight:700}
-    .wrap{max-width:1200px;margin:20px auto;padding:0 16px}
-    .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
-    .tag{background:#e9f2ff;color:#113a8f;border-radius:999px;padding:6px 10px;font-weight:600}
-    .btn{background:var(--accent);color:#fff;border:0;padding:10px 14px;border-radius:8px;font-weight:700;cursor:pointer}
-    .btn.secondary{background:#e7eefc;color:#113a8f}
-    .btn.ghost{background:#fff;color:#113a8f;border:1px solid var(--border)}
-    input[type="email"],input[type="date"]{border:1px solid var(--border);border-radius:8px;padding:10px 12px;min-width:260px}
-    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:12px}
-    .notice{background:#fff3cd;border:1px solid #ffe69c;color:#8a6d3b;padding:10px 12px;border-radius:8px;margin:12px 0}
-    .cal{overflow:auto;border:1px solid var(--border);border-radius:12px;background:#fff}
-    .cal-head{display:grid;grid-template-columns:80px repeat(7,1fr);border-bottom:1px solid var(--border);position:sticky;top:0;background:#fff;z-index:2}
-    .cal-hcell{padding:10px;border-left:1px solid var(--border);text-align:center;font-weight:700}
-    .cal-hcell small{display:block;color:var(--muted);font-weight:600}
-    .cal-body{display:grid;grid-template-columns:80px repeat(7,1fr);position:relative}
-    .time-col{border-right:1px solid var(--border);background:#fafcff}
-    .trow{height:60px;position:relative;border-bottom:1px dashed #e9edf7;color:#9aa7bd;font-size:12px;text-align:right;padding-right:8px}
-    .day-col{position:relative;border-left:1px solid var(--border);border-bottom:1px dashed #eef2f7;min-height:60px}
-    .slot{position:absolute;left:6%;width:88%;border-radius:8px;color:#fff;padding:6px 8px;box-shadow:0 2px 6px rgba(0,0,0,.12);font-size:12px;font-weight:700;display:flex;flex-direction:column;gap:2px}
-    .slot span{font-size:11px;font-weight:600;opacity:.95}
-    .empty-note{padding:32px;text-align:center;color:var(--muted)}
-    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
-    .right{display:flex;gap:8px;align-items:center}
-    .pill{padding:6px 8px;border-radius:8px;background:#eef3ff;color:#0d47a1;font-weight:700}
-    .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
-    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:#fff}
-    .dot{width:12px;height:12px;border-radius:50%}
-    @media (max-width:920px){
-      .cal-head,.cal-body{grid-template-columns:50px repeat(7,1fr)}
-      .trow{height:50px}
+    body{margin:0;background:var(--color-bg);color:var(--color-text);font:14px/1.5 var(--font-family)}
+    header{background:var(--brand-primary);color:#fff;padding:16px 24px;font-weight:600;font-size: 16px;box-shadow: 0 2px 4px rgba(0,0,0,.1);}
+    .wrap{max-width:1400px;margin:24px auto;padding:0 16px}
+    
+    /* === COMPONENTS === */
+    .card{background:var(--color-panel-bg);border:1px solid var(--color-border);border-radius:var(--border-radius);box-shadow:0 1px 3px rgba(0,0,0,.1);padding:20px}
+    .btn{background:var(--brand-accent);color:#fff;border:0;padding:10px 14px;border-radius:var(--border-radius);font-weight:600;cursor:pointer; transition: background 0.2s;}
+    .btn:hover{background: #067550;}
+    .btn:disabled{opacity: 0.6; cursor: not-allowed;}
+    .btn.secondary{background:#E0E7FF;color:var(--brand-primary); border: 1px solid #C7D2FE;}
+    .btn.secondary:hover{background: #C7D2FE;}
+    .btn.ghost{background:#fff;color:var(--color-text-muted);border:1px solid var(--color-border)}
+    .btn.ghost:hover{background: var(--color-hover-bg);}
+    input[type="email"],input[type="date"]{border:1px solid var(--color-border);border-radius:var(--border-radius);padding:10px 12px;min-width:200px; font-family: var(--font-family);}
+    .notice{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;padding:12px;border-radius:var(--border-radius);margin:16px 0}
+    .notice.success{background:#ECFDF5;border-color:#A7F3D0;color:#065F46;}
+    .tag{background:#E0E7FF;color:var(--brand-primary);border-radius:999px;padding:6px 12px;font-weight:600; font-size: 13px;}
+    
+    /* === LAYOUT & TOP BAR === */
+    .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px; flex-wrap: wrap; gap: 10px;}
+    .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+    
+    /* === VIEW TOGGLE === */
+    .view-toggle-group {
+        display: flex;
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius);
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+    .btn-toggle {
+        padding: 8px 16px;
+        font-size: 14px;
+        font-weight: 500;
+        background-color: var(--color-panel-bg);
+        color: var(--color-text-muted);
+        border: none;
+        cursor: pointer;
+        transition: background 0.2s, color 0.2s;
+    }
+    .btn-toggle:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+    .btn-toggle:hover:not(:disabled) {
+        background-color: var(--color-hover-bg);
+    }
+    .btn-toggle.active {
+        background-color: var(--brand-primary);
+        color: white;
+    }
+
+    /* === MY ROTA VIEW (Vertical List Layout) === */
+    #myRotaView {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); /* Creates a responsive grid of cards */
+        gap: 20px;
+    }
+    .day-card {
+        background: var(--color-panel-bg);
+        border: 1px solid var(--color-border);
+        border-radius: var(--border-radius);
+        padding: 16px;
+        box-shadow: 0 1px 2px rgba(0,0,0,.05);
+    }
+    .day-header {
+        border-bottom: 1px solid var(--color-border);
+        padding-bottom: 12px;
+        margin-bottom: 12px;
+    }
+    .day-title {
+        font-size: 18px;
+        font-weight: 700;
+        margin: 0;
+    }
+    .day-date {
+        color: var(--color-text-muted);
+        font-size: 14px;
+    }
+    .rdo-note {
+        padding: 30px 0;
+        text-align: center;
+        color: var(--color-text-muted);
+        font-style: italic;
+    }
+
+    /* Timeline Visualization (Horizontal bar within the day card) */
+    .timeline-viz {
+        position: relative;
+        height: 20px;
+        background: #F3F4F6;
+        border-radius: 10px;
+        margin: 16px 0 8px 0;
+        overflow: hidden;
+    }
+    .timeline-segment {
+        position: absolute;
+        height: 100%;
+    }
+    .timeline-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 12px;
+        color: var(--color-text-muted);
+    }
+
+    /* Schedule Details List */
+    .schedule-list {
+        list-style: none;
+        padding: 0;
+        margin: 16px 0 0 0;
+    }
+    .schedule-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 8px 0;
+        border-top: 1px dashed var(--color-border);
+    }
+    .item-time {
+        font-weight: 600;
+        font-family: monospace;
+        flex-shrink: 0;
+    }
+    .item-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+    .item-name {
+        flex-grow: 1;
+    }
+
+    /* === TEAM SCHEDULE VIEW (Grid) === */
+    #teamScheduleView {
+        overflow-x: auto;
+        border-top: 1px solid var(--color-border);
+        margin-top: 20px;
+    }
+    .team-grid {
+        width: 100%;
+        border-collapse: collapse;
+        background-color: white;
+    }
+    .team-grid th, .team-grid td {
+        padding: 12px 16px;
+        text-align: left;
+        border: 1px solid var(--color-border);
+        min-width: 150px;
+        vertical-align: top;
+    }
+    .team-grid th {
+        background-color: var(--color-hover-bg);
+        font-weight: 600;
+        color: var(--color-text-muted);
+        position: sticky;
+        top: 0;
+        z-index: 2;
+    }
+    /* Sticky first column for better navigation */
+    .team-grid th:first-child, .team-grid td:first-child {
+        position: sticky;
+        left: 0;
+        background-color: var(--color-panel-bg);
+        z-index: 1;
+        min-width: 200px;
+        box-shadow: 2px 0 5px -2px rgba(0,0,0,0.05);
+    }
+    .team-grid th:first-child {
+      background-color: var(--color-hover-bg);
+      z-index: 3;
+    }
+    .team-grid tbody tr:hover td:first-child,
+    .team-grid tbody tr:hover {
+        background-color: var(--color-hover-bg);
+    }
+
+    .weekly-shift-time {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--color-text);
+        display: block;
+    }
+    .weekly-shift-details {
+        font-size: 12px;
+        color: var(--color-text-muted);
+    }
+    .weekly-rdo {
+        font-size: 14px;
+        color: #9CA3AF;
+        font-weight: 500;
+    }
+
+    /* === RESPONSIVE === */
+    @media (max-width: 768px) {
+        .topbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .bar {
+            justify-content: space-between;
+        }
+        .view-toggle-group {
+            width: 100%;
+        }
+        .btn-toggle {
+            flex-grow: 1;
+            text-align: center;
+        }
     }
   </style>
 </head>
 <body>
-  <header>Advisor Portal – Weekly Rota</header>
+  <header>WFM Advisor Portal</header>
   <div class="wrap">
-    <!-- Sign in -->
-    <div id="authBox" class="card" style="display:none">
+    <div id="authBox" class="card" style="display:none; max-width: 450px; margin: 40px auto;">
+      <h2 style="margin-top: 0;">Sign In</h2>
       <div class="bar">
-        <input id="emailInput" type="email" placeholder="Enter your work email…" />
+        <input id="emailInput" type="email" placeholder="Enter your work email…" style="flex-grow: 1;" />
         <button id="sendLinkBtn" class="btn">Send magic link</button>
       </div>
-      <div class="notice">We’ll email you a one-time sign-in link. Check your inbox (and spam).</div>
+      <div class="notice">We’ll email you a one-time sign-in link. Check your inbox.</div>
     </div>
 
-    <!-- App -->
-    <div id="appBox" class="card" style="display:none">
+    <div id="appBox" class="card" style="display:none; padding: 20px;">
+      
       <div class="topbar">
         <div class="bar">
           <span id="userEmail" class="tag"></span>
-          <span id="advisorName" class="pill"></span>
+          <span id="advisorName" class="tag"></span>
+          <span id="teamName" class="tag" style="display:none;"></span>
         </div>
-        <div class="right">
+        <div class="bar">
           <input id="weekStart" type="date" />
-          <button id="prevBtn" class="btn secondary">◀ Prev Week</button>
-          <button id="nextBtn" class="btn secondary">Next Week ▶</button>
+          <button id="prevBtn" class="btn secondary">◀ Prev</button>
+          <button id="nextBtn" class="btn secondary">Next ▶</button>
           <button id="signOutBtn" class="btn ghost">Sign out</button>
         </div>
       </div>
-      <div id="calBox" class="cal"></div>
-      <div class="legend">
-        <span class="chip"><span class="dot" style="background:var(--emails)"></span> Email</span>
-        <span class="chip"><span class="dot" style="background:var(--mirakl)"></span> Mirakl</span>
-        <span class="chip"><span class="dot" style="background:var(--social)"></span> Social</span>
-        <span class="chip"><span class="dot" style="background:var(--meeting)"></span> Meeting</span>
-        <span class="chip"><span class="dot" style="background:var(--overtime)"></span> Overtime</span>
-        <span class="chip"><span class="dot" style="background:var(--break)"></span> Break</span>
-        <span class="chip"><span class="dot" style="background:var(--lunch)"></span> Lunch</span>
+
+       <div id="realtimeNote" class="notice success" style="display:none;">
+            Live Update: The schedule for this week was just updated.
+       </div>
+
+      <div class="view-toggle-group" id="viewToggleGroup">
+            <button class="btn-toggle active" data-view="my-rota">My Rota</button>
+            <button class="btn-toggle" data-view="team-schedule" id="teamToggleBtn">Team Schedule</button>
       </div>
-      <div id="infoNote" class="notice" style="display:none"></div>
+
+      <div id="myRotaView" class="view-container">
+          </div>
+      
+      <div id="teamScheduleView" class="view-container" style="display:none;">
+            </div>
+
+      <div id="infoNote" class="notice" style="display:none;"></div>
     </div>
   </div>
 
 <script>
+// --- Configuration ---
+// Using credentials identified in the provided files (Advisor portal.txt, planner js.txt)
 const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const authBox = document.getElementById("authBox");
-const appBox  = document.getElementById("appBox");
-const emailInput = document.getElementById("emailInput");
-const sendLinkBtn = document.getElementById("sendLinkBtn");
-const userEmailTag = document.getElementById("userEmail");
-const advisorNamePill = document.getElementById("advisorName");
-const weekStartInput = document.getElementById("weekStart");
-const prevBtn = document.getElementById("prevBtn");
-const nextBtn = document.getElementById("nextBtn");
-const signOutBtn = document.getElementById("signOutBtn");
-const calBox = document.getElementById("calBox");
-const infoNote = document.getElementById("infoNote");
+// --- DOM Elements (ELS) ---
+const ELS = {
+    authBox: document.getElementById("authBox"),
+    appBox: document.getElementById("appBox"),
+    emailInput: document.getElementById("emailInput"),
+    sendLinkBtn: document.getElementById("sendLinkBtn"),
+    userEmailTag: document.getElementById("userEmail"),
+    advisorNamePill: document.getElementById("advisorName"),
+    teamNamePill: document.getElementById("teamName"),
+    weekStartInput: document.getElementById("weekStart"),
+    prevBtn: document.getElementById("prevBtn"),
+    nextBtn: document.getElementById("nextBtn"),
+    signOutBtn: document.getElementById("signOutBtn"),
+    myRotaView: document.getElementById("myRotaView"),
+    teamScheduleView: document.getElementById("teamScheduleView"),
+    viewToggleGroup: document.getElementById("viewToggleGroup"),
+    teamToggleBtn: document.getElementById("teamToggleBtn"),
+    infoNote: document.getElementById("infoNote"),
+    realtimeNote: document.getElementById("realtimeNote"),
+};
 
+// --- Constants & Helpers ---
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-const START_H = 7, END_H = 20;
+// Visualization time range for My Rota view (7 AM to 9 PM, covering standard shifts)
+const VIZ_START_H = 7, VIZ_END_H = 21;
+const VIZ_DURATION_MIN = (VIZ_END_H - VIZ_START_H) * 60;
 
-/* ----- DATE HELPERS (LOCAL, no UTC shift) ----- */
+// Date Helpers (using local time for visualization consistency)
 function toMonday(d){
-  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0); // local midnight
-  const dow = x.getDay(); // 0..6 (Sun..Sat)
+  const x = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+  const dow = x.getDay();
   const diff = (dow === 0 ? -6 : 1 - dow);
   x.setDate(x.getDate() + diff);
   return x;
 }
 function fmtDateLocal(d){
-  const y = d.getFullYear();
-  const m = String(d.getMonth()+1).padStart(2,'0');
-  const day = String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${day}`;
+  // en-CA locale provides reliable YYYY-MM-DD format
+  return d.toLocaleDateString('en-CA', {year: 'numeric', month: '2-digit', day: '2-digit'});
+}
+function fmtDateFriendly(d) {
+    return d.toLocaleDateString("en-GB", { month: "long", day: "numeric" });
 }
 function addDays(d,n){ const x=new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate()+n); return x; }
-function hhmmToMinutes(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
+function hhmmToMinutes(t){ 
+    if (!t) return 0;
+    const [h,m]=(t.split(":")||["0","0"]).map(Number); 
+    return h*60+m; 
+}
+
+// Map activity codes to colors defined in CSS variables
 function colorForCode(code){
   const k = (code||"").toLowerCase();
   if (k.includes("email")) return "var(--emails)";
   if (k.includes("mirakl")) return "var(--mirakl)";
+  if (k.includes("whatsapp")) return "var(--whatsapp)";
   if (k.includes("social")) return "var(--social)";
-  if (k.includes("meeting")||k.includes("coach")) return "var(--meeting)";
+  if (k.includes("meeting")||k.includes("coach")||k.includes("121")||k.includes("huddle")||k.includes("training")) return "var(--meeting)";
   if (k.includes("overtime")) return "var(--overtime)";
   if (k.includes("break")) return "var(--break)";
   if (k.includes("lunch")) return "var(--lunch)";
-  return "var(--primary)";
+  if (k.includes("admin") || k.includes("payplus") || k.includes("qa") || k.includes("2nd line")) return "var(--admin)";
+  return "var(--default)";
 }
 
-let sessionUser = null;
-let advisorId = null;
-let advisorName = "";
-let monday = toMonday(new Date());
-let rotaRealtimeChannel = null;
+// --- Application State ---
+const STATE = {
+    user: null,
+    advisorId: null,
+    advisorName: "",
+    leaderId: null,
+    teamMembers: [], // {id, name}
+    teamMemberIds: new Set(), // For efficient lookups
+    monday: toMonday(new Date()),
+    templates: {},
+    currentView: 'my-rota', // 'my-rota' or 'team-schedule'
+    currentWeekData: null,
+    rotaRealtimeChannel: null, // Realtime subscription handler
+};
 
-/* ---- Templates → segments ---- */
+/* ---- Data Normalization (Handles Templates vs Segments) ---- */
+// Converts standard templates (e.g., from templates_rows.csv) into detailed segments
 function tplToSegments(t){
   if(!t || !t.start_time || !t.finish_time) return [];
   const mins = s => { const [h,m]=String(s).slice(0,5).split(":").map(Number); return h*60+m; };
   const m2t = m => `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
   const s = mins(t.start_time), e = mins(t.finish_time);
   const breaks = [];
+  // Assuming standard break durations based on templates_rows.csv structure
   if(t.break1) breaks.push({ at: mins(t.break1), dur: 15, code: "Break" });
   if(t.lunch)  breaks.push({ at: mins(t.lunch),  dur: 30, code: "Lunch" });
   if(t.break2) breaks.push({ at: mins(t.break2), dur: 15, code: "Break" });
+  
   const events = [{t:s, type:"start"}, ...breaks.map(b=>({t:b.at, type:"pause", dur:b.dur, code:b.code})), {t:e, type:"end"}]
     .sort((a,b)=>a.t-b.t);
   const out=[]; let cur=s;
   for(const ev of events){
-    if(ev.t>cur) out.push({ code: t.work_code || "Admin", start: m2t(cur), end: m2t(ev.t) });
+    // Use the defined work_code from the template
+    if(ev.t>cur) out.push({ code: t.work_code || "Activity", start: m2t(cur), end: m2t(ev.t) });
     if(ev.type==="pause"){ out.push({ code:ev.code, start:m2t(ev.t), end:m2t(ev.t+ev.dur) }); cur=ev.t+ev.dur; }
   }
   return out;
 }
-function normalizeDayValue(dayVal, templatesByName){
+
+// Ensures rota data is always in the 'segments' format, regardless of source format
+function normalizeDayValue(dayVal){
+  // If it already has detailed segments (e.g., complex data from rotas_rows.csv)
   if(dayVal && typeof dayVal==="object" && Array.isArray(dayVal.segments)) return dayVal;
-  if(typeof dayVal==="string"){
-    const tpl = templatesByName[dayVal];
-    if(!tpl) return { segments: [] };
+  // If it's a string (template name like 'Early' from rotas_published_rows.csv)
+  if(typeof dayVal==="string" && dayVal.trim() !== ""){
+    const tpl = STATE.templates[dayVal.trim()];
+    if(!tpl) return { segments: [] }; // Template not found
     return { segments: tplToSegments(tpl) };
   }
-  return { segments: [] };
+  return { segments: [] }; // RDO or empty
 }
 
+// --- Initialization & Authentication ---
 async function init(){
+  // 1. Load Templates (necessary for interpreting rotas)
+  await loadTemplates();
+
+  // 2. Authentication Check
   await supabase.auth.getSession();
   const { data: { user } } = await supabase.auth.getUser();
+
   if (!user){
-    authBox.style.display = "";
-    appBox.style.display = "none";
+    showAuth();
     return;
   }
-  sessionUser = user;
-  authBox.style.display = "none";
-  appBox.style.display = "";
-  userEmailTag.textContent = user.email;
 
-  advisorId = null; advisorName = "";
-  const { data: profile } = await supabase
-    .from("profiles").select("advisor_id, role").eq("user_id", user.id).maybeSingle();
-  if (profile && profile.advisor_id){
-    advisorId = profile.advisor_id;
-  } else {
-    const { data: adv } = await supabase
-      .from("advisors")
-      .select("id,name")
-      .ilike("email", user.email)   // case-insensitive email match
-      .maybeSingle();
-    if (adv){ advisorId = adv.id; advisorName = adv.name || ""; }
-  }
-  if (!advisorName && advisorId){
-    const { data: adv2 } = await supabase.from("advisors").select("name").eq("id", advisorId).maybeSingle();
-    advisorName = adv2?.name || "";
-  }
-  advisorNamePill.textContent = advisorName || "Not linked";
+  STATE.user = user;
+  
+  // 3. Identify Advisor and Team
+  await identifyAdvisorAndTeam(user);
 
-  weekStartInput.value = fmtDateLocal(monday);
-  prevBtn.onclick = ()=>{ monday = addDays(monday,-7); weekStartInput.value = fmtDateLocal(monday); loadAndRender(); restartRealtime(); };
-  nextBtn.onclick = ()=>{ monday = addDays(monday,7);  weekStartInput.value = fmtDateLocal(monday); loadAndRender(); restartRealtime(); };
-  weekStartInput.onchange = ()=>{
-    // parse at LOCAL midnight to avoid UTC shift
-    const parts = weekStartInput.value.split("-");
-    const d = new Date(Number(parts[0]), Number(parts[1])-1, Number(parts[2]), 0, 0, 0, 0);
-    monday = toMonday(d);
-    loadAndRender(); restartRealtime();
-  };
-  signOutBtn.onclick = async ()=>{ await supabase.auth.signOut(); location.href = location.pathname; };
-
+  // 4. Setup UI Controls
+  setupUIEvents();
+  
+  // 5. Show App, Initial Render, and Start Realtime
+  showApp();
   await loadAndRender();
   await startRealtime();
 }
 
-sendLinkBtn.onclick = async ()=>{
-  const email = emailInput.value.trim();
+function showAuth() {
+    ELS.authBox.style.display = "block";
+    ELS.appBox.style.display = "none";
+}
+
+function showApp() {
+    ELS.authBox.style.display = "none";
+    ELS.appBox.style.display = "block";
+    ELS.userEmailTag.textContent = STATE.user.email;
+    ELS.advisorNamePill.textContent = STATE.advisorName || (STATE.advisorId ? "ID Linked" : "Not Linked");
+    ELS.weekStartInput.value = fmtDateLocal(STATE.monday);
+}
+
+async function loadTemplates() {
+    const { data, error } = await supabase.from("templates").select("*");
+    if (error) {
+        console.error("Error loading templates:", error);
+    } else {
+      (data||[]).forEach(t=>STATE.templates[t.name]=t);
+    }
+}
+
+async function identifyAdvisorAndTeam(user) {
+    // 1. Identify Advisor ID (Check profiles table, then fallback to email match in advisors table)
+    const { data: profile } = await supabase.from("profiles").select("advisor_id").eq("user_id", user.id).maybeSingle();
+
+    if (profile && profile.advisor_id){
+        STATE.advisorId = profile.advisor_id;
+    } else {
+        // Fallback: match by email (case-insensitive)
+        const { data: adv } = await supabase.from("advisors").select("id").ilike("email", user.email).maybeSingle();
+        if (adv) STATE.advisorId = adv.id;
+    }
+
+    if (!STATE.advisorId) {
+        ELS.teamToggleBtn.disabled = true;
+        return;
+    }
+
+    // 2. Fetch Advisor Details and Leader ID
+    const { data: advisorDetails } = await supabase.from("advisors").select("name, leader_id").eq("id", STATE.advisorId).maybeSingle();
+
+    if (advisorDetails) {
+        STATE.advisorName = advisorDetails.name;
+        STATE.leaderId = advisorDetails.leader_id;
+    }
+
+    if (!STATE.leaderId) {
+        ELS.teamToggleBtn.disabled = true;
+        return;
+    }
+
+    // 3. Fetch Team Members and Leader Name
+    const [teamRes, leaderRes] = await Promise.all([
+        supabase.from("advisors").select("id, name").eq("leader_id", STATE.leaderId).order('name'),
+        supabase.from("leaders").select("name").eq("id", STATE.leaderId).maybeSingle()
+    ]);
+
+    if (teamRes.data) {
+        STATE.teamMembers = teamRes.data;
+        STATE.teamMemberIds = new Set(teamRes.data.map(t => t.id));
+    }
+    
+    if (leaderRes.data) {
+        ELS.teamNamePill.textContent = `Team: ${leaderRes.data.name}`;
+        ELS.teamNamePill.style.display = '';
+    }
+
+    // Disable team toggle if advisor is alone
+    if (STATE.teamMembers.length <= 1) {
+        ELS.teamToggleBtn.disabled = true;
+        ELS.teamToggleBtn.title = "Team view unavailable.";
+    }
+}
+
+function setupUIEvents() {
+    ELS.sendLinkBtn.onclick = handleSendLink;
+    ELS.signOutBtn.onclick = handleSignOut;
+
+    ELS.prevBtn.onclick = () => changeWeek(-7);
+    ELS.nextBtn.onclick = () => changeWeek(7);
+    
+    ELS.weekStartInput.onchange = ()=>{
+        // Parse date input safely at local midnight
+        const d = new Date(ELS.weekStartInput.value + "T00:00:00");
+        if (!isNaN(d.getTime())) {
+             STATE.monday = toMonday(d);
+             loadAndRender();
+             restartRealtime();
+        }
+    };
+
+    // View Toggle Logic
+    ELS.viewToggleGroup.addEventListener('click', (e) => {
+        const target = e.target.closest('.btn-toggle');
+        if (target && !target.classList.contains('active') && !target.disabled) {
+            STATE.currentView = target.dataset.view;
+            ELS.viewToggleGroup.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active'));
+            target.classList.add('active');
+            renderView(); // Only need to render, data is already loaded
+        }
+    });
+}
+
+// Navigation requires restarting the realtime connection for the new week
+function changeWeek(days) {
+    STATE.monday = addDays(STATE.monday, days);
+    ELS.weekStartInput.value = fmtDateLocal(STATE.monday);
+    loadAndRender();
+    restartRealtime();
+}
+
+async function handleSendLink(){
+  const email = ELS.emailInput.value.trim();
   if (!email) return alert("Please enter your work email.");
-  sendLinkBtn.disabled = true;
+  ELS.sendLinkBtn.disabled = true;
   try{
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -230,140 +576,277 @@ sendLinkBtn.onclick = async ()=>{
     if (error) throw error;
     alert("Magic link sent. Check your inbox.");
   }catch(e){ alert("Error: "+e.message); }
-  finally{ sendLinkBtn.disabled = false; }
-};
+  finally{ ELS.sendLinkBtn.disabled = false; }
+}
 
+async function handleSignOut(){
+    await stopRealtime();
+    await supabase.auth.signOut();
+    location.href = location.pathname;
+}
+
+// --- Main Data Loading Logic ---
+// Fetches all necessary data for the current week (My Rota + Team Rotas)
 async function loadAndRender(){
-  calBox.innerHTML = ""; infoNote.style.display="none";
-  if (!advisorId){
-    calBox.innerHTML = `<div class="empty-note">Your account isn’t linked to an advisor yet. Ask planning to link your email to your advisor profile.</div>`;
-    return;
-  }
-  const mondayISO = fmtDateLocal(monday);
+    ELS.infoNote.style.display="none";
+    if (!STATE.advisorId){
+        ELS.myRotaView.innerHTML = `<div class="notice">Your account isn’t linked to an advisor profile. Please contact the planning team.</div>`;
+        return;
+    }
+  
+    // Show loading state
+    ELS.myRotaView.innerHTML = `<div class="notice">Loading schedule data...</div>`;
+    ELS.teamScheduleView.innerHTML = `<div class="notice">Loading schedule data...</div>`;
 
-  const { data: pub, error: e1 } = await supabase
-    .from("rotas_published")
-    .select("data")
-    .eq("advisor_id", advisorId)
-    .eq("week_start", mondayISO)
-    .maybeSingle();
+    const mondayISO = fmtDateLocal(STATE.monday);
 
-  renderSkeleton();
+    // 1. Prepare data structures
+    const normalisedMyRota = {};
+    const normalisedTeamRotas = {};
 
-  if(e1){
-    infoNote.style.display="";
-    infoNote.textContent = "Error loading published rota: " + e1.message;
-    return;
-  }
-  if (!pub || !pub.data){
-    infoNote.style.display="";
-    infoNote.textContent = `No published rota for this week yet. (advisor_id=${advisorId}, week_start=${mondayISO})`;
-    return;
-  }
+    // 2. Identify IDs to fetch (Self + Team)
+    // Use the Set for efficient unique list of IDs
+    const advisorIdsToFetch = Array.from(STATE.teamMemberIds);
+    if (advisorIdsToFetch.length === 0 && STATE.advisorId) {
+        advisorIdsToFetch.push(STATE.advisorId);
+    }
 
-  const { data: tplRows, error: e2 } = await supabase
-    .from("templates")
-    .select("name, work_code, start_time, finish_time, break1, lunch, break2");
 
-  if(e2){
-    infoNote.style.display="";
-    infoNote.textContent = "Error loading templates: " + e2.message;
-    return;
-  }
+    // 3. Fetch all relevant rotas in a single query from rotas_published
+    const { data: rotas, error } = await supabase
+        .from("rotas_published")
+        .select("advisor_id, data")
+        .in("advisor_id", advisorIdsToFetch)
+        .eq("week_start", mondayISO);
 
-  const TPL = {}; (tplRows||[]).forEach(t=>TPL[t.name]=t);
-  const normalised = {};
-  DAYS.forEach(d=>{ normalised[d] = normalizeDayValue(pub.data[d], TPL); });
-  drawRota(normalised);
-}
-
-function renderSkeleton(){
-  const head = document.createElement("div");
-  head.className = "cal-head";
-  head.innerHTML = `<div class="cal-hcell"> </div>`;
-  for (let i=0;i<7;i++){
-    const d = addDays(monday,i);
-    head.innerHTML += `<div class="cal-hcell"><small>${d.toLocaleString("en-GB",{month:"long"})}</small>${DAYS[i]}<br><small>${d.getDate()}</small></div>`;
-  }
-  calBox.appendChild(head);
-
-  const body = document.createElement("div");
-  body.className="cal-body";
-  for (let h=START_H; h<=END_H; h++){
-    const t = document.createElement("div");
-    t.className="trow";
-    t.textContent = String(h).padStart(2,"0")+":00";
-    body.appendChild(t);
-  }
-  for (let i=0;i<7;i++){
-    const col = document.createElement("div");
-    col.className="day-col";
-    col.dataset.dayIndex = i;
-    col.style.gridColumn = (i+2);
-    col.style.gridRow = `1 / span ${END_H-START_H+1}`;
-    body.appendChild(col);
-  }
-  const timeCol = document.createElement("div");
-  timeCol.className="time-col";
-  timeCol.style.gridColumn = "1";
-  timeCol.style.gridRow = `1 / span ${END_H-START_H+1}`;
-  timeCol.style.position="relative";
-  body.insertBefore(timeCol, body.firstChild);
-  calBox.appendChild(body);
-}
-
-function drawRota(json){
-  const body = calBox.querySelector(".cal-body");
-  const dayCols = [...body.querySelectorAll(".day-col")];
-  const pxPerMin = 60/60;
-  dayCols.forEach((col, i)=>{
-    const dayName = DAYS[i];
-    const dayData = json[dayName];
-    if (!dayData || !dayData.segments) return;
-    dayData.segments.forEach(seg=>{
-      const startM = Math.max(0, hhmmToMinutes(seg.start||"07:00") - START_H*60);
-      const endM   = Math.min((END_H-START_H)*60, hhmmToMinutes(seg.end||"07:10") - START_H*60);
-      const top = startM * pxPerMin;
-      const height = Math.max(10, (endM - startM) * pxPerMin);
-      const el = document.createElement("div");
-      el.className="slot";
-      el.style.top = `${top}px`;
-      el.style.height = `${height}px`;
-      el.style.background = colorForCode(seg.code||"");
-      el.innerHTML = `<div>${(seg.code||"").toUpperCase()}</div><span>${(seg.start||"")} – ${(seg.end||"")}</span>`;
-      col.appendChild(el);
-    });
-  });
-}
-
-async function startRealtime(){
-  if (!advisorId) return;
-  const mondayISO = fmtDateLocal(monday);
-  rotaRealtimeChannel = supabase.channel(`rotas_pub_${advisorId}_${mondayISO}`)
-    .on("postgres_changes",
-      { event:"*", schema:"public", table:"rotas_published", filter:`advisor_id=eq.${advisorId}` },
-      payload=>{
-        const wk = payload.new?.week_start || payload.old?.week_start;
-        if (wk !== mondayISO) return;
-        if (payload.eventType === "DELETE"){
-          calBox.innerHTML = `<div class="empty-note">This week has no published rota.</div>`;
-          return;
+    if (error) {
+        console.error("Error loading rotas:", error);
+        ELS.infoNote.textContent = "Error loading schedule data.";
+        ELS.infoNote.style.display = "block";
+    }
+                
+    // 4. Normalize the fetched data
+    (rotas || []).forEach(r => {
+        const normalised = {};
+        DAYS.forEach(d => {
+            normalised[d] = normalizeDayValue(r.data[d]);
+        });
+        
+        if (r.advisor_id === STATE.advisorId) {
+            Object.assign(normalisedMyRota, normalised);
         }
-        loadAndRender();
-      })
-    .subscribe();
-}
-function restartRealtime(){
-  if (rotaRealtimeChannel) supabase.removeChannel(rotaRealtimeChannel);
-  startRealtime();
+        normalisedTeamRotas[r.advisor_id] = normalised;
+    });
+
+    // 5. Store normalized data in state
+    STATE.currentWeekData = {
+        myRota: normalisedMyRota,
+        teamRotas: normalisedTeamRotas,
+        mondayISO: mondayISO
+    };
+
+    // 6. Render the currently active view
+    renderView();
 }
 
-(async function boot(){
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user){ authBox.style.display = ""; appBox.style.display = "none"; }
-  else { authBox.style.display = "none"; appBox.style.display = ""; }
-  await init();
-})();
+// Renders the appropriate view based on the current state
+function renderView() {
+    if (!STATE.currentWeekData) return;
+
+    if (STATE.currentView === 'my-rota') {
+        ELS.myRotaView.style.display = 'grid';
+        ELS.teamScheduleView.style.display = 'none';
+        drawMyRotaVertical(STATE.currentWeekData.myRota);
+    } else if (STATE.currentView === 'team-schedule') {
+        ELS.myRotaView.style.display = 'none';
+        ELS.teamScheduleView.style.display = 'block';
+        drawTeamScheduleGrid(STATE.currentWeekData.teamRotas);
+    }
+}
+
+// --- My Rota (Vertical View) Rendering ---
+function drawMyRotaVertical(rotaData){
+  let html = '';
+  
+  if (Object.keys(rotaData).length === 0) {
+      ELS.myRotaView.innerHTML = `<div class="notice">No rota published for this week yet.</div>`;
+      return;
+  }
+
+  DAYS.forEach((dayName, i) => {
+    const date = addDays(STATE.monday, i);
+    const dayData = rotaData[dayName] || { segments: [] };
+    
+    html += `<div class="day-card">
+                <div class="day-header">
+                    <h2 class="day-title">${dayName}</h2>
+                    <p class="day-date">${fmtDateFriendly(date)}</p>
+                </div>
+                ${renderDayContent(dayData.segments)}
+            </div>`;
+  });
+
+  ELS.myRotaView.innerHTML = html;
+}
+
+function renderDayContent(segments) {
+    if (segments.length === 0) {
+        return `<div class="rdo-note">Rest Day Off (RDO)</div>`;
+    }
+
+    // 1. Timeline Visualization (Horizontal Bar)
+    let vizHtml = `<div class="timeline-viz" title="Visualization from ${VIZ_START_H}:00 to ${VIZ_END_H}:00">`;
+    segments.forEach(seg => {
+        const startMin = hhmmToMinutes(seg.start);
+        const endMin = hhmmToMinutes(seg.end);
+        const vizStartMin = VIZ_START_H * 60;
+
+        // Calculate position and width percentage within the visualization range
+        const startPct = Math.max(0, ((startMin - vizStartMin) / VIZ_DURATION_MIN) * 100);
+        const endPct = Math.min(100, ((endMin - vizStartMin) / VIZ_DURATION_MIN) * 100);
+        const widthPct = endPct - startPct;
+
+        if (widthPct > 0) {
+            vizHtml += `<div class="timeline-segment" style="left: ${startPct}%; width: ${widthPct}%; background: ${colorForCode(seg.code)};" title="${seg.code} (${seg.start} - ${seg.end})"></div>`;
+        }
+    });
+    vizHtml += `</div>`;
+    // Add labels for the visualization range
+    vizHtml += `<div class="timeline-labels">
+                    <span>${VIZ_START_H.toString().padStart(2,'0')}:00</span>
+                    <span>${VIZ_END_H.toString().padStart(2,'0')}:00</span>
+                </div>`;
+
+    // 2. Detailed List
+    let listHtml = `<ul class="schedule-list">`;
+    segments.forEach(seg => {
+        listHtml += `<li class="schedule-item">
+                        <span class="item-time">${seg.start} - ${seg.end}</span>
+                        <span class="item-dot" style="background: ${colorForCode(seg.code)};"></span>
+                        <span class="item-name">${seg.code}</span>
+                    </li>`;
+    });
+    listHtml += `</ul>`;
+
+    return vizHtml + listHtml;
+}
+
+// --- Team Schedule (Grid View) Rendering ---
+function drawTeamScheduleGrid(teamRotas) {
+    let html = `<table class="team-grid"><thead><tr><th>Advisor</th>`;
+    // Header Row (Days)
+    DAYS.forEach((dayName, i) => {
+        const date = addDays(STATE.monday, i);
+        html += `<th>${dayName}<br><small>${fmtDateFriendly(date)}</small></th>`;
+    });
+    html += `</tr></thead><tbody>`;
+
+    // Body Rows (Advisors)
+    STATE.teamMembers.forEach(member => {
+        const advisorRota = teamRotas[member.id];
+        html += `<tr><td>${member.name}</td>`;
+        
+        if (!advisorRota) {
+            // Handle case where rota might not be published for this team member
+            DAYS.forEach(() => html += `<td><span class="weekly-rdo">N/A</span></td>`);
+        } else {
+            DAYS.forEach(dayName => {
+                const dayData = advisorRota[dayName] || { segments: [] };
+                html += `<td>${renderTeamGridCell(dayData.segments)}</td>`;
+            });
+        }
+        html += `</tr>`;
+    });
+
+    html += `</tbody></table>`;
+    ELS.teamScheduleView.innerHTML = html;
+}
+
+function renderTeamGridCell(segments) {
+    if (segments.length === 0) {
+        return `<span class="weekly-rdo">RDO</span>`;
+    }
+
+    const start = segments[0].start;
+    const end = segments[segments.length - 1].end;
+    
+    // Identify main activities (excluding breaks/lunch) for a summary
+    const mainActivities = segments.filter(s => {
+        const code = s.code.toLowerCase();
+        return !code.includes('break') && !code.includes('lunch');
+    }).map(s => s.code);
+    
+    let summary = "Activity"; // Default
+    if (mainActivities.length > 0) {
+        // If all main activities are the same, use that name; otherwise use "Mixed".
+        if (mainActivities.every(val => val === mainActivities[0])) {
+            summary = mainActivities[0];
+        } else {
+            summary = "Mixed Activities";
+        }
+    }
+
+    return `
+        <span class="weekly-shift-time">${start} - ${end}</span>
+        <span class="weekly-shift-details">${summary}</span>
+    `;
+}
+
+// --- Real-Time Updates ---
+
+// Subscribe to changes for the currently viewed week
+async function startRealtime(){
+  if (!STATE.advisorId) return;
+  const mondayISO = fmtDateLocal(STATE.monday);
+  
+  // Subscribe to any changes in the rotas_published table where the week_start matches the current view.
+  // This covers updates for the individual and the entire team if they are viewing this week.
+  STATE.rotaRealtimeChannel = supabase.channel(`rotas_pub_week_${mondayISO}`)
+    .on("postgres_changes", {
+      event: "*", // INSERT, UPDATE, DELETE
+      schema: "public",
+      table: "rotas_published",
+      filter: `week_start=eq.${mondayISO}`
+    }, (payload)=>{
+      console.log("Realtime update received.", payload);
+      
+      // Check if the update affects the current user or their team
+      const affectedAdvisorId = payload.new?.advisor_id || payload.old?.advisor_id;
+      // Use the Set for efficient checking
+      const isRelevant = STATE.advisorId === affectedAdvisorId || STATE.teamMemberIds.has(affectedAdvisorId);
+
+      if (isRelevant) {
+          // Refresh the data and view
+          loadAndRender(); 
+          ELS.realtimeNote.style.display = "block";
+          // Hide notification after 5 seconds
+          setTimeout(()=>ELS.realtimeNote.style.display="none", 5000);
+      }
+    })
+    .subscribe((status) => {
+        if (status !== 'SUBSCRIBED') {
+            console.warn('Realtime subscription status:', status);
+        }
+    });
+}
+
+// Stop the realtime connection
+async function stopRealtime() {
+    if (STATE.rotaRealtimeChannel) {
+        await supabase.removeChannel(STATE.rotaRealtimeChannel);
+        STATE.rotaRealtimeChannel = null;
+    }
+}
+
+// Unsubscribe from the previous week and subscribe to the new week
+async function restartRealtime(){
+  await stopRealtime();
+  await startRealtime();
+}
+
+// Initialize the application
+document.addEventListener('DOMContentLoaded', init);
+
 </script>
 </body>
 </html>
