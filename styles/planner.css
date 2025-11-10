@@ -1292,3 +1292,10 @@ tbody tr:hover {
     background-color: #c82333; /* Darker red */
     border-color: #bd2130;     /* <--- THIS IS THE FIXED LINE */
 }
+/* Crisp login panel fix for blur over moving backgrounds */
+.login-panel {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transform: translateZ(0);
+  will-change: transform;
+}
