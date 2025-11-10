@@ -13,7 +13,6 @@
     :root {
       /* Modern Enterprise Palette (Indigo/Emerald) */
       --brand-primary: #4F46E5; /* Indigo 600 */
-      --brand-primary-dark: #4338CA;
       --brand-accent: #059669; /* Emerald 600 */
       
       /* Neutrals (Cool Gray) */
@@ -27,24 +26,289 @@
       --font-family: 'Inter', system-ui, Segoe UI, Roboto, Arial, sans-serif;
       --border-radius: 8px;
 
-      /* Schedule Colors (Mapped from common activities in the provided data) */
-      --emails:#10B981; /* Emerald 500 */
-      --mirakl:#F59E0B; /* Amber 500 */
-      --social:#8B5CF6; /* Violet 500 */
-      --whatsapp: #25D366; /* Green */
-      --overtime:#EF4444; /* Red 500 */
-      --meeting:#3B82F6; /* Blue 500 */
-      --break:#94A3B8;  /* Slate 400 */
-      --lunch:#64748B;  /* Slate 500 */
-      --admin: #6366F1; /* Indigo 500 */
-      --default:#475569; /* Slate 600 */
+      /* Schedule Colors */
+      --emails:#10B981; --mirakl:#F59E0B; --social:#8B5CF6; --whatsapp: #25D366;
+      --overtime:#EF4444; --meeting:#3B82F6; --break:#94A3B8; --lunch:#64748B;
+      --admin: #6366F1; --default:#475569;
+
+      /* Debenhams Branding (From planner css.txt) */
+      --debenhams-teal: #70E6D6;
+      --debenhams-dark: #000000;
+
+      /* Login Screen Styling (From planner css.txt) */
+      --login-bg: #000000;
+      --login-text: #FFFFFF;
+      --login-text-muted: #9CA3AF;
+      --login-input-bg: #1F2937;
+      --login-input-border: #374151;
+      --login-button-green: #22C55E;
     }
 
     /* === BASE STYLES === */
+    html, body {
+        height: 100%;
+        overflow: hidden; /* Prevent scroll on body during auth */
+    }
     *{box-sizing:border-box}
     body{margin:0;background:var(--color-bg);color:var(--color-text);font:14px/1.5 var(--font-family)}
-    header{background:var(--brand-primary);color:#fff;padding:16px 24px;font-weight:600;font-size: 16px;box-shadow: 0 2px 4px rgba(0,0,0,.1);}
-    .wrap{max-width:1400px;margin:24px auto;padding:0 16px}
+
+    /* === AUTHENTICATION OVERLAY (Copied/Adapted from planner css.txt) === */
+    
+    /* Hide main application components initially */
+    #appHeader, #appWrap {
+      display: none;
+    }
+
+    /* Reveal them when the 'authenticated' class is added to the body by JS */
+    body.authenticated #appHeader {
+      display: block;
+    }
+    body.authenticated #appWrap {
+        display: block;
+    }
+    body.authenticated {
+        overflow-y: auto; /* Allow scrolling when app is active */
+    }
+
+    /* Hide the auth overlay when authenticated */
+    body.authenticated #auth-overlay {
+        display: none;
+    }
+
+    .auth-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 9999;
+      display: flex; /* Ensure it's visible when not authenticated */
+    }
+
+    .auth-container {
+      display: flex;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* --- Banner Side (Left) --- */
+    .auth-banner {
+      width: 75%;
+      background-color: var(--debenhams-teal); 
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Subtle pattern background */
+    .auth-banner::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        /* SVG pattern mimicking the geometric style of the banner image (From planner css.txt) */
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cdefs%3E%3Cstyle%3E.bee%7Bfill:none;stroke:rgba(255,255,255,0.35);stroke-width:2;%7D%3C/style%3E%3C/defs%3E%3Cg transform='translate(50 50) rotate(5)'%3E%3Cpolygon class='bee' points='0,-12 12,-6 12,6 0,12 -12,6 -12,-6'/%3E%3Cline class='bee' x1='-6' y1='-9' x2='-6' y2='9'/%3E%3Cline class='bee' x1='0' y1='-12' x2='0' y2='12'/%3E%3Cline class='bee' x1='6' y1='-9' x2='6' y2='9'/%3E%3Cpolygon class='bee' points='0,-12 18,-30 30,-18 12,-6'/%3E%3Cpolygon class='bee' points='0,-12 -18,-30 -30,-18 -12,-6'/%3E%3C/g%3E%3C/svg%3E");
+        background-size: 90px 90px;
+        opacity: 0.7;
+    }
+
+    .banner-content {
+        position: relative;
+        z-index: 1;
+        padding: 40px;
+        text-align: center;
+    }
+
+    /* Debenhams Group Logo Recreation */
+    .dg-logo {
+      color: var(--debenhams-dark);
+      margin-bottom: 50px;
+    }
+
+    .dg-text {
+      text-align: center;
+      display: block;
+    }
+
+    .dg-main-text {
+      font-size: 72px;
+      font-weight: 700;
+      font-family: var(--font-family);
+      letter-spacing: -2px;
+      line-height: 1;
+      display: block;
+    }
+
+    .dg-sub-text {
+      font-size: 28px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-top: 5px;
+      display: block;
+    }
+
+    .dg-tagline {
+        font-size: 24px;
+        font-weight: 400;
+        text-transform: uppercase;
+        line-height: 1.3;
+        color: var(--debenhams-dark);
+    }
+
+    /* --- Form Side (Right) --- */
+    .auth-form-panel {
+      width: 25%;
+      padding: 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background-color: var(--login-bg);
+      color: var(--login-text);
+    }
+
+    .auth-title {
+      font-size: 24px;
+      font-weight: 600;
+      color: var(--login-text); 
+      margin-bottom: 16px;
+      margin-top: 0;
+    }
+
+    .auth-form-panel p {
+      color: var(--login-text-muted);
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .auth-motto {
+      margin-top: 8px;
+      margin-bottom: 60px;
+    }
+
+    .auth-welcome {
+      margin-bottom: 24px;
+    }
+
+    .form-group {
+        margin-bottom: 16px;
+    }
+
+    .auth-form label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 8px;
+        color: var(--login-text-muted);
+    }
+
+    /* Input styles for dark mode */
+    .auth-form .form-input {
+      width: 100%;
+      padding: 12px 16px;
+      font-size: 16px;
+      background-color: var(--login-input-bg);
+      border: 1px solid var(--login-input-border);
+      color: var(--login-text);
+      border-radius: var(--border-radius);
+      font-family: var(--font-family);
+    }
+
+    .auth-form .form-input:focus {
+      outline: none;
+      border-color: #FFFFFF; 
+      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
+    }
+
+    .btn-login {
+      padding: 12px 18px;
+      font-size: 16px;
+      font-weight: 600;
+      background-color: var(--login-button-green); 
+      color: white;
+      border: none;
+      border-radius: 30px; /* Pill shape */
+      cursor: pointer;
+      transition: background-color 0.2s;
+      margin-top: 16px;
+      width: 100%;
+    }
+
+    .btn-login:hover {
+      background-color: #16A34A;
+    }
+    .btn-login:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    /* Improved Feedback Messages */
+    .auth-notice {
+        margin-top: 24px;
+        padding: 12px;
+        border-radius: var(--border-radius);
+        display: none;
+        font-size: 14px;
+    }
+    .auth-notice.success {
+        background-color: #ECFDF5;
+        color: #065F46;
+        border: 1px solid #A7F3D0;
+    }
+    .auth-notice.error {
+        background-color: #FEE2E2;
+        color: #991B1B;
+        border: 1px solid #FCA5A5;
+    }
+
+    .auth-form-panel blockquote {
+      margin: 40px 0;
+      padding-left: 0;
+      border-left: none;
+      font-style: italic;
+      font-size: 16px;
+      color: var(--login-text-muted);
+      line-height: 1.6;
+    }
+
+    .auth-form-panel blockquote p {
+      margin: 0;
+    }
+
+    .auth-footer {
+        margin-top: auto;
+        padding-top: 24px;
+        font-size: 12px;
+        color: var(--login-text-muted);
+        border-top: 1px solid var(--login-input-border);
+    }
+
+    /* Responsive adjustments for the password screen (From planner css.txt) */
+    @media (max-width: 1200px) {
+      .dg-main-text { font-size: 72px; }
+      .dg-sub-text { font-size: 28px; }
+      .dg-tagline { font-size: 24px; }
+    }
+
+    @media (max-width: 992px) {
+      .auth-banner { width: 50%; }
+      .auth-form-panel { width: 50%; padding: 40px; }
+    }
+
+    @media (max-width: 768px) {
+      .auth-container { flex-direction: column; height: 100%; }
+      .auth-banner, .auth-form-panel { width: 100%; }
+      .auth-banner { padding: 40px 0; min-height: 40vh; height: auto; }
+      .auth-form-panel { padding: 40px 30px; flex-grow: 1; }
+      .dg-main-text { font-size: 64px; }
+      .dg-sub-text { font-size: 24px; }
+      .dg-tagline { font-size: 20px; }
+    }
+
+
+    /* === APPLICATION STYLES === */
+    #appHeader{background:var(--brand-primary);color:#fff;padding:16px 24px;font-weight:600;font-size: 16px;box-shadow: 0 2px 4px rgba(0,0,0,.1);}
+    #appWrap{max-width:1400px;margin:24px auto;padding:0 16px}
     
     /* === COMPONENTS === */
     .card{background:var(--color-panel-bg);border:1px solid var(--color-border);border-radius:var(--border-radius);box-shadow:0 1px 3px rgba(0,0,0,.1);padding:20px}
@@ -55,7 +319,7 @@
     .btn.secondary:hover{background: #C7D2FE;}
     .btn.ghost{background:#fff;color:var(--color-text-muted);border:1px solid var(--color-border)}
     .btn.ghost:hover{background: var(--color-hover-bg);}
-    input[type="email"],input[type="date"]{border:1px solid var(--color-border);border-radius:var(--border-radius);padding:10px 12px;min-width:200px; font-family: var(--font-family);}
+    input[type="date"]{border:1px solid var(--color-border);border-radius:var(--border-radius);padding:10px 12px;min-width:200px; font-family: var(--font-family);}
     .notice{background:#FFFBEB;border:1px solid #FDE68A;color:#92400E;padding:12px;border-radius:var(--border-radius);margin:16px 0}
     .notice.success{background:#ECFDF5;border-color:#A7F3D0;color:#065F46;}
     .tag{background:#E0E7FF;color:var(--brand-primary);border-radius:999px;padding:6px 12px;font-weight:600; font-size: 13px;}
@@ -235,7 +499,7 @@
         font-weight: 500;
     }
 
-    /* === RESPONSIVE === */
+    /* === RESPONSIVE (App View) === */
     @media (max-width: 768px) {
         .topbar {
             flex-direction: column;
@@ -255,18 +519,54 @@
   </style>
 </head>
 <body>
-  <header>WFM Advisor Portal</header>
-  <div class="wrap">
-    <div id="authBox" class="card" style="display:none; max-width: 450px; margin: 40px auto;">
-      <h2 style="margin-top: 0;">Sign In</h2>
-      <div class="bar">
-        <input id="emailInput" type="email" placeholder="Enter your work email…" style="flex-grow: 1;" />
-        <button id="sendLinkBtn" class="btn">Send magic link</button>
-      </div>
-      <div class="notice">We’ll email you a one-time sign-in link. Check your inbox.</div>
-    </div>
 
-    <div id="appBox" class="card" style="display:none; padding: 20px;">
+  <div id="auth-overlay" class="auth-overlay">
+    <div class="auth-container">
+      <div class="auth-banner">
+        <div class="banner-content">
+            <div class="dg-logo">
+                <div class="dg-text">
+                    <span class="dg-main-text">Debenhams</span>
+                    <span class="dg-sub-text">GROUP</span>
+                </div>
+            </div>
+            <div class="dg-tagline">
+                FASHION. BEAUTY. LIFESTYLE.<br>
+                <strong>FOR EVERYONE.</strong>
+            </div>
+        </div>
+      </div>
+      <div class="auth-form-panel">
+        <h2 class="auth-title">Advisor Portal</h2>
+        <p class="auth-motto">Powered by WFM Intelligence</p>
+
+        <form id="auth-form" class="auth-form">
+            <p class="auth-welcome">Welcome. Please sign in using your work email.</p>
+
+            <div class="form-group">
+                <label for="emailInput">Email Address</label>
+                <input type="email" id="emailInput" class="form-input" placeholder="Enter your work email" autofocus>
+            </div>
+            <button type="submit" id="sendLinkBtn" class="btn-login">Send Magic Link</button>
+        </form>
+
+        <div id="authNotice" class="auth-notice"></div>
+
+        <blockquote>
+          <p>"Clarity and communication are the foundations of great service."</p>
+        </blockquote>
+
+        <div class="auth-footer">
+            WFM Advisor Portal (v2)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <header id="appHeader">WFM Advisor Portal</header>
+  
+  <div id="appWrap">
+    <div id="appBox" class="card" style="padding: 20px;">
       
       <div class="topbar">
         <div class="bar">
@@ -303,17 +603,22 @@
 
 <script>
 // --- Configuration ---
-// Using credentials identified in the provided files (Advisor portal.txt, planner js.txt)
 const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- DOM Elements (ELS) ---
+// Mapped to the new structure
 const ELS = {
-    authBox: document.getElementById("authBox"),
-    appBox: document.getElementById("appBox"),
+    // Auth Elements
+    authOverlay: document.getElementById("auth-overlay"),
+    authForm: document.getElementById("auth-form"),
     emailInput: document.getElementById("emailInput"),
     sendLinkBtn: document.getElementById("sendLinkBtn"),
+    authNotice: document.getElementById("authNotice"),
+
+    // App Elements
+    appBox: document.getElementById("appBox"),
     userEmailTag: document.getElementById("userEmail"),
     advisorNamePill: document.getElementById("advisorName"),
     teamNamePill: document.getElementById("teamName"),
@@ -331,11 +636,11 @@ const ELS = {
 
 // --- Constants & Helpers ---
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-// Visualization time range for My Rota view (7 AM to 9 PM, covering standard shifts)
+// Visualization time range for My Rota view (7 AM to 9 PM)
 const VIZ_START_H = 7, VIZ_END_H = 21;
 const VIZ_DURATION_MIN = (VIZ_END_H - VIZ_START_H) * 60;
 
-// Date Helpers (using local time for visualization consistency)
+// Date Helpers
 function toMonday(d){
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
   const dow = x.getDay();
@@ -357,7 +662,7 @@ function hhmmToMinutes(t){
     return h*60+m; 
 }
 
-// Map activity codes to colors defined in CSS variables
+// Map activity codes to colors
 function colorForCode(code){
   const k = (code||"").toLowerCase();
   if (k.includes("email")) return "var(--emails)";
@@ -378,24 +683,23 @@ const STATE = {
     advisorId: null,
     advisorName: "",
     leaderId: null,
-    teamMembers: [], // {id, name}
-    teamMemberIds: new Set(), // For efficient lookups
+    teamMembers: [],
+    teamMemberIds: new Set(),
     monday: toMonday(new Date()),
     templates: {},
-    currentView: 'my-rota', // 'my-rota' or 'team-schedule'
+    currentView: 'my-rota',
     currentWeekData: null,
-    rotaRealtimeChannel: null, // Realtime subscription handler
+    rotaRealtimeChannel: null,
 };
 
-/* ---- Data Normalization (Handles Templates vs Segments) ---- */
-// Converts standard templates (e.g., from templates_rows.csv) into detailed segments
+/* ---- Data Normalization ---- */
 function tplToSegments(t){
   if(!t || !t.start_time || !t.finish_time) return [];
   const mins = s => { const [h,m]=String(s).slice(0,5).split(":").map(Number); return h*60+m; };
   const m2t = m => `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
   const s = mins(t.start_time), e = mins(t.finish_time);
   const breaks = [];
-  // Assuming standard break durations based on templates_rows.csv structure
+  // Assuming standard break durations
   if(t.break1) breaks.push({ at: mins(t.break1), dur: 15, code: "Break" });
   if(t.lunch)  breaks.push({ at: mins(t.lunch),  dur: 30, code: "Lunch" });
   if(t.break2) breaks.push({ at: mins(t.break2), dur: 15, code: "Break" });
@@ -404,62 +708,57 @@ function tplToSegments(t){
     .sort((a,b)=>a.t-b.t);
   const out=[]; let cur=s;
   for(const ev of events){
-    // Use the defined work_code from the template
     if(ev.t>cur) out.push({ code: t.work_code || "Activity", start: m2t(cur), end: m2t(ev.t) });
     if(ev.type==="pause"){ out.push({ code:ev.code, start:m2t(ev.t), end:m2t(ev.t+ev.dur) }); cur=ev.t+ev.dur; }
   }
   return out;
 }
 
-// Ensures rota data is always in the 'segments' format, regardless of source format
 function normalizeDayValue(dayVal){
-  // If it already has detailed segments (e.g., complex data from rotas_rows.csv)
   if(dayVal && typeof dayVal==="object" && Array.isArray(dayVal.segments)) return dayVal;
-  // If it's a string (template name like 'Early' from rotas_published_rows.csv)
   if(typeof dayVal==="string" && dayVal.trim() !== ""){
     const tpl = STATE.templates[dayVal.trim()];
-    if(!tpl) return { segments: [] }; // Template not found
+    if(!tpl) return { segments: [] };
     return { segments: tplToSegments(tpl) };
   }
-  return { segments: [] }; // RDO or empty
+  return { segments: [] };
 }
 
 // --- Initialization & Authentication ---
 async function init(){
-  // 1. Load Templates (necessary for interpreting rotas)
+  // 1. Setup Auth UI Events
+  setupAuthUIEvents();
+
+  // 2. Load Templates
   await loadTemplates();
 
-  // 2. Authentication Check
+  // 3. Authentication Check
   await supabase.auth.getSession();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user){
-    showAuth();
+    // Show auth overlay if not authenticated
+    document.body.classList.remove('authenticated');
     return;
   }
 
   STATE.user = user;
   
-  // 3. Identify Advisor and Team
+  // 4. Identify Advisor and Team
   await identifyAdvisorAndTeam(user);
 
-  // 4. Setup UI Controls
-  setupUIEvents();
+  // 5. Setup App UI Controls
+  setupAppUIEvents();
   
-  // 5. Show App, Initial Render, and Start Realtime
+  // 6. Show App, Initial Render, and Start Realtime
   showApp();
   await loadAndRender();
   await startRealtime();
 }
 
-function showAuth() {
-    ELS.authBox.style.display = "block";
-    ELS.appBox.style.display = "none";
-}
-
 function showApp() {
-    ELS.authBox.style.display = "none";
-    ELS.appBox.style.display = "block";
+    // Add 'authenticated' class to body to hide the overlay and show the app content
+    document.body.classList.add('authenticated');
     ELS.userEmailTag.textContent = STATE.user.email;
     ELS.advisorNamePill.textContent = STATE.advisorName || (STATE.advisorId ? "ID Linked" : "Not Linked");
     ELS.weekStartInput.value = fmtDateLocal(STATE.monday);
@@ -475,13 +774,12 @@ async function loadTemplates() {
 }
 
 async function identifyAdvisorAndTeam(user) {
-    // 1. Identify Advisor ID (Check profiles table, then fallback to email match in advisors table)
+    // 1. Identify Advisor ID
     const { data: profile } = await supabase.from("profiles").select("advisor_id").eq("user_id", user.id).maybeSingle();
 
     if (profile && profile.advisor_id){
         STATE.advisorId = profile.advisor_id;
     } else {
-        // Fallback: match by email (case-insensitive)
         const { data: adv } = await supabase.from("advisors").select("id").ilike("email", user.email).maybeSingle();
         if (adv) STATE.advisorId = adv.id;
     }
@@ -520,22 +818,25 @@ async function identifyAdvisorAndTeam(user) {
         ELS.teamNamePill.style.display = '';
     }
 
-    // Disable team toggle if advisor is alone
     if (STATE.teamMembers.length <= 1) {
         ELS.teamToggleBtn.disabled = true;
         ELS.teamToggleBtn.title = "Team view unavailable.";
     }
 }
 
-function setupUIEvents() {
-    ELS.sendLinkBtn.onclick = handleSendLink;
-    ELS.signOutBtn.onclick = handleSignOut;
+function setupAuthUIEvents() {
+    // Use form submission for better accessibility and reliability
+    if (ELS.authForm) {
+        ELS.authForm.addEventListener('submit', handleSendLink);
+    }
+}
 
+function setupAppUIEvents() {
+    ELS.signOutBtn.onclick = handleSignOut;
     ELS.prevBtn.onclick = () => changeWeek(-7);
     ELS.nextBtn.onclick = () => changeWeek(7);
     
     ELS.weekStartInput.onchange = ()=>{
-        // Parse date input safely at local midnight
         const d = new Date(ELS.weekStartInput.value + "T00:00:00");
         if (!isNaN(d.getTime())) {
              STATE.monday = toMonday(d);
@@ -551,12 +852,11 @@ function setupUIEvents() {
             STATE.currentView = target.dataset.view;
             ELS.viewToggleGroup.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active'));
             target.classList.add('active');
-            renderView(); // Only need to render, data is already loaded
+            renderView();
         }
     });
 }
 
-// Navigation requires restarting the realtime connection for the new week
 function changeWeek(days) {
     STATE.monday = addDays(STATE.monday, days);
     ELS.weekStartInput.value = fmtDateLocal(STATE.monday);
@@ -564,29 +864,70 @@ function changeWeek(days) {
     restartRealtime();
 }
 
-async function handleSendLink(){
+async function handleSendLink(event){
+  event.preventDefault(); // Prevent form submission navigation
+  ELS.authNotice.style.display = 'none';
   const email = ELS.emailInput.value.trim();
-  if (!email) return alert("Please enter your work email.");
+  
+  // Basic validation
+  if (!email || !email.includes('@')) {
+    ELS.authNotice.textContent = "Please enter a valid work email.";
+    ELS.authNotice.className = 'auth-notice error';
+    ELS.authNotice.style.display = 'block';
+    return;
+  }
+  
   ELS.sendLinkBtn.disabled = true;
+  ELS.sendLinkBtn.textContent = "Sending...";
+
   try{
+    // Determine the redirect URL robustly
+    let redirectUrl = undefined;
+    // Handle local file:// protocol where location.origin might be "null"
+    if (location.origin && location.origin !== "null" && location.protocol !== 'file:') {
+        redirectUrl = location.origin + location.pathname;
+    }
+    // If running locally via file://, we omit the redirect URL; the link will still be valid but won't redirect automatically.
+
     const { error } = await supabase.auth.signInWithOtp({
       email,
-      options:{ emailRedirectTo: location.origin + location.pathname }
+      options: redirectUrl ? { emailRedirectTo: redirectUrl } : undefined
     });
+
     if (error) throw error;
-    alert("Magic link sent. Check your inbox.");
-  }catch(e){ alert("Error: "+e.message); }
-  finally{ ELS.sendLinkBtn.disabled = false; }
+
+    // Success
+    ELS.authNotice.textContent = "Magic link sent. Check your inbox (and spam folder).";
+    ELS.authNotice.className = 'auth-notice success';
+    ELS.authNotice.style.display = 'block';
+    ELS.emailInput.value = ''; // Clear input
+
+  }catch(e){ 
+    // Failure
+    console.error("Authentication error:", e);
+    let errorMessage = e.message;
+    // User-friendly messages for common errors
+    if (e.message.includes("Rate limit exceeded")) {
+        errorMessage = "Too many requests. Please wait 60 seconds and try again.";
+    }
+    
+    ELS.authNotice.textContent = "Error: " + errorMessage + " (Check SMTP configuration if this persists)";
+    ELS.authNotice.className = 'auth-notice error';
+    ELS.authNotice.style.display = 'block';
+  }
+  finally{ 
+    ELS.sendLinkBtn.disabled = false;
+    ELS.sendLinkBtn.textContent = "Send Magic Link";
+  }
 }
 
 async function handleSignOut(){
     await stopRealtime();
     await supabase.auth.signOut();
-    location.href = location.pathname;
+    location.href = location.pathname; // Reload page to return to auth screen
 }
 
 // --- Main Data Loading Logic ---
-// Fetches all necessary data for the current week (My Rota + Team Rotas)
 async function loadAndRender(){
     ELS.infoNote.style.display="none";
     if (!STATE.advisorId){
@@ -604,15 +945,13 @@ async function loadAndRender(){
     const normalisedMyRota = {};
     const normalisedTeamRotas = {};
 
-    // 2. Identify IDs to fetch (Self + Team)
-    // Use the Set for efficient unique list of IDs
+    // 2. Identify IDs to fetch
     const advisorIdsToFetch = Array.from(STATE.teamMemberIds);
     if (advisorIdsToFetch.length === 0 && STATE.advisorId) {
         advisorIdsToFetch.push(STATE.advisorId);
     }
 
-
-    // 3. Fetch all relevant rotas in a single query from rotas_published
+    // 3. Fetch all relevant rotas in a single query
     const { data: rotas, error } = await supabase
         .from("rotas_published")
         .select("advisor_id, data")
@@ -628,9 +967,12 @@ async function loadAndRender(){
     // 4. Normalize the fetched data
     (rotas || []).forEach(r => {
         const normalised = {};
-        DAYS.forEach(d => {
-            normalised[d] = normalizeDayValue(r.data[d]);
-        });
+        // Check if r.data exists before iteration
+        if (r.data) {
+            DAYS.forEach(d => {
+                normalised[d] = normalizeDayValue(r.data[d]);
+            });
+        }
         
         if (r.advisor_id === STATE.advisorId) {
             Object.assign(normalisedMyRota, normalised);
@@ -649,7 +991,7 @@ async function loadAndRender(){
     renderView();
 }
 
-// Renders the appropriate view based on the current state
+// Renders the appropriate view
 function renderView() {
     if (!STATE.currentWeekData) return;
 
@@ -668,6 +1010,7 @@ function renderView() {
 function drawMyRotaVertical(rotaData){
   let html = '';
   
+  // Check if the object is empty (no rota found for the user for this week)
   if (Object.keys(rotaData).length === 0) {
       ELS.myRotaView.innerHTML = `<div class="notice">No rota published for this week yet.</div>`;
       return;
@@ -694,14 +1037,14 @@ function renderDayContent(segments) {
         return `<div class="rdo-note">Rest Day Off (RDO)</div>`;
     }
 
-    // 1. Timeline Visualization (Horizontal Bar)
+    // 1. Timeline Visualization
     let vizHtml = `<div class="timeline-viz" title="Visualization from ${VIZ_START_H}:00 to ${VIZ_END_H}:00">`;
     segments.forEach(seg => {
         const startMin = hhmmToMinutes(seg.start);
         const endMin = hhmmToMinutes(seg.end);
         const vizStartMin = VIZ_START_H * 60;
 
-        // Calculate position and width percentage within the visualization range
+        // Calculate position and width percentage
         const startPct = Math.max(0, ((startMin - vizStartMin) / VIZ_DURATION_MIN) * 100);
         const endPct = Math.min(100, ((endMin - vizStartMin) / VIZ_DURATION_MIN) * 100);
         const widthPct = endPct - startPct;
@@ -711,7 +1054,6 @@ function renderDayContent(segments) {
         }
     });
     vizHtml += `</div>`;
-    // Add labels for the visualization range
     vizHtml += `<div class="timeline-labels">
                     <span>${VIZ_START_H.toString().padStart(2,'0')}:00</span>
                     <span>${VIZ_END_H.toString().padStart(2,'0')}:00</span>
@@ -734,20 +1076,19 @@ function renderDayContent(segments) {
 // --- Team Schedule (Grid View) Rendering ---
 function drawTeamScheduleGrid(teamRotas) {
     let html = `<table class="team-grid"><thead><tr><th>Advisor</th>`;
-    // Header Row (Days)
+    // Header Row
     DAYS.forEach((dayName, i) => {
         const date = addDays(STATE.monday, i);
         html += `<th>${dayName}<br><small>${fmtDateFriendly(date)}</small></th>`;
     });
     html += `</tr></thead><tbody>`;
 
-    // Body Rows (Advisors)
+    // Body Rows
     STATE.teamMembers.forEach(member => {
         const advisorRota = teamRotas[member.id];
         html += `<tr><td>${member.name}</td>`;
         
         if (!advisorRota) {
-            // Handle case where rota might not be published for this team member
             DAYS.forEach(() => html += `<td><span class="weekly-rdo">N/A</span></td>`);
         } else {
             DAYS.forEach(dayName => {
@@ -770,15 +1111,14 @@ function renderTeamGridCell(segments) {
     const start = segments[0].start;
     const end = segments[segments.length - 1].end;
     
-    // Identify main activities (excluding breaks/lunch) for a summary
+    // Identify main activities
     const mainActivities = segments.filter(s => {
         const code = s.code.toLowerCase();
         return !code.includes('break') && !code.includes('lunch');
     }).map(s => s.code);
     
-    let summary = "Activity"; // Default
+    let summary = "Activity";
     if (mainActivities.length > 0) {
-        // If all main activities are the same, use that name; otherwise use "Mixed".
         if (mainActivities.every(val => val === mainActivities[0])) {
             summary = mainActivities[0];
         } else {
@@ -794,32 +1134,24 @@ function renderTeamGridCell(segments) {
 
 // --- Real-Time Updates ---
 
-// Subscribe to changes for the currently viewed week
 async function startRealtime(){
   if (!STATE.advisorId) return;
   const mondayISO = fmtDateLocal(STATE.monday);
   
-  // Subscribe to any changes in the rotas_published table where the week_start matches the current view.
-  // This covers updates for the individual and the entire team if they are viewing this week.
   STATE.rotaRealtimeChannel = supabase.channel(`rotas_pub_week_${mondayISO}`)
     .on("postgres_changes", {
-      event: "*", // INSERT, UPDATE, DELETE
+      event: "*",
       schema: "public",
       table: "rotas_published",
       filter: `week_start=eq.${mondayISO}`
     }, (payload)=>{
-      console.log("Realtime update received.", payload);
       
-      // Check if the update affects the current user or their team
       const affectedAdvisorId = payload.new?.advisor_id || payload.old?.advisor_id;
-      // Use the Set for efficient checking
       const isRelevant = STATE.advisorId === affectedAdvisorId || STATE.teamMemberIds.has(affectedAdvisorId);
 
       if (isRelevant) {
-          // Refresh the data and view
           loadAndRender(); 
           ELS.realtimeNote.style.display = "block";
-          // Hide notification after 5 seconds
           setTimeout(()=>ELS.realtimeNote.style.display="none", 5000);
       }
     })
@@ -830,7 +1162,6 @@ async function startRealtime(){
     });
 }
 
-// Stop the realtime connection
 async function stopRealtime() {
     if (STATE.rotaRealtimeChannel) {
         await supabase.removeChannel(STATE.rotaRealtimeChannel);
@@ -838,7 +1169,6 @@ async function stopRealtime() {
     }
 }
 
-// Unsubscribe from the previous week and subscribe to the new week
 async function restartRealtime(){
   await stopRealtime();
   await startRealtime();
