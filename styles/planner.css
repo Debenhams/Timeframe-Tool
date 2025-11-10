@@ -320,7 +320,19 @@ body.authenticated .app-main-content {
     /* border-top: 1px solid var(--color-border); CHANGED */
     border-top: 1px solid var(--login-input-border);
 }
+/* NEW: Inspirational Quote Blockquote (No Bar) */
+.auth-form-panel blockquote {
+  margin: 40px 0; /* Adds breathing room above and below */
+  padding-left: 20px; /* Indents the text */
+  font-style: italic; /* Makes it feel like a quote */
+  font-size: 16px; /* A good, readable size */
+  color: var(--login-text-muted); /* Softer than bright white */
+  line-height: 1.6; /* Makes it easier to read */
+}
 
+.auth-form-panel blockquote p {
+  margin: 0; /* Removes default paragraph spacing */
+}
 /* Responsive adjustments for the password screen */
 @media (max-width: 1200px) {
   /* Adjust font sizes slightly on smaller desktop screens */
