@@ -23,10 +23,10 @@ window.APP = window.APP || {};
     Config.SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
     Config.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 
-    // Timeline Visualization Constants (06:00-20:00)
-    Config.TIMELINE_START_MIN = 6 * 60; // 06:00
-    Config.TIMELINE_END_MIN = 20 * 60; // 20:00
-    Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_MIN; // 14 hours
+    // Timeline Visualization Constants (05:00-23:00)
+Config.TIMELINE_START_MIN = 5 * 60; // 05:00
+Config.TIMELINE_END_MIN = 23 * 60; // 23:00
+Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_MIN; // 18 hours
 
     APP.Config = Config;
 }(window.APP));
@@ -2399,7 +2399,7 @@ Utils.addDaysISO = (iso, days) => {
 
     const renderDailyPlanner = () => {
         // Updated time range in title
-        ELS.scheduleViewTitle.textContent = "Schedule Visualization (Daily 06:00 - 20:00)";
+        ELS.scheduleViewTitle.textContent = "Schedule Visualization (Daily 05:00 - 23:00)";
 
         // Setup the structure for the Gantt chart
         ELS.visualizationContainer.innerHTML = `
