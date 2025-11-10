@@ -172,6 +172,15 @@ body.authenticated .app-main-content {
     /* ADDED: Center the content */
     text-align: center;
 }
+.dg-pre-header {
+  font-size: 24px;
+  font-weight: 500;
+  font-family: var(--font-family);
+  color: var(--debenhams-dark);
+  margin-bottom: 24px; /* Space between it and the logo */
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
 
 /* Debenhams Group Logo Recreation (CSS approximation) */
 .dg-logo {
