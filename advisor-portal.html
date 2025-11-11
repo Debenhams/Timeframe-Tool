@@ -104,12 +104,15 @@
     .btn-login { padding: 12px 18px; font-size: 16px; font-weight: 600; background-color: var(--login-button-green); color: white; border: none; border-radius: 30px; cursor: pointer; margin-top: 16px; width: 100%; }
     .btn-login:hover { background-color: #16A34A; }
     .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
+    
+    /* Auth Feedback Notices */
     .auth-notice { margin-top: 24px; padding: 12px; border-radius: var(--border-radius); display: none; font-size: 14px; }
     .auth-notice.error { background-color: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
     .auth-notice.success { background-color: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
+    
     .auth-footer { margin-top: auto; padding-top: 24px; font-size: 12px; color: var(--login-text-muted); border-top: 1px solid var(--login-input-border); }
 
-    /* New: Forgot Password Styling */
+    /* Forgot Password Styling */
     .auth-link {
         color: var(--login-text-muted);
         cursor: pointer;
@@ -122,6 +125,7 @@
         color: var(--login-text);
     }
 
+    /* Auth Responsive Adjustments */
     @media (max-width: 992px) {
       .auth-banner { width: 50%; }
       .auth-form-panel { width: 50%; padding: 40px; }
@@ -618,9 +622,12 @@
   </main>
 
 <script>
+// (The JavaScript code for the Advisor Portal)
+
 // --- Configuration ---
 const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
+// Initialize Supabase client
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // --- DOM Elements (ELS) ---
@@ -724,7 +731,6 @@ const STATE = {
 
 /* ---- Data Normalization (Comprehensive Fix) ---- */
 
-// (tplToSegments, structureToSegments, normalizeDayValue functions remain the same)
 // Converts templates/shift_templates into detailed segments
 function tplToSegments(t){
   const startTime = t.start_time;
@@ -881,13 +887,13 @@ async function loadComponents() {
 
 
 async function identifyAdvisorAndTeam(user) {
-    // (Implementation remains the same)
     // 1. Identify Advisor ID
     const { data: profile } = await supabase.from("profiles").select("advisor_id").eq("user_id", user.id).maybeSingle();
 
     if (profile && profile.advisor_id){
         STATE.advisorId = profile.advisor_id;
     } else {
+        // Fallback: match by email
         const { data: adv } = await supabase.from("advisors").select("id").ilike("email", user.email).maybeSingle();
         if (adv) STATE.advisorId = adv.id;
     }
@@ -968,7 +974,7 @@ function toggleAuthView(view) {
         ELS.emailInput.focus();
     }
 }
-// Expose toggle function to global scope for onclick attribute
+// Expose toggle function to global scope for onclick attribute in HTML
 window.toggleAuthView = toggleAuthView;
 
 
@@ -978,6 +984,7 @@ function setupAppUIEvents() {
     ELS.nextBtn.onclick = () => changeWeek(7);
     
     ELS.weekStartInput.onchange = ()=>{
+        // Parse date input safely at local midnight
         const d = new Date(ELS.weekStartInput.value + "T00:00:00");
         if (!isNaN(d.getTime())) {
              STATE.monday = toMonday(d);
@@ -1049,7 +1056,12 @@ async function handleSignInWithPassword(event){
     if (error) throw error;
 
     // Success: Reload the page to trigger init() 
-    location.reload();
+    // Use location.href to ensure hash is cleared if present
+    if (window.location.hash) {
+        window.location.href = window.location.pathname;
+    } else {
+        location.reload();
+    }
 
   }catch(e){ 
     let errorMessage = e.message.includes("Invalid login credentials") ? "Invalid email or password." : e.message;
@@ -1160,7 +1172,6 @@ async function handleSignOut(){
 
 // --- Main Data Loading Logic ---
 async function loadAndRender(){
-    // (Implementation remains the same as previous response)
     ELS.infoNote.style.display="none";
     if (!STATE.advisorId){
         const msg = `<div class="notice info">Your account isn’t linked to an advisor profile. Please contact the planning team.</div>`;
@@ -1234,7 +1245,6 @@ function renderViews() {
 
 
 // --- My Rota (Calendar View) Rendering ---
-// (Implementation remains the same)
 function drawMyRotaCalendar(rotaData){
   
   if (Object.keys(rotaData).length === 0) {
@@ -1318,7 +1328,6 @@ function renderDayContent(segments) {
 }
 
 // --- Team Schedule (Grid View) Rendering ---
-// (Implementation remains the same)
 function drawTeamScheduleGrid(teamRotas) {
     let html = `<table class="team-grid"><thead><tr><th>Advisor</th>`;
     // Header Row
@@ -1366,7 +1375,6 @@ function renderTeamGridCell(segments) {
 }
 
 // --- Real-Time Updates ---
-// (Implementation remains the same)
 async function startRealtime(){
   if (!STATE.advisorId) return;
   const mondayISO = fmtDateLocal(STATE.monday);

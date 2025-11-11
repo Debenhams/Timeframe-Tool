@@ -1,12 +1,12 @@
 /**
- * WFM Intelligence Platform - Initialization (v15.8.3)
+ * WFM Intelligence Platform - Initialization (v15.8.4)
  * Bootloader script - Manages Supabase authentication, including password reset flow.
+ * FIX: Stabilized initialization sequence to prevent white screen errors.
  */
 
 (function() {
     // Configuration for the authentication
     const AUTH_CONFIG = {
-        // Supabase Config (required as init.js now handles auth)
         SUPABASE_URL: "https://oypdnjxhjpgpwmkltzmk.supabase.co",
         SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is"
     };
@@ -17,29 +17,30 @@
     // Initialize Supabase client
     function initializeSupabase() {
         if (window.supabase && window.supabase.createClient) {
-            supabase = window.supabase.createClient(AUTH_CONFIG.SUPABASE_URL, AUTH_CONFIG.SUPABASE_ANON_KEY);
+            try {
+                supabase = window.supabase.createClient(AUTH_CONFIG.SUPABASE_URL, AUTH_CONFIG.SUPABASE_ANON_KEY);
+            } catch (e) {
+                console.error("Supabase initialization failed:", e);
+            }
         } else {
             console.error("Supabase library not loaded.");
         }
     }
 
-    // Cache DOM elements used in the auth flow
+    // Cache DOM elements used in the auth flow (Robustly)
     function cacheAuthElements() {
-        ELS.authOverlay = document.getElementById('auth-overlay');
-        ELS.authForm = document.getElementById('auth-form');
-        ELS.forgotPasswordForm = document.getElementById('forgot-password-form');
-        ELS.updatePasswordForm = document.getElementById('update-password-form');
-        ELS.signInView = document.getElementById('signInView');
-        ELS.forgotPasswordView = document.getElementById('forgotPasswordView');
-        ELS.updatePasswordView = document.getElementById('updatePasswordView');
-        ELS.emailInput = document.getElementById('emailInput');
-        ELS.passwordInput = document.getElementById('passwordInput');
-        ELS.resetEmailInput = document.getElementById('resetEmailInput');
-        ELS.newPasswordInput = document.getElementById('newPasswordInput');
-        // Changed from authErrorMessage to the generalized authNotice
-        ELS.authNotice = document.getElementById('authNotice'); 
-        ELS.forgotPasswordLink = document.getElementById('forgotPasswordLink');
-        ELS.backToSignInLink = document.getElementById('backToSignInLink');
+        const elementsToCache = [
+            'auth-overlay', 'auth-form', 'forgot-password-form', 'update-password-form',
+            'signInView', 'forgotPasswordView', 'updatePasswordView',
+            'emailInput', 'passwordInput', 'resetEmailInput', 'newPasswordInput',
+            'authNotice', 'forgotPasswordLink', 'backToSignInLink'
+        ];
+        
+        elementsToCache.forEach(id => {
+            // Convert ID to camelCase for the ELS object key
+            const camelCaseId = id.replace(/-([a-z])/g, function (g) { return g[1].toUpperCase(); });
+            ELS[camelCaseId] = document.getElementById(id);
+        });
     }
 
     // Function to initialize the core application (the original init logic)
@@ -48,12 +49,13 @@
             // Start the application
             window.APP.Core.initialize();
         } else {
-            console.error("Fatal Error: Application core not found. Check planner.js loading.");
+            console.error("Fatal Error: Application core (APP.Core) not found. Check planner.js loading.");
             const mainArea = document.getElementById('main-content-area');
             if (mainArea) {
+                // Display error in the main area instead of a white screen
                 mainArea.innerHTML = `<div class="card" style="text-align: center; padding: 50px; margin: 24px;">
                     <h1>Initialization Failed</h1>
-                    <p>Please check the console for errors and ensure all files are deployed correctly.</p>
+                    <p>Application core missing. Please check the console for errors.</p>
                 </div>`;
             }
         }
@@ -61,15 +63,15 @@
 
     // Function to handle successful authentication
     function authenticateUser() {
-        // Hide the overlay with a fade effect (assuming 'hidden' class handles transition in planner.css)
+        // Hide the overlay
         if (ELS.authOverlay) {
             ELS.authOverlay.classList.add('hidden');
             setTimeout(() => {
                 ELS.authOverlay.style.display = 'none';
-            }, 500); 
+            }, 500); // Match CSS transition time
         }
         
-        // Add 'authenticated' class to body to reveal the main app layout (defined in planner.css)
+        // Reveal the main app layout
         document.body.classList.add('authenticated');
 
         // Initialize the core application logic
@@ -79,10 +81,13 @@
     // Function to show the authentication overlay
     function showAuthentication() {
         if (ELS.authOverlay) {
-            // Ensure the overlay is visible (display: flex is defined in planner.css)
             ELS.authOverlay.style.display = 'flex';
+        } else {
+            console.error("Auth overlay element missing.");
+            return; // Cannot proceed with auth flow if overlay is missing
         }
-        // Determine which view to show (signin, update)
+        
+        // Determine which view to show
         const hash = window.location.hash;
         if (hash && hash.includes("type=recovery")) {
             toggleAuthView('update');
@@ -92,7 +97,7 @@
         setupAuthListeners();
     }
 
-    // Toggle Auth Views
+    // Toggle Auth Views (Robustly)
     function toggleAuthView(view) {
         if (ELS.authNotice) ELS.authNotice.style.display = 'none';
         if (ELS.signInView) ELS.signInView.style.display = 'none';
@@ -111,7 +116,7 @@
         }
     }
 
-    // Setup event listeners for the auth forms
+    // Setup event listeners for the auth forms (Robustly)
     function setupAuthListeners() {
         if (ELS.authForm) ELS.authForm.addEventListener('submit', handleLogin);
         if (ELS.forgotPasswordForm) ELS.forgotPasswordForm.addEventListener('submit', handlePasswordResetRequest);
@@ -135,9 +140,8 @@
     function showAuthMessage(message, type = 'error') {
         if (ELS.authNotice) {
             ELS.authNotice.textContent = message;
-            // NOTE: planner.css needs to define styles for .auth-notice.error and .auth-notice.success
-            // If not, these classes won't change the appearance. The 'error' type often maps to the existing .error-message style in planner.css
             ELS.authNotice.className = `auth-notice ${type}`;
+            // Ensure compatibility with older CSS if 'error-message' class exists
             if (type === 'error') {
                 ELS.authNotice.classList.add('error-message');
             }
@@ -148,6 +152,11 @@
     // Function to handle the login submission
     async function handleLogin(event) {
         event.preventDefault();
+        if (!supabase) {
+            showAuthMessage("Database connection not initialized.");
+            return;
+        }
+
         const email = ELS.emailInput ? ELS.emailInput.value.trim() : '';
         const password = ELS.passwordInput ? ELS.passwordInput.value : '';
 
@@ -179,6 +188,8 @@
     // Function to handle the password reset request (Initiation)
     async function handlePasswordResetRequest(event) {
         event.preventDefault();
+        if (!supabase) return;
+
         const email = ELS.resetEmailInput ? ELS.resetEmailInput.value.trim() : '';
 
         if (!email) {
@@ -208,6 +219,8 @@
     // Function to handle the password update (Completion)
     async function handlePasswordUpdate(event) {
         event.preventDefault();
+        if (!supabase) return;
+
         const newPassword = ELS.newPasswordInput ? ELS.newPasswordInput.value : '';
 
         if (!newPassword || newPassword.length < 6) {
@@ -235,26 +248,34 @@
 
     // Main initialization logic
     async function initialize() {
-        initializeSupabase();
-        cacheAuthElements();
+        try {
+            initializeSupabase();
+            cacheAuthElements();
 
-        if (!supabase) {
-            showAuthentication(); // Show auth screen but expect errors
-            return;
-        }
+            if (!supabase) {
+                showAuthentication();
+                showAuthMessage("Initialization failed: Database connection error.");
+                return;
+            }
 
-        // Check current session
-        const { data: { session }, error } = await supabase.auth.getSession();
+            // Check current session
+            const { data: { session }, error } = await supabase.auth.getSession();
 
-        // If there is a session and we are NOT in recovery mode, authenticate immediately.
-        const hash = window.location.hash;
-        const isRecovery = hash && hash.includes("type=recovery");
+            // Determine if we are in recovery mode
+            const hash = window.location.hash;
+            const isRecovery = hash && hash.includes("type=recovery");
 
-        if (session && !error && !isRecovery) {
-            authenticateUser();
-        } else {
-            // No active session, or we are in recovery mode, show authentication screen
+            if (session && !error && !isRecovery) {
+                authenticateUser();
+            } else {
+                // No active session, or we are in recovery mode, show authentication screen
+                showAuthentication();
+            }
+        } catch (e) {
+            // Catch any unexpected errors during initialization
+            console.error("Critical Initialization Error:", e);
             showAuthentication();
+            showAuthMessage("Application failed to start. Check console for details.");
         }
     }
 

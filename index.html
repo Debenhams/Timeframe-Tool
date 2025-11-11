@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WFM Intelligence Platform (v15.8.3)</title>
+  <title>WFM Intelligence Platform (v15.8.4)</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
@@ -12,11 +12,11 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./styles/planner.css?v=15.8.3" />
+  <link rel="stylesheet" href="./styles/planner.css?v=15.8.4" />
 </head>
 <body>
 
-  <div id="auth-overlay" class="auth-overlay">
+  <div id="auth-overlay" class="auth-overlay" style="display: none;">
     <div class="auth-container">
       <div class="auth-banner">
         <div class="banner-content">
@@ -36,7 +36,7 @@
         <h2 class="auth-title">WFM Intelligence</h2>
         <p class="auth-motto">Planning for our people, powering our success</p>
 
-        <div id="signInView">
+        <div id="signInView" style="display:none;">
             <form id="auth-form" class="auth-form" novalidate>
                 <p class="auth-welcome">Welcome. Please authenticate.</p>
                 <div class="form-group">
@@ -55,7 +55,6 @@
         <div id="forgotPasswordView" style="display:none;">
              <form id="forgot-password-form" class="auth-form" novalidate>
                 <p class="auth-welcome">Reset Password. Enter your email to receive a reset link.</p>
-
                 <div class="form-group">
                     <label for="resetEmailInput">Email Address</label>
                     <input type="email" id="resetEmailInput" class="form-input" placeholder="Enter your work email">
@@ -68,7 +67,6 @@
         <div id="updatePasswordView" style="display:none;">
              <form id="update-password-form" class="auth-form" novalidate>
                 <p class="auth-welcome">Set New Password.</p>
-
                 <div class="form-group">
                     <label for="newPasswordInput">New Password</label>
                     <input type="password" id="newPasswordInput" class="form-input" placeholder="Enter your new password">
@@ -84,20 +82,24 @@
         </blockquote>
 
         <div class="auth-footer">
-                WFM Intelligence Platform (v15.8.3)
+                WFM Intelligence Platform (v15.8.4)
         </div>
       </div>
     </div>
   </div>
     
-    <aside class="app-sidebar">
-    </aside>
+    <aside class="app-sidebar" id="app-sidebar">
+        </aside>
 
     <main class="app-main-content" id="main-content-area">
-    </main>
+        </main>
 
-<script src="./scripts/planner.js?v=15.8.3"></script>
-<script src="./scripts/init.js?v=15.8.3"></script>
+    <div id="notification-container" class="notification-container"></div>
+
+    <div id="modal-backdrop" class="modal-backdrop"></div>
+
+<script src="./scripts/planner.js?v=15.8.4"></script>
+<script src="./scripts/init.js?v=15.8.4"></script>
 
 </body>
 </html>
