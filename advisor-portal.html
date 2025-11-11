@@ -1470,9 +1470,10 @@ function drawMyRotaCalendar(rotaData){
   DAYS.forEach((dayName, i) => {
     const date = addDays(STATE.monday, i);
     const dateISO = fmtDateLocal(date);
-    // --- START OF CHANGES ---
+    // --- START OF FIXED CODE ---
+    // This function *already* returns the final segments
     const liveSegments = calculateLiveSegments(STATE.advisorId, dayName, STATE.currentWeekData.mondayISO);
-    // --- END OF CHANGES ---
+    // --- END OF FIXED CODE ---
     const isToday = dateISO === TODAY_ISO;
     
     html += `<div class="day-card ${isToday ? 'today' : ''}">
@@ -1563,8 +1564,11 @@ function drawTeamScheduleGrid(teamRotas) {
         // --- START OF CHANGES ---
         // We removed the "if (!advisorRota)" logic
         DAYS.forEach(dayName => {
+            // --- START OF FIXED CODE ---
+            // This function *already* returns the final segments
             const liveSegments = calculateLiveSegments(member.id, dayName, STATE.currentWeekData.mondayISO);
-            html += `<td>${renderTeamGridCell(liveSegments)}</td>`;
+            // --- END OF FIXED CODE ---
+            html += `<td>${renderTeamGridCell(liveSegments)}</td>`; // <-- Use liveSegments
         });
         // --- END OF CHANGES ---
         
