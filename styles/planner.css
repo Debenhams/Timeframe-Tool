@@ -329,7 +329,10 @@ body.authenticated .app-main-content {
   border: 1px solid var(--login-input-border);
   color: var(--login-text);
 }
-
+/* ADD THIS NEW RULE FOR SPACING */
+.auth-form .form-group {
+  margin-bottom: 16px;
+}
 
 /* Override default focus style to use the brand color */
 /* This replaces the specific #passwordInput:focus styles */
