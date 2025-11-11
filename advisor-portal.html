@@ -871,77 +871,6 @@ function calculateLiveSegments(advisorId, dayName, weekStartISO) {
     return structureToSegments(definition.structure);
 }
   
-  const s = mins(startTime), e = mins(endTime);
-  if (isNaN(s) || isNaN(e)) return [];
-
-  const breaks = [];
-  if(t.break1 && !isNaN(mins(t.break1))) breaks.push({ at: mins(t.break1), dur: 15, code: "Break" });
-  if(t.lunch && !isNaN(mins(t.lunch)))  breaks.push({ at: mins(t.lunch),  dur: 30, code: "Lunch" });
-  if(t.break2 && !isNaN(mins(t.break2))) breaks.push({ at: mins(t.break2), dur: 15, code: "Break" });
-  
-  const events = [{t:s, type:"start"}, ...breaks.map(b=>({t:b.at, type:"pause", dur:b.dur, code:b.code})), {t:e, type:"end"}]
-    .sort((a,b)=>a.t-b.t);
-  
-  const out=[]; let cur=s;
-  const workCode = t.work_code || "Activity";
-
-  for(const ev of events){
-    if(ev.t>cur) out.push({ code: workCode, start: m2t(cur), end: m2t(ev.t) });
-    if(ev.type==="pause"){ 
-        out.push({ code:ev.code, start:m2t(ev.t), end:m2t(ev.t+ev.dur) }); 
-        cur=ev.t+ev.dur; 
-    }
-  }
-  return out;
-
-
-// Converts planner-style structures (using component_id) into display format
-function structureToSegments(structure) {
-    if (!Array.isArray(structure)) return [];
-    
-    // Ensure sorting by start time
-    const sortedStructure = structure.sort((a, b) => (a.start_min || 0) - (b.start_min || 0));
-
-    return sortedStructure.map(item => {
-        const component = STATE.components[item.component_id];
-        const code = component ? component.name : "Unknown Activity";
-        const start = m2t(item.start_min || 0);
-        
-        let endMin = item.end_min;
-        // Calculate end time if only duration is provided
-        if (endMin === undefined && item.duration_min !== undefined) {
-            endMin = (item.start_min || 0) + item.duration_min;
-        }
-        const end = m2t(endMin || 0);
-
-        return { code, start, end };
-    });
-}
-
-// Ensures rota data is always normalized, handling all potential formats
-function normalizeDayValue(dayVal){
-  // 1. Handle Planner App/Exception format ({"structure": [...]})
-  if(dayVal && typeof dayVal==="object" && Array.isArray(dayVal.structure)) {
-      return { segments: structureToSegments(dayVal.structure) };
-  }
-
-  // 2. Handle legacy/simple segment format ({"segments": [...]})
-  if(dayVal && typeof dayVal==="object" && Array.isArray(dayVal.segments)) {
-      return dayVal;
-  }
-
-  // 3. Handle Template Names or Shift Codes (e.g., "Early" or "8B")
-  if(typeof dayVal==="string" && dayVal.trim() !== ""){
-    const def = STATE.definitions[dayVal.trim()];
-    if(!def) {
-        return { segments: [] }; 
-    }
-    return { segments: tplToSegments(def) };
-  }
-  
-  // 4. Handle RDO or empty
-  return { segments: [] };
-}
 
 // --- Initialization & Authentication ---
 async function init(){
@@ -1391,61 +1320,6 @@ async function loadAndRender(){
     renderViews();
 }
   
-    // Show loading state
-    const loadingMsg = `<div class="notice info">Loading schedule data...</div>`;
-    ELS.myRotaGrid.innerHTML = loadingMsg;
-    ELS.teamScheduleView.innerHTML = loadingMsg;
-
-    const mondayISO = fmtDateLocal(STATE.monday);
-
-    // 1. Prepare data structures
-    const normalisedMyRota = {};
-    const normalisedTeamRotas = {};
-
-    // 2. Identify IDs to fetch
-    const advisorIdsToFetch = Array.from(STATE.teamMemberIds);
-    if (advisorIdsToFetch.length === 0 && STATE.advisorId) {
-        advisorIdsToFetch.push(STATE.advisorId);
-    }
-
-    // 3. Fetch all relevant rotas
-    const { data: rotas, error } = await supabase
-        .from("rotas_published")
-        .select("advisor_id, data")
-        .in("advisor_id", advisorIdsToFetch)
-        .eq("week_start", mondayISO);
-
-    if (error) {
-        console.error("Error loading rotas:", error);
-        ELS.infoNote.textContent = "Error loading schedule data.";
-        ELS.infoNote.style.display = "block";
-    }
-                
-    // 4. Normalize the fetched data (Using the comprehensive normalization)
-    (rotas || []).forEach(r => {
-        const normalised = {};
-        if (r.data) {
-            DAYS.forEach(d => {
-                normalised[d] = normalizeDayValue(r.data[d]);
-            });
-        }
-        
-        if (r.advisor_id === STATE.advisorId) {
-            Object.assign(normalisedMyRota, normalised);
-        }
-        normalisedTeamRotas[r.advisor_id] = normalised;
-    });
-
-    // 5. Store normalized data in state
-    STATE.currentWeekData = {
-        myRota: normalisedMyRota,
-        teamRotas: normalisedTeamRotas,
-        mondayISO: mondayISO
-    };
-
-    // 6. Render views
-    renderViews();
-
 
 // Renders the views
 function renderViews() {
