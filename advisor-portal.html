@@ -4,9 +4,6 @@
   <meta charset="UTF-8" />
   <title>WFM Advisor Portal</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <style>
     /* === VARIABLES & CONFIGURATION (Updated for Photo 2 Style) === */
@@ -58,8 +55,8 @@
       --login-input-border: #374151;
       --login-button-green: #22C55E;
 
-      /* Time Grid Configuration */
-      --timegrid-row-height: 20px; /* Height for a 30-minute slot (40px per hour) */
+      /* Time Grid Configuration - Increased density slightly to match photo */
+      --timegrid-row-height: 24px; /* Height for a 30-minute slot (48px per hour) */
     }
 
     /* === BASE STYLES & LAYOUT === */
@@ -72,7 +69,8 @@
     body{
         background:var(--color-bg);
         color:var(--color-text);
-        font:14px/1.5 var(--font-family);
+        /* Reduced base font size from 14px to 13px for closer match */
+        font:13px/1.4 var(--font-family);
         display: flex;
     }
 
@@ -319,7 +317,7 @@
     
     .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
 
-    /* === MY ROTA VIEW (Vertical Time Grid - Overhaul) === */
+    /* === MY ROTA VIEW (Vertical Time Grid - Refinements) === */
     
     /* Hide the elements from the old card-based structure if they somehow appear (Safety net) */
     #myRotaGrid .day-card, #myRotaGrid .day-header, #myRotaGrid .day-content, .rdo-note, .shift-summary, .timeline-viz, .shift-activity-list {
@@ -340,8 +338,9 @@
 
     /* 1. Top Summary Section (The green blocks in Photo 2) */
     .summary-grid {
+        /* Reduced time axis width from 60px to 50px */
         display: grid;
-        grid-template-columns: 60px repeat(7, 1fr); /* 60px for the time axis label */
+        grid-template-columns: 50px repeat(7, 1fr);
         border-bottom: 2px solid var(--color-border);
         flex-shrink: 0; /* Prevent summary from shrinking */
     }
@@ -352,6 +351,8 @@
         background-color: var(--color-hover-bg);
         border-bottom: 1px solid var(--color-border);
         font-weight: bold;
+        /* Ensure font size is consistent */
+        font-size: 13px; 
     }
 
     .summary-axis-label {
@@ -360,7 +361,8 @@
     }
 
     .summary-day {
-        padding: 5px;
+        /* Removed padding: 5px; to allow the green block to fill the cell */
+        padding: 0; 
         text-align: center;
         border-right: 1px solid var(--color-border);
         display: flex;
@@ -371,36 +373,64 @@
         border-right: none;
     }
     
-    .summary-day-name {
-        font-size: 12px;
-        font-weight: bold;
+    /* New styles for the Day/Date header boxes (Matching Photo 2 layout: Side-by-side) */
+    .summary-date-header {
+        display: flex;
+        flex-direction: row; 
+        border-bottom: 1px solid var(--color-border);
+        /* Added background color for the header part as seen in photo */
+        background-color: #F0F0F0; 
     }
+
+    .summary-day-name {
+         /* Reduced font size and adjusted padding */
+        font-size: 11px;
+        font-weight: bold;
+        padding: 4px 2px;
+        /* Make it take roughly 2/3rds of the width */
+        flex-basis: 60%;
+        border-right: 1px solid var(--color-border);
+        text-transform: uppercase;
+    }
+    
     .summary-day-date {
-        font-size: 14px;
-        margin-bottom: 5px;
+         /* Reduced font size and adjusted padding */
+        font-size: 12px;
+        /* Make it take the remaining 1/3rd */
+        flex-basis: 40%;
+        padding: 4px 2px;
+        margin-bottom: 0; /* Removed margin if it existed */
     }
 
     .summary-block {
         background-color: var(--color-shift-summary);
         color: white;
-        padding: 8px 5px;
-        font-size: 13px;
+        padding: 5px 2px;
+        /* Reduced font size significantly */
+        font-size: 11px; 
         font-weight: bold;
         flex-grow: 1; /* Fill remaining space in the day column */
         display: flex;
         align-items: center;
         justify-content: center;
+        /* Ensure text alignment is centered when wrapping */
+        text-align: center;
+        line-height: 1.3;
+        white-space: pre-wrap; /* Honors line breaks from JS */
     }
 
     .summary-rdo {
         background-color: var(--color-rdo-bg);
         color: var(--color-text);
-        padding: 8px 5px;
-        font-size: 13px;
+         /* Removed padding, it fills the cell now */
+        padding: 5px 2px;
+        /* Reduced font size */
+        font-size: 11px;
         flex-grow: 1;
         display: flex;
         align-items: center;
         justify-content: center;
+        text-align: center;
         /* Hatched pattern for RDO matching Photo 2 */
         background-image: repeating-linear-gradient(
             45deg,
@@ -420,7 +450,8 @@
 
     .time-grid {
         display: grid;
-        grid-template-columns: 60px repeat(7, 1fr); /* 60px for the time axis */
+        /* Reduced time axis width from 60px to 50px */
+        grid-template-columns: 50px repeat(7, 1fr);
         position: relative;
         width: 100%;
     }
@@ -434,10 +465,12 @@
         align-items: flex-start;
         justify-content: flex-end;
         padding-right: 5px;
-        font-size: 12px;
+        /* Reduced font size */
+        font-size: 11px;
         color: var(--color-text-muted);
         /* Offset the time slightly so it sits just below the hour line */
-        transform: translateY(-8px); 
+        /* Adjusting offset based on new font size/row height */
+        transform: translateY(-7px); 
     }
 
     /* Day Columns (The background grid cells providing horizontal lines) */
@@ -469,16 +502,37 @@
     /* Activity Blocks (Positioned Events) */
     .activity-block {
         position: absolute;
-        /* Inset slightly from the borders */
-        left: 0;
-        right: 0; 
-        padding: 4px;
-        font-size: 12px;
+        /* Inset from the borders to prevent distortion/overlap (Fixes width issue) */
+        left: 1px;
+        right: 1px; 
+        padding: 2px;
+        /* Reduced font size significantly */
+        font-size: 10px;
         color: white;
         overflow: hidden;
         /* Add border to blocks as seen in Photo 2 */
         border: 1px solid rgba(0,0,0,0.2); 
         pointer-events: auto; /* Allow interaction with events */
+        /* Center text within the block */
+        text-align: center;
+        line-height: 1.3;
+        /* Ensure centering vertically */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    /* Specific style for breaks/lunch where text should be hidden */
+    .activity-block.no-text {
+        /* Ensure no text is visible if it somehow gets rendered */
+        color: transparent !important; 
+    }
+    
+    /* Ensure the spans inside are hidden too */
+    .activity-block.no-text .activity-title,
+    .activity-block.no-text .activity-time {
+        display: none;
     }
 
     /* Color overrides for text contrast on lighter backgrounds */
@@ -490,11 +544,15 @@
 
 
     .activity-title {
+        /* Ensure title is bold as in the photo */
         font-weight: bold;
+        display: block;
     }
 
     .activity-time {
         display: block;
+        /* Ensure time is normal weight */
+        font-weight: normal; 
     }
 
 
@@ -807,9 +865,9 @@ const ELS = {
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 
 // Constants for the new Time Grid visualization (Photo 2 Style)
-// These define the start and end hours displayed on the grid.
-const TIMEGRID_START_H = 8; // 8 AM (Adjustable)
-const TIMEGRID_END_H = 21; // 9 PM (Adjustable)
+// These define the default start and end hours if the week is empty or if the dynamic range is smaller.
+const TIMEGRID_START_H = 8; // 8 AM (Default)
+const TIMEGRID_END_H = 20; // 8 PM (Default)
 const TIMEGRID_INTERVAL_MIN = 30; // 30 minute slots
 
 
@@ -860,8 +918,11 @@ function calculateRotationLength(pattern) {
 function getEffectiveWeek(startDateISO, weekStartISO, assignment, getPatternByName) {
     try {
         if (!startDateISO || !weekStartISO || !assignment) return null;
-        const [y1, m1, d1] = startDateISO.split('-').map(Number);
-        const [y2, m2, d2] = weekStartISO.split('-').map(Number);
+        
+        // Use optional chaining and nullish coalescing for robust date parsing
+        const [y1, m1, d1] = (startDateISO?.split('-') || []).map(Number);
+        const [y2, m2, d2] = (weekStartISO?.split('-') || []).map(Number);
+
         if (isNaN(y1) || isNaN(y2)) return null; 
         
         const startUTC = Date.UTC(y1, m1 - 1, d1);
@@ -887,6 +948,7 @@ function getEffectiveWeek(startDateISO, weekStartISO, assignment, getPatternByNa
 
 // Helper: Finds the correct key in the pattern data
 function findWeekKey(patternData, weekNumber) {
+    if (!patternData) return undefined;
     const keys = Object.keys(patternData);
     return keys.find(k => {
         const match = k.match(/^Week ?(\d+)$/i);
@@ -1009,7 +1071,7 @@ function calculateLiveSegments(advisorId, dayName, weekStartISO) {
     // 5. Get Shift Definition
     const definition = STATE.definitions[String(shiftCode).trim()];
     if (!definition || !definition.structure) {
-        console.warn(`Shift code ${shiftCode} not found in definitions.`);
+        // console.warn(`Shift code ${shiftCode} not found in definitions.`);
         return []; // Definition missing = RDO
     }
 
@@ -1441,6 +1503,7 @@ async function loadAndRender(){
             
             // Find the *latest* assignment that is active in this week
             const effectiveAssignment = relevantAssignments.find(a => {
+                // Use UTC for boundary checks
                 const start = new Date(a.start_date + "T00:00:00Z");
                 const weekStart = new Date(mondayISO + "T00:00:00Z");
 
@@ -1483,10 +1546,14 @@ function renderViews() {
 
 // --- My Rota (Calendar View) Rendering ---
 // REWRITTEN for Vertical Time Grid Layout (Photo 2 Style)
+// REFINED for precise matching of Photo 2 aesthetics.
 function drawMyRotaCalendar(){
     if (!STATE.currentWeekData) return;
 
-    // 1. Calculate all data needed for the week
+    // 1. Calculate all data needed for the week AND find the min/max times
+    let minTimeMin = 24 * 60; // Start high
+    let maxTimeMin = 0; // Start low
+
     const weekData = DAYS.map((dayName, i) => {
         const date = addDays(STATE.monday, i);
         const dateISO = fmtDateLocal(date);
@@ -1497,12 +1564,18 @@ function drawMyRotaCalendar(){
         // Determine the summary block content (Top section)
         let summary = { type: 'rdo', text: 'Roster Day Off' };
         if (segments.length > 0) {
+            const startMin = hhmmToMinutes(segments[0].start);
+            const endMin = hhmmToMinutes(segments[segments.length - 1].end);
+            
+            // Update min/max times for dynamic timeline range
+            if (startMin < minTimeMin) minTimeMin = startMin;
+            if (endMin > maxTimeMin) maxTimeMin = endMin;
+
             const start = segments[0].start;
             const end = segments[segments.length - 1].end;
-            // Use getMainActivitySummary as a placeholder for the shift name (e.g., "Middle")
             const mainActivity = getMainActivitySummary(segments);
 
-            // Calculate duration (simple total duration for visualization)
+            // Calculate duration
             const durationMin = segments.reduce((acc, seg) => {
                  return acc + (hhmmToMinutes(seg.end) - hhmmToMinutes(seg.start));
             }, 0);
@@ -1510,31 +1583,56 @@ function drawMyRotaCalendar(){
             // Display integer hours as per Photo 2 style
             const durationH = Math.round(durationMin / 60);
             
-            // Format matching Photo 2: Activity \n Start - End \n Duration
+            // Format matching Photo 2 (using \n which CSS honors with white-space: pre-wrap)
             summary = { type: 'shift', text: `${mainActivity}\n${start} - ${end}\n${durationH} h` };
         }
+        
+        // Get short day name for the new header layout (e.g. MON)
+        const shortDayName = dayName.substring(0, 3).toUpperCase();
 
-        return { dayName, date, dateISO, segments, isToday, summary };
+        return { dayName, shortDayName, date, dateISO, segments, isToday, summary };
     });
 
-    // 2. Generate HTML Structure
+    // 2. Determine the Time Grid Range (Dynamic Timeline Logic)
+    // If the week is empty (all RDO), use the default range.
+    if (minTimeMin === 24 * 60 && maxTimeMin === 0) {
+        minTimeMin = TIMEGRID_START_H * 60;
+        maxTimeMin = TIMEGRID_END_H * 60;
+    } else {
+        // Pad the range: start at the hour of the first shift
+        minTimeMin = Math.floor(minTimeMin / 60) * 60; 
+        // End at the hour after the last shift
+        maxTimeMin = Math.ceil(maxTimeMin / 60) * 60;
+        
+        // Ensure a minimum duration is shown (e.g. 8 hours) if the schedule is very short
+        if (maxTimeMin - minTimeMin < 8 * 60) {
+            // Try to center the short shift within an 8 hour window if possible, or stick to the start time.
+            maxTimeMin = minTimeMin + 8 * 60;
+        }
+    }
+
+
+    // 3. Generate HTML Structure
     let html = `<div class="schedule-container">`;
 
-    // 3. Generate Summary Grid (Top Section)
-    // Get Month Name for the header
+    // 4. Generate Summary Grid (Top Section)
     const monthName = STATE.monday.toLocaleDateString('en-GB', { month: 'long' });
 
     html += `<div class="summary-grid">
-                <div class="summary-header">${monthName}</div> <div class="summary-axis-label"></div>`; // Empty cell above time axis
+                <div class="summary-header">${monthName}</div>
+                <div class="summary-axis-label"></div>`; // Empty cell above time axis
 
     weekData.forEach(day => {
+        // Updated structure for the header layout (Side-by-side)
         html += `<div class="summary-day">
-                    <div class="summary-day-name">${day.dayName.toUpperCase()}</div>
-                    <div class="summary-day-date">${day.date.getDate()}</div>`;
+                    <div class="summary-date-header">
+                        <div class="summary-day-name">${day.shortDayName}</div>
+                        <div class="summary-day-date">${day.date.getDate()}</div>
+                    </div>`;
         
         if (day.summary.type === 'shift') {
-            // Use <br> for line breaks in the summary block
-            html += `<div class="summary-block">${day.summary.text.replace(/\n/g, '<br>')}</div>`;
+            // JS now uses \n, CSS (white-space: pre-wrap) handles the display.
+            html += `<div class="summary-block">${day.summary.text}</div>`;
         } else {
             html += `<div class="summary-rdo">${day.summary.text}</div>`;
         }
@@ -1543,13 +1641,14 @@ function drawMyRotaCalendar(){
     });
     html += `</div>`; // Close summary-grid
 
-    // 4. Generate Detailed Time Grid (Bottom Section)
+    // 5. Generate Detailed Time Grid (Bottom Section)
     html += `<div class="time-grid-wrapper">
                 <div class="time-grid">`;
 
-    // 4a. Generate Grid Cells (Time Axis and Background)
-    const startMin = TIMEGRID_START_H * 60;
-    const endMin = TIMEGRID_END_H * 60;
+    // 5a. Generate Grid Cells (Time Axis and Background)
+    // Use the dynamically calculated range
+    const startMin = minTimeMin;
+    const endMin = maxTimeMin;
     
     // We iterate up to (but not including) endMin for the grid lines
     for (let m = startMin; m < endMin; m += TIMEGRID_INTERVAL_MIN) {
@@ -1566,12 +1665,10 @@ function drawMyRotaCalendar(){
         }
     }
 
-    // 4b. Generate Event Containers and Positioned Events
+    // 5b. Generate Event Containers and Positioned Events
     
-    // We need the actual pixel height for calculations. We retrieve the CSS variable value.
-    // Default to 20px if retrieval fails (must match --timegrid-row-height default).
     // We must ensure the document body is ready to read the computed style.
-    const rowHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--timegrid-row-height')) || 20;
+    const rowHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--timegrid-row-height')) || 24; // Updated fallback to 24px
     const pixelsPerMinute = rowHeight / TIMEGRID_INTERVAL_MIN;
 
     weekData.forEach((day, index) => {
@@ -1599,8 +1696,15 @@ function drawMyRotaCalendar(){
                 // Use the specific color mapping for the time grid style
                 const color = getBlockColor(seg.code);
                 
-                // Format matching Photo 2: Activity \n Start - End
-                html += `<div class="activity-block" style="top: ${topPx}px; height: ${heightPx}px; background-color: ${color};">
+                // Determine if text should be hidden (Breaks/Lunch)
+                const activityCodeLower = seg.code.toLowerCase();
+                const isBreakOrLunch = activityCodeLower.includes('break') || activityCodeLower.includes('lunch');
+                const blockClass = isBreakOrLunch ? 'no-text' : '';
+
+                // Render content (it will be hidden by CSS if blockClass is 'no-text')
+                // Note: We still render the spans inside so that the flexbox centering works correctly, 
+                // the 'no-text' class makes the color transparent and hides the spans.
+                html += `<div class="activity-block ${blockClass}" style="top: ${topPx}px; height: ${heightPx}px; background-color: ${color};">
                             <span class="activity-title">${seg.code}</span>
                             <span class="activity-time">${seg.start} - ${seg.end}</span>
                          </div>`;
