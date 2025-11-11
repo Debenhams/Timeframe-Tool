@@ -37,22 +37,27 @@
 
     <p class="auth-motto">Planning for our people, powering our success</p>
 
+    <p class="auth-welcome">Welcome. Please sign in.</p>
+
     <form id="auth-form" class="auth-form" novalidate>
             <div class="form-group">
-                <label for="emailInput">Email</label>
+            
+    <label for="emailInput">Email</label>
                 <input type="email" id="emailInput" class="form-input" placeholder="Enter your email" autofocus>
             </div>
             <div class="form-group">
                 <label for="passwordInput">Password</label>
                 <input type="password" id="passwordInput" class="form-input" placeholder="Enter your password">
-            </div>
-            <button type="submit" class="btn btn-login">Authenticate</button>
+                
+                <span class="auth-link">Forgot Password?</span>
+        
+    </div>
+            <button type="submit" class="btn btn-login">Sign In</button>
         </form>
-        <div id="authErrorMessage" class="auth-error-message" style="display:none;">
-            Invalid email or password.
-        </div>
 
-    <blockquote>
+        <div id="authNotice" class="auth-notice error" style="display:none;"></div>
+
+<blockquote>
       <p>"Great planning is the art of making complexity look simple."</p>
     </blockquote>
 

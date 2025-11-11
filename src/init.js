@@ -58,20 +58,25 @@
         // 1. Get new email and password inputs
         const emailInput = document.getElementById('emailInput');
         const passwordInput = document.getElementById('passwordInput');
-        const errorMessage = document.getElementById('authErrorMessage');
+        
+        // CHANGE 1: Get 'authNotice' instead of 'authErrorMessage'
+        const authNotice = document.getElementById('authNotice');
 
         if (!emailInput || !passwordInput || !emailInput.value || !passwordInput.value) {
-            if (errorMessage) {
-                errorMessage.textContent = "Email and password are required.";
-                errorMessage.style.display = 'block';
+            // CHANGE 2: Update 'authNotice'
+            if (authNotice) {
+                authNotice.textContent = "Email and password are required.";
+                // We also set the class to make it look like the advisor portal error
+                authNotice.className = 'auth-notice error';
+authNotice.style.display = 'block';
             }
             return;
-        }
+}
 
         // 2. Create a temporary Supabase client just for login
         //    (These values are from your planner.js file)
         const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
-        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         try {
@@ -80,24 +85,27 @@
                 email: emailInput.value,
                 password: passwordInput.value,
             });
-
-            if (error) {
-                throw error; // Jump to the catch block
+if (error) {
+                throw error;
+// Jump to the catch block
             }
 
             // 4. Success!
-            if (errorMessage) errorMessage.style.display = 'none';
+            // CHANGE 3: Hide 'authNotice'
+if (authNotice) authNotice.style.display = 'none';
             authenticateUser();
 
         } catch (error) {
             // 5. Failure
-            if (errorMessage) {
-                errorMessage.textContent = "Invalid email or password.";
-                errorMessage.style.display = 'block';
+            // CHANGE 4: Show error in 'authNotice'
+            if (authNotice) {
+                authNotice.textContent = "Invalid email or password.";
+                authNotice.className = 'auth-notice error';
+authNotice.style.display = 'block';
             }
             if (passwordInput) {
                 passwordInput.value = '';
-                passwordInput.focus();
+passwordInput.focus();
             }
         }
     }
