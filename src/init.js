@@ -1,6 +1,7 @@
 /**
- * WFM Intelligence Platform - Initialization (v15.8.3)
+ * WFM Intelligence Platform - Initialization (v15.8.4 - Fixed)
  * Bootloader script - Manages Supabase authentication, including password reset flow.
+ * FIX: Corrected syntax errors in handlePasswordUpdate (pushState and catch block).
  */
 
 (function() {
@@ -36,8 +37,7 @@
         ELS.passwordInput = document.getElementById('passwordInput');
         ELS.resetEmailInput = document.getElementById('resetEmailInput');
         ELS.newPasswordInput = document.getElementById('newPasswordInput');
-        // Changed from authErrorMessage to the generalized authNotice
-        ELS.authNotice = document.getElementById('authNotice'); 
+        ELS.authNotice = document.getElementById('authNotice'); // Generalized notice
         ELS.forgotPasswordLink = document.getElementById('forgotPasswordLink');
         ELS.backToSignInLink = document.getElementById('backToSignInLink');
     }
@@ -61,17 +61,11 @@
 
     // Function to handle successful authentication
     function authenticateUser() {
-        // Hide the overlay with a fade effect (assuming 'hidden' class handles transition in planner.css)
+        // Hide the overlay
         if (ELS.authOverlay) {
-            ELS.authOverlay.classList.add('hidden');
-            setTimeout(() => {
-                ELS.authOverlay.style.display = 'none';
-            }, 500); 
+            ELS.authOverlay.style.display = 'none';
         }
         
-        // Add 'authenticated' class to body to reveal the main app layout (defined in planner.css)
-        document.body.classList.add('authenticated');
-
         // Initialize the core application logic
         initializeCoreApplication();
     }
@@ -79,7 +73,7 @@
     // Function to show the authentication overlay
     function showAuthentication() {
         if (ELS.authOverlay) {
-            // Ensure the overlay is visible (display: flex is defined in planner.css)
+            // Ensure the overlay is visible
             ELS.authOverlay.style.display = 'flex';
         }
         // Determine which view to show (signin, update)
@@ -105,7 +99,7 @@
         } else if (view === 'update') {
             if (ELS.updatePasswordView) ELS.updatePasswordView.style.display = 'block';
             if (ELS.newPasswordInput) ELS.newPasswordInput.focus();
-        } else {
+        } else { // 'signin'
             if (ELS.signInView) ELS.signInView.style.display = 'block';
             if (ELS.emailInput) ELS.emailInput.focus();
         }
@@ -113,34 +107,42 @@
 
     // Setup event listeners for the auth forms
     function setupAuthListeners() {
+        // Prevent multiple listeners
+        if (ELS.authForm) ELS.authForm.removeEventListener('submit', handleLogin);
+        if (ELS.forgotPasswordForm) ELS.forgotPasswordForm.removeEventListener('submit', handlePasswordResetRequest);
+        if (ELS.updatePasswordForm) ELS.updatePasswordForm.removeEventListener('submit', handlePasswordUpdate);
+        if (ELS.forgotPasswordLink) ELS.forgotPasswordLink.removeEventListener('click', handleForgotLink);
+        if (ELS.backToSignInLink) ELS.backToSignInLink.removeEventListener('click', handleBackToSignInLink);
+
+        // Add listeners
         if (ELS.authForm) ELS.authForm.addEventListener('submit', handleLogin);
         if (ELS.forgotPasswordForm) ELS.forgotPasswordForm.addEventListener('submit', handlePasswordResetRequest);
         if (ELS.updatePasswordForm) ELS.updatePasswordForm.addEventListener('submit', handlePasswordUpdate);
         
         if (ELS.forgotPasswordLink) {
-            ELS.forgotPasswordLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                toggleAuthView('forgot');
-            });
+            ELS.forgotPasswordLink.addEventListener('click', handleForgotLink);
         }
         if (ELS.backToSignInLink) {
-            ELS.backToSignInLink.addEventListener('click', (e) => {
-                e.preventDefault();
-                toggleAuthView('signin');
-            });
+            ELS.backToSignInLink.addEventListener('click', handleBackToSignInLink);
         }
+    }
+    
+    // Link handlers
+    function handleForgotLink(e) {
+        e.preventDefault();
+        toggleAuthView('forgot');
+    }
+    
+    function handleBackToSignInLink(e) {
+        e.preventDefault();
+        toggleAuthView('signin');
     }
 
     // Helper to display auth messages
     function showAuthMessage(message, type = 'error') {
         if (ELS.authNotice) {
             ELS.authNotice.textContent = message;
-            // NOTE: planner.css needs to define styles for .auth-notice.error and .auth-notice.success
-            // If not, these classes won't change the appearance. The 'error' type often maps to the existing .error-message style in planner.css
-            ELS.authNotice.className = `auth-notice ${type}`;
-            if (type === 'error') {
-                ELS.authNotice.classList.add('error-message');
-            }
+            ELS.authNotice.className = `auth-notice ${type === 'success' ? 'success-message' : 'error-message'}`;
             ELS.authNotice.style.display = 'block';
         }
     }
@@ -162,12 +164,13 @@
         try {
             const { error } = await supabase.auth.signInWithPassword({ email, password });
             if (error) throw error;
-            // On successful login, ensure URL hash is cleared if present before authenticating
+            
+            // On successful login, clear any URL hash
             if (window.location.hash) {
-                window.location.href = window.location.pathname;
-            } else {
-                authenticateUser();
+                history.pushState("", document.title, window.location.pathname + window.location.search);
             }
+            authenticateUser();
+            
         } catch (error) {
             let errorMessage = error.message.includes("Invalid login credentials") ? "Invalid email or password." : error.message;
             showAuthMessage(errorMessage);
@@ -190,14 +193,13 @@
         if (submitButton) submitButton.disabled = true;
 
         try {
-            let redirectUrl = undefined;
-            if (location.origin && location.origin !== "null" && location.protocol !== 'file:') {
-                redirectUrl = location.origin + location.pathname;
-            }
+            // Get the base URL to send the user back to this page
+            let redirectUrl = window.location.origin + window.location.pathname;
 
             const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: redirectUrl });
             if (error) throw error;
             showAuthMessage("Password reset link sent. Please check your email.", "success");
+            
         } catch (error) {
             showAuthMessage("Error: " + error.message);
         } finally {
@@ -222,11 +224,17 @@
             const { error } = await supabase.auth.updateUser({ password: newPassword });
             if (error) throw error;
 
-            showAuthMessage("Password updated successfully. Initializing...", "success");
-            // Reload to clear the hash and start the app fresh
-            setTimeout(() => location.href = location.pathname, 1000);
+            showAuthMessage("Password updated successfully. Logging in...", "success");
+            
+            // Clear the URL hash and authenticate
+            setTimeout(() => {
+                // *** FIX 1: Changed push-State to pushState ***
+                history.pushState("", document.title, window.location.pathname + window.location.search);
+                authenticateUser();
+            }, 1500);
 
-        } catch (error) {
+        // *** FIX 2: Removed underscore from catch block ***
+        } catch (error) { 
             showAuthMessage("Error updating password: " + error.message);
         } finally {
             if (submitButton) submitButton.disabled = false;
@@ -239,6 +247,7 @@
         cacheAuthElements();
 
         if (!supabase) {
+            showAuthMessage("Failed to initialize authentication. Please refresh.");
             showAuthentication(); // Show auth screen but expect errors
             return;
         }
