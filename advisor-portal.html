@@ -417,6 +417,46 @@
         color: var(--color-text-muted);
     }
 
+    /* === NEW: Vertical Shift List (for Day Cards) === */
+    .vertical-shift-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px; /* Space between blocks */
+        height: 100%;
+        /* Remove padding from the parent card's content area */
+        margin: -16px;
+    }
+    .shift-segment-block {
+        border-left: 5px solid var(--default); /* Default color */
+        padding: 6px 12px;
+        background: var(--color-bg); /* Light grey background for the block */
+        border-radius: 0; /* Square edges */
+    }
+    /* First and last for rounded corners to fit the card */
+    .shift-segment-block:first-child {
+        border-top-left-radius: var(--border-radius);
+        border-top-right-radius: var(--border-radius);
+    }
+    .shift-segment-block:last-child {
+        border-bottom-left-radius: var(--border-radius);
+        border-bottom-right-radius: var(--border-radius);
+        /* This is a small hack to make it fill the card */
+        flex-grow: 1; 
+    }
+    .segment-time {
+        display: block;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--color-text-muted);
+    }
+    .segment-title {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--color-text);
+    }
+    /* --- End of New Styles --- */
+
 
     /* === RESPONSIVE === */
     @media (max-width: 1024px) {
@@ -1377,40 +1417,32 @@ function getMainActivitySummary(segments) {
     }
 }
 
+// --- THIS IS THE NEW renderDayContent FUNCTION for vertical lists ---
 function renderDayContent(segments) {
     if (segments.length === 0) {
         return `<div class="rdo-note">RDO</div>`;
     }
 
-    const start = segments[0].start;
-    const end = segments[segments.length - 1].end;
-    const summary = getMainActivitySummary(segments);
+    // This is our new vertical list container
+    let contentHtml = `<div class="vertical-shift-list">`;
 
-    // 1. Summary Block
-    let contentHtml = `<div class="shift-summary">
-                        ${start} - ${end}
-                       </div>
-                       <p style="text-align:center; color: var(--color-text-muted);">${summary}</p>`;
-
-    // 2. Timeline Visualization Bar (Small)
-    let vizHtml = `<div class="timeline-viz" title="Visualization from ${VIZ_START_H}:00 to ${VIZ_END_H}:00">`;
     segments.forEach(seg => {
-        const startMin = hhmmToMinutes(seg.start);
-        const endMin = hhmmToMinutes(seg.end);
-        const vizStartMin = VIZ_START_H * 60;
+        const start = seg.start;
+        const end = seg.end;
+        const summary = seg.code; // Use the raw component name
+        const color = colorForCode(summary); // Get the color
 
-        // Calculate position and width percentage
-        const startPct = Math.max(0, ((startMin - vizStartMin) / VIZ_DURATION_MIN) * 100);
-        const endPct = Math.min(100, ((endMin - vizStartMin) / VIZ_DURATION_MIN) * 100);
-        const widthPct = endPct - startPct;
-
-        if (widthPct > 0) {
-            vizHtml += `<div class="timeline-segment" style="left: ${startPct}%; width: ${widthPct}%; background: ${colorForCode(seg.code)};"></div>`;
-        }
+        // Add a block for each segment
+        contentHtml += `
+            <div class="shift-segment-block" style="border-left-color: ${color};">
+                <span class="segment-time">${start} - ${end}</span>
+                <span class="segment-title">${summary}</span>
+            </div>
+        `;
     });
-    vizHtml += `</div>`;
 
-    return contentHtml + vizHtml;
+    contentHtml += `</div>`;
+    return contentHtml;
 }
 
 // --- Team Schedule (Grid View) Rendering ---
