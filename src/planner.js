@@ -968,24 +968,58 @@ Utils.addDaysISO = (iso, days) => {
     ComponentManager.render = () => {
         if (!ELS.grid) return;
         const STATE = APP.StateManager.getState();
+  
         const components = STATE.scheduleComponents.sort((a,b) => a.name.localeCompare(b.name));
         
         let html = '<table><thead><tr><th>Name</th><th>Type</th><th>Color</th><th>Default Duration</th><th>Paid</th><th>Actions</th></tr></thead><tbody>';
+        
         components.forEach(comp => {
             html += `<tr data-component-id="${comp.id}">
-                <td>${comp.name}</td>
-                <td>${comp.type}</td>
-                <td><span style="display: inline-block; width: 20px; height: 20px; background-color: ${comp.color}; border-radius: 4px;"></span></td>
-                <td>${comp.default_duration_min}m</td>
-                <td>${comp.is_paid ? 'Yes' : 'No'}</td>
+                <td>
+                    <span class="display-value">${comp.name}</span>
+                    <input type="text" class="form-input edit-value" name="comp-name" value="${comp.name}" style="display:none;">
+                </td>
+                
+                <td>
+                    <span class="display-value">${comp.type}</span>
+                    <select class="form-select edit-value" name="comp-type" style="display:none;">
+                        <option value="Activity" ${comp.type === 'Activity' ? 'selected' : ''}>Activity</option>
+                        <option value="Break" ${comp.type === 'Break' ? 'selected' : ''}>Break</option>
+                        <option value="Lunch" ${comp.type === 'Lunch' ? 'selected' : ''}>Lunch</option>
+                        <option value="Shrinkage" ${comp.type === 'Shrinkage' ? 'selected' : ''}>Shrinkage</option>
+                        <option value="Absence" ${comp.type === 'Absence' ? 'selected' : ''}>Absence</option>
+                    </select>
+                </td>
+                
+                <td>
+                    <span class="display-value" style="display: inline-block; width: 20px; height: 20px; background-color: ${comp.color}; border-radius: 4px;"></span>
+                    <input type="color" class="form-input-color edit-value" name="comp-color" value="${comp.color}" style="display:none;">
+                </td>
+                
+                <td>
+                    <span class="display-value">${comp.default_duration_min}m</span>
+                    <input type="number" class="form-input edit-value" name="comp-duration" value="${comp.default_duration_min}" style="display:none; width: 70px;">
+                </td>
+                
+                <td>
+                    <span class="display-value">${comp.is_paid ? 'Yes' : 'No'}</span>
+                    <select class="form-select edit-value" name="comp-paid" style="display:none; width: 70px;">
+                        <option value="true" ${comp.is_paid ? 'selected' : ''}>Yes</option>
+                        <option value="false" ${!comp.is_paid ? 'selected' : ''}>No</option>
+                    </select>
+                </td>
+                
                 <td class="actions">
                     <button class="btn btn-sm btn-primary edit-component" data-component-id="${comp.id}">Edit</button>
                     <button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button>
+                    <button class="btn btn-sm btn-success save-component" data-component-id="${comp.id}" style="display:none;">Save</button>
+                    <button class="btn btn-sm btn-secondary cancel-edit-component" data-component-id="${comp.id}" style="display:none;">Cancel</button>
                 </td>
             </tr>`;
         });
         html += '</tbody></table>';
         ELS.grid.innerHTML = html;
+ 
     };
 
     const handleNew = async () => {
@@ -1013,55 +1047,77 @@ Utils.addDaysISO = (iso, days) => {
     };
 
     const handleClick = (e) => {
-        if (e.target.classList.contains('delete-component')) {
-            handleDelete(e.target.dataset.componentId);
-        } else if (e.target.classList.contains('edit-component')) {
-            handleEdit(e.target.dataset.componentId);
-}
+        const target = e.target;
+        const id = target.dataset.componentId;
+        if (!id) return;
+
+        if (target.classList.contains('delete-component')) {
+            handleDelete(id);
+        } else if (target.classList.contains('edit-component')) {
+            toggleRowEditMode(id, true);
+        } else if (target.classList.contains('cancel-edit-component')) {
+            toggleRowEditMode(id, false);
+        } else if (target.classList.contains('save-component')) {
+            handleInlineSave(id);
+        }
     };
-const handleEdit = async (id) => {
-    const component = APP.StateManager.getComponentById(id);
-    if (!component) return;
+const toggleRowEditMode = (id, isEditing) => {
+        const row = ELS.grid.querySelector(`tr[data-component-id="${id}"]`);
+        if (!row) return;
 
-    // Basic prompt-based input, pre-filled with existing data
-    const name = prompt("Enter component name:", component.name);
-    if (name === null) return; // User cancelled
+        // Toggle visibility for display spans vs. edit inputs
+        row.querySelectorAll('.display-value').forEach(el => el.style.display = isEditing ? 'none' : '');
+        row.querySelectorAll('.edit-value').forEach(el => el.style.display = isEditing ? 'block' : 'none');
 
-    const type = prompt("Enter type (Activity, Break, Lunch, Shrinkage, Absence):", component.type);
-    if (type === null) return;
+        // Toggle action buttons
+        row.querySelector('.edit-component').style.display = isEditing ? 'none' : '';
+        row.querySelector('.delete-component').style.display = isEditing ? 'none' : '';
+        row.querySelector('.save-component').style.display = isEditing ? 'block' : 'none';
+        row.querySelector('.cancel-edit-component').style.display = isEditing ? 'block' : 'none';
 
-    const color = prompt("Enter hex color code (e.g., '#3498db'):", component.color);
-    if (color === null) return;
-
-    const durationStr = prompt("Enter default duration in minutes:", component.default_duration_min);
-    if (durationStr === null) return;
-    const duration = parseInt(durationStr, 10);
-
-    const isPaid = confirm("Is this a paid activity?", component.is_paid);
-
-    if (!name || !type || !color || isNaN(duration)) {
-        APP.Utils.showToast("Invalid input provided.", "danger");
-        return;
-    }
-
-    const updatedComponent = {
-        id: id, // Include the ID for the update
-        name, 
-        type, 
-        color, 
-        default_duration_min: duration, 
-        is_paid: isPaid 
+        // If we are cancelling, we must re-render the table to reset the values
+        if (!isEditing) {
+            ComponentManager.render();
+        }
     };
 
-    // Use updateRecord instead of saveRecord
-    const { data, error } = await APP.DataService.updateRecord('schedule_components', updatedComponent, { id: id });
+    const handleInlineSave = async (id) => {
+        const row = ELS.grid.querySelector(`tr[data-component-id="${id}"]`);
+        if (!row) return;
 
-    if (!error) {
-        APP.StateManager.syncRecord('schedule_components', data);
-        APP.Utils.showToast(`Component '${name}' updated.`, "success");
-        ComponentManager.render();
-    }
-};
+        // 1. Read all new values from the inputs
+        const name = row.querySelector('[name="comp-name"]').value;
+        const type = row.querySelector('[name="comp-type"]').value;
+        const color = row.querySelector('[name="comp-color"]').value;
+        const duration = parseInt(row.querySelector('[name="comp-duration"]').value, 10);
+        const isPaid = row.querySelector('[name="comp-paid"]').value === 'true';
+
+        // 2. Validate
+        if (!name || !type || !color || isNaN(duration) || duration < 0) {
+            APP.Utils.showToast("Invalid data. Please check all fields.", "danger");
+            return;
+        }
+
+        const updatedComponent = {
+            id: id,
+            name, 
+            type, 
+            color, 
+            default_duration_min: duration, 
+            is_paid: isPaid 
+        };
+
+        // 3. Save to database
+        const { data, error } = await APP.DataService.updateRecord('schedule_components', updatedComponent, { id: id });
+        
+        if (!error) {
+            APP.StateManager.syncRecord('schedule_components', data);
+            APP.Utils.showToast(`Component '${name}' updated.`, "success");
+            // Re-render the whole table to show the new, non-editable data
+            ComponentManager.render();
+        }
+        // Error is handled by DataService
+    };
     const handleDelete = async (id) => {
         const component = APP.StateManager.getComponentById(id);
         if (!component || !confirm(`Are you sure you want to delete '${component.name}'?`)) return;
