@@ -9,37 +9,46 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   <style>
-    /* === VARIABLES & CONFIGURATION (Aligned with WFM Intelligence Platform) === */
+    /* === VARIABLES & CONFIGURATION (Updated for Photo 2 Style) === */
     :root {
-      /* Modern Enterprise Palette (Indigo/Emerald) */
-      --brand-primary: #4F46E5; /* Indigo 600 */
-      --brand-accent: #059669; /* Emerald 600 */
+      /* Utilitarian Palette (Matching Photo 2) */
+      --brand-primary: #333333; /* Dark Gray for borders/text */
+      --brand-accent: #555555;
       
-      /* Neutrals (Cool Gray) */
-      --color-text: #111827;
-      --color-text-muted: #6B7280;
-      --color-bg: #F9FAFB; 
+      /* Neutrals */
+      --color-text: #333333;
+      --color-text-muted: #666666;
+      --color-bg: #FFFFFF; 
       --color-panel-bg: #FFFFFF;
-      --color-border: #E5E7EB;
-      --color-hover-bg: #F3F4F6;
+      --color-border: #DDDDDD;
+      --color-hover-bg: #F5F5F5;
 
-       /* Sidebar (Dark) - Matching Planner Portal */
+       /* Sidebar (Dark) - Kept as is for navigation context */
       --sidebar-bg: #111827;
       --sidebar-text: #D1D5DB;
       --sidebar-text-hover: #FFFFFF;
       --sidebar-border: #1F2937;
       --sidebar-width: 240px;
       
-      --font-family: 'Inter', system-ui, Segoe UI, Roboto, Arial, sans-serif;
-      --border-radius: 8px;
+      /* Use a standard system font stack for utilitarian look (Photo 2 style) */
+      --font-family: Arial, Helvetica, sans-serif;
+      --border-radius: 0px; /* Photo 2 has square corners */
 
-      /* Schedule Colors */
+      /* Schedule Colors (Matching Photo 2) */
+      --color-shift-summary: #1B5E20; /* Dark Green for the top summary blocks */
+      --color-activity-main: #808000; /* Olive Green for main activities (Mirakl, Email) */
+      --color-activity-secondary: #FFB74D; /* Orange for secondary activities (Projects) */
+      --color-meeting: #FFF9C4; /* Light Yellow for meetings */
+      --color-break: #B0BEC5; /* Light Gray for breaks/lunch */
+      --color-rdo-bg: #F9FBE7; /* Pale yellow/beige for RDO */
+
+      /* Legacy colors kept for compatibility but mostly unused now */
       --emails:#10B981; --mirakl:#F59E0B; --social:#8B5CF6; --whatsapp: #25D366;
-      --overtime:#EF4444; --meeting:#3B82F6; --break:#94A3B8; --lunch:#64748B;
+      --overtime:#EF4444; /*--meeting:#3B82F6;*/ --break:#94A3B8; --lunch:#64748B;
       --admin: #6366F1; --default:#475569;
-      --rdo-bg: #F3F4F6;
+      /*--rdo-bg: #F3F4F6;*/
 
-      /* Debenhams Branding (For Login Screen) */
+      /* Debenhams Branding (For Login Screen - Kept as is) */
       --debenhams-teal: #70E6D6;
       --debenhams-dark: #000000;
       --login-bg: #000000;
@@ -48,6 +57,9 @@
       --login-input-bg: #1F2937;
       --login-input-border: #374151;
       --login-button-green: #22C55E;
+
+      /* Time Grid Configuration */
+      --timegrid-row-height: 20px; /* Height for a 30-minute slot (40px per hour) */
     }
 
     /* === BASE STYLES & LAYOUT === */
@@ -101,7 +113,7 @@
     .form-group { margin-bottom: 16px; }
     .auth-form .form-input { width: 100%; padding: 12px 16px; font-size: 16px; background-color: var(--login-input-bg); border: 1px solid var(--login-input-border); color: var(--login-text); border-radius: var(--border-radius); font-family: var(--font-family); }
     .auth-form .form-input:focus { outline: none; border-color: #FFF; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2); }
-    .btn-login { padding: 12px 18px; font-size: 16px; font-weight: 600; background-color: var(--login-button-green); color: white; border: none; border-radius: 30px; cursor: pointer; margin-top: 16px; width: 100%; }
+    .btn-login { padding: 12px 18px; font-size: 16px; font-weight: 600; background-color: var(--login-button-green); color: white; border: none; border-radius: 30px !important; cursor: pointer; margin-top: 16px; width: 100%; }
     .btn-login:hover { background-color: #16A34A; }
     .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
     .auth-notice { margin-top: 24px; padding: 12px; border-radius: var(--border-radius); display: none; font-size: 14px; }
@@ -190,7 +202,8 @@
         color: var(--sidebar-text);
         background-color: transparent;
         border: none;
-        border-radius: var(--border-radius);
+        /* Keep sidebar nav rounded even if main UI is square */
+        border-radius: 8px; 
         cursor: pointer;
         text-align: left;
         transition: background-color 0.15s, color 0.15s;
@@ -201,8 +214,9 @@
         color: var(--sidebar-text-hover);
     }
 
+    /* Active nav link updated to be subtle as the primary focus is the schedule */
     .nav-link.active {
-        background-color: var(--brand-primary);
+        background-color: rgba(255, 255, 255, 0.1);
         color: white;
     }
 
@@ -257,108 +271,230 @@
     /* Content Area (Scrollable) */
     .content-area {
         flex-grow: 1;
-        overflow-y: auto;
-        padding: 24px;
+        /* Changed from overflow-y: auto to overflow: hidden to manage scrolling via internal components */
+        overflow: hidden; 
+        /* Padding removed for the time grid view */
+        padding: 0;
+        display: flex;
+        flex-direction: column;
     }
 
     .tab-content {
         display: none;
+        /* Ensure tabs take full height/width */
+        height: 100%;
+        width: 100%;
     }
     .tab-content.active {
-        display: block;
+        display: flex; /* Use flex to allow schedule-container to grow */
+        flex-direction: column;
     }
+
+    /* Add padding back for non-visualization tabs */
+    #tab-team-schedule, #tab-time-off, #tab-shift-swap, #tab-metrics {
+        padding: 24px;
+        overflow-y: auto; /* Allow scrolling within these specific tabs */
+    }
+
 
     /* === COMPONENTS === */
     .card{background:var(--color-panel-bg);border:1px solid var(--color-border);border-radius:var(--border-radius);box-shadow:0 1px 3px rgba(0,0,0,.05);padding:20px}
     .btn{background:var(--brand-accent);color:#fff;border:0;padding:10px 14px;border-radius:var(--border-radius);font-weight:600;cursor:pointer; transition: background 0.2s; font-family: var(--font-family);}
-    .btn:hover{background: #067550;}
+    .btn:hover{background: #444444;}
     .btn:disabled{opacity: 0.6; cursor: not-allowed;}
-    .btn.secondary{background:#E0E7FF;color:var(--brand-primary); border: 1px solid #C7D2FE;}
-    .btn.secondary:hover{background: #C7D2FE;}
+    .btn.secondary{background:#EEEEEE;color:var(--color-text); border: 1px solid var(--color-border);}
+    .btn.secondary:hover{background: #E0E0E0;}
     .btn.ghost{background:transparent;color:var(--sidebar-text);border:1px solid var(--sidebar-border)}
     .btn.ghost:hover{background: rgba(255,255,255,0.1); color: white;}
     
-    input[type="date"]{border:1px solid var(--color-border);border-radius:var(--border-radius);padding:10px 12px;min-width:200px; font-family: var(--font-family);}
+    input[type="date"], .form-input, .auth-form .form-input {border:1px solid var(--color-border);border-radius:var(--border-radius);padding:10px 12px; font-family: var(--font-family);}
+    input[type="date"] { min-width: 200px; }
+
     
-    .notice{padding:12px;border-radius:var(--border-radius);margin:16px 0}
+    .notice{padding:12px;border-radius:var(--border-radius);margin:16px}
     .notice.success{background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;}
     .notice.info{background:#EFF6FF;border:1px solid #93C5FD;color:#1E40AF;}
 
-    .tag{background:#E0E7FF;color:var(--brand-primary);border-radius:999px;padding:4px 12px;font-weight:600; font-size: 13px; display: inline-block;}
+    .tag{background:#E0E0E0;color:var(--color-text);border-radius:999px;padding:4px 12px;font-weight:600; font-size: 13px; display: inline-block;}
     
     .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
 
-    /* === MY ROTA VIEW (Advanced Calendar Grid) === */
-    #myRotaGrid {
-        display: grid;
-        grid-template-columns: repeat(7, 1fr); /* 7 columns for the week */
-        gap: 12px;
+    /* === MY ROTA VIEW (Vertical Time Grid - Overhaul) === */
+    
+    /* Hide the elements from the old card-based structure if they somehow appear (Safety net) */
+    #myRotaGrid .day-card, #myRotaGrid .day-header, #myRotaGrid .day-content, .rdo-note, .shift-summary, .timeline-viz, .shift-activity-list {
+        display: none;
     }
-    .day-card {
-        background: var(--color-panel-bg);
+
+    /* The container for the entire schedule view */
+    .schedule-container {
+        display: flex;
+        flex-direction: column;
         border: 1px solid var(--color-border);
-        border-radius: var(--border-radius);
-        box-shadow: 0 1px 3px rgba(0,0,0,.05);
-        display: flex;
-        flex-direction: column;
-        min-height: 200px;
-    }
-
-    /* Highlight for today's date */
-    .day-card.today {
-        border-color: var(--brand-primary);
-        box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
-    }
-
-    .day-header {
-        background-color: var(--color-hover-bg);
-        padding: 12px 16px;
-        border-bottom: 1px solid var(--color-border);
-        text-align: center;
-    }
-    .day-title {
-        font-size: 16px;
-        font-weight: 700;
-        margin: 0;
-    }
-    .day-date {
-        color: var(--color-text-muted);
-        font-size: 14px;
-    }
-    .day-content {
-        padding: 16px;
+        background: var(--color-panel-bg);
+        /* Ensure it takes available height */
         flex-grow: 1;
+        /* Ensure minimum width for the grid */
+        min-width: 900px;
+    }
+
+    /* 1. Top Summary Section (The green blocks in Photo 2) */
+    .summary-grid {
+        display: grid;
+        grid-template-columns: 60px repeat(7, 1fr); /* 60px for the time axis label */
+        border-bottom: 2px solid var(--color-border);
+        flex-shrink: 0; /* Prevent summary from shrinking */
+    }
+
+    .summary-header {
+        grid-column: 1 / span 8;
+        padding: 5px 10px;
+        background-color: var(--color-hover-bg);
+        border-bottom: 1px solid var(--color-border);
+        font-weight: bold;
+    }
+
+    .summary-axis-label {
+        /* Empty cell above the time axis */
+        border-right: 1px solid var(--color-border);
+    }
+
+    .summary-day {
+        padding: 5px;
+        text-align: center;
+        border-right: 1px solid var(--color-border);
         display: flex;
         flex-direction: column;
+    }
+
+    .summary-day:last-child {
+        border-right: none;
+    }
+    
+    .summary-day-name {
+        font-size: 12px;
+        font-weight: bold;
+    }
+    .summary-day-date {
+        font-size: 14px;
+        margin-bottom: 5px;
+    }
+
+    .summary-block {
+        background-color: var(--color-shift-summary);
+        color: white;
+        padding: 8px 5px;
+        font-size: 13px;
+        font-weight: bold;
+        flex-grow: 1; /* Fill remaining space in the day column */
+        display: flex;
+        align-items: center;
         justify-content: center;
     }
-    .rdo-note {
-        text-align: center;
-        color: var(--color-text-muted);
-        font-style: italic;
-        margin: auto;
+
+    .summary-rdo {
+        background-color: var(--color-rdo-bg);
+        color: var(--color-text);
+        padding: 8px 5px;
+        font-size: 13px;
+        flex-grow: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        /* Hatched pattern for RDO matching Photo 2 */
+        background-image: repeating-linear-gradient(
+            45deg,
+            transparent,
+            transparent 10px,
+            rgba(0, 0, 0, 0.1) 10px,
+            rgba(0, 0, 0, 0.1) 20px
+        );
     }
 
-    .shift-summary {
-        font-size: 18px;
-        font-weight: 800;
-        text-align: center;
-        margin-bottom: 16px;
+    /* 2. Detailed Time Grid Section */
+    .time-grid-wrapper {
+        flex-grow: 1;
+        overflow-y: auto; /* Allow vertical scrolling for time */
+        position: relative;
+    }
+
+    .time-grid {
+        display: grid;
+        grid-template-columns: 60px repeat(7, 1fr); /* 60px for the time axis */
+        position: relative;
+        width: 100%;
+    }
+
+    /* Time Axis (Left Column) */
+    .time-axis-cell {
+        border-right: 1px solid var(--color-border);
+        border-bottom: 1px dotted var(--color-border); /* Dotted for half hours */
+        height: var(--timegrid-row-height);
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-end;
+        padding-right: 5px;
+        font-size: 12px;
+        color: var(--color-text-muted);
+        /* Offset the time slightly so it sits just below the hour line */
+        transform: translateY(-8px); 
+    }
+
+    /* Day Columns (The background grid cells providing horizontal lines) */
+    .day-column-cell {
+        /* border-right is handled by the event container */
+        border-bottom: 1px dotted var(--color-border); /* Dotted for half hours */
+        height: var(--timegrid-row-height);
+    }
+
+    /* Solid line for hour marks */
+    .time-axis-cell.hour-mark, .day-column-cell.hour-mark {
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    /* Containers for the absolutely positioned events */
+    /* We place these in the grid flow, spanning all time rows */
+    .day-column-events {
+        position: relative;
+        grid-row: 1 / span 100; /* Span many rows */
+        pointer-events: none; /* Allow clicks on the underlying grid if needed */
+        /* Add the vertical border here */
+        border-right: 1px solid var(--color-border); 
+    }
+    
+    .day-column-events:last-child {
+        border-right: none;
+    }
+
+    /* Activity Blocks (Positioned Events) */
+    .activity-block {
+        position: absolute;
+        /* Inset slightly from the borders */
+        left: 0;
+        right: 0; 
+        padding: 4px;
+        font-size: 12px;
+        color: white;
+        overflow: hidden;
+        /* Add border to blocks as seen in Photo 2 */
+        border: 1px solid rgba(0,0,0,0.2); 
+        pointer-events: auto; /* Allow interaction with events */
+    }
+
+    /* Color overrides for text contrast on lighter backgrounds */
+    .activity-block[style*="background-color: var(--color-activity-secondary)"],
+    .activity-block[style*="background-color: var(--color-break)"],
+    .activity-block[style*="background-color: var(--color-meeting)"] {
         color: var(--color-text);
     }
 
-     /* Timeline Visualization (Small bar at the bottom) */
-    .timeline-viz {
-        position: relative;
-        height: 10px;
-        background: #E5E7EB;
-        border-radius: 5px;
-        margin-top: auto;
-        overflow: hidden;
+
+    .activity-title {
+        font-weight: bold;
     }
-    .timeline-segment {
-        position: absolute;
-        height: 100%;
+
+    .activity-time {
+        display: block;
     }
 
 
@@ -417,150 +553,16 @@
         color: var(--color-text-muted);
     }
 
-    /* === NEW: Flat Activity List (Matches Goal Image) === */
-    .day-content {
-        /* The goal image has no padding inside the content box */
-        padding: 0; 
-    }
-    .shift-activity-list {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-    .shift-activity-item {
-        padding: 12px 16px;
-        border-bottom: 1px solid var(--color-border);
-        display: flex; /* To align the dot and text */
-        align-items: center;
-        gap: 10px;
-    }
-    .shift-activity-item:last-child {
-        border-bottom: none;
-        flex-grow: 1; /* Pushes content up */
-    }
-    .activity-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background-color: var(--default); /* Default color */
-        flex-shrink: 0; /* Don't let it shrink */
-    }
-    .activity-details {
-        display: flex;
-        flex-direction: column;
-    }
-    .activity-time {
-        font-size: 12px;
-        font-weight: 500;
-        color: var(--color-text-muted);
-    }
-    .activity-title {
-        font-size: 14px;
-        font-weight: 500;
-        color: var(--color-text);
-    }
-    /* We need to override the RDO note to have padding again */
-    .day-content .rdo-note {
-        padding: 16px;
-    }
-
-    /* === NEW: Flat Activity List (Matches image_d965a7.png) === */
-    .day-content {
-        /* The goal image has no padding inside the content box */
-        padding: 0; 
-    }
-    .shift-activity-list {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-    .shift-activity-item {
-        padding: 12px 16px;
-        border-bottom: 1px solid var(--color-border);
-        display: flex; /* To align the dot and text */
-        align-items: center;
-        gap: 10px;
-    }
-    .shift-activity-item:last-child {
-        border-bottom: none;
-    }
-    .activity-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background-color: var(--default); /* Default color */
-        flex-shrink: 0; /* Don't let it shrink */
-    }
-    .activity-details {
-        display: flex;
-        flex-direction: column;
-    }
-    .activity-time {
-        font-size: 12px;
-        font-weight: 500;
-        color: var(--color-text-muted);
-    }
-    .activity-title {
-        font-size: 14px;
-        font-weight: 500;
-        color: var(--color-text);
-    }
-    /* We need to override the RDO note to have padding again */
-    .day-content .rdo-note {
-        padding: 16px;
-    }
-
-    /* === NEW: Flat Activity List (Matches image_d965a7.png) === */
-    .day-content {
-        /* The goal image has no padding inside the content box */
-        padding: 0; 
-    }
-    .shift-activity-list {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-    .shift-activity-item {
-        padding: 12px 16px;
-        border-bottom: 1px solid var(--color-border);
-        display: flex; /* To align the dot and text */
-        align-items: center;
-        gap: 10px;
-    }
-    .shift-activity-item:last-child {
-        border-bottom: none;
-    }
-    .activity-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background-color: var(--default); /* Default color */
-        flex-shrink: 0; /* Don't let it shrink */
-    }
-    .activity-details {
-        display: flex;
-        flex-direction: column;
-    }
-    .activity-time {
-        font-size: 12px;
-        font-weight: 500;
-        color: var(--color-text-muted);
-    }
-    .activity-title {
-        font-size: 14px;
-        font-weight: 500;
-        color: var(--color-text);
-    }
-    /* We need to override the RDO note to have padding again */
-    .day-content .rdo-note {
-        padding: 16px;
-    }
-    /* --- End of New Styles --- */
+    /* Removed all "NEW: Flat Activity List" sections as they are obsolete */
 
 
     /* === RESPONSIVE === */
     @media (max-width: 1024px) {
-}
+        /* Allow horizontal scrolling of the main container on tablets/mobile if necessary */
+         .content-area {
+            overflow-x: auto;
+        }
+    }
 
     @media (max-width: 768px) {
       /* App Layout Responsive (Mobile view - Sidebar hidden) */
@@ -576,10 +578,15 @@
           justify-content: space-between;
           width: 100%;
       }
+       /* The new time grid is complex for mobile. We ensure the container allows scrolling */
        #myRotaGrid {
-            /* Switch to single column list view on mobile */
-            grid-template-columns: 1fr;
-        }
+            /* Override previous mobile grid setting if it existed */
+            display: block; 
+       }
+       /* Ensure the grid structure holds a minimum width on mobile */
+       .summary-grid, .time-grid {
+            min-width: 800px; 
+       }
     }
   </style>
 </head>
@@ -722,9 +729,7 @@
        <div id="infoNote" class="notice info" style="display:none;"></div>
 
         <div id="tab-my-schedule" class="tab-content active">
-            <div id="myRotaGrid">
-                </div>
-        </div>
+            </div>
 
         <div id="tab-team-schedule" class="tab-content">
              <div id="teamScheduleView">
@@ -791,7 +796,8 @@ const ELS = {
     teamToggleBtn: document.getElementById("teamToggleBtn"),
     
     // Views
-    myRotaGrid: document.getElementById("myRotaGrid"),
+    // Updated: myRotaGrid now refers to the tab container where the visualization is rendered
+    myRotaGrid: document.getElementById("tab-my-schedule"),
     teamScheduleView: document.getElementById("teamScheduleView"),
     infoNote: document.getElementById("infoNote"),
     realtimeNote: document.getElementById("realtimeNote"),
@@ -799,8 +805,14 @@ const ELS = {
 
 // --- Constants & Helpers ---
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-const VIZ_START_H = 7, VIZ_END_H = 21;
-const VIZ_DURATION_MIN = (VIZ_END_H - VIZ_START_H) * 60;
+
+// Constants for the new Time Grid visualization (Photo 2 Style)
+// These define the start and end hours displayed on the grid.
+const TIMEGRID_START_H = 8; // 8 AM (Adjustable)
+const TIMEGRID_END_H = 21; // 9 PM (Adjustable)
+const TIMEGRID_INTERVAL_MIN = 30; // 30 minute slots
+
+
 // Get today's date in ISO format for comparison (using local time)
 const TODAY_ISO = new Date().toLocaleDateString('en-CA', {year: 'numeric', month: '2-digit', day: '2-digit'});
 
@@ -826,9 +838,8 @@ function hhmmToMinutes(t){
 }
 const m2t = m => `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
 
-// --- START OF NEW CODE ---
 
-// Helper: Calculate the length (in weeks) of a rotation pattern [cite: 563-567]
+// Helper: Calculate the length (in weeks) of a rotation pattern
 function calculateRotationLength(pattern) {
     let numWeeks = 0;
     if (pattern && pattern.pattern && Object.keys(pattern.pattern).length > 0) {
@@ -845,7 +856,7 @@ function calculateRotationLength(pattern) {
     return numWeeks;
 };
 
-// Calculates the effective week number based on the assignment start date [cite: 569-583]
+// Calculates the effective week number based on the assignment start date
 function getEffectiveWeek(startDateISO, weekStartISO, assignment, getPatternByName) {
     try {
         if (!startDateISO || !weekStartISO || !assignment) return null;
@@ -874,7 +885,7 @@ function getEffectiveWeek(startDateISO, weekStartISO, assignment, getPatternByNa
     }
 };
 
-// Helper: Finds the correct key in the pattern data [cite: 730-731]
+// Helper: Finds the correct key in the pattern data
 function findWeekKey(patternData, weekNumber) {
     const keys = Object.keys(patternData);
     return keys.find(k => {
@@ -884,18 +895,23 @@ function findWeekKey(patternData, weekNumber) {
 };
 
 
-// Color mapping
-function colorForCode(code){
+// Color mapping for the Time Grid (Photo 2 Style)
+function getBlockColor(code){
   const k = (code||"").toLowerCase();
-  if (k.includes("email")) return "var(--emails)";
-  if (k.includes("mirakl")) return "var(--mirakl)";
-  if (k.includes("whatsapp")) return "var(--whatsapp)";
-  if (k.includes("social")) return "var(--social)";
-  if (k.includes("meeting")||k.includes("coach")||k.includes("121")||k.includes("huddle")||k.includes("training")) return "var(--meeting)";
-  if (k.includes("overtime")) return "var(--overtime)";
-  if (k.includes("break")) return "var(--break)";
-  if (k.includes("lunch")) return "var(--lunch)";
-  if (k.includes("admin") || k.includes("payplus") || k.includes("qa") || k.includes("2nd line")) return "var(--admin)";
+  // Use the new CSS variables defined in :root
+  if (k.includes("break") || k.includes("lunch")) return "var(--color-break)";
+  // Use light yellow for meetings/coaching (as seen in Photo 2)
+  if (k.includes("meeting")||k.includes("coach")||k.includes("121")||k.includes("huddle")||k.includes("training")) return "var(--color-meeting)";
+  // Use orange for 'Projects' or similar secondary tasks
+  if (k.includes("projects")) return "var(--color-activity-secondary)";
+
+  // Defaulting others (Emails, Mirakl, Social, Admin, etc.) to the main activity color (Olive Green)
+  return "var(--color-activity-main)";
+}
+
+// Legacy Color mapping (Kept for Team Schedule View if needed, though it uses old variables)
+function colorForCode(code){
+  // This is mostly deprecated now, use getBlockColor for the main view.
   return "var(--default)";
 }
 
@@ -908,24 +924,18 @@ const STATE = {
     teamMembers: [],
     teamMemberIds: new Set(),
     monday: toMonday(new Date()),
-    definitions: {}, // Centralized store for ALL shift definitions (templates, shift_templates)
+    definitions: {}, // Centralized store for ALL shift definitions
     components: {}, // Store for schedule components (for structure format)
     currentTab: 'tab-my-schedule',
     currentWeekData: null,
     rotaRealtimeChannel: null,
     
-    // --- ADD THESE NEW PROPERTIES ---
     exceptions: [], // Stores schedule_exceptions
     rotationPatterns: {}, // Stores rotation_patterns by name
     assignments: new Map(), // Stores assignments by advisor_id
-    // --- END NEW PROPERTIES ---
 };
 
-/* ---- Data Normalization (Comprehensive Fix) ---- */
-
 /* ---- Live Schedule Calculation ---- */
-
-// (structureToSegments remains, tplToSegments and normalizeDayValue are removed)
 
 // Converts planner-style structures (using component_id) into display format
 function structureToSegments(structure) {
@@ -950,7 +960,7 @@ return sortedStructure.map(item => {
 }
 
 
-// --- NEW: The Live Schedule Calculator ---
+// --- The Live Schedule Calculator ---
 function calculateLiveSegments(advisorId, dayName, weekStartISO) {
     const dateISO = fmtDateLocal(addDays(new Date(weekStartISO + "T00:00:00"), DAYS.indexOf(dayName)));
 
@@ -1059,10 +1069,9 @@ function showApp() {
     ELS.weekStartInput.value = fmtDateLocal(STATE.monday);
 }
 
-// Load definitions from 'templates' AND 'shift_templates'
-// --- THIS IS THE NEW loadAllDefinitions FUNCTION ---
+// Load definitions
 async function loadAllDefinitions() {
-    // Load the planner's shift_definitions instead
+    // Load the planner's shift_definitions
     const { data } = await supabase.from("shift_definitions").select("*");
     
     // Clear existing definitions
@@ -1362,7 +1371,6 @@ async function handleSignOut(){
 }
 
 // --- Main Data Loading Logic ---
-// --- THIS IS THE NEW loadAndRender FUNCTION ---
 async function loadAndRender(){
     ELS.infoNote.style.display="none";
     if (!STATE.advisorId){
@@ -1371,9 +1379,17 @@ async function loadAndRender(){
         return;
     }
   
-    const loadingMsg = `<div class="notice info">Loading live schedule...</div>`;
-    ELS.myRotaGrid.innerHTML = loadingMsg;
-    ELS.teamScheduleView.innerHTML = loadingMsg;
+    // Show loading message only if the grid is currently empty or showing a previous loading message
+    if (ELS.myRotaGrid.innerHTML.trim() === '' || ELS.myRotaGrid.querySelector('.notice.info')) {
+        const loadingMsg = `<div class="notice info" style="margin: 24px;">Loading live schedule...</div>`;
+        ELS.myRotaGrid.innerHTML = loadingMsg;
+    }
+    
+    // Show loading for team view if visible
+    if (document.getElementById('tab-team-schedule').classList.contains('active')) {
+        ELS.teamScheduleView.innerHTML = `<div class="notice info" style="margin: 24px;">Loading team schedule...</div>`;
+    }
+
 
     const mondayISO = fmtDateLocal(STATE.monday);
     const dateRange = Array.from({length: 7}, (_, i) => fmtDateLocal(addDays(STATE.monday, i)));
@@ -1452,7 +1468,7 @@ async function loadAndRender(){
         return;
     }
 
-    // 6. Render views (this function call remains)
+    // 6. Render views
     renderViews();
 }
   
@@ -1460,38 +1476,144 @@ async function loadAndRender(){
 // Renders the views
 function renderViews() {
     if (!STATE.currentWeekData) return;
-drawMyRotaCalendar();
-drawTeamScheduleGrid();
+    drawMyRotaCalendar();
+    drawTeamScheduleGrid();
 }
 
 
 // --- My Rota (Calendar View) Rendering ---
-// (Implementation remains the same)
+// REWRITTEN for Vertical Time Grid Layout (Photo 2 Style)
 function drawMyRotaCalendar(){
-  
-  // --- THE CRASHING CODE BLOCK IS NOW GONE ---
+    if (!STATE.currentWeekData) return;
 
-  let html = '';
-DAYS.forEach((dayName, i) => {
-    const date = addDays(STATE.monday, i);
-    const dateISO = fmtDateLocal(date);
-    // --- START OF FIXED CODE ---
-    // This function *already* returns the final segments
-    const liveSegments = calculateLiveSegments(STATE.advisorId, dayName, STATE.currentWeekData.mondayISO);
-    // --- END OF FIXED CODE ---
-    const isToday = dateISO === TODAY_ISO;
+    // 1. Calculate all data needed for the week
+    const weekData = DAYS.map((dayName, i) => {
+        const date = addDays(STATE.monday, i);
+        const dateISO = fmtDateLocal(date);
+        // Use the centralized calculator
+        const segments = calculateLiveSegments(STATE.advisorId, dayName, STATE.currentWeekData.mondayISO);
+        const isToday = dateISO === TODAY_ISO;
+
+        // Determine the summary block content (Top section)
+        let summary = { type: 'rdo', text: 'Roster Day Off' };
+        if (segments.length > 0) {
+            const start = segments[0].start;
+            const end = segments[segments.length - 1].end;
+            // Use getMainActivitySummary as a placeholder for the shift name (e.g., "Middle")
+            const mainActivity = getMainActivitySummary(segments);
+
+            // Calculate duration (simple total duration for visualization)
+            const durationMin = segments.reduce((acc, seg) => {
+                 return acc + (hhmmToMinutes(seg.end) - hhmmToMinutes(seg.start));
+            }, 0);
+            
+            // Display integer hours as per Photo 2 style
+            const durationH = Math.round(durationMin / 60);
+            
+            // Format matching Photo 2: Activity \n Start - End \n Duration
+            summary = { type: 'shift', text: `${mainActivity}\n${start} - ${end}\n${durationH} h` };
+        }
+
+        return { dayName, date, dateISO, segments, isToday, summary };
+    });
+
+    // 2. Generate HTML Structure
+    let html = `<div class="schedule-container">`;
+
+    // 3. Generate Summary Grid (Top Section)
+    // Get Month Name for the header
+    const monthName = STATE.monday.toLocaleDateString('en-GB', { month: 'long' });
+
+    html += `<div class="summary-grid">
+                <div class="summary-header">${monthName}</div> <div class="summary-axis-label"></div>`; // Empty cell above time axis
+
+    weekData.forEach(day => {
+        html += `<div class="summary-day">
+                    <div class="summary-day-name">${day.dayName.toUpperCase()}</div>
+                    <div class="summary-day-date">${day.date.getDate()}</div>`;
+        
+        if (day.summary.type === 'shift') {
+            // Use <br> for line breaks in the summary block
+            html += `<div class="summary-block">${day.summary.text.replace(/\n/g, '<br>')}</div>`;
+        } else {
+            html += `<div class="summary-rdo">${day.summary.text}</div>`;
+        }
+        
+        html += `</div>`;
+    });
+    html += `</div>`; // Close summary-grid
+
+    // 4. Generate Detailed Time Grid (Bottom Section)
+    html += `<div class="time-grid-wrapper">
+                <div class="time-grid">`;
+
+    // 4a. Generate Grid Cells (Time Axis and Background)
+    const startMin = TIMEGRID_START_H * 60;
+    const endMin = TIMEGRID_END_H * 60;
     
-    html += `<div class="day-card ${isToday ? 'today' : ''}">
-                <div class="day-header">
-                    <h2 class="day-title">${dayName}</h2>
-       
-             <p class="day-date">${fmtDateFriendly(date)}</p>
-                </div>
-                <div class="day-content">
-                    ${renderDayContent(liveSegments)}
-                </div>
-            </div>`;
-  });
+    // We iterate up to (but not including) endMin for the grid lines
+    for (let m = startMin; m < endMin; m += TIMEGRID_INTERVAL_MIN) {
+        const time = m2t(m);
+        const isHour = m % 60 === 0;
+        const hourClass = isHour ? 'hour-mark' : '';
+
+        // Time Axis Cell - Show time only on the hour
+        html += `<div class="time-axis-cell ${hourClass}">${isHour ? time : ''}</div>`;
+
+        // Day Column Background Cells (These provide the horizontal lines)
+        for (let i = 0; i < 7; i++) {
+            html += `<div class="day-column-cell ${hourClass}"></div>`;
+        }
+    }
+
+    // 4b. Generate Event Containers and Positioned Events
+    
+    // We need the actual pixel height for calculations. We retrieve the CSS variable value.
+    // Default to 20px if retrieval fails (must match --timegrid-row-height default).
+    // We must ensure the document body is ready to read the computed style.
+    const rowHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--timegrid-row-height')) || 20;
+    const pixelsPerMinute = rowHeight / TIMEGRID_INTERVAL_MIN;
+
+    weekData.forEach((day, index) => {
+        // Calculate the column index (Start at 2 because column 1 is the time axis)
+        const colIndex = index + 2; 
+        html += `<div class="day-column-events" style="grid-column: ${colIndex};">`;
+
+        day.segments.forEach(seg => {
+            const segStartMin = hhmmToMinutes(seg.start);
+            const segEndMin = hhmmToMinutes(seg.end);
+            
+            // Constrain visualization to the grid boundaries
+            const visibleStartMin = Math.max(segStartMin, startMin);
+            const visibleEndMin = Math.min(segEndMin, endMin);
+
+            // Only render if the segment is visible within the time range
+            if (visibleStartMin < visibleEndMin) {
+                 // Calculate position and height
+                const topOffsetMin = visibleStartMin - startMin;
+                const durationMin = visibleEndMin - visibleStartMin;
+
+                const topPx = topOffsetMin * pixelsPerMinute;
+                const heightPx = durationMin * pixelsPerMinute;
+
+                // Use the specific color mapping for the time grid style
+                const color = getBlockColor(seg.code);
+                
+                // Format matching Photo 2: Activity \n Start - End
+                html += `<div class="activity-block" style="top: ${topPx}px; height: ${heightPx}px; background-color: ${color};">
+                            <span class="activity-title">${seg.code}</span>
+                            <span class="activity-time">${seg.start} - ${seg.end}</span>
+                         </div>`;
+            }
+        });
+
+        html += `</div>`; // Close day-column-events
+    });
+
+
+    html += `   </div>
+            </div>`; // Close time-grid and wrapper
+    html += `</div>`; // Close schedule-container
 
   ELS.myRotaGrid.innerHTML = html;
 }
@@ -1506,47 +1628,24 @@ function getMainActivitySummary(segments) {
     if (mainActivities.length === 0 && segments.length > 0) return "Breaks";
     if (mainActivities.length === 0) return "";
     
+    // Use a generic term like "Shift" or "Middle" as seen in Photo 2 if mixed
     if (mainActivities.every(val => val === mainActivities[0])) {
         return mainActivities[0];
     } else {
-        return "Mixed Activities";
+        return "Shift"; // Generic term if mixed
     }
 }
 
-// --- THIS IS THE NEW renderDayContent FUNCTION (Matches image_d965a7.png) ---
-function renderDayContent(segments) {
-    if (segments.length === 0) {
-        return `<div class="rdo-note">RDO</div>`;
-    }
-
-    // This is our new flat activity list
-    let contentHtml = `<div class="shift-activity-list">`;
-
-    segments.forEach(seg => {
-        const start = seg.start;
-        const end = seg.end;
-        const summary = seg.code; // Use the raw component name
-        const color = colorForCode(summary); // Get the color
-
-        // Add an item for each segment
-        contentHtml += `
-            <div class="shift-activity-item">
-                <span class="activity-dot" style="background-color: ${color};"></span>
-                <div class="activity-details">
-                    <span class="activity-time">${start} - ${end}</span>
-                    <span class="activity-title">${summary}</span>
-                </div>
-            </div>
-        `;
-    });
-
-    contentHtml += `</div>`;
-    return contentHtml;
-}
+// Removed renderDayContent as it is obsolete.
 
 // --- Team Schedule (Grid View) Rendering ---
 // (Implementation remains the same)
 function drawTeamScheduleGrid() {
+    // Ensure loading message is shown if empty
+    if (ELS.teamScheduleView.innerHTML.trim() === '') {
+        ELS.teamScheduleView.innerHTML = `<div class="notice info">Loading team schedule...</div>`;
+    }
+
     let html = `<table class="team-grid"><thead><tr><th>Advisor</th>`;
     // Header Row
     DAYS.forEach((dayName, i) => {
@@ -1559,18 +1658,14 @@ function drawTeamScheduleGrid() {
     STATE.teamMembers.forEach(member => {
         // Highlight the current user's row
         const isCurrentUser = member.id === STATE.advisorId;
-        html += `<tr style="${isCurrentUser ? 'background-color: #F0F9FF;' : ''}"><td>${member.name} ${isCurrentUser ? '<span class="tag">(You)</span>' : ''}</td>`;
+        // Use a slightly different background color for team view based on the utilitarian theme
+        html += `<tr style="${isCurrentUser ? 'background-color: #E3F2FD;' : ''}"><td>${member.name} ${isCurrentUser ? '<span class="tag">(You)</span>' : ''}</td>`;
         
-        // --- START OF CHANGES ---
-        // We removed the "if (!advisorRota)" logic
         DAYS.forEach(dayName => {
-            // --- START OF FIXED CODE ---
             // This function *already* returns the final segments
             const liveSegments = calculateLiveSegments(member.id, dayName, STATE.currentWeekData.mondayISO);
-            // --- END OF FIXED CODE ---
             html += `<td>${renderTeamGridCell(liveSegments)}</td>`; // <-- Use liveSegments
         });
-        // --- END OF CHANGES ---
         
         html 
 += `</tr>`;
@@ -1597,7 +1692,6 @@ function renderTeamGridCell(segments) {
 
 // --- Real-Time Updates ---
 // (Implementation remains the same)
-// --- THIS IS THE NEW startRealtime FUNCTION ---
 async function startRealtime(){
     if (!STATE.advisorId) return;
 
