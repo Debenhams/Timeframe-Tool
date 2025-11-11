@@ -463,16 +463,104 @@
     .day-content .rdo-note {
         padding: 16px;
     }
+
+    /* === NEW: Flat Activity List (Matches image_d965a7.png) === */
+    .day-content {
+        /* The goal image has no padding inside the content box */
+        padding: 0; 
+    }
+    .shift-activity-list {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    .shift-activity-item {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--color-border);
+        display: flex; /* To align the dot and text */
+        align-items: center;
+        gap: 10px;
+    }
+    .shift-activity-item:last-child {
+        border-bottom: none;
+    }
+    .activity-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: var(--default); /* Default color */
+        flex-shrink: 0; /* Don't let it shrink */
+    }
+    .activity-details {
+        display: flex;
+        flex-direction: column;
+    }
+    .activity-time {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--color-text-muted);
+    }
+    .activity-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--color-text);
+    }
+    /* We need to override the RDO note to have padding again */
+    .day-content .rdo-note {
+        padding: 16px;
+    }
+
+    /* === NEW: Flat Activity List (Matches image_d965a7.png) === */
+    .day-content {
+        /* The goal image has no padding inside the content box */
+        padding: 0; 
+    }
+    .shift-activity-list {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    .shift-activity-item {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--color-border);
+        display: flex; /* To align the dot and text */
+        align-items: center;
+        gap: 10px;
+    }
+    .shift-activity-item:last-child {
+        border-bottom: none;
+    }
+    .activity-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: var(--default); /* Default color */
+        flex-shrink: 0; /* Don't let it shrink */
+    }
+    .activity-details {
+        display: flex;
+        flex-direction: column;
+    }
+    .activity-time {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--color-text-muted);
+    }
+    .activity-title {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--color-text);
+    }
+    /* We need to override the RDO note to have padding again */
+    .day-content .rdo-note {
+        padding: 16px;
+    }
     /* --- End of New Styles --- */
 
 
     /* === RESPONSIVE === */
     @media (max-width: 1024px) {
-        #myRotaGrid {
-            /* Switch to 3 columns on tablets */
-            grid-template-columns: repeat(3, 1fr);
-        }
-    }
+}
 
     @media (max-width: 768px) {
       /* App Layout Responsive (Mobile view - Sidebar hidden) */
