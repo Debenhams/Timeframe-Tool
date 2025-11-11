@@ -978,7 +978,10 @@ Utils.addDaysISO = (iso, days) => {
                 <td><span style="display: inline-block; width: 20px; height: 20px; background-color: ${comp.color}; border-radius: 4px;"></span></td>
                 <td>${comp.default_duration_min}m</td>
                 <td>${comp.is_paid ? 'Yes' : 'No'}</td>
-                <td class="actions"><button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button></td>
+                <td class="actions">
+                    <button class="btn btn-sm btn-primary edit-component" data-component-id="${comp.id}">Edit</button>
+                    <button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button>
+                </td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -1012,9 +1015,53 @@ Utils.addDaysISO = (iso, days) => {
     const handleClick = (e) => {
         if (e.target.classList.contains('delete-component')) {
             handleDelete(e.target.dataset.componentId);
-        }
+        } else if (e.target.classList.contains('edit-component')) {
+            handleEdit(e.target.dataset.componentId);
+}
+    };
+const handleEdit = async (id) => {
+    const component = APP.StateManager.getComponentById(id);
+    if (!component) return;
+
+    // Basic prompt-based input, pre-filled with existing data
+    const name = prompt("Enter component name:", component.name);
+    if (name === null) return; // User cancelled
+
+    const type = prompt("Enter type (Activity, Break, Lunch, Shrinkage, Absence):", component.type);
+    if (type === null) return;
+
+    const color = prompt("Enter hex color code (e.g., '#3498db'):", component.color);
+    if (color === null) return;
+
+    const durationStr = prompt("Enter default duration in minutes:", component.default_duration_min);
+    if (durationStr === null) return;
+    const duration = parseInt(durationStr, 10);
+
+    const isPaid = confirm("Is this a paid activity?", component.is_paid);
+
+    if (!name || !type || !color || isNaN(duration)) {
+        APP.Utils.showToast("Invalid input provided.", "danger");
+        return;
+    }
+
+    const updatedComponent = {
+        id: id, // Include the ID for the update
+        name, 
+        type, 
+        color, 
+        default_duration_min: duration, 
+        is_paid: isPaid 
     };
 
+    // Use updateRecord instead of saveRecord
+    const { data, error } = await APP.DataService.updateRecord('schedule_components', updatedComponent, { id: id });
+
+    if (!error) {
+        APP.StateManager.syncRecord('schedule_components', data);
+        APP.Utils.showToast(`Component '${name}' updated.`, "success");
+        ComponentManager.render();
+    }
+};
     const handleDelete = async (id) => {
         const component = APP.StateManager.getComponentById(id);
         if (!component || !confirm(`Are you sure you want to delete '${component.name}'?`)) return;
