@@ -106,7 +106,21 @@
     .btn-login:disabled { opacity: 0.6; cursor: not-allowed; }
     .auth-notice { margin-top: 24px; padding: 12px; border-radius: var(--border-radius); display: none; font-size: 14px; }
     .auth-notice.error { background-color: #FEE2E2; color: #991B1B; border: 1px solid #FCA5A5; }
+    .auth-notice.success { background-color: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
     .auth-footer { margin-top: auto; padding-top: 24px; font-size: 12px; color: var(--login-text-muted); border-top: 1px solid var(--login-input-border); }
+
+    /* New: Forgot Password Styling */
+    .auth-link {
+        color: var(--login-text-muted);
+        cursor: pointer;
+        text-decoration: underline;
+        font-size: 13px;
+        display: block;
+        margin-top: 8px;
+    }
+    .auth-link:hover {
+        color: var(--login-text);
+    }
 
     @media (max-width: 992px) {
       .auth-banner { width: 50%; }
@@ -451,24 +465,52 @@
         <h2 class="auth-title">Advisor Portal</h2>
         <p class="auth-motto">Powered by WFM Intelligence</p>
 
-        <form id="auth-form" class="auth-form">
-            <p class="auth-welcome">Welcome. Please sign in.</p>
+        <div id="signInView">
+            <form id="auth-form" class="auth-form">
+                <p class="auth-welcome">Welcome. Please sign in.</p>
 
-            <div class="form-group">
-                <label for="emailInput">Email Address</label>
-                <input type="email" id="emailInput" class="form-input" placeholder="Enter your work email" autofocus>
-            </div>
-            <div class="form-group">
-                <label for="passwordInput">Password</label>
-                <input type="password" id="passwordInput" class="form-input" placeholder="Enter your password">
-            </div>
-            <button type="submit" id="signInBtn" class="btn-login">Sign In</button>
-        </form>
+                <div class="form-group">
+                    <label for="emailInput">Email Address</label>
+                    <input type="email" id="emailInput" class="form-input" placeholder="Enter your work email" autofocus>
+                </div>
+                <div class="form-group">
+                    <label for="passwordInput">Password</label>
+                    <input type="password" id="passwordInput" class="form-input" placeholder="Enter your password">
+                    <span class="auth-link" onclick="toggleAuthView('forgot')">Forgot Password?</span>
+                </div>
+                <button type="submit" id="signInBtn" class="btn-login">Sign In</button>
+            </form>
+        </div>
+
+        <div id="forgotPasswordView" style="display:none;">
+             <form id="forgot-password-form" class="auth-form">
+                <p class="auth-welcome">Reset Password. Enter your email to receive a reset link.</p>
+
+                <div class="form-group">
+                    <label for="resetEmailInput">Email Address</label>
+                    <input type="email" id="resetEmailInput" class="form-input" placeholder="Enter your work email">
+                </div>
+                <button type="submit" id="sendResetBtn" class="btn-login">Send Reset Link</button>
+                <span class="auth-link" onclick="toggleAuthView('signin')">Back to Sign In</span>
+            </form>
+        </div>
+          
+        <div id="updatePasswordView" style="display:none;">
+             <form id="update-password-form" class="auth-form">
+                <p class="auth-welcome">Set New Password.</p>
+
+                <div class="form-group">
+                    <label for="newPasswordInput">New Password</label>
+                    <input type="password" id="newPasswordInput" class="form-input" placeholder="Enter your new password">
+                </div>
+                <button type="submit" id="updatePasswordBtn" class="btn-login">Update Password</button>
+            </form>
+        </div>
 
         <div id="authNotice" class="auth-notice"></div>
 
         <div class="auth-footer">
-            WFM Advisor Portal (v4)
+            WFM Advisor Portal (v5)
         </div>
       </div>
     </div>
@@ -585,9 +627,18 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const ELS = {
     // Auth
     authForm: document.getElementById("auth-form"),
+    forgotPasswordForm: document.getElementById("forgot-password-form"),
+    updatePasswordForm: document.getElementById("update-password-form"),
+    signInView: document.getElementById("signInView"),
+    forgotPasswordView: document.getElementById("forgotPasswordView"),
+    updatePasswordView: document.getElementById("updatePasswordView"),
     emailInput: document.getElementById("emailInput"),
+    resetEmailInput: document.getElementById("resetEmailInput"),
+    newPasswordInput: document.getElementById("newPasswordInput"),
     passwordInput: document.getElementById("passwordInput"),
     signInBtn: document.getElementById("signInBtn"),
+    sendResetBtn: document.getElementById("sendResetBtn"),
+    updatePasswordBtn: document.getElementById("updatePasswordBtn"),
     authNotice: document.getElementById("authNotice"),
 
     // App Layout & Nav
@@ -672,6 +723,8 @@ const STATE = {
 };
 
 /* ---- Data Normalization (Comprehensive Fix) ---- */
+
+// (tplToSegments, structureToSegments, normalizeDayValue functions remain the same)
 // Converts templates/shift_templates into detailed segments
 function tplToSegments(t){
   const startTime = t.start_time;
@@ -748,7 +801,6 @@ function normalizeDayValue(dayVal){
   if(typeof dayVal==="string" && dayVal.trim() !== ""){
     const def = STATE.definitions[dayVal.trim()];
     if(!def) {
-        // console.warn(`Definition not found: ${dayVal.trim()}`);
         return { segments: [] }; 
     }
     return { segments: tplToSegments(def) };
@@ -763,30 +815,44 @@ async function init(){
   // 1. Setup Auth UI Events
   setupAuthUIEvents();
 
-  // 2. Load Definitions (CRITICAL FIX: Load all required data sources)
+  // 2. Check for Password Recovery Mode
+  const hash = window.location.hash;
+  if (hash && hash.includes("type=recovery")) {
+      toggleAuthView('update');
+      // Proceed to step 3, as Supabase handles the session in the background
+  }
+
+  // 3. Load Definitions
   await Promise.all([loadAllDefinitions(), loadComponents()]);
 
-  // 3. Authentication Check
+  // 4. Authentication Check
   await supabase.auth.getSession();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user){
-    document.body.classList.remove('authenticated');
+    // If no user and not in recovery mode, show login
+    if (!hash || !hash.includes("type=recovery")) {
+        document.body.classList.remove('authenticated');
+    }
     return;
   }
 
+  // If user exists (either pre-existing session or just recovered)
   STATE.user = user;
   
-  // 4. Identify Advisor and Team
+  // 5. Identify Advisor and Team
   await identifyAdvisorAndTeam(user);
 
-  // 5. Setup App UI Controls
+  // 6. Setup App UI Controls
   setupAppUIEvents();
   
-  // 6. Show App, Initial Render, and Start Realtime
-  showApp();
-  await loadAndRender();
-  await startRealtime();
+  // 7. Show App, Initial Render, and Start Realtime
+  // Only show the app if not currently updating the password (which happens in the overlay)
+  if (ELS.updatePasswordView.style.display !== 'block') {
+    showApp();
+    await loadAndRender();
+    await startRealtime();
+  }
 }
 
 function showApp() {
@@ -815,6 +881,7 @@ async function loadComponents() {
 
 
 async function identifyAdvisorAndTeam(user) {
+    // (Implementation remains the same)
     // 1. Identify Advisor ID
     const { data: profile } = await supabase.from("profiles").select("advisor_id").eq("user_id", user.id).maybeSingle();
 
@@ -871,7 +938,39 @@ function setupAuthUIEvents() {
     if (ELS.authForm) {
         ELS.authForm.addEventListener('submit', handleSignInWithPassword);
     }
+    if (ELS.forgotPasswordForm) {
+        ELS.forgotPasswordForm.addEventListener('submit', handleForgotPasswordRequest);
+    }
+    if (ELS.updatePasswordForm) {
+         ELS.updatePasswordForm.addEventListener('submit', handlePasswordUpdate);
+    }
 }
+
+// Toggle between Auth views
+function toggleAuthView(view) {
+    ELS.authNotice.style.display = 'none'; // Clear previous notices
+    ELS.signInView.style.display = 'none';
+    ELS.forgotPasswordView.style.display = 'none';
+    ELS.updatePasswordView.style.display = 'none';
+
+    if (view === 'forgot') {
+        ELS.forgotPasswordView.style.display = 'block';
+        // Prefill email if available
+        if (ELS.emailInput.value) {
+            ELS.resetEmailInput.value = ELS.emailInput.value;
+        }
+        ELS.resetEmailInput.focus();
+    } else if (view === 'update') {
+        ELS.updatePasswordView.style.display = 'block';
+        ELS.newPasswordInput.focus();
+    } else {
+        ELS.signInView.style.display = 'block';
+        ELS.emailInput.focus();
+    }
+}
+// Expose toggle function to global scope for onclick attribute
+window.toggleAuthView = toggleAuthView;
+
 
 function setupAppUIEvents() {
     ELS.signOutBtn.onclick = handleSignOut;
@@ -964,14 +1063,104 @@ async function handleSignInWithPassword(event){
   }
 }
 
+// Handle Forgot Password Request (Initiation)
+async function handleForgotPasswordRequest(event) {
+    event.preventDefault();
+    ELS.authNotice.style.display = 'none';
+    const email = ELS.resetEmailInput.value.trim();
+
+    if (!email) {
+        ELS.authNotice.textContent = "Please enter your email address.";
+        ELS.authNotice.className = 'auth-notice error';
+        ELS.authNotice.style.display = 'block';
+        return;
+    }
+
+    ELS.sendResetBtn.disabled = true;
+    ELS.sendResetBtn.textContent = "Sending...";
+
+    try {
+        // Determine the redirect URL robustly
+        let redirectUrl = undefined;
+        if (location.origin && location.origin !== "null" && location.protocol !== 'file:') {
+            redirectUrl = location.origin + location.pathname;
+        }
+
+        // Trigger the password reset email
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: redirectUrl,
+        });
+
+        if (error) throw error;
+
+        // Success
+        ELS.authNotice.textContent = "Password reset link sent. Please check your email.";
+        ELS.authNotice.className = 'auth-notice success';
+        ELS.authNotice.style.display = 'block';
+        ELS.resetEmailInput.value = '';
+
+    } catch (e) {
+        ELS.authNotice.textContent = "Error: " + e.message;
+        ELS.authNotice.className = 'auth-notice error';
+        ELS.authNotice.style.display = 'block';
+    } finally {
+        ELS.sendResetBtn.disabled = false;
+        ELS.sendResetBtn.textContent = "Send Reset Link";
+    }
+}
+
+// Handle Password Update (Completion)
+async function handlePasswordUpdate(event) {
+    event.preventDefault();
+    ELS.authNotice.style.display = 'none';
+    const newPassword = ELS.newPasswordInput.value;
+
+    if (!newPassword || newPassword.length < 6) {
+        ELS.authNotice.textContent = "Password must be at least 6 characters.";
+        ELS.authNotice.className = 'auth-notice error';
+        ELS.authNotice.style.display = 'block';
+        return;
+    }
+
+    ELS.updatePasswordBtn.disabled = true;
+    ELS.updatePasswordBtn.textContent = "Updating...";
+
+    try {
+        // Update the user's password using the active recovery session
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+        if (error) throw error;
+
+        // Success
+        ELS.authNotice.textContent = "Password updated successfully. Initializing...";
+        ELS.authNotice.className = 'auth-notice success';
+        ELS.authNotice.style.display = 'block';
+        
+        // Reload the page to clear the hash and initialize the app fully
+        // Use location.href = location.pathname to remove the hash from the URL
+        setTimeout(() => location.href = location.pathname, 1000);
+
+    } catch (e) {
+        ELS.authNotice.textContent = "Error updating password: " + e.message;
+        ELS.authNotice.className = 'auth-notice error';
+        ELS.authNotice.style.display = 'block';
+    } finally {
+        ELS.updatePasswordBtn.disabled = false;
+        ELS.updatePasswordBtn.textContent = "Update Password";
+    }
+}
+
+
 async function handleSignOut(){
     await stopRealtime();
     await supabase.auth.signOut();
-    location.reload();
+    // Ensure we redirect to the base path without any URL hash
+    location.href = location.pathname;
 }
 
 // --- Main Data Loading Logic ---
 async function loadAndRender(){
+    // (Implementation remains the same as previous response)
     ELS.infoNote.style.display="none";
     if (!STATE.advisorId){
         const msg = `<div class="notice info">Your account isn’t linked to an advisor profile. Please contact the planning team.</div>`;
@@ -1045,6 +1234,7 @@ function renderViews() {
 
 
 // --- My Rota (Calendar View) Rendering ---
+// (Implementation remains the same)
 function drawMyRotaCalendar(rotaData){
   
   if (Object.keys(rotaData).length === 0) {
@@ -1081,7 +1271,8 @@ function getMainActivitySummary(segments) {
         return !code.includes('break') && !code.includes('lunch');
     }).map(s => s.code);
     
-    if (mainActivities.length === 0) return "Breaks";
+    if (mainActivities.length === 0 && segments.length > 0) return "Breaks";
+    if (mainActivities.length === 0) return "";
     
     if (mainActivities.every(val => val === mainActivities[0])) {
         return mainActivities[0];
@@ -1127,6 +1318,7 @@ function renderDayContent(segments) {
 }
 
 // --- Team Schedule (Grid View) Rendering ---
+// (Implementation remains the same)
 function drawTeamScheduleGrid(teamRotas) {
     let html = `<table class="team-grid"><thead><tr><th>Advisor</th>`;
     // Header Row
@@ -1174,7 +1366,7 @@ function renderTeamGridCell(segments) {
 }
 
 // --- Real-Time Updates ---
-
+// (Implementation remains the same)
 async function startRealtime(){
   if (!STATE.advisorId) return;
   const mondayISO = fmtDateLocal(STATE.monday);
