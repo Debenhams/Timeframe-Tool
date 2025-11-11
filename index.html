@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WFM Intelligence Platform (v15.8.3)</title>
+  <title>WFM Intelligence Platform (v15.8.2)</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
@@ -12,14 +12,10 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <!-- Make sure this path is correct -->
-  <link rel="stylesheet" href="./styles/planner.css?v=15.8.3" />
+  <link rel="stylesheet" href="./styles/planner.css?v=15.8.2" />
 </head>
 <body>
 
-  <!-- ==================================================================== -->
-  <!-- AUTH OVERLAY - This is the new, multi-panel login UI -->
-  <!-- ==================================================================== -->
   <div id="auth-overlay" class="auth-overlay">
     <div class="auth-container">
       <div class="auth-banner">
@@ -28,7 +24,7 @@
                     <div class="dg-text">
                     <span class="dg-main-text">Debenhams</span>
                     <span class="dg-sub-text">GROUP</span>
-                    </div>
+                </div>
             </div>
             <div class="dg-tagline">
                 FASHION. BEAUTY. LIFESTYLE.<br>
@@ -37,72 +33,36 @@
         </div>
       </div>
       <div class="auth-form-panel">
-        <h2 class="auth-title">WFM Intelligence</h2>
-        <p class="auth-motto">Planning for our people, powering our success</p>
+    <h2 class="auth-title">WFM Intelligence</h2>
 
-        <!-- Notification area for all views -->
-        <div id="authNotice" class="auth-notice" style="display:none;"></div>
+    <p class="auth-motto">Planning for our people, powering our success</p>
 
-        <!-- ====== View 1: Sign In (Default) ====== -->
-        <div id="signInView">
-          <form id="auth-form" class="auth-form" novalidate>
-              <div class="form-group">
-                  <label for="emailInput">Email</label>
-                  <input type="email" id="emailInput" class="form-input" placeholder="Enter your email" autofocus>
-              </div>
-              <div class="form-group">
-                  <label for="passwordInput">Password</label>
-                  <input type="password" id="passwordInput" class="form-input" placeholder="Enter your password">
-              </div>
-              <button type="submit" class="btn btn-login">Authenticate</button>
-          </form>
-          <div class="auth-links">
-            <a href="#" id="forgotPasswordLink">Forgot your password?</a>
-          </div>
-        </div>
-
-        <!-- ====== View 2: Forgot Password ====== -->
-        <div id="forgotPasswordView" style="display:none;">
-          <p class="auth-helper-text">Enter your email and we'll send you a link to reset your password.</p>
-          <form id="forgot-password-form" class="auth-form" novalidate>
+    <form id="auth-form" class="auth-form" novalidate>
             <div class="form-group">
-                <label for="resetEmailInput">Email</label>
-                <input type="email" id="resetEmailInput" class="form-input" placeholder="Enter your email" autofocus>
+                <label for="emailInput">Email</label>
+                <input type="email" id="emailInput" class="form-input" placeholder="Enter your email" autofocus>
             </div>
-            <button type="submit" class="btn btn-login">Send Reset Link</button>
-          </form>
-          <div class="auth-links">
-            <a href="#" id="backToSignInLink">Back to Sign In</a>
-          </div>
+            <div class="form-group">
+                <label for="passwordInput">Password</label>
+                <input type="password" id="passwordInput" class="form-input" placeholder="Enter your password">
+            </div>
+            <button type="submit" class="btn btn-login">Authenticate</button>
+        </form>
+        <div id="authErrorMessage" class="auth-error-message" style="display:none;">
+            Invalid email or password.
         </div>
 
-        <!-- ====== View 3: Update Password (from link) ====== -->
-        <div id="updatePasswordView" style="display:none;">
-          <p class="auth-helper-text">You're almost done. Enter your new password below.</p>
-          <form id="update-password-form" class="auth-form" novalidate>
-            <div class="form-group">
-                <label for="newPasswordInput">New Password</label>
-                <input type="password" id="newPasswordInput" class="form-input" placeholder="Enter new password (min. 6)" autofocus>
-            </div>
-            <button type="submit" class="btn btn-login">Update Password</button>
-          </form>
-        </div>
-        
-        <blockquote>
-          <p>"Great planning is the art of making complexity look simple."</p>
-        </blockquote>
-        <div class="auth-footer">
-            WFM Intelligence Platform (v15.8.3)
+    <blockquote>
+      <p>"Great planning is the art of making complexity look simple."</p>
+    </blockquote>
+
+    <div class="auth-footer">
+            WFM Intelligence Platform (v15.8.2)
         </div>
       </div>
     </div>
   </div>
-  <!-- ==================================================================== -->
-  <!-- END AUTH OVERLAY -->
-  <!-- ==================================================================== -->
-
-  <!-- The main application (hidden by default via planner.css) -->
-  <aside class="app-sidebar">
+    <aside class="app-sidebar">
     <div class="sidebar-header">
         WFM Intelligence
     </div>
@@ -121,10 +81,12 @@ stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="r
             <span>Shift Swop</span>
         </button>
 
+
         <button class="tab-link" data-tab="tab-rotation-editor" title="Rotation Editor">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
             <span>Rotation Editor</span>
         </button>
+        
         
    <button class="tab-link" data-tab="tab-shift-definitions" title="Shift Definitions">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
@@ -143,6 +105,7 @@ width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" str
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" 
 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82-.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             <span>Components</span>
+        
         </button>
     </nav>
   </aside>
@@ -155,61 +118,77 @@ stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="r
             <input type="text" id="weekStart" class="week-picker" placeholder="Select week..." />
             
             <button id="prevWeek" class="btn-icon" title="Previous Week">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    
+                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
             </button>
             <button id="nextWeek" class="btn-icon" title="Next Week">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-            </button>
+            
+       </button>
             
             <div class="separator"></div>
             
             <button id="btnUndo" class="btn-icon" title="Undo" disabled>
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l-3 2.7"></path></svg>
+ 
             </button>
             <button id="btnRedo" class="btn-icon" title="Redo" disabled>
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17v-6h6"></path><path d="M21 7a9 9 0 0 1-9 9 9 9 0 0 1-6-2.3l3-2.7"></path></svg>
             </button>
         </div>
         <div class="ai-assistant-placeholder">
+  
              <input type="text" class="form-input" placeholder="Ask AI Assistant (Future Feature)" disabled>
         </div>
     </header>
 
     <main class="content-area" id="main-content-area">
-      <!-- All content tabs load here -->
+
       <section id="tab-schedule-view" class="tab-content active planner-section">
         <div class="planner-layout">
             <div class="planner-controls card">
                 <h2>Team Selection</h2>
-                <input type="text" id="treeSearch" class="form-input" placeholder="Filter leaders/advisors...">
+                
+   <input type="text" id="treeSearch" class="form-input" placeholder="Filter leaders/advisors...">
                 <button id="btnClearSelection" class="btn btn-secondary btn-sm" style="margin-top: 8px;">Clear All</button>
                 <div class="schedules-tree" id="schedulesTree">
-                </div>
+                  </div>
             </div>
             <div class="planner-viewer card">
-                <div class="planner-header">
-                    <h2 id="scheduleViewTitle">Schedule Visualization</h2>
-                    <div class="planner-view-controls">
-                        <div class="view-toggle-group" id="viewToggleGroup">
-                            <button class="btn-toggle active" data-view="daily">Daily</button>
-                            <button class="btn-toggle" data-view="weekly">Weekly</button>
+    
+                 <div class="planner-header">
+                     <h2 id="scheduleViewTitle">Schedule Visualization</h2>
+                     
+                     <div class="planner-view-controls">
+                         <div class="view-toggle-group" 
+id="viewToggleGroup">
+                             <button class="btn-toggle active" data-view="daily">Daily</button>
+                             <button class="btn-toggle" data-view="weekly">Weekly</button>
+                         </div>
+
+                 
+               <div class="planner-day-toggle" id="dayToggleContainer">
+                             <label for="plannerDay">Day:</label>
+                             <select id="plannerDay" class="form-select">
+                             <option value="Monday">Monday</option>
+ 
+                              <option value="Tuesday">Tuesday</option>
+                             <option value="Wednesday">Wednesday</option>
+                             <option value="Thursday">Thursday</option>
+                 
+                              <option value="Friday">Friday</option>
+                             <option value="Saturday">Saturday</option>
+                             <option value="Sunday">Sunday</option>
+                            
+   </select>
+                         </div>
+                     </div>
+                 </div>
+                
+                 <div class="visualization-container" id="visualizationContainer">
+     
                         </div>
-                        <div class="planner-day-toggle" id="dayToggleContainer">
-                            <label for="plannerDay">Day:</label>
-                            <select id="plannerDay" class="form-select">
-                            <option value="Monday">Monday</option>
-                            <option value="Tuesday">Tuesday</option>
-                            <option value="Wednesday">Wednesday</option>
-                            <option value="Thursday">Thursday</option>
-                            <option value="Friday">Friday</option>
-                            <option value="Saturday">Saturday</option>
-                            <option value="Sunday">Sunday</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="visualization-container" id="visualizationContainer">
-                </div>
+                
             </div>
         </div>
       </section>
@@ -217,49 +196,58 @@ stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="r
       <section id="tab-trade-center" class="tab-content">
         <div class="card">
             <h2>Shift Swop</h2>
-            <p class="helper-text">Select two advisors and the corresponding dates to trade their schedules.
+
+            <p 
+class="helper-text">Select two advisors and the corresponding dates to trade their schedules.
 This creates exceptions for the selected dates only.</p>
             
             <div class="trade-layout">
                 <div class="trade-panel">
                     <h3>Trade Slot 1</h3>
                     <div class="form-group">
-                        <label for="tradeAdvisor1">Advisor 1</label>
+        
+                         <label for="tradeAdvisor1">Advisor 1</label>
                         <select id="tradeAdvisor1" class="form-select trade-advisor"></select>
                     </div>
                     <div class="form-group">
-                        <label for="tradeDate1">Date 1</label>
+                 
+                       <label for="tradeDate1">Date 1</label>
                         <input type="text" id="tradeDate1" class="form-input trade-date-picker" placeholder="Select date...">
                     </div>
                     <div class="trade-preview" id="tradePreview1">
-                        Select advisor and date to preview schedule.
-                    </div>
+                
+                    Select advisor and date to preview schedule.
+</div>
                 </div>
 
                 <div class="trade-swap-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
                 </div>
                 
+   
                 <div class="trade-panel">
                     <h3>Trade Slot 2</h3>
-                    <div class="form-group">
-                        <label for="tradeAdvisor2">Advisor 2</label>
-                        <select id="tradeAdvisor2" class="form-select trade-advisor"></select>
-                    </div>
-                    <div class="form-group">
-                        <label for="tradeDate2">Date 2</label>
-                        <input type="text" id="tradeDate2" class="form-input trade-date-picker" placeholder="Select date...">
-                    </div>
-                    <div class="trade-preview" id="tradePreview2">
-                        Select advisor and date to preview schedule.
-                    </div>
+                     <div class="form-group">
+                         <label for="tradeAdvisor2">Advisor 2</label>
+                
+                          <select id="tradeAdvisor2" class="form-select trade-advisor"></select>
+                     </div>
+                     <div class="form-group">
+                         <label for="tradeDate2">Date 2</label>
+                
+                          <input type="text" id="tradeDate2" class="form-input trade-date-picker" placeholder="Select date...">
+                     </div>
+                     <div class="trade-preview" id="tradePreview2">
+                         Select advisor and date to preview schedule.
+</div>
                 </div>
             </div>
 
             <div class="trade-actions">
                  <div class="form-group" style="max-width: 500px; margin: 0 auto 16px auto;">
-                    <label for="tradeReason">Reason for Trade (Required)</label>
-                    <input type="text" id="tradeReason" class="form-input" placeholder="e.g., Mutual agreement, Operational need...">
+                     <label for="tradeReason">Reason for Trade (Required)</label>
+                
+                      <input type="text" id="tradeReason" class="form-input" placeholder="e.g., Mutual agreement, Operational need...">
                  </div>
                 <button id="btnExecuteTrade" class="btn btn-primary btn-lg" disabled>Execute Trade</button>
             </div>
@@ -268,31 +256,35 @@ This creates exceptions for the selected dates only.</p>
 
       <section id="tab-rotation-editor" class="tab-content">
         <div class="card">
+ 
             <div class="editor-controls">
             <div class="form-group">
                 <label for="rotationFamily">Rotation Family</label>
                 <select id="rotationFamily" class="form-select"></select>
             </div>
             <div class="editor-buttons">
-                <span id="autoSaveStatus" class="auto-save-status"></span>
+                
+   <span id="autoSaveStatus" class="auto-save-status"></span>
                 <button id="btnAddWeek" class="btn btn-secondary" disabled>[+] Add Week (Top)</button>
                 <button id="btnNewRotation" class="btn btn-primary">[+] New Rotation</button>
                 <button id="btnDeleteRotation" class="btn btn-danger">
                 Delete Rotation
-                </button>
+                
+</button>
             </div>
             </div>
             <p class="helper-text">Select a predefined Shift Definition for each day.
 Changes are saved automatically. Rotations are finite and do not repeat.</p>
             <div class="table-container" id="rotationGrid">
-            </div>
+              </div>
         </div>
       </section>
 
       <section id="tab-shift-definitions" class="tab-content">
         <div class="card">
             <div class="editor-controls">
-                <h2>Shift Library</h2>
+                
+<h2>Shift Library</h2>
                 <div class="editor-buttons">
                     <button id="btnNewShiftDefinition" class="btn btn-primary">[+] New Shift Definition</button>
                 </div>
@@ -300,23 +292,26 @@ Changes are saved automatically. Rotations are finite and do not repeat.</p>
             <p class="helper-text">Define available shifts.
 Click 'Edit Structure' to configure using the Sequential Builder.</p>
             <div class="table-container" id="shiftDefinitionsGrid">
-            </div>
+              </div>
         </div>
       </section>
       
       <section id="tab-advisor-assignments" class="tab-content">
         <div class="card">
             <h2>Advisor Assignments</h2>
-            <p class="helper-text">Manage rotation assignments and swaps. Use the action buttons to apply changes for specific periods.</p>
+            
+<p class="helper-text">Manage rotation assignments and swaps. Use the action buttons to apply changes for specific periods.</p>
             <div class="table-container" id="assignmentGrid">
-            </div>
+              </div>
         </div>
+        
       </section>
 
       <section id="tab-component-manager" class="tab-content">
         <div class="card">
             <div class="editor-controls">
-                <h2>Schedule Components</h2>
+ 
+                 <h2>Schedule Components</h2>
                 <div class="editor-buttons">
                     <button id="btnNewComponent" class="btn btn-primary">[+] New Component</button>
                 </div>
@@ -331,20 +326,21 @@ blocks for shifts (Activities, Breaks, Lunch, etc.).</p>
     </main>
   </div> 
 
-  <!-- Modal for Shift Builder / Exception Editor -->
   <div class="modal-backdrop" id="shiftBuilderModal">
     <div class="modal-content modal-lg">
       <div class="modal-header">
         <h2 id="modalTitle">Sequential Builder</h2>
         <button class="btn-icon modal-close" id="modalClose">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        
+           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
       <div class="modal-body sequential-layout">
         
         <div class="form-group exception-reason-group" id="exceptionReasonGroup" style="display: none;">
             <label for="modalExceptionReason">Reason for Exception/Override</label>
-            <input type="text" id="modalExceptionReason" class="form-input" placeholder="e.g., Meeting, Training, Intraday Adjustment...">
+            <input type="text" id="modalExceptionReason" class="form-input" placeholder="e.g., Meeting, Training, 
+Intraday Adjustment...">
         </div>
 
         <div class="builder-controls">
@@ -352,14 +348,16 @@ blocks for shifts (Activities, Breaks, Lunch, etc.).</p>
                 <label for="modalStartTime">Shift Start Time</label>
                 <input type="text" id="modalStartTime" class="form-input time-picker-input" placeholder="Select time..." />
             </div>
-            <button id="modalAddActivity" class="btn btn-secondary">[+] Add Activity (Bottom)</button>
+            <button id="modalAddActivity" class="btn 
+btn-secondary">[+] Add Activity (Bottom)</button>
         </div>
         
         <div class="builder-grid-container">
             <table class="builder-grid">
                 <thead>
                     <tr>
-                        <th>#</th>
+                        
+   <th>#</th>
                         <th>Component</th>
                         <th>Duration (min)</th>
                         <th>Start Time</th>
@@ -368,9 +366,11 @@ blocks for shifts (Activities, Breaks, Lunch, etc.).</p>
                     </tr>
                 </thead>
                 <tbody id="modalSequenceBody">
-                </tbody>
-            </table>
+                   </tbody>
+ 
+                </table>
         </div>
+
       </div>
       <div class="modal-footer">
         <div class="editor-summary">
@@ -384,9 +384,8 @@ Paid Time: <strong id="modalPaidTime">0h 00m</strong>
   
   <div id="notification-container"></div>
 
-  <!-- Make sure these paths are correct -->
-  <script src="./src/planner.js?v=15.8.3"></script>
-  <script src="./src/init.js?v=15.8.3"></script>
+    <script src="./src/planner.js?v=15.8.2"></script>
+  <script src="./src/init.js?v=15.8.2"></script>
 
 </body>
 </html>
