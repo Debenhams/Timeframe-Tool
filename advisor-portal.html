@@ -417,43 +417,51 @@
         color: var(--color-text-muted);
     }
 
-    /* === NEW: Vertical Shift List (for Day Cards) === */
-    .vertical-shift-list {
+    /* === NEW: Flat Activity List (Matches Goal Image) === */
+    .day-content {
+        /* The goal image has no padding inside the content box */
+        padding: 0; 
+    }
+    .shift-activity-list {
         display: flex;
         flex-direction: column;
-        gap: 8px; /* Space between blocks */
         height: 100%;
-        /* Remove padding from the parent card's content area */
-        margin: -16px;
     }
-    .shift-segment-block {
-        border-left: 5px solid var(--default); /* Default color */
-        padding: 6px 12px;
-        background: var(--color-bg); /* Light grey background for the block */
-        border-radius: 0; /* Square edges */
+    .shift-activity-item {
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--color-border);
+        display: flex; /* To align the dot and text */
+        align-items: center;
+        gap: 10px;
     }
-    /* First and last for rounded corners to fit the card */
-    .shift-segment-block:first-child {
-        border-top-left-radius: var(--border-radius);
-        border-top-right-radius: var(--border-radius);
+    .shift-activity-item:last-child {
+        border-bottom: none;
+        flex-grow: 1; /* Pushes content up */
     }
-    .shift-segment-block:last-child {
-        border-bottom-left-radius: var(--border-radius);
-        border-bottom-right-radius: var(--border-radius);
-        /* This is a small hack to make it fill the card */
-        flex-grow: 1; 
+    .activity-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: var(--default); /* Default color */
+        flex-shrink: 0; /* Don't let it shrink */
     }
-    .segment-time {
-        display: block;
-        font-size: 11px;
-        font-weight: 600;
+    .activity-details {
+        display: flex;
+        flex-direction: column;
+    }
+    .activity-time {
+        font-size: 12px;
+        font-weight: 500;
         color: var(--color-text-muted);
     }
-    .segment-title {
-        display: block;
+    .activity-title {
         font-size: 14px;
-        font-weight: 600;
+        font-weight: 500;
         color: var(--color-text);
+    }
+    /* We need to override the RDO note to have padding again */
+    .day-content .rdo-note {
+        padding: 16px;
     }
     /* --- End of New Styles --- */
 
@@ -1417,14 +1425,14 @@ function getMainActivitySummary(segments) {
     }
 }
 
-// --- THIS IS THE NEW renderDayContent FUNCTION for vertical lists ---
+// --- THIS IS THE NEW renderDayContent FUNCTION (Matches image_d965a7.png) ---
 function renderDayContent(segments) {
     if (segments.length === 0) {
         return `<div class="rdo-note">RDO</div>`;
     }
 
-    // This is our new vertical list container
-    let contentHtml = `<div class="vertical-shift-list">`;
+    // This is our new flat activity list
+    let contentHtml = `<div class="shift-activity-list">`;
 
     segments.forEach(seg => {
         const start = seg.start;
@@ -1432,11 +1440,14 @@ function renderDayContent(segments) {
         const summary = seg.code; // Use the raw component name
         const color = colorForCode(summary); // Get the color
 
-        // Add a block for each segment
+        // Add an item for each segment
         contentHtml += `
-            <div class="shift-segment-block" style="border-left-color: ${color};">
-                <span class="segment-time">${start} - ${end}</span>
-                <span class="segment-title">${summary}</span>
+            <div class="shift-activity-item">
+                <span class="activity-dot" style="background-color: ${color};"></span>
+                <div class="activity-details">
+                    <span class="activity-time">${start} - ${end}</span>
+                    <span class="activity-title">${summary}</span>
+                </div>
             </div>
         `;
     });
