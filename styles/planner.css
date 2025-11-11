@@ -343,16 +343,18 @@ body.authenticated .app-main-content {
 .btn-login {
   padding: 12px 18px;
   font-size: 16px;
-  font-weight: 600;
+font-weight: 600;
   /* background-color: var(--debenhams-dark); CHANGED to green */
   background-color: var(--login-button-green); 
   color: white;
   border: none;
-  /* border-radius: var(--border-radius); CHANGED to pill shape */
+  /* border-radius: var(--border-radius);
+CHANGED to pill shape */
   border-radius: 30px;
   cursor: pointer;
   transition: background-color 0.2s;
   margin-top: 16px;
+  width: 100%; /* <-- ADD THIS LINE */
 }
 
 .btn-login:hover {
@@ -590,7 +592,8 @@ body.authenticated .app-main-content {
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+gap: 6px;
+    margin-bottom: 16px; /* <-- ADD THIS LINE */
 }
 
 .form-input, .form-select, .week-picker {
