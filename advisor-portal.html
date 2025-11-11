@@ -685,10 +685,67 @@ function fmtDateFriendly(d) {
 function addDays(d,n){ const x=new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate()+n); return x; }
 function hhmmToMinutes(t){ 
     if (!t) return 0;
-    const [h,m]=(t.split(":")||["0","0"]).map(Number); 
+   const [h,m]=(t.split(":")||["0","0"]).map(Number); 
     return h*60+m; 
 }
 const m2t = m => `${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`;
+
+// --- START OF NEW CODE ---
+
+// Helper: Calculate the length (in weeks) of a rotation pattern [cite: 563-567]
+function calculateRotationLength(pattern) {
+    let numWeeks = 0;
+    if (pattern && pattern.pattern && Object.keys(pattern.pattern).length > 0) {
+        const keys = Object.keys(pattern.pattern);
+        const weekNumbers = keys.map(k => {
+            const match = k.match(/^Week ?(\d+)$/i);
+            return match ? parseInt(match[1], 10) : 0;
+        });
+        const maxWeek = Math.max(0, ...weekNumbers);
+        if (maxWeek > 0) {
+            numWeeks = maxWeek;
+        }
+    }
+    return numWeeks;
+};
+
+// Calculates the effective week number based on the assignment start date [cite: 569-583]
+function getEffectiveWeek(startDateISO, weekStartISO, assignment, getPatternByName) {
+    try {
+        if (!startDateISO || !weekStartISO || !assignment) return null;
+        const [y1, m1, d1] = startDateISO.split('-').map(Number);
+        const [y2, m2, d2] = weekStartISO.split('-').map(Number);
+        if (isNaN(y1) || isNaN(y2)) return null; 
+        
+        const startUTC = Date.UTC(y1, m1 - 1, d1);
+        const checkUTC = Date.UTC(y2, m2 - 1, d2);
+        
+        const diffTime = checkUTC - startUTC;
+        if (diffTime < 0) return null;
+
+        const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
+        const pattern = getPatternByName(assignment.rotation_name);
+        let numWeeksInRotation = calculateRotationLength(pattern);
+        
+        if (numWeeksInRotation === 0) return null;
+        if (diffWeeks >= numWeeksInRotation) return null; // Finite rotation ended
+
+        const effectiveWeek = diffWeeks + 1;
+        return effectiveWeek;
+    } catch (e) {
+        console.error("Error calculating effective week:", e);
+        return null;
+    }
+};
+
+// Helper: Finds the correct key in the pattern data [cite: 730-731]
+function findWeekKey(patternData, weekNumber) {
+    const keys = Object.keys(patternData);
+    return keys.find(k => {
+        const match = k.match(/^Week ?(\d+)$/i);
+        return match && parseInt(match[1], 10) === weekNumber;
+    });
+};
 
 
 // Color mapping
@@ -720,23 +777,99 @@ const STATE = {
     currentTab: 'tab-my-schedule',
     currentWeekData: null,
     rotaRealtimeChannel: null,
+    
+    // --- ADD THESE NEW PROPERTIES ---
+    exceptions: [], // Stores schedule_exceptions
+    rotationPatterns: {}, // Stores rotation_patterns by name
+    assignments: new Map(), // Stores assignments by advisor_id
+    // --- END NEW PROPERTIES ---
 };
 
 /* ---- Data Normalization (Comprehensive Fix) ---- */
 
-// (tplToSegments, structureToSegments, normalizeDayValue functions remain the same)
-// Converts templates/shift_templates into detailed segments
-function tplToSegments(t){
-  const startTime = t.start_time;
-  const endTime = t.finish_time || t.end_time; 
+/* ---- Live Schedule Calculation ---- */
 
-  if(!t || !startTime || !endTime) return [];
+// (structureToSegments remains, tplToSegments and normalizeDayValue are removed)
 
-  const mins = s => { 
-    if (!s) return NaN;
-    const [h,m]=String(s).slice(0,5).split(":").map(Number); 
-    return h*60+m; 
-  };
+// Converts planner-style structures (using component_id) into display format
+function structureToSegments(structure) {
+    if (!Array.isArray(structure)) return [];
+// Ensure sorting by start time
+    const sortedStructure = structure.sort((a, b) => (a.start_min || 0) - (b.start_min || 0));
+return sortedStructure.map(item => {
+        const component = STATE.components[item.component_id];
+        const code = component ? component.name : "Unknown Activity";
+        const start = m2t(item.start_min || 0);
+        
+        let endMin = item.end_min;
+        // Calculate end time if only duration is provided
+        if (endMin === undefined && item.duration_min !== undefined) {
+      
+      endMin = (item.start_min || 0) + item.duration_min;
+        }
+        const end = m2t(endMin || 0);
+
+        return { code, start, end };
+    });
+}
+
+
+// --- NEW: The Live Schedule Calculator ---
+function calculateLiveSegments(advisorId, dayName, weekStartISO) {
+    const dateISO = fmtDateLocal(addDays(new Date(weekStartISO + "T00:00:00"), DAYS.indexOf(dayName)));
+
+    // 1. Check for an Exception (Priority 1)
+    const exception = STATE.exceptions.find(e => e.advisor_id === advisorId && e.exception_date === dateISO);
+    if (exception) {
+        // Use structureToSegments to convert the exception
+        return structureToSegments(exception.structure || []); // Return segments or RDO
+    }
+
+    // 2. Check for Rotation (Priority 2)
+    const assignment = STATE.assignments.get(advisorId);
+    if (!assignment || !assignment.rotation_name) {
+        return []; // No assignment = RDO
+    }
+
+    // 3. Calculate effective week
+    const effectiveWeek = getEffectiveWeek(
+        assignment.start_date, 
+        weekStartISO, 
+        assignment,
+        (name) => STATE.rotationPatterns[name]
+    );
+
+    if (effectiveWeek === null) {
+        return []; // Not in rotation this week = RDO
+    }
+
+    // 4. Find pattern and shift code
+    const pattern = STATE.rotationPatterns[assignment.rotation_name];
+    if (!pattern || !pattern.pattern) {
+        return []; // Pattern missing = RDO
+    }
+
+    const weekKey = findWeekKey(pattern.pattern, effectiveWeek);
+    const weekPattern = weekKey ? pattern.pattern[weekKey] : {};
+    
+    // Find shift code by day index (1-7)
+    const dayIndex = DAYS.indexOf(dayName) + 1;
+    const shiftCode = weekPattern[dayIndex.toString()];
+
+    if (!shiftCode) {
+        return []; // No shift code = RDO
+    }
+    
+    // 5. Get Shift Definition
+    const definition = STATE.definitions[String(shiftCode).trim()];
+    if (!definition || !definition.structure) {
+        console.warn(`Shift code ${shiftCode} not found in definitions.`);
+        return []; // Definition missing = RDO
+    }
+
+    // 6. Return the structure from the definition, converted to segments
+    return structureToSegments(definition.structure);
+}
   
   const s = mins(startTime), e = mins(endTime);
   if (isNaN(s) || isNaN(e)) return [];
@@ -760,7 +893,7 @@ function tplToSegments(t){
     }
   }
   return out;
-}
+
 
 // Converts planner-style structures (using component_id) into display format
 function structureToSegments(structure) {
@@ -862,15 +995,20 @@ function showApp() {
 }
 
 // Load definitions from 'templates' AND 'shift_templates'
+// --- THIS IS THE NEW loadAllDefinitions FUNCTION ---
 async function loadAllDefinitions() {
-    const [templatesRes, shiftTemplatesRes] = await Promise.all([
-        supabase.from("templates").select("*"),
-        supabase.from("shift_templates").select("*")
-    ]);
-
-    // Merge into STATE.definitions using appropriate keys
-    (templatesRes.data || []).forEach(t => STATE.definitions[t.name] = t);
-    (shiftTemplatesRes.data || []).forEach(t => STATE.definitions[t.code] = t);
+    // Load the planner's shift_definitions instead
+    const { data } = await supabase.from("shift_definitions").select("*");
+    
+    // Clear existing definitions
+    STATE.definitions = {};
+    
+    // Map them by their CODE
+    (data || []).forEach(def => {
+        if (def.code) {
+            STATE.definitions[String(def.code).trim()] = def;
+        }
+    });
 }
 
 // Load components to interpret planner-style structures
@@ -1159,14 +1297,99 @@ async function handleSignOut(){
 }
 
 // --- Main Data Loading Logic ---
+// --- THIS IS THE NEW loadAndRender FUNCTION ---
 async function loadAndRender(){
-    // (Implementation remains the same as previous response)
     ELS.infoNote.style.display="none";
     if (!STATE.advisorId){
         const msg = `<div class="notice info">Your account isn’t linked to an advisor profile. Please contact the planning team.</div>`;
         ELS.myRotaGrid.innerHTML = msg;
         return;
     }
+  
+    const loadingMsg = `<div class="notice info">Loading live schedule...</div>`;
+    ELS.myRotaGrid.innerHTML = loadingMsg;
+    ELS.teamScheduleView.innerHTML = loadingMsg;
+
+    const mondayISO = fmtDateLocal(STATE.monday);
+    const dateRange = Array.from({length: 7}, (_, i) => fmtDateLocal(addDays(STATE.monday, i)));
+    
+    // Store mondayISO in the state object so our calculator can find it
+    STATE.currentWeekData = {
+        mondayISO: mondayISO
+    };
+    
+    // 1. Fetch all data in parallel
+    try {
+        const [exceptionsRes, patternsRes, assignmentsRes] = await Promise.all([
+            // Get exceptions for all team members for this week
+            supabase.from("schedule_exceptions")
+                    .select("advisor_id, exception_date, structure")
+                    .in("advisor_id", Array.from(STATE.teamMemberIds))
+                    .in("exception_date", dateRange),
+                    
+            // Get all rotation patterns
+            supabase.from("rotation_patterns").select("name, pattern"),
+            
+            // Get all relevant assignment history records
+            supabase.from("rotation_assignments_history")
+                     .select("advisor_id, rotation_name, start_date, end_date")
+                     .in("advisor_id", Array.from(STATE.teamMemberIds))
+                     .lte('start_date', dateRange[6]) // start date is on or before end of week
+                     .or(`end_date.is.null,end_date.gte.${mondayISO}`) // end date is null or after start of week
+        ]);
+
+        // 2. Process and store the data in STATE
+        
+        // Process Exceptions
+        STATE.exceptions = exceptionsRes.data || [];
+        
+        // Process Patterns
+        STATE.rotationPatterns = {};
+        (patternsRes.data || []).forEach(p => {
+            STATE.rotationPatterns[p.name] = p;
+        });
+        
+        // Process Assignments (Find the *effective* one for this week)
+        STATE.assignments.clear();
+        const assignments = assignmentsRes.data || [];
+        
+        STATE.teamMemberIds.forEach(advId => {
+            const relevantAssignments = assignments
+                .filter(a => a.advisor_id === advId)
+                .sort((a, b) => new Date(b.start_date) - new Date(a.start_date)); // Sort by start_date DESC
+            
+            // Find the *latest* assignment that is active in this week
+            const effectiveAssignment = relevantAssignments.find(a => {
+                const start = new Date(a.start_date + "T00:00:00Z");
+                const weekStart = new Date(mondayISO + "T00:00:00Z");
+
+                // Must have started on or before the *end* of this week
+                const weekEnd = new Date(dateRange[6] + "T00:00:00Z");
+                if (start > weekEnd) return false; 
+                
+                // If it has an end date, it must end on or after this week's *start*
+                if (a.end_date) {
+                    const end = new Date(a.end_date + "T00:00:00Z");
+                    if (end < weekStart) return false;
+                }
+                return true;
+            });
+            
+            if (effectiveAssignment) {
+                STATE.assignments.set(advId, effectiveAssignment);
+            }
+        });
+
+    } catch (error) {
+        console.error("Error loading live data:", error);
+        ELS.infoNote.textContent = "Error loading live schedule data.";
+        ELS.infoNote.style.display = "block";
+        return;
+    }
+
+    // 6. Render views (this function call remains)
+    renderViews();
+}
   
     // Show loading state
     const loadingMsg = `<div class="notice info">Loading schedule data...</div>`;
@@ -1222,7 +1445,7 @@ async function loadAndRender(){
 
     // 6. Render views
     renderViews();
-}
+
 
 // Renders the views
 function renderViews() {
@@ -1247,16 +1470,19 @@ function drawMyRotaCalendar(rotaData){
   DAYS.forEach((dayName, i) => {
     const date = addDays(STATE.monday, i);
     const dateISO = fmtDateLocal(date);
-    const dayData = rotaData[dayName] || { segments: [] };
+    // --- START OF CHANGES ---
+    const liveSegments = calculateLiveSegments(STATE.advisorId, dayName, STATE.currentWeekData.mondayISO);
+    // --- END OF CHANGES ---
     const isToday = dateISO === TODAY_ISO;
     
     html += `<div class="day-card ${isToday ? 'today' : ''}">
                 <div class="day-header">
                     <h2 class="day-title">${dayName}</h2>
-                    <p class="day-date">${fmtDateFriendly(date)}</p>
+       
+             <p class="day-date">${fmtDateFriendly(date)}</p>
                 </div>
                 <div class="day-content">
-                    ${renderDayContent(dayData.segments)}
+                    ${renderDayContent(liveSegments)}
                 </div>
             </div>`;
   });
@@ -1330,20 +1556,20 @@ function drawTeamScheduleGrid(teamRotas) {
 
     // Body Rows
     STATE.teamMembers.forEach(member => {
-        const advisorRota = teamRotas[member.id];
         // Highlight the current user's row
         const isCurrentUser = member.id === STATE.advisorId;
         html += `<tr style="${isCurrentUser ? 'background-color: #F0F9FF;' : ''}"><td>${member.name} ${isCurrentUser ? '<span class="tag">(You)</span>' : ''}</td>`;
         
-        if (!advisorRota) {
-            DAYS.forEach(() => html += `<td><span class="weekly-rdo">N/A</span></td>`);
-        } else {
-            DAYS.forEach(dayName => {
-                const dayData = advisorRota[dayName] || { segments: [] };
-                html += `<td>${renderTeamGridCell(dayData.segments)}</td>`;
-            });
-        }
-        html += `</tr>`;
+        // --- START OF CHANGES ---
+        // We removed the "if (!advisorRota)" logic
+        DAYS.forEach(dayName => {
+            const liveSegments = calculateLiveSegments(member.id, dayName, STATE.currentWeekData.mondayISO);
+            html += `<td>${renderTeamGridCell(liveSegments)}</td>`;
+        });
+        // --- END OF CHANGES ---
+        
+        html 
++= `</tr>`;
     });
 
     html += `</tbody></table>`;
@@ -1367,28 +1593,61 @@ function renderTeamGridCell(segments) {
 
 // --- Real-Time Updates ---
 // (Implementation remains the same)
+// --- THIS IS THE NEW startRealtime FUNCTION ---
 async function startRealtime(){
-  if (!STATE.advisorId) return;
-  const mondayISO = fmtDateLocal(STATE.monday);
-  
-  STATE.rotaRealtimeChannel = supabase.channel(`rotas_pub_week_${mondayISO}`)
-    .on("postgres_changes", {
-      event: "*",
-      schema: "public",
-      table: "rotas_published",
-      filter: `week_start=eq.${mondayISO}`
-    }, (payload)=>{
-      
-      const affectedAdvisorId = payload.new?.advisor_id || payload.old?.advisor_id;
-      const isRelevant = STATE.advisorId === affectedAdvisorId || STATE.teamMemberIds.has(affectedAdvisorId);
+    if (!STATE.advisorId) return;
 
-      if (isRelevant) {
-          loadAndRender(); 
-          ELS.realtimeNote.style.display = "block";
-          setTimeout(()=>ELS.realtimeNote.style.display="none", 5000);
-      }
-    })
-    .subscribe();
+    // Stop listening for just one week and listen to all relevant tables
+    STATE.rotaRealtimeChannel = supabase.channel(`live-rota-updates-v2`)
+        .on("postgres_changes", {
+          event: "*",
+          schema: "public",
+          table: "schedule_exceptions"
+        }, (payload)=>{
+            // Check if the change is relevant to this team
+            const changedAdvisorId = payload.new?.advisor_id || payload.old?.advisor_id;
+            if (changedAdvisorId && STATE.teamMemberIds.has(changedAdvisorId)) {
+                console.log('Live update: schedule_exceptions changed.');
+                loadAndRender(); // Refetch all data
+                ELS.realtimeNote.style.display = "block";
+                setTimeout(()=>ELS.realtimeNote.style.display="none", 5000);
+            }
+        })
+        .on("postgres_changes", {
+          event: "*",
+          schema: "public",
+          table: "rotation_assignments_history"
+        }, (payload)=>{
+            const changedAdvisorId = payload.new?.advisor_id || payload.old?.advisor_id;
+            if (changedAdvisorId && STATE.teamMemberIds.has(changedAdvisorId)) {
+                console.log('Live update: rotation_assignments_history changed.');
+                loadAndRender(); // Refetch all data
+                ELS.realtimeNote.style.display = "block";
+                setTimeout(()=>ELS.realtimeNote.style.display="none", 5000);
+            }
+        })
+        .on("postgres_changes", {
+          event: "*",
+          schema: "public",
+          table: "rotation_patterns"
+        }, (payload)=>{
+            console.log('Live update: rotation_patterns changed.');
+            loadAndRender(); // Refetch all data
+            ELS.realtimeNote.style.display = "block";
+            setTimeout(()=>ELS.realtimeNote.style.display="none", 5000);
+        })
+        .on("postgres_changes", {
+          event: "*",
+          schema: "public",
+          table: "shift_definitions"
+        }, (payload)=>{
+            console.log('Live update: shift_definitions changed.');
+            // This requires reloading definitions *and* data
+            loadAllDefinitions().then(loadAndRender);
+            ELS.realtimeNote.style.display = "block";
+            setTimeout(()=>ELS.realtimeNote.style.display="none", 5000);
+        })
+        .subscribe();
 }
 
 async function stopRealtime() {
