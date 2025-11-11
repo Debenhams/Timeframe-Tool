@@ -1324,24 +1324,19 @@ async function loadAndRender(){
 // Renders the views
 function renderViews() {
     if (!STATE.currentWeekData) return;
-
-    drawMyRotaCalendar(STATE.currentWeekData.myRota);
-    drawTeamScheduleGrid(STATE.currentWeekData.teamRotas);
+drawMyRotaCalendar();
+drawTeamScheduleGrid();
 }
 
 
 // --- My Rota (Calendar View) Rendering ---
 // (Implementation remains the same)
-function drawMyRotaCalendar(rotaData){
+function drawMyRotaCalendar(){
   
-  if (Object.keys(rotaData).length === 0) {
-      ELS.myRotaGrid.innerHTML = `<div class="notice info">No rota published for this week yet. Check back later.</div>`;
-      return;
-  }
+  // --- THE CRASHING CODE BLOCK IS NOW GONE ---
 
   let html = '';
-
-  DAYS.forEach((dayName, i) => {
+DAYS.forEach((dayName, i) => {
     const date = addDays(STATE.monday, i);
     const dateISO = fmtDateLocal(date);
     // --- START OF FIXED CODE ---
@@ -1420,7 +1415,7 @@ function renderDayContent(segments) {
 
 // --- Team Schedule (Grid View) Rendering ---
 // (Implementation remains the same)
-function drawTeamScheduleGrid(teamRotas) {
+function drawTeamScheduleGrid() {
     let html = `<table class="team-grid"><thead><tr><th>Advisor</th>`;
     // Header Row
     DAYS.forEach((dayName, i) => {
