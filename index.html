@@ -377,10 +377,7 @@ blocks for shifts (Activities, Breaks, Lunch, etc.).</p>
 
           </div>
 
-        <div class="form-group exception-reason-group" id="exceptionReasonGroup" style="display: none; margin-top: 20px;">
-            <label for="modalExceptionReason">Reason for Exception/Override</label>
-            <input type="text" id="modalExceptionReason" class="form-input" placeholder="e.g., Meeting, Training, Intraday Adjustment...">
-        </div>
+    
 
         <div class="ve-add-popup" id="visualEditorAddPopup" style="display: none;">
           <h4 id="ve-add-popup-title">Add Component</h4>
@@ -400,24 +397,32 @@ blocks for shifts (Activities, Breaks, Lunch, etc.).</p>
 
       </div>
       <div class="modal-footer">
-        <div class="modal-footer-left">
-          <div class="editor-summary">
-              Total Time: <strong id="modalTotalTime">0h 00m</strong> |
-              Paid Time: <strong id="modalPaidTime">0h 00m</strong>
-          </div>
-          
-          <div class="ve-undo-redo">
-            <button classimg="btn-icon" id="ve-undo" title="Undo (Ctrl+Z)" disabled>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l-3 2.7"></path></svg>
-            </button>
-            <button class="btn-icon" id="ve-redo" title="Redo (Ctrl+Y)" disabled>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17v-6h6"></path><path d="M21 7a9 9 0 0 1-9 9 9 9 0 0 1-6-2.3l3-2.7"></path></svg>
-            </button>
-          </div>
-        </div>
-        
-        <button id="modalSaveStructure" class="btn btn-primary">Save Structure</button>
+
+    <div class="modal-footer-left">
+      <div class="form-group" id="exceptionReasonGroup" style="display: none;">
+        <label for="modalExceptionReason">Reason for Exception/Override</label>
+        <input type="text" id="modalExceptionReason" class="form-input" placeholder="e.g., Meeting, Training, Intraday Adjustment...">
       </div>
+    </div>
+
+    <div class="modal-footer-right">
+      <div class="ve-undo-redo">
+        <button class="btn-icon" id="ve-undo" title="Undo (Ctrl+Z)" disabled>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l-3 2.7"></path></svg>
+        </button>
+        <button class="btn-icon" id="ve-redo" title="Redo (Ctrl+Y)" disabled>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17v-6h6"></path><path d="M21 7a9 9 0 0 1-9 9 9 9 0 0 1-6-2.3l3-2.7"></path></svg>
+        </button>
+      </div>
+
+      <div class="editor-summary">
+          Total: <strong id="modalTotalTime">0h 00m</strong> | Paid: <strong id="modalPaidTime">0h 00m</strong>
+      </div>
+
+      <button id="modalSaveStructure" class="btn btn-primary">Save Exception</button>
+    </div>
+
+  </div>
     </div>
   </div>
   
