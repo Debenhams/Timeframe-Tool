@@ -1362,3 +1362,144 @@ td .form-input-color.edit-value {
     width: 60px;
     height: 30px;
 }
+/* === NEW STYLES: Smart-Visual Editor (v16+) === */
+
+/* Main layout: 25% Toolbox, 75% Timeline */
+.visual-editor-layout {
+  display: flex;
+  gap: 20px;
+  height: 350px; /* Give the visual editor a fixed height */
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background-color: var(--color-hover-bg);
+}
+
+/* 1. Toolbox (Left side) */
+.ve-toolbox {
+  width: 25%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--color-border);
+  background-color: var(--color-panel-bg);
+  border-top-left-radius: var(--border-radius);
+  border-bottom-left-radius: var(--border-radius);
+}
+
+.ve-toolbox-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+.ve-toolbox-header p {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: 4px 0 0 0;
+}
+
+.ve-toolbox-list {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+/* Individual component item in the toolbox */
+.ve-toolbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: grab;
+  font-weight: 500;
+  font-size: 12px;
+  margin-bottom: 4px;
+  border: 1px solid transparent;
+}
+.ve-toolbox-item:hover {
+  background-color: var(--color-hover-bg);
+}
+/* This is the little colored square */
+.ve-toolbox-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.1);
+  flex-shrink: 0;
+}
+
+/* 2. Timeline (Right side) */
+.ve-timeline-container {
+  width: 75%;
+  height: 100%;
+  padding: 20px 16px; /* Give it some space */
+  overflow-y: auto; /* In case many segments are added */
+}
+
+/* This is the main track that holds all the colored bars */
+.ve-timeline-track {
+  display: flex;
+  width: 100%;
+  height: 50px; /* Height of the timeline bar */
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  background-color: #fff;
+  position: relative; /* For pop-ups and handles */
+}
+
+/* Individual colored segment in the timeline */
+.ve-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  border-right: 1px solid rgba(0,0,0,0.1);
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 600;
+  position: relative; /* For the drag handles */
+}
+.ve-segment:last-child {
+  border-right: none;
+}
+
+/* Drag handle on the edge of a segment */
+.ve-drag-handle {
+  position: absolute;
+  right: -3px;
+  top: 0;
+  bottom: 0;
+  width: 6px; /* Wider click target */
+  cursor: col-resize;
+  z-index: 10;
+}
+.ve-segment:last-child .ve-drag-handle {
+  display: none; /* No handle on the last segment */
+}
+
+/* 3. "Add Component" Pop-up */
+.ve-add-popup {
+  position: absolute;
+  width: 280px;
+  background: var(--color-panel-bg);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  border-radius: var(--border-radius);
+  padding: 16px;
+  z-index: 20;
+  display: none; /* Hidden by default */
+}
+.ve-add-popup h4 {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+.ve-add-popup .form-group {
+  margin-bottom: 12px;
+}
+.ve-add-popup .ve-add-popup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}

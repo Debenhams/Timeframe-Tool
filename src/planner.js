@@ -1378,12 +1378,12 @@ const toggleRowEditMode = (id, isEditing) => {
 }(window.APP));
 
 /**
- * MODULE: APP.Components.SequentialBuilder (Shared Modal Logic)
- * Supports both Shift Definitions and Exceptions (Live Editing).
+ * MODULE: APP.Components.SequentialBuilder (v16 - Smart Visual Editor)
+ * Supports Shift Definitions (legacy) and Visual Exceptions (Live Editing).
  */
 (function(APP) {
     const SequentialBuilder = {};
-    const ELS = {};
+    const ELS = {}; // Cached DOM Elements
 
     // State specific to the Builder Modal
     const BUILDER_STATE = {
@@ -1394,8 +1394,23 @@ const toggleRowEditMode = (id, isEditing) => {
         startTimeMin: 480, // Default 08:00
         segments: [], // { component_id, duration_min }
         reason: null,
+        
+        // --- New Visual State ---
+        dragState: {
+            isDragging: false,
+            segmentIndex: -1, // The index of the segment *before* the handle
+            startX: 0,
+            originalDurations: [], // [durationA, durationB]
+            minDuration: 5 // Min duration for a segment
+        },
+        addPopupState: {
+            isOpen: false,
+            componentId: null,
+            componentName: null
+        }
     };
-// Helper to parse HH:MM string to minutes
+
+    // Helper to parse HH:MM string to minutes
     const parseTimeToMinutes = (timeStr) => {
         const parts = (timeStr || "").split(':');
         if (parts.length !== 2) return null;
@@ -1404,82 +1419,71 @@ const toggleRowEditMode = (id, isEditing) => {
         if (isNaN(h) || isNaN(m)) return null;
         return h * 60 + m;
     };
+
     SequentialBuilder.initialize = () => {
         // Cache Modal Elements
         ELS.modal = document.getElementById('shiftBuilderModal');
         ELS.modalTitle = document.getElementById('modalTitle');
         ELS.modalClose = document.getElementById('modalClose');
-        ELS.modalStartTime = document.getElementById('modalStartTime');
-        ELS.modalAddActivity = document.getElementById('modalAddActivity');
-        ELS.modalSequenceBody = document.getElementById('modalSequenceBody');
+        ELS.modalSave = document.getElementById('modalSaveStructure');
         ELS.modalTotalTime = document.getElementById('modalTotalTime');
         ELS.modalPaidTime = document.getElementById('modalPaidTime');
-        ELS.modalSave = document.getElementById('modalSaveStructure');
-
+        
         // Exception specific elements
         ELS.exceptionReasonGroup = document.getElementById('exceptionReasonGroup');
         ELS.modalExceptionReason = document.getElementById('modalExceptionReason');
 
-        // Check if critical elements are found during initialization
-        if (!ELS.modal || !ELS.modalSave || !ELS.modalSequenceBody || !ELS.modalStartTime) {
-            console.error("CRITICAL ERROR: SequentialBuilder failed to find necessary modal elements (e.g., modalStartTime) in index.html during initialization. Check HTML integrity.");
-        }
-
-        // Event Listeners
-        if (ELS.modalClose) ELS.modalClose.addEventListener('click', SequentialBuilder.close);
-        if (ELS.modalAddActivity) ELS.modalAddActivity.addEventListener('click', handleAddActivity);
-        if (ELS.modalSave) ELS.modalSave.addEventListener('click', handleSave);
+        // --- New Visual Editor Elements ---
+        ELS.visualEditorBody = document.getElementById('visualEditorBody');
+        ELS.visualEditorToolbox = document.getElementById('visualEditorToolbox');
+        ELS.visualEditorTimeline = document.getElementById('visualEditorTimeline');
         
-        if (ELS.modalSequenceBody) {
-            ELS.modalSequenceBody.addEventListener('change', handleSequenceChange);
-            ELS.modalSequenceBody.addEventListener('click', handleSequenceClick);
-        }
+        // Add Pop-up
+        ELS.visualEditorAddPopup = document.getElementById('visualEditorAddPopup');
+        ELS.veAddPopupTitle = document.getElementById('ve-add-popup-title');
+        ELS.veAddStartTime = document.getElementById('ve-add-start-time');
+        ELS.veAddDuration = document.getElementById('ve-add-duration');
+        ELS.veAddPopupCancel = document.getElementById('ve-add-popup-cancel');
+        ELS.veAddPopupSave = document.getElementById('ve-add-popup-save');
 
+        // --- Legacy Elements (for Shift Definition Editor) ---
+        ELS.modalStartTime = document.getElementById('modalStartTime');
+        ELS.modalAddActivity = document.getElementById('modalAddActivity');
+        ELS.modalSequenceBody = document.getElementById('modalSequenceBody');
+
+        // --- Event Listeners ---
+        if (ELS.modalClose) ELS.modalClose.addEventListener('click', SequentialBuilder.close);
+        if (ELS.modalSave) ELS.modalSave.addEventListener('click', handleSave);
+
+        // Reason field
         if (ELS.modalExceptionReason) {
             ELS.modalExceptionReason.addEventListener('input', (e) => {
                 BUILDER_STATE.reason = e.target.value;
             });
         }
-
-        // Initialize Time Picker (Flatpickr)
-        if (ELS.modalStartTime) {
-            // Check if flatpickr library is loaded before using it
-            if (typeof flatpickr === 'undefined') {
-                console.error("CRITICAL ERROR: flatpickr library not loaded during SequentialBuilder init.");
-                return;
-            }
-            flatpickr(ELS.modalStartTime, {
-                enableTime: true,
-                noCalendar: true,
-                dateFormat: "H:i",
-                time_24hr: true,
-                minuteIncrement: 5,
-                onChange: (selectedDates, dateStr) => {
-                    const [h, m] = dateStr.split(':').map(Number);
-                    BUILDER_STATE.startTimeMin = h * 60 + m;
-                    render(); // Recalculate sequence times on start time change
-                }
-            });
+        
+        // --- New Visual Editor Listeners ---
+        if (ELS.visualEditorToolbox) {
+            ELS.visualEditorToolbox.addEventListener('click', handleToolboxClick);
         }
+        if (ELS.visualEditorTimeline) {
+            ELS.visualEditorTimeline.addEventListener('mousedown', handleDragStart);
+        }
+        if (ELS.veAddPopupCancel) ELS.veAddPopupCancel.addEventListener('click', closeAddPopup);
+        if (ELS.veAddPopupSave) ELS.veAddPopupSave.addEventListener('click', handleAddPopupSave);
+
+        // Mouse move/up listeners on the whole document to catch drags
+        document.addEventListener('mousemove', handleDragMove);
+        document.addEventListener('mouseup', handleDragEnd);
     };
 
     // Generalized open function
-    // config: { mode, id, title, structure, date (optional), reason (optional) }
     SequentialBuilder.open = (config) => {
-        
-        // Ensure modal elements exist before attempting to open.
-        if (!ELS.modal || !ELS.modalStartTime) {
-            console.error("ERROR: Attempted to open SequentialBuilder, but critical modal elements are missing.");
-            APP.Utils.showToast("Fatal UI Error: Editor component missing. Please ensure index.html is complete.", "danger", 10000);
-            return;
-        }
-
         // 1. Convert absolute times (structure) to sequential format (segments)
         const sequentialSegments = [];
         let startTimeMin = 480; // Default 8:00 AM
 
         if (config.structure && config.structure.length > 0) {
-            // Ensure input structure is sorted
             const sortedStructure = JSON.parse(JSON.stringify(config.structure)).sort((a, b) => a.start_min - b.start_min);
             startTimeMin = sortedStructure[0].start_min;
             
@@ -1497,109 +1501,117 @@ const toggleRowEditMode = (id, isEditing) => {
         BUILDER_STATE.contextId = config.id;
         BUILDER_STATE.exceptionDate = config.date || null;
         BUILDER_STATE.startTimeMin = startTimeMin;
-        // Deep copy segments to prevent mutation before save
         BUILDER_STATE.segments = JSON.parse(JSON.stringify(sequentialSegments));
         BUILDER_STATE.reason = config.reason || null;
 
         // 3. Initialize UI
         ELS.modalTitle.textContent = config.title;
-        
-        if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
-            ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
-        }
 
         // Show/Hide exception reason input based on mode
         if (config.mode === 'exception') {
+            // --- This is the NEW "Smart-Visual Editor" flow ---
+            if (ELS.visualEditorBody) ELS.visualEditorBody.style.display = 'block';
+            if (ELS.modalSequenceBody) ELS.visualEditorBody.closest('.modal-body').style.display = 'block'; // Show new body
+            if (ELS.modalSequenceBody) ELS.modalSequenceBody.closest('.modal-body').style.display = 'none'; // Hide old table
+
             ELS.exceptionReasonGroup.style.display = 'block';
             ELS.modalExceptionReason.value = BUILDER_STATE.reason || '';
             ELS.modalSave.textContent = "Save Exception";
+            
+            renderToolbox();
+            renderTimeline();
+            
         } else {
+            // --- This is the OLD "Shift Definition" flow ---
+            if (ELS.visualEditorBody) ELS.visualEditorBody.style.display = 'none';
+            if (ELS.modalSequenceBody) ELS.visualEditorBody.closest('.modal-body').style.display = 'none'; // Hide new body
+            if (ELS.modalSequenceBody) ELS.modalSequenceBody.closest('.modal-body').style.display = 'block'; // Show old table
+
             ELS.exceptionReasonGroup.style.display = 'none';
             ELS.modalSave.textContent = "Save Definition";
+
+            // We must support the old editor for Shift Definitions
+            // This code is from the original file, slightly adapted
+            if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
+                ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
+            }
+            if (ELS.modalSequenceBody) {
+                ELS.modalSequenceBody.addEventListener('change', handleLegacySequenceChange);
+                ELS.modalSequenceBody.addEventListener('click', handleLegacySequenceClick);
+            }
+            if (ELS.modalAddActivity) {
+                ELS.modalAddActivity.addEventListener('click', handleLegacyAddActivity);
+            }
+            renderLegacyTable();
         }
         
-        render();
         ELS.modal.style.display = 'flex';
     };
 
     SequentialBuilder.close = () => {
         BUILDER_STATE.isOpen = false;
         if (ELS.modal) ELS.modal.style.display = 'none';
+        closeAddPopup(); // Ensure pop-up is closed
+        
+        // Clean up legacy listeners if they were added
+        if (ELS.modalSequenceBody) {
+            ELS.modalSequenceBody.removeEventListener('change', handleLegacySequenceChange);
+            ELS.modalSequenceBody.removeEventListener('click', handleLegacySequenceClick);
+        }
     };
 
-    // Renders the dynamic sequence grid (The Ripple Effect)
-    const render = () => {
-        let html = '';
-        let currentTime = BUILDER_STATE.startTimeMin;
+    // --- NEW: Smart-Visual Editor Functions ---
+
+    // 1. Render Toolbox (Left side)
+    const renderToolbox = () => {
+        const STATE = APP.StateManager.getState();
+        const components = STATE.scheduleComponents.sort((a, b) => a.name.localeCompare(b.name));
+        
+        ELS.visualEditorToolbox.innerHTML = components.map(comp => `
+            <div class="ve-toolbox-item" data-component-id="${comp.id}" data-component-name="${comp.name}">
+                <div class="ve-toolbox-color" style="background-color: ${comp.color};"></div>
+                ${comp.name}
+            </div>
+        `).join('');
+    };
+
+    // 2. Render Timeline (Right side)
+    const renderTimeline = () => {
+        const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
+        if (totalDuration === 0) {
+            ELS.visualEditorTimeline.innerHTML = '<div style="padding: 16px; color: #6B7280;">No activities in this shift (RDO).</div>';
+            renderSummary();
+            return;
+        }
+
+        ELS.visualEditorTimeline.innerHTML = BUILDER_STATE.segments.map((seg, index) => {
+            const component = APP.StateManager.getComponentById(seg.component_id);
+            if (!component) return '';
+
+            const widthPct = (seg.duration_min / totalDuration) * 100;
+            const textColor = APP.Utils.getContrastingTextColor(component.color);
+
+            return `
+                <div class="ve-segment" style="width: ${widthPct}%; background-color: ${component.color}; color: ${textColor};" data-index="${index}" title="${component.name} (${seg.duration_min}m)">
+                    <span>${component.name} (${seg.duration_min}m)</span>
+                    <div class="ve-drag-handle" data-handle-index="${index}"></div>
+                </div>
+            `;
+        }).join('');
+
+        renderSummary(); // Update totals
+    };
+    
+    // 3. Render Summary (Footer)
+    const renderSummary = () => {
         let totalDuration = 0;
         let paidDuration = 0;
-        const STATE = APP.StateManager.getState();
 
-        // Generate component options HTML
-        const componentOptions = STATE.scheduleComponents
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map(c => `<option value="${c.id}">${c.name} (${c.type})</option>`)
-            .join('');
-
-        BUILDER_STATE.segments.forEach((seg, index) => {
+        BUILDER_STATE.segments.forEach(seg => {
             const component = APP.StateManager.getComponentById(seg.component_id);
-            
-            // Calculate times dynamically based on previous segments
-            const startTime = currentTime;
-            const endTime = currentTime + seg.duration_min;
-
-            html += `
-                <tr data-index="${index}">
-                    <td>${index + 1}</td>
-                    <td>
-                        <select class="form-select sequence-component" data-index="${index}">
-                            <option value="">-- Select Activity --</option>
-                            ${componentOptions}
-                        </select>
-                    </td>
-                    <td>
-                        <input type="number" class="form-input duration-input sequence-duration" data-index="${index}" value="${seg.duration_min}" min="5" step="5">
-                    </td>
-                    <td>
-                        <input type="text" 
-                               class="form-input duration-input sequence-start-time" 
-                               data-index="${index}" 
-                               value="${APP.Utils.formatMinutesToTime(startTime)}" 
-                               data-minutes="${startTime}">
-                    </td>
-                    <td>
-                        <input type="text" 
-                               class="form-input duration-input sequence-end-time" 
-                               data-index="${index}" 
-                               value="${APP.Utils.formatMinutesToTime(endTime)}" 
-                               data-minutes="${endTime}">
-                    </td>
-                    <td class="actions-cell">
-                      <div class="btn-group">
-                        <button class="btn btn-sm" data-action="insert-before" data-index="${index}">+ Above</button>
-                        <button class="btn btn-sm" data-action="insert-after" data-index="${index}">+ Below</button>
-                        <button class="btn btn-sm" data-action="split-row" data-index="${index}">Split</button>
-                        <button class="btn btn-sm btn-danger delete-sequence-item" data-index="${index}">Remove</button>
-                      </div>
-                    </td>
-
-                </tr>
-            `;
-
-            currentTime = endTime;
             totalDuration += seg.duration_min;
             if (component && component.is_paid) {
                 paidDuration += seg.duration_min;
-            }
-        });
-
-        ELS.modalSequenceBody.innerHTML = html;
-
-        // Set selected values for dropdowns (must be done after HTML insertion)
-        BUILDER_STATE.segments.forEach((seg, index) => {
-            const selectEl = ELS.modalSequenceBody.querySelector(`.sequence-component[data-index="${index}"]`);
-            if (selectEl) {
-                selectEl.value = seg.component_id || '';
             }
         });
 
@@ -1607,183 +1619,171 @@ const toggleRowEditMode = (id, isEditing) => {
         ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
     };
 
-    const handleAddActivity = () => {
-        BUILDER_STATE.segments.push({ component_id: null, duration_min: 60 });
-        render();
+    // 4. Handle Clicks on Toolbox
+    const handleToolboxClick = (e) => {
+        const item = e.target.closest('.ve-toolbox-item');
+        if (!item) return;
+
+        const { componentId, componentName } = item.dataset;
+        BUILDER_STATE.addPopupState = { isOpen: true, componentId, componentName };
+
+        // Open the pop-up
+        ELS.veAddPopupTitle.textContent = `Add: ${componentName}`;
+        ELS.veAddStartTime.value = '';
+        ELS.veAddDuration.value = '30';
+        ELS.visualEditorAddPopup.style.display = 'block';
+        ELS.veAddStartTime.focus();
     };
 
-    const handleSequenceChange = (e) => {
-        const target = e.target;
-        const index = parseInt(target.dataset.index, 10);
-        if (isNaN(index)) return;
+    const closeAddPopup = () => {
+        BUILDER_STATE.addPopupState.isOpen = false;
+        ELS.visualEditorAddPopup.style.display = 'none';
+    };
 
-        if (target.classList.contains('sequence-component')) {
-            const componentId = target.value;
-            BUILDER_STATE.segments[index].component_id = componentId || null;
-            
-            // Auto-set default duration if the component is known
-            const component = APP.StateManager.getComponentById(componentId);
-            if (component) {
-                // When a component is selected, update the duration to its default.
-                BUILDER_STATE.segments[index].duration_min = component.default_duration_min;
-            }
+    // 5. Handle "Save" on Add Pop-up (The "Carve-Out" Ripple)
+    const handleAddPopupSave = () => {
+        const { componentId } = BUILDER_STATE.addPopupState;
+        const startTime = parseTimeToMinutes(ELS.veAddStartTime.value);
+        let duration = parseInt(ELS.veAddDuration.value, 10);
 
-        } else if (target.classList.contains('sequence-duration')) {
-            const duration = parseInt(target.value, 10);
-            if (isNaN(duration) || duration < 5) {
-                target.value = BUILDER_STATE.segments[index].duration_min; // Revert display if invalid
-                return;
-            }
-            BUILDER_STATE.segments[index].duration_min = duration;
-        
-        } else if (target.classList.contains('sequence-start-time')) {
-            // --- Handle Start Time Change ---
-            const newStartTimeMin = parseTimeToMinutes(target.value);
-            const originalStartTimeMin = parseInt(target.dataset.minutes, 10);
+        if (startTime === null) {
+            APP.Utils.showToast("Invalid start time. Use HH:MM format.", "danger");
+            return;
+        }
+        if (isNaN(duration) || duration < 5) {
+            APP.Utils.showToast("Invalid duration. Must be at least 5 minutes.", "danger");
+            return;
+        }
 
-            if (newStartTimeMin === null || newStartTimeMin === originalStartTimeMin) {
-                target.value = APP.Utils.formatMinutesToTime(originalStartTimeMin); // Revert if invalid
-                return;
-            }
-            
-            if (index === 0) {
-                // --- 1. Overall Shift Start Change (Ripple Effect) ---
-                // This is the "lateness" scenario.
-                // We just update the global start time and let render() recalculate everything.
-                BUILDER_STATE.startTimeMin = newStartTimeMin;
+        // Convert the "absolute" start time to a "relative" time within the shift
+        const relativeStartTime = startTime - BUILDER_STATE.startTimeMin;
+        if (relativeStartTime < 0) {
+            APP.Utils.showToast("Start time is before the shift begins.", "danger");
+            return;
+        }
+
+        // --- This is the "Carve-Out" Logic ---
+        let timeElapsed = 0;
+        let inserted = false;
+        const newSegments = [];
+
+        for (const seg of BUILDER_STATE.segments) {
+            const segStart = timeElapsed;
+            const segEnd = timeElapsed + seg.duration_min;
+
+            if (!inserted && relativeStartTime >= segStart && relativeStartTime < segEnd) {
+                // This is the segment we need to split
+                const timeIntoSegment = relativeStartTime - segStart;
                 
+                // 1. The first part of the split segment
+                const firstPartDuration = timeIntoSegment;
+                if (firstPartDuration >= 5) { // Only add if it's a valid length
+                    newSegments.push({ component_id: seg.component_id, duration_min: firstPartDuration });
+                }
+
+                // 2. The new segment
+                newSegments.push({ component_id: componentId, duration_min: duration });
+
+                // 3. The second part of the split segment
+                const secondPartDuration = seg.duration_min - timeIntoSegment;
+                if (secondPartDuration < 0) {
+                    // This means the new activity "overruns" this segment
+                    // We must "pay" for it from the *next* segment
+                    duration += secondPartDuration; // 'duration' is now the remaining time to "pay"
+                } else if (secondPartDuration >= 5) {
+                    newSegments.push({ component_id: seg.component_id, duration_min: secondPartDuration });
+                }
+                
+                inserted = true;
+            } else if (inserted && duration < 0) {
+                // We are "paying" for an overrun from a previous segment
+                const paidDuration = Math.min(seg.duration_min - 5, Math.abs(duration));
+                const remainingDuration = seg.duration_min - paidDuration;
+                
+                if (remainingDuration >= 5) {
+                    newSegments.push({ component_id: seg.component_id, duration_min: remainingDuration });
+                }
+                duration += paidDuration; // Reduce the "debt"
             } else {
-                // --- 2. Internal Boundary Change (Zero-Sum Adjustment) ---
-                // This adjusts the durations of the two adjacent segments.
-                const durationDiff = newStartTimeMin - originalStartTimeMin;
-                const prevDuration = BUILDER_STATE.segments[index - 1].duration_min;
-                const currDuration = BUILDER_STATE.segments[index].duration_min;
-                const newPrevDuration = prevDuration + durationDiff;
-                const newCurrDuration = currDuration - durationDiff;
-
-                // Validate that neither segment becomes too small
-                if (newPrevDuration < 5 || newCurrDuration < 5) {
-                    APP.Utils.showToast("Cannot adjust: an activity would become too short.", "warning");
-                    target.value = APP.Utils.formatMinutesToTime(originalStartTimeMin); // Revert
-                    return;
-                }
-                
-                // All checks passed. Apply duration changes.
-                BUILDER_STATE.segments[index - 1].duration_min = newPrevDuration;
-                BUILDER_STATE.segments[index].duration_min = newCurrDuration;
+                // This segment is unaffected
+                newSegments.push(seg);
             }
+            timeElapsed += seg.duration_min;
+        }
+
+        if (!inserted) {
+            APP.Utils.showToast("Start time is after the shift ends.", "danger");
+            return;
+        }
+
+        BUILDER_STATE.segments = newSegments;
+        renderTimeline();
+        closeAddPopup();
+    };
+
+    // 6. Handle Drag-to-Adjust (The "Drag" Ripple)
+    const handleDragStart = (e) => {
+        const handle = e.target.closest('.ve-drag-handle');
+        if (!handle) return;
+
+        e.preventDefault(); // Prevent text selection
+        const segmentIndex = parseInt(handle.dataset.handleIndex, 10);
         
-        } else if (target.classList.contains('sequence-end-time')) {
-            // --- Handle End Time Change ---
-            const newEndTimeMin = parseTimeToMinutes(target.value);
-            const originalEndTimeMin = parseInt(target.dataset.minutes, 10);
-
-            if (newEndTimeMin === null || newEndTimeMin === originalEndTimeMin) {
-                target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin); // Revert if invalid
-                return;
-            }
-            
-            const isLastRow = index === BUILDER_STATE.segments.length - 1;
-
-            if (isLastRow) {
-                // --- 1. Overall Shift End Change (Adjusts last segment) ---
-                // This is the "leaving early/staying late" scenario.
-                // We just adjust the duration of this (the last) segment.
-                const durationDiff = newEndTimeMin - originalEndTimeMin;
-                const newLastDuration = BUILDER_STATE.segments[index].duration_min + durationDiff;
-
-                if (newLastDuration < 5) {
-                     APP.Utils.showToast("Cannot adjust: the last activity would be too short.", "warning");
-                     target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin); // Revert
-                     return;
-                }
-                BUILDER_STATE.segments[index].duration_min = newLastDuration;
-                
-            } else {
-                // --- 2. Internal Boundary Change (Zero-Sum Adjustment) ---
-                // This adjusts the durations of the two adjacent segments.
-                const durationDiff = newEndTimeMin - originalEndTimeMin;
-                const currDuration = BUILDER_STATE.segments[index].duration_min;
-                const nextDuration = BUILDER_STATE.segments[index + 1].duration_min;
-                const newCurrDuration = currDuration + durationDiff;
-                const newNextDuration = nextDuration - durationDiff;
-
-                if (newCurrDuration < 5 || newNextDuration < 5) {
-                    APP.Utils.showToast("Cannot adjust: an activity would become too short.", "warning");
-                    target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin); // Revert
-                    return;
-                }
-                
-                // All checks passed. Apply duration changes.
-                BUILDER_STATE.segments[index].duration_min = newCurrDuration;
-                BUILDER_STATE.segments[index + 1].duration_min = newNextDuration;
-            }
-        }
-        render(); // Recalculate ripple effect
+        BUILDER_STATE.dragState = {
+            isDragging: true,
+            segmentIndex: segmentIndex,
+            startX: e.clientX,
+            originalDurations: [
+                BUILDER_STATE.segments[segmentIndex].duration_min,
+                BUILDER_STATE.segments[segmentIndex + 1].duration_min
+            ],
+            minDuration: 5
+        };
     };
 
-    const handleSequenceClick = (e) => {
-        const target = e.target.closest('button');
-        if (!target) return;
+    const handleDragMove = (e) => {
+        if (!BUILDER_STATE.dragState.isDragging) return;
 
-        const index = parseInt(target.dataset.index, 10);
-        if (isNaN(index)) return;
+        const { segmentIndex, startX, originalDurations, minDuration } = BUILDER_STATE.dragState;
+        const totalDuration = originalDurations[0] + originalDurations[1];
+        
+        // Calculate pixel difference and convert to minutes
+        // This is an approximation: 1 pixel = 1 minute (good enough for UI)
+        // A better way would be (deltaX / trackWidth) * totalShiftDuration
+        const deltaX = e.clientX - startX;
+        const deltaMinutes = Math.round(deltaX / 2); // Slow down the drag speed
 
-        // Helper: clamp duration to minimum 5 minutes and round to nearest 5
-        const clamp = (v) => Math.max(5, Math.round(v / 5) * 5);
+        // Calculate new durations
+        let newDurationA = originalDurations[0] + deltaMinutes;
+        let newDurationB = originalDurations[1] - deltaMinutes;
 
-        if (target.classList.contains('delete-sequence-item')) {
-            BUILDER_STATE.segments.splice(index, 1);
-            render();
-            return;
+        // Enforce minimums (the "ripple" stop)
+        if (newDurationA < minDuration) {
+            newDurationA = minDuration;
+            newDurationB = totalDuration - minDuration;
+        } else if (newDurationB < minDuration) {
+            newDurationB = minDuration;
+            newDurationA = totalDuration - minDuration;
         }
 
-        const action = target.dataset.action;
+        // Update the state
+        BUILDER_STATE.segments[segmentIndex].duration_min = newDurationA;
+        BUILDER_STATE.segments[segmentIndex + 1].duration_min = newDurationB;
 
-        if (action === 'insert-before' || action === 'insert-after') {
-            // Default new block duration
-            const NEW_DURATION = 30;
-            const insertAt = action === 'insert-before' ? index : index + 1;
+        // Re-render the timeline
+        renderTimeline();
+    };
 
-            // Insert a blank segment
-            BUILDER_STATE.segments.splice(insertAt, 0, { component_id: null, duration_min: NEW_DURATION });
-
-            // Optional: Auto-adjust a neighbor so total end time stays aligned.
-            const adjustIndex = action === 'insert-before' ? index + 1 /* the original row moved down */ : index;
-            if (BUILDER_STATE.segments[adjustIndex]) {
-                const cur = BUILDER_STATE.segments[adjustIndex];
-                // Check if the current segment is long enough to subtract the new duration and still have at least 5 mins left
-                if (cur.duration_min > NEW_DURATION + 5) {
-                    cur.duration_min = cur.duration_min - NEW_DURATION;
-                }
-            }
-
-            render();
-            return;
-        }
-
-        if (action === 'split-row') {
-            const seg = BUILDER_STATE.segments[index];
-            if (!seg || seg.duration_min < 10) {
-                APP.Utils.showToast("Cannot split activity shorter than 10 minutes.", "warning");
-                return;
-            }
-
-            // Split into two halves, rounding to nearest 5 minutes
-            let first = clamp(Math.floor(seg.duration_min / 2));
-            let second = seg.duration_min - first;
-
-            // Replace current with first half, insert second half after, same component
-            seg.duration_min = first;
-            BUILDER_STATE.segments.splice(index + 1, 0, { component_id: seg.component_id, duration_min: second });
-
-            render();
-            return;
+    const handleDragEnd = () => {
+        if (BUILDER_STATE.dragState.isDragging) {
+            BUILDER_STATE.dragState.isDragging = false;
         }
     };
 
 
-    // Generalized save function
+    // --- UNIVERSAL SAVE FUNCTION ---
+    // This function works for BOTH the new visual editor and the legacy table,
+    // because both of them store the data in BUILDER_STATE.segments
     const handleSave = async () => {
         const { mode, contextId, segments, startTimeMin, exceptionDate, reason } = BUILDER_STATE;
         
@@ -1791,11 +1791,8 @@ const toggleRowEditMode = (id, isEditing) => {
         const absoluteTimeSegments = [];
         let currentTime = startTimeMin;
 
-        // If there are no segments, this is an RDO/Absence exception or an empty definition
         if (segments.length === 0) {
-             if (mode === 'definition') {
-                 // Allow saving empty definitions
-             } else if (mode === 'exception') {
+             if (mode === 'exception') {
                 if (!confirm("This will clear the schedule for the selected day (RDO/Absence). Proceed?")) {
                     return;
                 }
@@ -1826,7 +1823,7 @@ const toggleRowEditMode = (id, isEditing) => {
             SequentialBuilder.close();
             // Always re-render the main visualization
             if (APP.Components.ScheduleViewer) {
-                APP.Components.ScheduleViewer.render(); 
+                APP.Components.ScheduleViewer.render();
             }
         }
     };
@@ -1834,7 +1831,6 @@ const toggleRowEditMode = (id, isEditing) => {
     // Specific save handler for Shift Definitions
     const saveShiftDefinition = async (definitionId, structure) => {
         const { data, error } = await APP.DataService.updateRecord('shift_definitions', { structure: structure }, { id: definitionId });
-        
         if (!error) {
             APP.StateManager.syncRecord('shift_definitions', data);
             APP.StateManager.saveHistory("Update Shift Structure");
@@ -1858,7 +1854,6 @@ const toggleRowEditMode = (id, isEditing) => {
 
         // Upsert based on composite key constraint (advisor_id, exception_date)
         const { data, error } = await APP.DataService.saveRecord('schedule_exceptions', record, 'advisor_id, exception_date');
-
         if (!error) {
             APP.StateManager.syncRecord('schedule_exceptions', data);
             APP.StateManager.saveHistory("Save Schedule Exception");
@@ -1866,6 +1861,197 @@ const toggleRowEditMode = (id, isEditing) => {
         }
         return { data, error };
     };
+
+
+    // --- LEGACY FUNCTIONS (For Shift Definition Editor) ---
+    // These are the original functions from your file, preserved to keep
+    // the Shift Definition editor working as it did before.
+
+    const renderLegacyTable = () => {
+        let html = '';
+        let currentTime = BUILDER_STATE.startTimeMin;
+        let totalDuration = 0;
+        let paidDuration = 0;
+        const STATE = APP.StateManager.getState();
+        const componentOptions = STATE.scheduleComponents
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map(c => `<option value="${c.id}">${c.name} (${c.type})</option>`)
+            .join('');
+
+        BUILDER_STATE.segments.forEach((seg, index) => {
+            const component = APP.StateManager.getComponentById(seg.component_id);
+            const startTime = currentTime;
+            const endTime = currentTime + seg.duration_min;
+            html += `
+             <tr data-index="${index}">
+                    <td>${index + 1}</td>
+                    <td>
+                        <select class="form-select sequence-component" data-index="${index}">
+                           <option value="">-- Select Activity --</option>
+                            ${componentOptions}
+                        </select>
+                    </td>
+                    <td>
+                        <input type="number" class="form-input duration-input sequence-duration" data-index="${index}" value="${seg.duration_min}" min="5" step="5">
+                    </td>
+                    <td>
+                         <input type="text" class="form-input duration-input sequence-start-time" 
+                                data-index="${index}" value="${APP.Utils.formatMinutesToTime(startTime)}" data-minutes="${startTime}">
+                    </td>
+                    <td>
+                        <input type="text" class="form-input duration-input sequence-end-time" 
+                               data-index="${index}" value="${APP.Utils.formatMinutesToTime(endTime)}" data-minutes="${endTime}">
+                    </td>
+                    <td class="actions-cell">
+                      <div class="btn-group">
+                         <button class="btn btn-sm" data-action="insert-before" data-index="${index}">+ Above</button>
+                        <button class="btn btn-sm" data-action="insert-after" data-index="${index}">+ Below</button>
+                        <button class="btn btn-sm" data-action="split-row" data-index="${index}">Split</button>
+                         <button class="btn btn-sm btn-danger delete-sequence-item" data-index="${index}">Remove</button>
+                      </div>
+                    </td>
+                </tr>`;
+            currentTime = endTime;
+            totalDuration += seg.duration_min;
+            if (component && component.is_paid) {
+                paidDuration += seg.duration_min;
+            }
+        });
+
+        ELS.modalSequenceBody.innerHTML = html;
+        BUILDER_STATE.segments.forEach((seg, index) => {
+            const selectEl = ELS.modalSequenceBody.querySelector(`.sequence-component[data-index="${index}"]`);
+            if (selectEl) {
+                selectEl.value = seg.component_id || '';
+            }
+        });
+        ELS.modalTotalTime.textContent = APP.Utils.formatDuration(totalDuration);
+        ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
+    };
+
+    const handleLegacyAddActivity = () => {
+        BUILDER_STATE.segments.push({ component_id: null, duration_min: 60 });
+        renderLegacyTable();
+    };
+
+    const handleLegacySequenceChange = (e) => {
+        const target = e.target;
+        const index = parseInt(target.dataset.index, 10);
+        if (isNaN(index)) return;
+        if (target.classList.contains('sequence-component')) {
+            const componentId = target.value;
+            BUILDER_STATE.segments[index].component_id = componentId || null;
+            const component = APP.StateManager.getComponentById(componentId);
+            if (component) {
+                BUILDER_STATE.segments[index].duration_min = component.default_duration_min;
+            }
+        } else if (target.classList.contains('sequence-duration')) {
+            const duration = parseInt(target.value, 10);
+            if (isNaN(duration) || duration < 5) {
+                target.value = BUILDER_STATE.segments[index].duration_min;
+                return;
+            }
+            BUILDER_STATE.segments[index].duration_min = duration;
+        } else if (target.classList.contains('sequence-start-time')) {
+            const newStartTimeMin = parseTimeToMinutes(target.value);
+            const originalStartTimeMin = parseInt(target.dataset.minutes, 10);
+            if (newStartTimeMin === null || newStartTimeMin === originalStartTimeMin) {
+                target.value = APP.Utils.formatMinutesToTime(originalStartTimeMin);
+                return;
+            }
+            if (index === 0) {
+                BUILDER_STATE.startTimeMin = newStartTimeMin;
+            } else {
+                const durationDiff = newStartTimeMin - originalStartTimeMin;
+                const prevDuration = BUILDER_STATE.segments[index - 1].duration_min;
+                const currDuration = BUILDER_STATE.segments[index].duration_min;
+                const newPrevDuration = prevDuration + durationDiff;
+                const newCurrDuration = currDuration - durationDiff;
+                if (newPrevDuration < 5 || newCurrDuration < 5) {
+                    APP.Utils.showToast("Cannot adjust: an activity would become too short.", "warning");
+                    target.value = APP.Utils.formatMinutesToTime(originalStartTimeMin); // Revert
+                    return;
+                }
+                BUILDER_STATE.segments[index - 1].duration_min = newPrevDuration;
+                BUILDER_STATE.segments[index].duration_min = newCurrDuration;
+            }
+        } else if (target.classList.contains('sequence-end-time')) {
+            const newEndTimeMin = parseTimeToMinutes(target.value);
+            const originalEndTimeMin = parseInt(target.dataset.minutes, 10);
+            if (newEndTimeMin === null || newEndTimeMin === originalEndTimeMin) {
+                target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin);
+                return;
+            }
+            const isLastRow = index === BUILDER_STATE.segments.length - 1;
+            if (isLastRow) {
+                const durationDiff = newEndTimeMin - originalEndTimeMin;
+                const newLastDuration = BUILDER_STATE.segments[index].duration_min + durationDiff;
+                if (newLastDuration < 5) {
+                     APP.Utils.showToast("Cannot adjust: the last activity would be too short.", "warning");
+                     target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin); // Revert
+                     return;
+                }
+                BUILDER_STATE.segments[index].duration_min = newLastDuration;
+            } else {
+                const durationDiff = newEndTimeMin - originalEndTimeMin;
+                const currDuration = BUILDER_STATE.segments[index].duration_min;
+                const nextDuration = BUILDER_STATE.segments[index + 1].duration_min;
+                const newCurrDuration = currDuration + durationDiff;
+                const newNextDuration = nextDuration - durationDiff;
+                if (newCurrDuration < 5 || newNextDuration < 5) {
+                    APP.Utils.showToast("Cannot adjust: an activity would become too short.", "warning");
+                    target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin); // Revert
+                    return;
+                }
+                BUILDER_STATE.segments[index].duration_min = newCurrDuration;
+                BUILDER_STATE.segments[index + 1].duration_min = newNextDuration;
+            }
+        }
+        renderLegacyTable();
+    };
+
+    const handleLegacySequenceClick = (e) => {
+        const target = e.target.closest('button');
+        if (!target) return;
+        const index = parseInt(target.dataset.index, 10);
+        if (isNaN(index)) return;
+        const clamp = (v) => Math.max(5, Math.round(v / 5) * 5);
+        if (target.classList.contains('delete-sequence-item')) {
+            BUILDER_STATE.segments.splice(index, 1);
+            renderLegacyTable();
+            return;
+        }
+        const action = target.dataset.action;
+        if (action === 'insert-before' || action === 'insert-after') {
+            const NEW_DURATION = 30;
+            const insertAt = action === 'insert-before' ? index : index + 1;
+            BUILDER_STATE.segments.splice(insertAt, 0, { component_id: null, duration_min: NEW_DURATION });
+            const adjustIndex = action === 'insert-before' ? index + 1 : index;
+            if (BUILDER_STATE.segments[adjustIndex]) {
+                const cur = BUILDER_STATE.segments[adjustIndex];
+                if (cur.duration_min > NEW_DURATION + 5) {
+                    cur.duration_min = cur.duration_min - NEW_DURATION;
+                }
+            }
+            renderLegacyTable();
+            return;
+        }
+        if (action === 'split-row') {
+            const seg = BUILDER_STATE.segments[index];
+            if (!seg || seg.duration_min < 10) {
+                APP.Utils.showToast("Cannot split activity shorter than 10 minutes.", "warning");
+                return;
+            }
+            let first = clamp(Math.floor(seg.duration_min / 2));
+            let second = seg.duration_min - first;
+            seg.duration_min = first;
+            BUILDER_STATE.segments.splice(index + 1, 0, { component_id: seg.component_id, duration_min: second });
+            renderLegacyTable();
+            return;
+        }
+    };
+    
+    // --- End Legacy Functions ---
 
     APP.Components = APP.Components || {};
     APP.Components.SequentialBuilder = SequentialBuilder;

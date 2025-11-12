@@ -335,40 +335,45 @@ blocks for shifts (Activities, Breaks, Lunch, etc.).</p>
            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
-      <div class="modal-body sequential-layout">
+      <div class="modal-body sequential-layout" id="visualEditorBody">
         
-        <div class="form-group exception-reason-group" id="exceptionReasonGroup" style="display: none;">
-            <label for="modalExceptionReason">Reason for Exception/Override</label>
-            <input type="text" id="modalExceptionReason" class="form-input" placeholder="e.g., Meeting, Training, 
-Intraday Adjustment...">
+        <div class="visual-editor-layout">
+
+          <div class="ve-toolbox">
+            <div class="ve-toolbox-header">
+                <strong>Component Toolbox</strong>
+                <p>Drag or click to add an activity.</p>
+            </div>
+            <div class="ve-toolbox-list" id="visualEditorToolbox">
+              </div>
+          </div>
+
+          <div class="ve-timeline-container">
+            <div class="ve-timeline-track" id="visualEditorTimeline">
+              </div>
+          </div>
+
         </div>
 
-        <div class="builder-controls">
-            <div class="form-group">
-                <label for="modalStartTime">Shift Start Time</label>
-                <input type="text" id="modalStartTime" class="form-input time-picker-input" placeholder="Select time..." />
-            </div>
-            <button id="modalAddActivity" class="btn 
-btn-secondary">[+] Add Activity (Bottom)</button>
+        <div class="form-group exception-reason-group" id="exceptionReasonGroup" style="display: none; margin-top: 20px;">
+            <label for="modalExceptionReason">Reason for Exception/Override</label>
+            <input type="text" id="modalExceptionReason" class="form-input" placeholder="e.g., Meeting, Training, Intraday Adjustment...">
         </div>
-        
-        <div class="builder-grid-container">
-            <table class="builder-grid">
-                <thead>
-                    <tr>
-                        
-   <th>#</th>
-                        <th>Component</th>
-                        <th>Duration (min)</th>
-                        <th>Start Time</th>
-                        <th>End Time</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="modalSequenceBody">
-                   </tbody>
- 
-                </table>
+
+        <div class="ve-add-popup" id="visualEditorAddPopup" style="display: none;">
+          <h4 id="ve-add-popup-title">Add Component</h4>
+          <div class="form-group">
+            <label for="ve-add-start-time">Start Time (HH:MM)</label>
+            <input type="text" id="ve-add-start-time" class="form-input" placeholder="e.g., 14:00">
+          </div>
+          <div class="form-group">
+            <label for="ve-add-duration">Duration (minutes)</label>
+            <input type="number" id="ve-add-duration" class="form-input" min="5" step="5" value="30">
+          </div>
+          <div class="ve-add-popup-actions">
+            <button class="btn btn-sm btn-secondary" id="ve-add-popup-cancel">Cancel</button>
+            <button class="btn btn-sm btn-primary" id="ve-add-popup-save">Add</button>
+          </div>
         </div>
 
       </div>
