@@ -968,58 +968,21 @@ Utils.addDaysISO = (iso, days) => {
     ComponentManager.render = () => {
         if (!ELS.grid) return;
         const STATE = APP.StateManager.getState();
-  
         const components = STATE.scheduleComponents.sort((a,b) => a.name.localeCompare(b.name));
         
         let html = '<table><thead><tr><th>Name</th><th>Type</th><th>Color</th><th>Default Duration</th><th>Paid</th><th>Actions</th></tr></thead><tbody>';
-        
         components.forEach(comp => {
             html += `<tr data-component-id="${comp.id}">
-                <td>
-                    <span class="display-value">${comp.name}</span>
-                    <input type="text" class="form-input edit-value" name="comp-name" value="${comp.name}" style="display:none;">
-                </td>
-                
-                <td>
-                    <span class="display-value">${comp.type}</span>
-                    <select class="form-select edit-value" name="comp-type" style="display:none;">
-                        <option value="Activity" ${comp.type === 'Activity' ? 'selected' : ''}>Activity</option>
-                        <option value="Break" ${comp.type === 'Break' ? 'selected' : ''}>Break</option>
-                        <option value="Lunch" ${comp.type === 'Lunch' ? 'selected' : ''}>Lunch</option>
-                        <option value="Shrinkage" ${comp.type === 'Shrinkage' ? 'selected' : ''}>Shrinkage</option>
-                        <option value="Absence" ${comp.type === 'Absence' ? 'selected' : ''}>Absence</option>
-                    </select>
-                </td>
-                
-                <td>
-                    <span class="display-value" style="display: inline-block; width: 20px; height: 20px; background-color: ${comp.color}; border-radius: 4px;"></span>
-                    <input type="color" class="form-input-color edit-value" name="comp-color" value="${comp.color}" style="display:none;">
-                </td>
-                
-                <td>
-                    <span class="display-value">${comp.default_duration_min}m</span>
-                    <input type="number" class="form-input edit-value" name="comp-duration" value="${comp.default_duration_min}" style="display:none; width: 70px;">
-                </td>
-                
-                <td>
-                    <span class="display-value">${comp.is_paid ? 'Yes' : 'No'}</span>
-                    <select class="form-select edit-value" name="comp-paid" style="display:none; width: 70px;">
-                        <option value="true" ${comp.is_paid ? 'selected' : ''}>Yes</option>
-                        <option value="false" ${!comp.is_paid ? 'selected' : ''}>No</option>
-                    </select>
-                </td>
-                
-                <td class="actions">
-                    <button class="btn btn-sm btn-primary edit-component" data-component-id="${comp.id}">Edit</button>
-                    <button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button>
-                    <button class="btn btn-sm btn-success save-component" data-component-id="${comp.id}" style="display:none;">Save</button>
-                    <button class="btn btn-sm btn-secondary cancel-edit-component" data-component-id="${comp.id}" style="display:none;">Cancel</button>
-                </td>
+                <td>${comp.name}</td>
+                <td>${comp.type}</td>
+                <td><span style="display: inline-block; width: 20px; height: 20px; background-color: ${comp.color}; border-radius: 4px;"></span></td>
+                <td>${comp.default_duration_min}m</td>
+                <td>${comp.is_paid ? 'Yes' : 'No'}</td>
+                <td class="actions"><button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button></td>
             </tr>`;
         });
         html += '</tbody></table>';
         ELS.grid.innerHTML = html;
- 
     };
 
     const handleNew = async () => {
@@ -1047,77 +1010,11 @@ Utils.addDaysISO = (iso, days) => {
     };
 
     const handleClick = (e) => {
-        const target = e.target;
-        const id = target.dataset.componentId;
-        if (!id) return;
-
-        if (target.classList.contains('delete-component')) {
-            handleDelete(id);
-        } else if (target.classList.contains('edit-component')) {
-            toggleRowEditMode(id, true);
-        } else if (target.classList.contains('cancel-edit-component')) {
-            toggleRowEditMode(id, false);
-        } else if (target.classList.contains('save-component')) {
-            handleInlineSave(id);
-        }
-    };
-const toggleRowEditMode = (id, isEditing) => {
-        const row = ELS.grid.querySelector(`tr[data-component-id="${id}"]`);
-        if (!row) return;
-
-        // Toggle visibility for display spans vs. edit inputs
-        row.querySelectorAll('.display-value').forEach(el => el.style.display = isEditing ? 'none' : '');
-        row.querySelectorAll('.edit-value').forEach(el => el.style.display = isEditing ? 'block' : 'none');
-
-        // Toggle action buttons
-        row.querySelector('.edit-component').style.display = isEditing ? 'none' : '';
-        row.querySelector('.delete-component').style.display = isEditing ? 'none' : '';
-        row.querySelector('.save-component').style.display = isEditing ? 'block' : 'none';
-        row.querySelector('.cancel-edit-component').style.display = isEditing ? 'block' : 'none';
-
-        // If we are cancelling, we must re-render the table to reset the values
-        if (!isEditing) {
-            ComponentManager.render();
+        if (e.target.classList.contains('delete-component')) {
+            handleDelete(e.target.dataset.componentId);
         }
     };
 
-    const handleInlineSave = async (id) => {
-        const row = ELS.grid.querySelector(`tr[data-component-id="${id}"]`);
-        if (!row) return;
-
-        // 1. Read all new values from the inputs
-        const name = row.querySelector('[name="comp-name"]').value;
-        const type = row.querySelector('[name="comp-type"]').value;
-        const color = row.querySelector('[name="comp-color"]').value;
-        const duration = parseInt(row.querySelector('[name="comp-duration"]').value, 10);
-        const isPaid = row.querySelector('[name="comp-paid"]').value === 'true';
-
-        // 2. Validate
-        if (!name || !type || !color || isNaN(duration) || duration < 0) {
-            APP.Utils.showToast("Invalid data. Please check all fields.", "danger");
-            return;
-        }
-
-        const updatedComponent = {
-            id: id,
-            name, 
-            type, 
-            color, 
-            default_duration_min: duration, 
-            is_paid: isPaid 
-        };
-
-        // 3. Save to database
-        const { data, error } = await APP.DataService.updateRecord('schedule_components', updatedComponent, { id: id });
-        
-        if (!error) {
-            APP.StateManager.syncRecord('schedule_components', data);
-            APP.Utils.showToast(`Component '${name}' updated.`, "success");
-            // Re-render the whole table to show the new, non-editable data
-            ComponentManager.render();
-        }
-        // Error is handled by DataService
-    };
     const handleDelete = async (id) => {
         const component = APP.StateManager.getComponentById(id);
         if (!component || !confirm(`Are you sure you want to delete '${component.name}'?`)) return;
@@ -1395,7 +1292,15 @@ const toggleRowEditMode = (id, isEditing) => {
         segments: [], // { component_id, duration_min }
         reason: null,
     };
-
+// Helper to parse HH:MM string to minutes
+    const parseTimeToMinutes = (timeStr) => {
+        const parts = (timeStr || "").split(':');
+        if (parts.length !== 2) return null;
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        if (isNaN(h) || isNaN(m)) return null;
+        return h * 60 + m;
+    };
     SequentialBuilder.initialize = () => {
         // Cache Modal Elements
         ELS.modal = document.getElementById('shiftBuilderModal');
@@ -1552,8 +1457,20 @@ const toggleRowEditMode = (id, isEditing) => {
                     <td>
                         <input type="number" class="form-input duration-input sequence-duration" data-index="${index}" value="${seg.duration_min}" min="5" step="5">
                     </td>
-                    <td class="time-display">${APP.Utils.formatMinutesToTime(startTime)}</td>
-                    <td class="time-display">${APP.Utils.formatMinutesToTime(endTime)}</td>
+                    <td>
+                        <input type="text" 
+                               class="form-input duration-input sequence-start-time" 
+                               data-index="${index}" 
+                               value="${APP.Utils.formatMinutesToTime(startTime)}" 
+                               data-minutes="${startTime}">
+                    </td>
+                    <td>
+                        <input type="text" 
+                               class="form-input duration-input sequence-end-time" 
+                               data-index="${index}" 
+                               value="${APP.Utils.formatMinutesToTime(endTime)}" 
+                               data-minutes="${endTime}">
+                    </td>
                     <td class="actions-cell">
                       <div class="btn-group">
                         <button class="btn btn-sm" data-action="insert-before" data-index="${index}">+ Above</button>
@@ -1612,9 +1529,92 @@ const toggleRowEditMode = (id, isEditing) => {
             const duration = parseInt(target.value, 10);
             if (isNaN(duration) || duration < 5) {
                 target.value = BUILDER_STATE.segments[index].duration_min; // Revert display if invalid
-                return; 
+                return;
             }
             BUILDER_STATE.segments[index].duration_min = duration;
+        
+        } else if (target.classList.contains('sequence-start-time')) {
+            // --- Handle Start Time Change ---
+            const newStartTimeMin = parseTimeToMinutes(target.value);
+            const originalStartTimeMin = parseInt(target.dataset.minutes, 10);
+
+            if (newStartTimeMin === null || newStartTimeMin === originalStartTimeMin) {
+                target.value = APP.Utils.formatMinutesToTime(originalStartTimeMin); // Revert if invalid
+                return;
+            }
+            
+            if (index === 0) {
+                // --- 1. Overall Shift Start Change (Ripple Effect) ---
+                // This is the "lateness" scenario.
+                // We just update the global start time and let render() recalculate everything.
+                BUILDER_STATE.startTimeMin = newStartTimeMin;
+                
+            } else {
+                // --- 2. Internal Boundary Change (Zero-Sum Adjustment) ---
+                // This adjusts the durations of the two adjacent segments.
+                const durationDiff = newStartTimeMin - originalStartTimeMin;
+                const prevDuration = BUILDER_STATE.segments[index - 1].duration_min;
+                const currDuration = BUILDER_STATE.segments[index].duration_min;
+                const newPrevDuration = prevDuration + durationDiff;
+                const newCurrDuration = currDuration - durationDiff;
+
+                // Validate that neither segment becomes too small
+                if (newPrevDuration < 5 || newCurrDuration < 5) {
+                    APP.Utils.showToast("Cannot adjust: an activity would become too short.", "warning");
+                    target.value = APP.Utils.formatMinutesToTime(originalStartTimeMin); // Revert
+                    return;
+                }
+                
+                // All checks passed. Apply duration changes.
+                BUILDER_STATE.segments[index - 1].duration_min = newPrevDuration;
+                BUILDER_STATE.segments[index].duration_min = newCurrDuration;
+            }
+        
+        } else if (target.classList.contains('sequence-end-time')) {
+            // --- Handle End Time Change ---
+            const newEndTimeMin = parseTimeToMinutes(target.value);
+            const originalEndTimeMin = parseInt(target.dataset.minutes, 10);
+
+            if (newEndTimeMin === null || newEndTimeMin === originalEndTimeMin) {
+                target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin); // Revert if invalid
+                return;
+            }
+            
+            const isLastRow = index === BUILDER_STATE.segments.length - 1;
+
+            if (isLastRow) {
+                // --- 1. Overall Shift End Change (Adjusts last segment) ---
+                // This is the "leaving early/staying late" scenario.
+                // We just adjust the duration of this (the last) segment.
+                const durationDiff = newEndTimeMin - originalEndTimeMin;
+                const newLastDuration = BUILDER_STATE.segments[index].duration_min + durationDiff;
+
+                if (newLastDuration < 5) {
+                     APP.Utils.showToast("Cannot adjust: the last activity would be too short.", "warning");
+                     target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin); // Revert
+                     return;
+                }
+                BUILDER_STATE.segments[index].duration_min = newLastDuration;
+                
+            } else {
+                // --- 2. Internal Boundary Change (Zero-Sum Adjustment) ---
+                // This adjusts the durations of the two adjacent segments.
+                const durationDiff = newEndTimeMin - originalEndTimeMin;
+                const currDuration = BUILDER_STATE.segments[index].duration_min;
+                const nextDuration = BUILDER_STATE.segments[index + 1].duration_min;
+                const newCurrDuration = currDuration + durationDiff;
+                const newNextDuration = nextDuration - durationDiff;
+
+                if (newCurrDuration < 5 || newNextDuration < 5) {
+                    APP.Utils.showToast("Cannot adjust: an activity would become too short.", "warning");
+                    target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin); // Revert
+                    return;
+                }
+                
+                // All checks passed. Apply duration changes.
+                BUILDER_STATE.segments[index].duration_min = newCurrDuration;
+                BUILDER_STATE.segments[index + 1].duration_min = newNextDuration;
+            }
         }
         render(); // Recalculate ripple effect
     };
