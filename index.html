@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WFM Intelligence Platform (v15.8.2)</title>
+  <title>WFM Intelligence Platform (v15.9)</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
@@ -12,7 +12,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./styles/planner.css?v=15.8.2" />
+  <link rel="stylesheet" href="./styles/planner.css?v=15.9" />
 </head>
 <body>
 
@@ -37,32 +37,27 @@
 
     <p class="auth-motto">Planning for our people, powering our success</p>
 
-    <p class="auth-welcome">Welcome. Please sign in.</p>
-
     <form id="auth-form" class="auth-form" novalidate>
             <div class="form-group">
-            
-    <label for="emailInput">Email</label>
+                <label for="emailInput">Email</label>
                 <input type="email" id="emailInput" class="form-input" placeholder="Enter your email" autofocus>
             </div>
             <div class="form-group">
                 <label for="passwordInput">Password</label>
                 <input type="password" id="passwordInput" class="form-input" placeholder="Enter your password">
-                
-                <span class="auth-link">Forgot Password?</span>
-        
-    </div>
-            <button type="submit" class="btn btn-login">Sign In</button>
+            </div>
+            <button type="submit" class="btn btn-login">Authenticate</button>
         </form>
+        <div id="authErrorMessage" class="auth-error-message" style="display:none;">
+            Invalid email or password.
+        </div>
 
-        <div id="authNotice" class="auth-notice error" style="display:none;"></div>
-
-<blockquote>
+    <blockquote>
       <p>"Great planning is the art of making complexity look simple."</p>
     </blockquote>
 
     <div class="auth-footer">
-            WFM Intelligence Platform (v15.8.2)
+            WFM Intelligence Platform (v15.9)
         </div>
       </div>
     </div>
@@ -356,6 +351,9 @@ Intraday Adjustment...">
             <button id="modalAddActivity" class="btn 
 btn-secondary">[+] Add Activity (Bottom)</button>
         </div>
+
+        <div class="builder-visualization" id="modalVisualization">
+            </div>
         
         <div class="builder-grid-container">
             <table class="builder-grid">
@@ -389,8 +387,8 @@ Paid Time: <strong id="modalPaidTime">0h 00m</strong>
   
   <div id="notification-container"></div>
 
-    <script src="./src/planner.js?v=15.8.2"></script>
-  <script src="./src/init.js?v=15.8.2"></script>
+    <script src="./src/planner.js?v=15.9"></script>
+  <script src="./src/init.js?v=15.9"></script>
 
 </body>
 </html>
