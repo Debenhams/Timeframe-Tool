@@ -1152,11 +1152,12 @@ const toggleRowEditMode = (id, isEditing) => {
     // Renders the assignment grid, showing the effective rotation for the selected week.
     AssignmentManager.render = async () => {
         if (!ELS.grid) return;
+
         const STATE = APP.StateManager.getState();
         const advisors = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name));
         const patterns = STATE.rotationPatterns.sort((a,b) => a.name.localeCompare(b.name));
         const patternOpts = patterns.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
-        
+
         // Get the selected Week Start (YYYY-MM-DD) from the global state
         const weekStartISO = STATE.weekStart;
 
@@ -1167,7 +1168,6 @@ const toggleRowEditMode = (id, isEditing) => {
 
         // Get the map from the cache.
         const effectiveMap = STATE.effectiveAssignmentsCache.get(weekStartISO);
-
 
         let html = '<table><thead><tr><th>Advisor</th><th>Assigned Rotation (This Week)</th><th>Start Date (Week 1)</th><th>Actions</th></tr></thead><tbody>';
 
@@ -1182,23 +1182,22 @@ const toggleRowEditMode = (id, isEditing) => {
 
             const startDate = (assignment && assignment.start_date) ? assignment.start_date : '';
 
-            
+
             // V15.8 FIX (Bug 2): Corrected the HTML structure to resolve button duplication ("spam").
             // Ensured all buttons are within the single <td> and removed invalid <div> wrappers inside <tr>.
             html += `<tr data-advisor-id="${adv.id}">
                   <td>${adv.name}</td>
                   <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
                   <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${startDate}" /></td>
-                  <td class="actions">
+                   <td class="actions">
                       <button class="btn btn-sm btn-primary act-assign-week" data-advisor-id="${adv.id}">Assign from this week</button>
                       <button class="btn btn-sm btn-primary act-change-forward" data-advisor-id="${adv.id}">Change from this week forward</button>
                       <button class="btn btn-sm btn-secondary act-change-week" data-advisor-id="${adv.id}">Change only this week (Swap)</button>
                 </td>
             </tr>`;
-
         });
         html += '</tbody></table>';
-        
+
         // V15.8 FIX: Removed duplicate innerHTML assignment.
         ELS.grid.innerHTML = html;
 
@@ -1230,7 +1229,7 @@ const toggleRowEditMode = (id, isEditing) => {
                 // Set the dropdown to the currently effective rotation for this week.
                 rotSelect.value = (assignment && assignment.rotation_name) ? assignment.rotation_name : '';
             }
-            
+
             const dateInput = row.querySelector('.assign-start-date');
             if (dateInput && typeof flatpickr !== 'undefined') {
                 // Configure Flatpickr
@@ -1264,29 +1263,29 @@ const toggleRowEditMode = (id, isEditing) => {
         const globalWeekStartISO = APP.StateManager.getState().weekStart; // Use global context
 
         const rotationName = rotationSel ? rotationSel.value : '';
-        
+
         // Validation: For swaps, rotation must be selected.
         if (!rotationName && action === 'change_one_week') {
              return APP.Utils.showToast('Pick a rotation first for the swap.', 'warning');
         }
 
         // Determine the start date for the action.
-        let startISO = globalWeekStartISO; // Default to current week context for swaps
+        let startISO = globalWeekStartISO;
+        // Default to current week context for swaps
 
         if (action === 'assign_from_week') {
             // For these actions, we use the date specified in the input field.
-            
             // Get the underlying ISO value managed by Flatpickr if available, otherwise the raw value.
             let rawInput = '';
             if (dateInput) {
                  // Flatpickr stores the ISO value in the actual input element when altInput is used.
                  rawInput = dateInput.value.trim();
             }
-            
+
             if (!rawInput) {
                 return APP.Utils.showToast('Start date is required for this action.', 'danger');
             }
-            
+
             // Handle potential UK format if user somehow typed manually and Flatpickr didn't parse
             if (rawInput.includes('/')) {
                 const iso = APP.Utils.convertUKToISODate(rawInput);
@@ -1297,7 +1296,7 @@ const toggleRowEditMode = (id, isEditing) => {
             }
         }
 
-        
+
         if (!/^\d{4}-\d{2}-\d{2}$/.test(startISO)) {
           return APP.Utils.showToast('Start date looks invalid (YYYY-MM-DD expected).', 'danger');
         }
@@ -1335,11 +1334,10 @@ const toggleRowEditMode = (id, isEditing) => {
         // V15.8: Clear the cache explicitly as data has changed.
         // We don't need to syncRecord for history table, just clear the cache.
         APP.StateManager.clearEffectiveAssignmentsCache();
-        
+
         // V15.8.1 FIX: Corrected synchronization logic (Replaced fetchTable with fetchSnapshotForAdvisor)
         // The snapshot table (rotation_assignments) is updated automatically by the DataService helpers in the DB.
         // We need to refresh the local state's snapshot view (STATE.rotationAssignments) for history tracking.
-
         // Fetch the updated snapshot specifically for this advisor using the new public function.
         const { data: updatedSnapshot, error: snapshotError } = await APP.DataService.fetchSnapshotForAdvisor(advisorId);
 
@@ -1357,15 +1355,13 @@ const toggleRowEditMode = (id, isEditing) => {
 
 
         APP.StateManager.saveHistory(`Assignment Action: ${action}`);
-
         // Refresh both views so changes are instant (this triggers a fresh cache load)
         // ScheduleViewer.render() handles rendering both itself and the AssignmentManager if active.
         if (APP.Components.ScheduleViewer) {
              APP.Components.ScheduleViewer.render();
         }
-        
-        APP.Utils.showToast('Assignment updated successfully.', 'success');
 
+        APP.Utils.showToast('Assignment updated successfully.', 'success');
       } catch (e) {
         console.error("Error in handleRowAction:", e);
         APP.Utils.showToast('Unexpected error during assignment update. See console.', 'danger');
