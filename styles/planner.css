@@ -1503,3 +1503,109 @@ td .form-input-color.edit-value {
   gap: 8px;
   margin-top: 16px;
 }
+/* === NEW STYLES: Time Ruler for Visual Editor === */
+
+.ve-timeline-container {
+  /* Change padding to make room for the ruler */
+  padding: 10px 16px 20px 16px; 
+}
+
+/* This is the new Time Ruler */
+.ve-time-ruler {
+  display: flex;
+  position: relative;
+  width: 100%;
+  height: 25px; /* Height of the ruler */
+  margin-bottom: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+/* This is a single hour marker, e.g., "09:00" */
+.ve-time-marker {
+  position: absolute;
+  height: 100%;
+  border-left: 1px solid var(--color-border);
+  padding-left: 4px;
+  user-select: none; /* Make text unselectable */
+}
+/* Don't show a border for the very first marker */
+.ve-time-marker:first-child {
+  border-left: none;
+}
+/* === NEW STYLES: Drag-and-Drop Cursor === */
+
+/* This is the vertical red line */
+.ve-drop-cursor {
+  position: absolute;
+  top: 35px; /* Aligns with the top of the timeline track */
+  bottom: 20px; /* Aligns with the bottom of the timeline track */
+  width: 2px;
+  background-color: var(--color-danger);
+  z-index: 30; /* Above timeline, below pop-ups */
+  pointer-events: none; /* Mouse clicks go through it */
+  box-shadow: 0 0 5px var(--color-danger);
+}
+
+/* This class gets added by JS when dragging */
+.ve-toolbox-item.is-dragging {
+  opacity: 0.5;
+  background-color: var(--color-success-bg);
+  border: 1px dashed var(--color-success);
+}
+/* === NEW STYLES: Right-Click Context Menu === */
+
+.ve-context-menu {
+  position: absolute;
+  z-index: 1060; /* Above modal backdrop */
+  display: flex;
+  flex-direction: column;
+  width: 200px;
+  background-color: var(--color-panel-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  padding: 6px;
+}
+
+.ve-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 10px;
+  border: none;
+  background-color: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-text);
+}
+
+.ve-context-menu-item:hover {
+  background-color: var(--color-hover-bg);
+}
+
+.ve-context-menu-item svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.ve-context-menu-separator {
+  height: 1px;
+  background-color: var(--color-border);
+  margin: 6px 0;
+}
+
+/* Red text for destructive actions */
+.ve-context-menu-item.is-danger {
+  color: var(--color-danger);
+}
+.ve-context-menu-item.is-danger svg {
+  color: var(--color-danger);
+}
+.ve-context-menu-item.is-danger:hover {
+  background-color: var(--color-danger-bg);
+}
