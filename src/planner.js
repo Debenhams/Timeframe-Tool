@@ -1,11 +1,12 @@
 /**
- * WFM Intelligence Platform - Application Logic (v15.9)
+ * WFM Intelligence Platform - Application Logic (v15.8.1)
  * 
- * V15.9:   ENHANCEMENT: Advanced Live Editor (SequentialBuilder) with interactive timeline visualization and drag/resize handles.
- *          FIX: Restored "Edit" button functionality in Component Manager.
  * V15.8.1: Added "Delete Last Week" functionality to Rotation Editor.
  *          Incorporated AssignmentManager sync fix (fetchSnapshotForAdvisor).
  *          Fixed error handling logic in DataService (insertError check).
+ * V15.8:   CRITICAL FIX: Resolved major structural/syntax errors.
+ *          CRITICAL FIX: Fixed Assignments tab "Button Spam".
+ *          CRITICAL FIX: Implemented missing DataService functions for assignment history.
  */
 
 // Global Namespace Initialization
@@ -23,9 +24,9 @@ window.APP = window.APP || {};
     Config.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 
     // Timeline Visualization Constants (05:00-23:00)
-	Config.TIMELINE_START_MIN = 5 * 60; // 05:00
-	Config.TIMELINE_END_MIN = 23 * 60; // 23:00
-	Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_MIN; // 18 hours
+Config.TIMELINE_START_MIN = 5 * 60; // 05:00
+Config.TIMELINE_END_MIN = 23 * 60; // 23:00
+Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_MIN; // 18 hours
 
     APP.Config = Config;
 }(window.APP));
@@ -95,43 +96,18 @@ window.APP = window.APP || {};
         return `${h}h ${String(m).padStart(2, '0')}m`;
     };
 
-    // V15.9: Enhanced robustness for color contrast detection.
     // Determine contrasting text color (black or white) based on background brightness
     Utils.getContrastingTextColor = (hexColor) => {
         if (!hexColor) return '#000000';
-        
-        // Handle CSS variables (common in the new visualization)
-        if (hexColor.startsWith('var(')) {
-            // This is complex to resolve client-side without computed styles, fallback to black for safety
-            return '#000000';
-        }
-
-        // Standardize input (remove # if present)
-        const hex = hexColor.replace('#', '');
-
-        // Handle short hex codes (e.g., "FFF")
-        let r, g, b;
-        if (hex.length === 3) {
-            r = parseInt(hex.charAt(0) + hex.charAt(0), 16);
-            g = parseInt(hex.charAt(1) + hex.charAt(1), 16);
-            b = parseInt(hex.charAt(2) + hex.charAt(2), 16);
-        } else if (hex.length === 6) {
-            r = parseInt(hex.substr(0, 2), 16);
-            g = parseInt(hex.substr(2, 2), 16);
-            b = parseInt(hex.substr(4, 2), 16);
-        } else {
-            // Fallback for invalid hex strings or named colors
-            return '#000000';
-        }
-
-        if (isNaN(r) || isNaN(g) || isNaN(b)) return '#000000';
-
         try {
+            const r = parseInt(hexColor.substr(1, 2), 16);
+            const g = parseInt(hexColor.substr(3, 2), 16);
+            const b = parseInt(hexColor.substr(5, 2), 16);
             // Formula for luminance perception
             const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
             return (brightness > 128) ? '#000000' : '#FFFFFF';
         } catch (e) {
-            // Fallback if calculation fails
+            // Fallback if hex color is invalid
             return '#FFFFFF';
         }
     };
@@ -283,21 +259,21 @@ window.APP = window.APP || {};
             return null;
         }
    
-	};
+};
 
-	// Robust ISO date arithmetic using UTC
-	Utils.addDaysISO = (iso, days) => {
-	  if (!iso) return null;
-	  // Use UTC midnight to prevent timezone issues when calculating date differences
-	  const d = new Date(iso + 'T00:00:00Z');
-	  if (isNaN(d.getTime())) {
-		  console.error("Invalid ISO date provided to addDaysISO:", iso);
-		  return null;
-	  }
-	  d.setUTCDate(d.getUTCDate() + days);
-	  // Return the YYYY-MM-DD part of the ISO string (toISOString slice works correctly because we are in UTC)
-	  return d.toISOString().slice(0,10);
-	};
+// Robust ISO date arithmetic using UTC
+Utils.addDaysISO = (iso, days) => {
+  if (!iso) return null;
+  // Use UTC midnight to prevent timezone issues when calculating date differences
+  const d = new Date(iso + 'T00:00:00Z');
+  if (isNaN(d.getTime())) {
+      console.error("Invalid ISO date provided to addDaysISO:", iso);
+      return null;
+  }
+  d.setUTCDate(d.getUTCDate() + days);
+  // Return the YYYY-MM-DD part of the ISO string (toISOString slice works correctly because we are in UTC)
+  return d.toISOString().slice(0,10);
+};
 
     APP.Utils = Utils;
 }(window.APP));
@@ -468,8 +444,7 @@ window.APP = window.APP || {};
     DataService.loadCoreData = async () => {
         try {
             // Fetch tables in parallel for efficiency
-            // Note: leadersResult structure is different due to the join query
-            const [advisors, leadersResult, components, definitions, patterns, assignments, exceptions] = await Promise.all([
+            const [advisors, leaders, components, definitions, patterns, assignments, exceptions] = await Promise.all([
                 fetchTable('advisors'),
                 supabase.from('leaders').select('*, sites(name)'),
                 fetchTable('schedule_components'),
@@ -479,16 +454,8 @@ window.APP = window.APP || {};
                 fetchTable('schedule_exceptions')
             ]);
 
-            // Handle potential error from the joined query
-            if (leadersResult.error) {
-                handleError(leadersResult.error, "Fetch leaders with sites");
-                // Convert to the structure expected by the rest of the checks
-                leadersResult.data = []; 
-            }
-
             // Check if any critical data failed to load
-            // We check leadersResult.error explicitly as it wasn't handled by fetchTable
-            if (advisors.error || leadersResult.error || components.error || definitions.error || patterns.error) {
+            if (advisors.error || leaders.error || components.error || definitions.error || patterns.error) {
                 throw new Error("Failed to load one or more core data tables (Advisors, Leaders, Components, Definitions, or Patterns).");
             }
 
@@ -504,7 +471,7 @@ window.APP = window.APP || {};
 
             return {
                 advisors: advisors.data,
-                leaders: leadersResult.data, // Use data from the result object
+                leaders: leaders.data,
                 scheduleComponents: components.data,
                 shiftDefinitions: definitions.data,
                 rotationPatterns: patterns.data,
@@ -998,7 +965,6 @@ window.APP = window.APP || {};
         if (ELS.grid) ELS.grid.addEventListener('click', handleClick);
     };
 
-    // V15.9 FIX: Restored Edit button in render.
     ComponentManager.render = () => {
         if (!ELS.grid) return;
         const STATE = APP.StateManager.getState();
@@ -1012,10 +978,7 @@ window.APP = window.APP || {};
                 <td><span style="display: inline-block; width: 20px; height: 20px; background-color: ${comp.color}; border-radius: 4px;"></span></td>
                 <td>${comp.default_duration_min}m</td>
                 <td>${comp.is_paid ? 'Yes' : 'No'}</td>
-                <td class="actions">
-                    <button class="btn btn-sm btn-secondary edit-component" data-component-id="${comp.id}">Edit</button>
-                    <button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button>
-                </td>
+                <td class="actions"><button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button></td>
             </tr>`;
         });
         html += '</tbody></table>';
@@ -1046,39 +1009,9 @@ window.APP = window.APP || {};
         }
     };
 
-    // V15.9 FIX: Updated handleClick to include edit action.
     const handleClick = (e) => {
         if (e.target.classList.contains('delete-component')) {
             handleDelete(e.target.dataset.componentId);
-        } else if (e.target.classList.contains('edit-component')) {
-            handleEdit(e.target.dataset.componentId);
-        }
-    };
-
-    // V15.9 FIX: Implemented handleEdit using prompts for consistency.
-    const handleEdit = async (id) => {
-        const component = APP.StateManager.getComponentById(id);
-        if (!component) return;
-
-        const name = prompt("Edit component name:", component.name);
-        if (!name) return; // User cancelled
-        const type = prompt("Edit type:", component.type);
-        const color = prompt("Edit hex color code:", component.color);
-        const duration = parseInt(prompt("Edit default duration in minutes:", component.default_duration_min), 10);
-        const isPaid = confirm(`Is this a paid activity? (Currently: ${component.is_paid ? 'Yes' : 'No'})`);
-
-        if (!name || !type || !color || isNaN(duration)) {
-            APP.Utils.showToast("Invalid input provided during edit.", "danger");
-            return;
-        }
-
-        const updates = { name, type, color, default_duration_min: duration, is_paid: isPaid };
-
-        const { data, error } = await APP.DataService.updateRecord('schedule_components', updates, { id });
-        if (!error) {
-            APP.StateManager.syncRecord('schedule_components', data);
-            APP.Utils.showToast(`Component '${name}' updated.`, "success");
-            ComponentManager.render();
         }
     };
 
@@ -1117,13 +1050,6 @@ window.APP = window.APP || {};
     AssignmentManager.render = async () => {
         if (!ELS.grid) return;
         const STATE = APP.StateManager.getState();
-        
-        // Check if the Assignments tab is active before proceeding with heavy rendering
-        const activeTab = document.querySelector('.tab-content.active');
-        if (!activeTab || activeTab.id !== 'tab-advisor-assignments') {
-            return;
-        }
-
         const advisors = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name));
         const patterns = STATE.rotationPatterns.sort((a,b) => a.name.localeCompare(b.name));
         const patternOpts = patterns.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
@@ -1132,7 +1058,6 @@ window.APP = window.APP || {};
         const weekStartISO = STATE.weekStart;
 
         // Ensure effective assignments for the selected week start date are loaded into the cache.
-        // Note: ScheduleViewer.render often calls this first, but we ensure it here if accessed directly.
         if (weekStartISO) {
             await APP.StateManager.loadEffectiveAssignments(weekStartISO);
         }
@@ -1352,7 +1277,6 @@ window.APP = window.APP || {};
 /**
  * MODULE: APP.Components.SequentialBuilder (Shared Modal Logic)
  * Supports both Shift Definitions and Exceptions (Live Editing).
- * V15.9: Major enhancements including interactive timeline visualization and drag/resize handles.
  */
 (function(APP) {
     const SequentialBuilder = {};
@@ -1367,11 +1291,8 @@ window.APP = window.APP || {};
         startTimeMin: 480, // Default 08:00
         segments: [], // { component_id, duration_min }
         reason: null,
-        // V15.9: New state for drag interactions
-        isDragging: false,
-        dragContext: null, 
     };
-	// Helper to parse HH:MM string to minutes
+// Helper to parse HH:MM string to minutes
     const parseTimeToMinutes = (timeStr) => {
         const parts = (timeStr || "").split(':');
         if (parts.length !== 2) return null;
@@ -1391,17 +1312,14 @@ window.APP = window.APP || {};
         ELS.modalTotalTime = document.getElementById('modalTotalTime');
         ELS.modalPaidTime = document.getElementById('modalPaidTime');
         ELS.modalSave = document.getElementById('modalSaveStructure');
-        // V15.9: New element for visualization
-        ELS.modalVisualization = document.getElementById('modalVisualization');
-
 
         // Exception specific elements
         ELS.exceptionReasonGroup = document.getElementById('exceptionReasonGroup');
         ELS.modalExceptionReason = document.getElementById('modalExceptionReason');
 
         // Check if critical elements are found during initialization
-        if (!ELS.modal || !ELS.modalSave || !ELS.modalSequenceBody || !ELS.modalStartTime || !ELS.modalVisualization) {
-            console.error("CRITICAL ERROR: SequentialBuilder failed to find necessary modal elements (e.g., modalStartTime, modalVisualization) in index.html during initialization. Check HTML integrity.");
+        if (!ELS.modal || !ELS.modalSave || !ELS.modalSequenceBody || !ELS.modalStartTime) {
+            console.error("CRITICAL ERROR: SequentialBuilder failed to find necessary modal elements (e.g., modalStartTime) in index.html during initialization. Check HTML integrity.");
         }
 
         // Event Listeners
@@ -1412,11 +1330,6 @@ window.APP = window.APP || {};
         if (ELS.modalSequenceBody) {
             ELS.modalSequenceBody.addEventListener('change', handleSequenceChange);
             ELS.modalSequenceBody.addEventListener('click', handleSequenceClick);
-        }
-
-        // V15.9: Event listeners for drag interactions on the visualization
-        if (ELS.modalVisualization) {
-            ELS.modalVisualization.addEventListener('mousedown', handleDragStart);
         }
 
         if (ELS.modalExceptionReason) {
@@ -1484,9 +1397,6 @@ window.APP = window.APP || {};
         // Deep copy segments to prevent mutation before save
         BUILDER_STATE.segments = JSON.parse(JSON.stringify(sequentialSegments));
         BUILDER_STATE.reason = config.reason || null;
-        // V15.9: Reset drag state
-        BUILDER_STATE.isDragging = false;
-        BUILDER_STATE.dragContext = null;
 
         // 3. Initialize UI
         ELS.modalTitle.textContent = config.title;
@@ -1509,25 +1419,13 @@ window.APP = window.APP || {};
         ELS.modal.style.display = 'flex';
     };
 
-    // V15.9: Enhanced close function to ensure drag state is cleaned up.
     SequentialBuilder.close = () => {
-        // Ensure any ongoing drag operations are cancelled
-        if (BUILDER_STATE.isDragging) {
-            handleDragEnd();
-        }
         BUILDER_STATE.isOpen = false;
         if (ELS.modal) ELS.modal.style.display = 'none';
     };
 
-    // V15.9: Updated Render function to call both grid and visualization renderers.
-    // Renders the dynamic sequence grid AND the visualization (The Ripple Effect)
+    // Renders the dynamic sequence grid (The Ripple Effect)
     const render = () => {
-        renderGrid();
-        renderVisualization();
-    };
-
-    // V15.9: Separated Grid rendering logic.
-    const renderGrid = () => {
         let html = '';
         let currentTime = BUILDER_STATE.startTimeMin;
         let totalDuration = 0;
@@ -1605,53 +1503,6 @@ window.APP = window.APP || {};
         ELS.modalTotalTime.textContent = APP.Utils.formatDuration(totalDuration);
         ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
     };
-
-    // V15.9: New function to render the interactive visualization.
-    const renderVisualization = () => {
-        if (!ELS.modalVisualization) return;
-
-        const segments = BUILDER_STATE.segments;
-        if (segments.length === 0) {
-            ELS.modalVisualization.innerHTML = '<div class="visualization-empty">Add activities to visualize the shift.</div>';
-            return;
-        }
-
-        // Calculate total duration of the shift being edited
-        const totalDurationMin = segments.reduce((sum, seg) => sum + seg.duration_min, 0);
-        if (totalDurationMin === 0) {
-            ELS.modalVisualization.innerHTML = '';
-            return;
-        }
-
-        let html = '<div class="builder-timeline">';
-        let currentTime = BUILDER_STATE.startTimeMin;
-
-        segments.forEach((seg, index) => {
-            const component = APP.StateManager.getComponentById(seg.component_id);
-            const widthPct = (seg.duration_min / totalDurationMin) * 100;
-            const color = component ? component.color : '#999';
-            const textColor = APP.Utils.getContrastingTextColor(color);
-            const name = component ? component.name : 'N/A';
-
-            const startTime = currentTime;
-            const endTime = currentTime + seg.duration_min;
-            currentTime = endTime;
-
-            // Add data attributes for interaction
-            html += `<div class="builder-timeline-bar" 
-                          style="width: ${widthPct}%; background-color: ${color}; color: ${textColor};"
-                          data-index="${index}"
-                          title="${name} (${APP.Utils.formatMinutesToTime(startTime)} - ${APP.Utils.formatMinutesToTime(endTime)})">
-                        ${name}
-                        <div class="resize-handle left" data-index="${index}" data-action="resize-left"></div>
-                        <div class="resize-handle right" data-index="${index}" data-action="resize-right"></div>
-                     </div>`;
-        });
-
-        html += '</div>';
-        ELS.modalVisualization.innerHTML = html;
-    };
-
 
     const handleAddActivity = () => {
         BUILDER_STATE.segments.push({ component_id: null, duration_min: 60 });
@@ -1765,133 +1616,8 @@ window.APP = window.APP || {};
                 BUILDER_STATE.segments[index + 1].duration_min = newNextDuration;
             }
         }
-        render(); // V15.9: Recalculate ripple effect (updates grid and visualization)
+        render(); // Recalculate ripple effect
     };
-
-    // --- V15.9: Drag Interaction Logic ---
-
-    const handleDragStart = (e) => {
-        const handle = e.target.closest('.resize-handle');
-        // We only support resizing via handles currently. Moving blocks is complex due to ripple effects.
-        if (!handle) return;
-
-        const index = parseInt(handle.dataset.index, 10);
-        const action = handle.dataset.action;
-
-        if (isNaN(index) || !action) return;
-
-        // Calculate pixels per minute based on current visualization width
-        const timelineElement = ELS.modalVisualization.querySelector('.builder-timeline');
-        if (!timelineElement) return;
-
-        const totalDurationMin = BUILDER_STATE.segments.reduce((sum, seg) => sum + seg.duration_min, 0);
-        const timelineWidthPx = timelineElement.offsetWidth;
-        const pixelsPerMinute = timelineWidthPx / totalDurationMin;
-
-        // Determine constraints for the drag operation
-        // The logic depends on which handle is being dragged and the adjacent segments.
-        
-        let indexA, indexB; // The two segments involved in the zero-sum adjustment
-
-        if (action === 'resize-left') {
-            if (index === 0) {
-                // Dragging the start of the first activity changes the overall shift start time.
-                // This is a different interaction type.
-                // For now, we disable dragging the very start/end of the shift via visualization.
-                return; 
-            }
-            indexA = index - 1;
-            indexB = index;
-        } else if (action === 'resize-right') {
-            if (index === BUILDER_STATE.segments.length - 1) {
-                // Dragging the end of the last activity changes the overall shift end time.
-                return; 
-            }
-            indexA = index;
-            indexB = index + 1;
-        }
-
-        const segA = BUILDER_STATE.segments[indexA];
-        const segB = BUILDER_STATE.segments[indexB];
-
-        // Calculate the maximum movement allowed (in minutes)
-        // Constraint: Neither segment can be less than 5 minutes.
-        const maxMoveRightMin = segB.duration_min - 5;
-        const maxMoveLeftMin = segA.duration_min - 5;
-
-        BUILDER_STATE.isDragging = true;
-        BUILDER_STATE.dragContext = {
-            startX: e.clientX,
-            pixelsPerMinute: pixelsPerMinute,
-            indexA: indexA,
-            indexB: indexB,
-            originalDurationA: segA.duration_min,
-            originalDurationB: segB.duration_min,
-            maxMoveRightMin: maxMoveRightMin,
-            maxMoveLeftMin: maxMoveLeftMin,
-        };
-
-        // Add global listeners for move and end
-        document.addEventListener('mousemove', handleDragMove);
-        document.addEventListener('mouseup', handleDragEnd);
-        
-        // Add visual feedback class
-        if (ELS.modalVisualization) ELS.modalVisualization.classList.add('is-dragging');
-
-        e.preventDefault(); // Prevent text selection
-    };
-
-    const handleDragMove = (e) => {
-        if (!BUILDER_STATE.isDragging || !BUILDER_STATE.dragContext) return;
-
-        const context = BUILDER_STATE.dragContext;
-        const deltaX = e.clientX - context.startX;
-        
-        // Convert pixel movement to minutes
-        let deltaMin = deltaX / context.pixelsPerMinute;
-
-        // Apply constraints
-        if (deltaMin > 0) { // Moving Right
-            deltaMin = Math.min(deltaMin, context.maxMoveRightMin);
-        } else if (deltaMin < 0) { // Moving Left
-            deltaMin = Math.max(deltaMin, -context.maxMoveLeftMin);
-        }
-
-        // Snap to 5-minute increments
-        deltaMin = Math.round(deltaMin / 5) * 5;
-
-        if (deltaMin === 0) return;
-
-        // Calculate new durations (Zero-Sum)
-        const newDurationA = context.originalDurationA + deltaMin;
-        const newDurationB = context.originalDurationB - deltaMin;
-
-        // Update the state
-        BUILDER_STATE.segments[context.indexA].duration_min = newDurationA;
-        BUILDER_STATE.segments[context.indexB].duration_min = newDurationB;
-
-        // Re-render visualization in real-time (and the grid)
-        render();
-    };
-
-    const handleDragEnd = () => {
-        if (!BUILDER_STATE.isDragging) return;
-
-        // Cleanup
-        document.removeEventListener('mousemove', handleDragMove);
-        document.removeEventListener('mouseup', handleDragEnd);
-        
-        if (ELS.modalVisualization) ELS.modalVisualization.classList.remove('is-dragging');
-
-        BUILDER_STATE.isDragging = false;
-        BUILDER_STATE.dragContext = null;
-
-        // Final render (ensures grid and visualization are perfectly in sync)
-        render();
-    };
-
-    // --- End of Drag Interaction Logic ---
-
 
     const handleSequenceClick = (e) => {
         const target = e.target.closest('button');
@@ -1956,11 +1682,6 @@ window.APP = window.APP || {};
 
     // Generalized save function
     const handleSave = async () => {
-        // V15.9: Ensure any ongoing drag is finalized before saving
-        if (BUILDER_STATE.isDragging) {
-            handleDragEnd();
-        }
-
         const { mode, contextId, segments, startTimeMin, exceptionDate, reason } = BUILDER_STATE;
         
         // 1. Convert sequential format (segments) back to absolute time format (structure)
@@ -2201,8 +1922,6 @@ window.APP = window.APP || {};
         if (ELS.btnDelete) ELS.btnDelete.addEventListener('click', handleDeleteRotation);
         if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeek);
         if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
-        // V15.8.1: Added click listener for the grid to handle dynamic buttons (like delete week) - Handled in renderGrid now
-        // if (ELS.grid) ELS.grid.addEventListener('click', handleGridClick);
     };
 
     RotationEditor.render = () => {
@@ -2222,283 +1941,324 @@ window.APP = window.APP || {};
         ELS.familySelect.innerHTML = opts;
     };
 
-    // V15.8.1: Refactored renderGrid to include "Delete Last Week" button handling.
     RotationEditor.renderGrid = () => {
         if (!ELS.grid) return;
         const STATE = APP.StateManager.getState();
-        const currentRotationName = STATE.currentRotation;
-        const pattern = APP.StateManager.getPatternByName(currentRotationName);
+        const pattern = APP.StateManager.getPatternByName(STATE.currentRotation);
+        const patternData = pattern ? (pattern.pattern || {}) : {};
         
-        // Enable/Disable buttons based on selection
-        const isDisabled = !pattern;
-        if (ELS.btnAddWeek) ELS.btnAddWeek.disabled = isDisabled;
-        if (ELS.btnDelete) ELS.btnDelete.disabled = isDisabled;
-
-        if (!pattern) {
-            ELS.grid.innerHTML = '<p style="margin-top: 16px;">Please select or create a rotation pattern.</p>';
-            return;
+        // Use the utility function to determine the number of weeks
+        let numWeeks = 0;
+        if (pattern) {
+            numWeeks = APP.Utils.calculateRotationLength(pattern);
+            // Ensure a minimum of 6 weeks is displayed if the pattern exists but has fewer than 6 defined.
+            if (numWeeks < 6) numWeeks = 6; 
         }
-
-        // Generate shift definition options HTML
-        const shiftOptions = STATE.shiftDefinitions
-            .sort((a, b) => a.code.localeCompare(b.code))
-            .map(s => `<option value="${s.code}">${s.code} (${s.name})</option>`)
+       
+        const weeks = Array.from({length: numWeeks}, (_, i) => i + 1);
+        const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+        
+        // Generate shift definition options
+        const definitionOpts = STATE.shiftDefinitions
+            .sort((a,b) => (String(a.code) || '').localeCompare(String(b.code) || ''))
+            .map(d => `<option value="${d.code}">${d.code} (${d.name})</option>`)
             .join('');
-        
-        // Determine the number of weeks
-        const numWeeks = APP.Utils.calculateRotationLength(pattern);
+            
+        let html = '<table><thead><tr><th>WEEK</th>';
+        days.forEach(d => html += `<th>${d}</th>`);
+        html += '</tr></thead><tbody>';
 
-        // V15.8.1: Added 'Actions' column header - Removed as button is now inline footer
-        let html = '<table><thead><tr><th>Week</th><th>Monday</th><th>Tuesday</th><th>Wednesday</th><th>Thursday</th><th>Friday</th><th>Saturday</th><th>Sunday</th></tr></thead><tbody>';
-        
-        for (let i = 1; i <= numWeeks; i++) {
-            // Use the robust key finder
-            const weekKey = Object.keys(pattern.pattern).find(k => {
-                const match = k.match(/^Week ?(\d+)$/i);
-                return match && parseInt(match[1], 10) === i;
+        weeks.forEach(w => {
+            html += `<tr><td>Week ${w}</td>`;
+            days.forEach((d, i) => {
+                const dow = i + 1; // Day of week index (1-7)
+                html += `
+                <td>
+                    <select class="form-select rotation-grid-select" data-week="${w}" data-dow="${dow}" ${!pattern ? 'disabled' : ''}>
+                    <option value="">-- RDO --</option>
+                    ${definitionOpts}
+                    </select>
+                </td>`;
             });
-
-            const weekData = weekKey ? pattern.pattern[weekKey] : {};
-            
-            html += `<tr><td>Week ${i}</td>`;
-            
-            // Define standard day keys (numerical) and legacy keys (DOW abbreviations)
-            const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-
-            for (let j = 1; j <= 7; j++) {
-                const dayKey = j.toString();
-                const legacyDayKey = days[j-1];
-                
-                // Prioritize numerical key, fallback to legacy key
-                const shiftCode = weekData[dayKey] || weekData[legacyDayKey] || '';
-                
-                // V15.8.1: Ensure data attributes use standard numerical format (data-day="${j}")
-                html += `<td><select class="form-select rotation-input" data-week="${i}" data-day="${j}">
-                            <option value="">-- RDO --</option>
-                            ${shiftOptions}
-                         </select></td>`;
-            }
-
-            html += `</tr>`;
-        }
+            html += '</tr>';
+        });
         html += '</tbody></table>';
-        // Inline footer buttons
-        html += `<div class="table-footer-inline">
-                    <button id="btnRemoveWeekBottom" class="btn btn-sm btn-danger" ${numWeeks <= 1 ? 'disabled' : ''}>[-] Delete Last Week</button>
-                    <button id="btnAddWeekBottom" class="btn btn-sm btn-secondary">[+] Add Week (Bottom)</button>
-                 </div>`;
 
+        // V15.8.1: Added "Delete Last Week" button
+        // Inline "Add Week" and "Delete Week" (only when a rotation is selected)
+        if (pattern) {
+          html += `
+            <div class="table-footer-inline">
+              <button id="btnAddWeekInline" class="btn btn-secondary">[+] Add Week (Bottom)</button>
+              <button id="btnDeleteWeekInline" class="btn btn-danger" ${numWeeks === 0 ? 'disabled' : ''}>[-] Delete Last Week</button>
+            </div>
+          `;
+        }
+
+        
+        if (numWeeks === 0 && !pattern) {
+             html = '<div class="visualization-empty">Select or create a rotation to begin editing.</div>';
+        }
 
         ELS.grid.innerHTML = html;
 
+
+        // Wire inline buttons (appears under the table)
+        const inlineAdd = document.getElementById('btnAddWeekInline');
+        if (inlineAdd) inlineAdd.addEventListener('click', handleAddWeek);
+
+        // V15.8.1: Wire the new Delete Last Week button
+        const inlineDelete = document.getElementById('btnDeleteWeekInline');
+        if (inlineDelete) inlineDelete.addEventListener('click', handleDeleteLastWeek);
+
+
         // Set selected values (must be done after HTML insertion)
-        ELS.grid.querySelectorAll('.rotation-input').forEach(input => {
-            const weekNum = parseInt(input.dataset.week, 10);
-            const dayNum = parseInt(input.dataset.day, 10);
+        if (pattern) {
+            weeks.forEach(w => {
+                // Need a robust way to find the week data regardless of key format
+                const weekKey = findWeekKey(patternData, w);
+                const weekData = weekKey ? patternData[weekKey] : {};
+                
+                days.forEach((d, i) => {
+                    const dow = i + 1;
+                    // Handle legacy DOW keys (e.g., 'mon') if numerical key is missing
+                    const legacyDayKey = d.toLowerCase();
+                    const code = weekData[dow] || weekData[legacyDayKey] || ''; 
 
-            // Re-find the key for setting the value
-            const weekKey = Object.keys(pattern.pattern).find(k => {
-                const match = k.match(/^Week ?(\d+)$/i);
-                return match && parseInt(match[1], 10) === weekNum;
+                    const sel = ELS.grid.querySelector(`select[data-week="${w}"][data-dow="${dow}"]`);
+                    if (sel) {
+                        sel.value = code;
+                    }
+                });
             });
-            const weekData = weekKey ? pattern.pattern[weekKey] : {};
-            
-            const dayKey = dayNum.toString();
-            const legacyDayKey = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][dayNum-1];
-            const shiftCode = weekData[dayKey] || weekData[legacyDayKey] || '';
-
-            input.value = shiftCode;
-        });
-
-        // Wire up the bottom buttons
-        const btnAddBottom = document.getElementById('btnAddWeekBottom');
-        if (btnAddBottom) {
-            btnAddBottom.addEventListener('click', handleAddWeek);
         }
-        const btnRemoveBottom = document.getElementById('btnRemoveWeekBottom');
-        if (btnRemoveBottom) {
-            btnRemoveBottom.addEventListener('click', handleRemoveLastWeek);
+
+        // Enable/Disable Add Week button based on selection
+        if (ELS.btnAddWeek) {
+            ELS.btnAddWeek.disabled = !pattern;
         }
     };
 
-    // --- Event Handlers ---
+    // Helper: Finds the correct key in the pattern data (handles "Week 1", "Week1", "week1" etc.)
+    const findWeekKey = (patternData, weekNumber) => {
+        const keys = Object.keys(patternData);
+        // Find the key that matches the week number using the robust regex
+        return keys.find(k => {
+            const match = k.match(/^Week ?(\d+)$/i);
+            return match && parseInt(match[1], 10) === weekNumber;
+        });
+    };
 
-    const handleFamilyChange = (e) => {
-        const STATE = APP.StateManager.getState();
-        STATE.currentRotation = e.target.value;
+    const handleFamilyChange = () => {
+        APP.StateManager.getState().currentRotation = ELS.familySelect.value;
         RotationEditor.renderGrid();
     };
 
-    const handleGridChange = (e) => {
-        if (!e.target.classList.contains('rotation-input')) return;
-        
-        const input = e.target;
-        // V15.8.1: Use data-day instead of data-day-index for consistency with renderGrid
-        const weekNum = parseInt(input.dataset.week, 10);
-        const dayNum = input.dataset.day; // Keep as string "1"-"7"
-        const shiftCode = input.value;
-        
-        const STATE = APP.StateManager.getState();
-        const pattern = APP.StateManager.getPatternByName(STATE.currentRotation);
-        
-        if (!pattern) return;
-
-        // Find the specific week key (e.g., "Week1" or "Week 1")
-        const weekKey = Object.keys(pattern.pattern).find(k => {
-             const match = k.match(/^Week ?(\d+)$/i);
-            return match && parseInt(match[1], 10) === weekNum;
-        });
-
-        if (!weekKey) {
-            console.error("Error: Could not find matching week key in pattern object for Week", weekNum);
-            return;
-        }
-
-        // Update the pattern object in memory
-        if (shiftCode) {
-            pattern.pattern[weekKey][dayNum] = shiftCode;
-        } else {
-            // If RDO selected, remove the entry for that day
-            delete pattern.pattern[weekKey][dayNum];
-        }
-        
-        // Auto-save the updated pattern structure
-        saveRotation(pattern);
-    };
-
-    // --- CRUD Operations ---
-
     const handleNewRotation = async () => {
-        const name = prompt("Enter name for the new rotation pattern:");
+        const name = prompt("Enter a name for the new rotation family:");
         if (!name) return;
-
+        
         if (APP.StateManager.getPatternByName(name)) {
             APP.Utils.showToast("Error: Rotation name already exists.", "danger");
             return;
         }
+        
+        // Initialize with a standard 6-week structure (Using standard "Week N" format)
+        const initialPattern = {};
+        for (let i = 1; i <= 6; i++) {
+            initialPattern[`Week ${i}`] = {};
+        }
 
-        // Start with an empty pattern containing Week 1
-        const newRotation = { name, pattern: { "Week 1": {} } };
-
-        const { data, error } = await APP.DataService.saveRecord('rotation_patterns', newRotation);
+        const newPatternRecord = { name: name, pattern: initialPattern };
+        const { data, error } = await APP.DataService.saveRecord('rotation_patterns', newPatternRecord);
+        
         if (!error) {
             APP.StateManager.syncRecord('rotation_patterns', data);
             APP.StateManager.getState().currentRotation = name;
-            APP.StateManager.saveHistory("Create Rotation");
-            APP.Utils.showToast(`Rotation '${name}' created.`, "success");
-            RotationEditor.render(); // Re-render dropdown and grid
+            APP.StateManager.saveHistory(`Create rotation`);
+            APP.Utils.showToast(`Rotation '${name}' created (6 weeks).`, "success");
+            RotationEditor.render();
+            
+            // Update related components
+            if (APP.Components.AssignmentManager) {
+                APP.Components.AssignmentManager.render(); // Update assignment dropdowns
+            }
         }
     };
+
+    // Handle adding a new week to the existing rotation
+    const handleAddWeek = async () => {
+        const STATE = APP.StateManager.getState();
+        const rotationName = STATE.currentRotation;
+        const pattern = APP.StateManager.getPatternByName(rotationName);
+
+        if (!pattern) return;
+
+        // Determine the next week number
+        // Use the utility function
+        const maxWeek = APP.Utils.calculateRotationLength(pattern);
+        // If the length was 0 (empty pattern), we ensure it starts at 1.
+        const nextWeek = (maxWeek === 0) ? 1 : maxWeek + 1;
+
+
+        // Update the pattern structure locally (Using standard "Week N" format)
+        if (!pattern.pattern) pattern.pattern = {};
+        const nextWeekKey = `Week ${nextWeek}`;
+        pattern.pattern[nextWeekKey] = {};
+
+        // Save the updated structure (Auto-Save Architecture)
+        const { error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: pattern.pattern }, { name: rotationName });
+
+        if (!error) {
+            APP.StateManager.saveHistory(`Add Week ${nextWeek}`);
+            APP.Utils.showToast(`Week ${nextWeek} added to rotation.`, "success");
+            RotationEditor.renderGrid(); // Re-render the grid to show the new week
+        } else {
+            // Rollback local change if save failed
+            delete pattern.pattern[nextWeekKey];
+        }
+    };
+
+    // V15.8.1: Handle deleting the last week from the existing rotation
+    const handleDeleteLastWeek = async () => {
+        const STATE = APP.StateManager.getState();
+        const rotationName = STATE.currentRotation;
+        const pattern = APP.StateManager.getPatternByName(rotationName);
+
+        if (!pattern || !pattern.pattern) return;
+
+        // Determine the current maximum week number
+        const maxWeek = APP.Utils.calculateRotationLength(pattern);
+
+        if (maxWeek === 0) {
+            APP.Utils.showToast("Rotation is already empty.", "warning");
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete Week ${maxWeek} from ${rotationName}? This cannot be undone easily.`)) {
+            return;
+        }
+
+        // Find the key for the last week
+        const lastWeekKey = findWeekKey(pattern.pattern, maxWeek);
+
+        if (!lastWeekKey) {
+            console.error("Error: Could not find the key for the last week, even though length > 0.");
+            return;
+        }
+
+        // Store the week data for potential rollback if the save fails
+        const deletedWeekData = JSON.parse(JSON.stringify(pattern.pattern[lastWeekKey]));
+
+        // 1. Delete the week locally
+        delete pattern.pattern[lastWeekKey];
+
+        // 2. Save the updated structure (Auto-Save Architecture)
+        const { error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: pattern.pattern }, { name: rotationName });
+
+        if (!error) {
+            APP.StateManager.saveHistory(`Delete Week ${maxWeek}`);
+            APP.Utils.showToast(`Week ${maxWeek} deleted from rotation.`, "success");
+            RotationEditor.renderGrid(); // Re-render the grid to show the change
+        } else {
+            // Rollback local change if save failed
+            pattern.pattern[lastWeekKey] = deletedWeekData;
+            // Error toast is shown by DataService
+        }
+    };
+
 
     const handleDeleteRotation = async () => {
         const STATE = APP.StateManager.getState();
-        const name = STATE.currentRotation;
-        if (!name || !confirm(`Are you sure you want to delete '${name}'?`)) return;
-
+        const rotationName = STATE.currentRotation;
+        if (!rotationName || !confirm(`Delete '${rotationName}'?`)) return;
+        
         // NOTE: Should ideally check if rotation is assigned before deleting
-        const { error } = await APP.DataService.deleteRecord('rotation_patterns', { name });
+        const { error } = await APP.DataService.deleteRecord('rotation_patterns', { name: rotationName });
+        
         if (!error) {
-            APP.StateManager.syncRecord('rotation_patterns', { name: name }, true);
+            APP.StateManager.syncRecord('rotation_patterns', { name: rotationName }, true);
             STATE.currentRotation = null;
-            APP.StateManager.saveHistory("Delete Rotation");
+            APP.StateManager.saveHistory(`Delete rotation`);
             APP.Utils.showToast(`Rotation deleted.`, "success");
             RotationEditor.render();
-        }
-    };
-
-    // V15.8.1: Implementation for removing the last week.
-    const handleRemoveLastWeek = async () => {
-        const STATE = APP.StateManager.getState();
-        const pattern = APP.StateManager.getPatternByName(STATE.currentRotation);
-        if (!pattern) return;
-
-        const numWeeks = APP.Utils.calculateRotationLength(pattern);
-
-        if (numWeeks <= 1) {
-            APP.Utils.showToast("Cannot delete the only week in the rotation.", "warning");
-            return;
-        }
-
-        if (!confirm(`Are you sure you want to remove Week ${numWeeks}?`)) return;
-
-        // Find the key corresponding to the last week number
-        const lastWeekKey = Object.keys(pattern.pattern).find(k => {
-            const match = k.match(/^Week ?(\d+)$/i);
-            return match && parseInt(match[1], 10) === numWeeks;
-        });
-
-        if (lastWeekKey) {
-            // Remove the last week from the pattern object in memory
-            delete pattern.pattern[lastWeekKey];
-            
-            // Save the updated pattern structure and re-render
-            await saveRotation(pattern);
-            RotationEditor.renderGrid(); 
-        } else {
-            console.error("Could not find the key for the last week.");
-        }
-    };
-
-
-    const handleAddWeek = async (e) => {
-        const STATE = APP.StateManager.getState();
-        const pattern = APP.StateManager.getPatternByName(STATE.currentRotation);
-        if (!pattern) return;
-
-        const numWeeks = APP.Utils.calculateRotationLength(pattern);
-        const newWeekNum = numWeeks + 1;
-        const newWeekKey = `Week ${newWeekNum}`;
-
-        // Check if the key somehow already exists
-        if (pattern.pattern[newWeekKey]) {
-            APP.Utils.showToast("Error: New week key already exists.", "danger");
-            return;
-        }
-
-        // Determine insertion method based on which button was clicked (Top or Bottom)
-        // The current implementation always adds to the bottom (increases week count).
-        // If "Add Week (Top)" requires inserting a new Week 1 and shifting others down, 
-        // that logic is significantly more complex and is deferred for now.
-        
-        // Add the new week to the pattern object in memory
-        pattern.pattern[newWeekKey] = {};
-        
-        // Save the updated pattern structure and re-render
-        await saveRotation(pattern);
-        RotationEditor.renderGrid(); 
-    };
-
-    // Debounced save function to prevent excessive DB calls during rapid input
-    let saveTimeout = null;
-    const saveRotation = (pattern) => {
-        clearTimeout(saveTimeout);
-        
-        if (ELS.autoSaveStatus) {
-            ELS.autoSaveStatus.style.opacity = 0.5;
-            ELS.autoSaveStatus.textContent = "Saving...";
-        }
-
-        saveTimeout = setTimeout(async () => {
-            // V15.8.1: Ensure we save the pattern.pattern (the actual data structure), not the whole object.
-            const { data, error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: pattern.pattern }, { name: pattern.name });
-            
-            if (!error) {
-                APP.StateManager.syncRecord('rotation_patterns', data);
-                APP.StateManager.saveHistory("Edit Rotation Pattern");
-                if (ELS.autoSaveStatus) {
-                    ELS.autoSaveStatus.textContent = "Saved";
-                    // Fade out the status indicator
-                    setTimeout(() => { 
-                        if (ELS.autoSaveStatus) ELS.autoSaveStatus.style.opacity = 0; 
-                    }, 1000);
-                }
-            } else {
-                if (ELS.autoSaveStatus) {
-                    ELS.autoSaveStatus.style.opacity = 1;
-                    ELS.autoSaveStatus.textContent = "Save Failed";
-                }
+            if (APP.Components.AssignmentManager) {
+                APP.Components.AssignmentManager.render(); // Update assignment dropdowns
             }
-        }, 500); // 500ms debounce time
+        }
+    };
+
+    // Auto-save functionality for grid cell changes
+    const handleGridChange = async (e) => {
+        if (!e.target.classList.contains('rotation-grid-select')) return;
+        
+        // Show saving indicator
+        if (ELS.autoSaveStatus) {
+            ELS.autoSaveStatus.textContent = "Saving...";
+            ELS.autoSaveStatus.style.opacity = 1;
+        }
+
+        const { week, dow } = e.target.dataset;
+        const shiftCode = e.target.value;
+        const STATE = APP.StateManager.getState();
+        const rotationName = STATE.currentRotation;
+        
+        const pattern = APP.StateManager.getPatternByName(rotationName);
+        if (!pattern) return;
+        
+        // 1. Update the local state object
+        if (!pattern.pattern) pattern.pattern = {};
+
+        // Find the correct week key format or create it if missing (using standard format)
+        let weekKey = findWeekKey(pattern.pattern, parseInt(week, 10));
+        if (!weekKey) {
+            weekKey = `Week ${week}`; // Use standard format for new entries
+        }
+
+        if (!pattern.pattern[weekKey]) pattern.pattern[weekKey] = {};
+        
+        // Normalize the update by removing legacy keys and using the standard numerical DOW key
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        const legacyDayKey = days[parseInt(dow, 10) - 1];
+
+        if (shiftCode) {
+            // Ensure the shift code is stored consistently as a string
+            pattern.pattern[weekKey][dow] = String(shiftCode);
+            // Remove the legacy key if it exists (Normalization)
+            if (pattern.pattern[weekKey].hasOwnProperty(legacyDayKey)) {
+                delete pattern.pattern[weekKey][legacyDayKey];
+            }
+        } else {
+            // RDO (Remove the keys)
+            delete pattern.pattern[weekKey][dow]; 
+            if (pattern.pattern[weekKey].hasOwnProperty(legacyDayKey)) {
+                delete pattern.pattern[weekKey][legacyDayKey];
+            }
+        }
+
+        // 2. Auto-save the entire pattern object
+        const { error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: pattern.pattern }, { name: rotationName });
+            
+        if (!error) {
+            // Syncing the pattern also clears the historical cache in StateManager
+            APP.StateManager.syncRecord('rotation_patterns', pattern); 
+            APP.StateManager.saveHistory(`Update rotation cell`);
+            if (ELS.autoSaveStatus) {
+                ELS.autoSaveStatus.textContent = "✓ Saved";
+                setTimeout(() => {
+                    ELS.autoSaveStatus.style.opacity = 0;
+                }, 2000);
+            }
+            // Re-render visualization as rotations affect schedules
+            if (APP.Components.ScheduleViewer) {
+                APP.Components.ScheduleViewer.render();
+            }
+        } else {
+             if (ELS.autoSaveStatus) {
+                ELS.autoSaveStatus.textContent = "Error Saving";
+            }
+            // Error toast handled in DataService
+        }
     };
 
     APP.Components = APP.Components || {};
@@ -2512,390 +2272,559 @@ window.APP = window.APP || {};
 (function(APP) {
     const ScheduleViewer = {};
     const ELS = {};
+    const Config = APP.Config;
+    let timeIndicatorInterval = null;
 
     ScheduleViewer.initialize = () => {
+        // Cache Elements
         ELS.tree = document.getElementById('schedulesTree');
         ELS.treeSearch = document.getElementById('treeSearch');
         ELS.btnClearSelection = document.getElementById('btnClearSelection');
-        ELS.container = document.getElementById('visualizationContainer');
-        ELS.viewToggleGroup = document.getElementById('viewToggleGroup');
-        ELS.plannerDay = document.getElementById('plannerDay');
-        ELS.dayToggleContainer = document.getElementById('dayToggleContainer');
+        ELS.visualizationContainer = document.getElementById('visualizationContainer');
         ELS.scheduleViewTitle = document.getElementById('scheduleViewTitle');
+        ELS.viewToggleGroup = document.getElementById('viewToggleGroup');
+        ELS.dayToggleContainer = document.getElementById('dayToggleContainer');
+        ELS.plannerDay = document.getElementById('plannerDay');
 
+        // Event Listeners
+        if (ELS.treeSearch) ELS.treeSearch.addEventListener('input', renderTree);
+        if (ELS.btnClearSelection) ELS.btnClearSelection.addEventListener('click', clearSelection);
+        if (ELS.tree) ELS.tree.addEventListener('change', handleTreeChange);
         
-        if (ELS.tree) ELS.tree.addEventListener('change', handleTreeSelection);
-        if (ELS.treeSearch) ELS.treeSearch.addEventListener('input', renderTree); // Use renderTree for filtering
-        if (ELS.btnClearSelection) ELS.btnClearSelection.addEventListener('click', clearTreeSelection);
-        if (ELS.viewToggleGroup) ELS.viewToggleGroup.addEventListener('click', handleViewToggle);
-        if (ELS.plannerDay) ELS.plannerDay.addEventListener('change', handleDayChange);
+        if (ELS.plannerDay) ELS.plannerDay.addEventListener('change', () => {
+            APP.StateManager.getState().selectedDay = ELS.plannerDay.value;
+            renderPlannerContent();
+        });
 
-        // V15.1: Add click listener to the container for Live Editing
-        if (ELS.container) ELS.container.addEventListener('click', handleVisualizationClick);
+        if (ELS.viewToggleGroup) ELS.viewToggleGroup.addEventListener('click', handleViewToggle);
+
+        // Add listener for Live Editing clicks
+        if (ELS.visualizationContainer) ELS.visualizationContainer.addEventListener('click', handleVisualizationClick);
     };
 
-    // Renders the entire Schedule View (Tree and Visualization)
+    // Main render function (coordinates tree and planner rendering)
     ScheduleViewer.render = async () => {
+        // Ensure historical data is loaded before rendering the planner visualization.
         const STATE = APP.StateManager.getState();
-        
-        // Ensure the effective assignments for the selected week are loaded first.
         if (STATE.weekStart) {
+            // Pre-load the effective assignments for the selected week start date.
             await APP.StateManager.loadEffectiveAssignments(STATE.weekStart);
         }
-
-        // Only render the tree and visualization if the Schedule View tab is active
-        const activeTab = document.querySelector('.tab-content.active');
-        if (activeTab && activeTab.id === 'tab-schedule-view') {
-            renderTree();
-            renderVisualization();
-        }
         
-        // Set the selected day dropdown
-        if (ELS.plannerDay) ELS.plannerDay.value = STATE.selectedDay;
+        renderTree();
+        renderPlannerContent();
 
-        // If the Assignments tab is currently active, it also needs a refresh 
-        // because its data depends on the effective assignments cache.
-        if (activeTab && activeTab.id === 'tab-advisor-assignments' && APP.Components.AssignmentManager) {
-            APP.Components.AssignmentManager.render();
+        // Also ensure Assignments tab is up-to-date if visible (as it relies on the same historical data)
+        const assignmentsTab = document.getElementById('tab-advisor-assignments');
+        if (assignmentsTab && assignmentsTab.classList.contains('active') && APP.Components.AssignmentManager) {
+             APP.Components.AssignmentManager.render();
         }
     };
 
-    // --- Tree View Logic ---
 
+    const handleViewToggle = (e) => {
+        const target = e.target.closest('.btn-toggle');
+        if (target) {
+            const viewMode = target.dataset.view;
+            APP.StateManager.getState().scheduleViewMode = viewMode;
+            
+            ELS.viewToggleGroup.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active'));
+            target.classList.add('active');
+
+            ELS.dayToggleContainer.style.display = (viewMode === 'daily') ? 'flex' : 'none';
+            
+            renderPlannerContent();
+        }
+    };
+
+    // Handle clicks on the visualization (for Live Editing)
+    const handleVisualizationClick = (e) => {
+        const STATE = APP.StateManager.getState();
+        let advisorId, dateISO, dayName;
+
+        // Determine context based on view mode
+        if (STATE.scheduleViewMode === 'daily') {
+            const row = e.target.closest('.timeline-row');
+            if (row && row.dataset.advisorId) {
+                advisorId = row.dataset.advisorId;
+                dayName = STATE.selectedDay;
+                // Calculate the specific ISO date for the selected day
+                dateISO = APP.Utils.getISODateForDayName(STATE.weekStart, dayName);
+            }
+        } else if (STATE.scheduleViewMode === 'weekly') {
+             const cell = e.target.closest('.weekly-cell');
+             // The cell already has the required data attributes
+             if (cell && cell.dataset.advisorId && cell.dataset.date) {
+                 advisorId = cell.dataset.advisorId;
+                 dateISO = cell.dataset.date;
+                 // Use utility function for consistency
+                 dayName = APP.Utils.getDayNameFromISO(dateISO);
+             }
+        }
+
+        if (advisorId && dateISO && dayName) {
+            const advisor = APP.StateManager.getAdvisorById(advisorId);
+            if (!advisor) return;
+            
+            // Calculate the Monday for that specific date
+            const weekStartISO = APP.Utils.getMondayForDate(dateISO); 
+            
+            // Use the centralized ScheduleCalculator
+            // NOTE: This relies on the historical data for weekStartISO being loaded. 
+            const { segments, reason } = APP.ScheduleCalculator.calculateSegments(advisorId, dayName, weekStartISO);
+
+            // Open the Sequential Builder in 'exception' mode
+            if (APP.Components.SequentialBuilder) {
+                APP.Components.SequentialBuilder.open({
+                    mode: 'exception',
+                    id: advisorId,
+                    date: dateISO,
+                    title: `Live Editor: ${advisor.name} (${dayName}, ${APP.Utils.convertISOToUKDate(dateISO)})`,
+                    structure: segments,
+                    reason: reason
+                });
+            } else {
+                 APP.Utils.showToast("Error: Live Editor module not initialized.", "danger");
+            }
+        }
+    };
+
+    // Render the hierarchical team selection tree
     const renderTree = () => {
         if (!ELS.tree) return;
         const STATE = APP.StateManager.getState();
-        const leaders = STATE.leaders;
-        const advisors = STATE.advisors;
-        const filterText = ELS.treeSearch ? ELS.treeSearch.value.toLowerCase() : '';
-        
+        const filter = ELS.treeSearch ? ELS.treeSearch.value.toLowerCase() : '';
         let html = '';
 
-        leaders.forEach(leader => {
-            const teamAdvisors = APP.StateManager.getAdvisorsByLeader(leader.id);
-            
-            // Apply filter
-            const filteredAdvisors = teamAdvisors.filter(a => 
-                a.name.toLowerCase().includes(filterText) || 
-                leader.name.toLowerCase().includes(filterText)
-            );
+        const leaders = STATE.leaders.sort((a, b) => a.name.localeCompare(b.name));
+        const advisors = STATE.advisors.sort((a, b) => a.name.localeCompare(b.name));
 
-            if (filteredAdvisors.length > 0) {
-                // V15.6.3: Added Site/Brand Tag
-                const siteName = (leader.sites && leader.sites.name) ? leader.sites.name : 'Unknown Site';
+        leaders.forEach(leader => {
+            const teamAdvisors = advisors.filter(a => a.leader_id === leader.id);
+            
+            // Determine if the leader or any team member matches the filter
+            const matchesFilter = !filter || leader.name.toLowerCase().includes(filter) || teamAdvisors.some(a => a.name.toLowerCase().includes(filter));
+
+            if (matchesFilter && teamAdvisors.length > 0) {
+                // Check if all advisors in the team are currently selected
+                const allSelected = teamAdvisors.every(a => STATE.selectedAdvisors.has(a.id));
+
+                // Get the site name (if it exists) from the data we fetched in Fix 1
+                const site = leader.sites ? leader.sites.name : '';
+                const siteHTML = site ? `<span class="team-brand">${site}</span>` : '';
 
                 html += `<div class="tree-node-leader">
+                    <label>
+                   
+                     <input type="checkbox" class="select-leader" data-leader-id="${leader.id}" ${allSelected ? 'checked' : ''} />
+                        ${leader.name} (Team Leader)
+                        ${siteHTML}
+                    </label>
+                </div>`;
+
+                teamAdvisors.forEach(adv => {
+                    // Show advisor if filter matches or if the leader matches (to show the whole team)
+                    if (!filter || adv.name.toLowerCase().includes(filter) || leader.name.toLowerCase().includes(filter)) {
+                         const isChecked = STATE.selectedAdvisors.has(adv.id);
+                        html += `<div class="tree-node-advisor">
                             <label>
-                                <input type="checkbox" data-leader-id="${leader.id}">
-                                ${leader.name}
-                                <span class="team-brand">${siteName}</span>
+                                <input type="checkbox" class="select-advisor" data-advisor-id="${adv.id}" data-leader-id="${leader.id}" ${isChecked ? 'checked' : ''} />
+                                ${adv.name}
                             </label>
-                         </div>`;
-                
-                filteredAdvisors.forEach(advisor => {
-                    html += `<div class="tree-node-advisor">
-                                <label>
-                                    <input type="checkbox" data-advisor-id="${advisor.id}" ${STATE.selectedAdvisors.has(advisor.id) ? 'checked' : ''}>
-                                    ${advisor.name}
-                                </label>
-                             </div>`;
+                        </div>`;
+                    }
                 });
             }
         });
+        
+        ELS.tree.innerHTML = html || '<div class="visualization-empty">No teams or advisors found.</div>';
 
-        ELS.tree.innerHTML = html;
+        // Auto-select the first advisor on initial load if none are selected (Bootstrapping UI)
+        if (STATE.selectedAdvisors.size === 0 && STATE.advisors.length > 0 && !STATE.treeInitialized) {
+            const firstAdvisor = advisors.find(a => a.leader_id);
+             if (firstAdvisor) {
+                STATE.selectedAdvisors.add(firstAdvisor.id);
+                STATE.treeInitialized = true;
+                // Trigger the main render function to ensure coordination
+                ScheduleViewer.render();
+            }
+        }
     };
 
-    const handleTreeSelection = (e) => {
-        const checkbox = e.target;
-        const leaderId = checkbox.dataset.leaderId;
-        const advisorId = checkbox.dataset.advisorId;
+    const handleTreeChange = (e) => {
+        const target = e.target;
         const STATE = APP.StateManager.getState();
 
-        if (leaderId && !advisorId) {
-            // Leader checkbox clicked: Toggle all advisors under this leader
+        if (target.classList.contains('select-leader')) {
+            const leaderId = target.dataset.leaderId;
+            const isChecked = target.checked;
             const teamAdvisors = APP.StateManager.getAdvisorsByLeader(leaderId);
-            teamAdvisors.forEach(advisor => {
-                if (checkbox.checked) {
-                    STATE.selectedAdvisors.add(advisor.id);
+
+            // Select/Deselect the entire team
+            teamAdvisors.forEach(adv => {
+                if (isChecked) {
+                    STATE.selectedAdvisors.add(adv.id);
                 } else {
-                    STATE.selectedAdvisors.delete(advisor.id);
+                    STATE.selectedAdvisors.delete(adv.id);
                 }
             });
-            // Re-render tree to update checkboxes visually (necessary for leader toggle)
-            renderTree(); 
-        } else if (advisorId) {
-            // Advisor checkbox clicked
-            if (checkbox.checked) {
-                STATE.selectedAdvisors.add(advisorId);
-            } else {
-                STATE.selectedAdvisors.delete(advisorId);
-            }
+            renderTree(); // Re-render to update individual checkboxes
+
+        } else if (target.classList.contains('select-advisor')) {
+            const id = target.dataset.advisorId;
+            target.checked ? STATE.selectedAdvisors.add(id) : STATE.selectedAdvisors.delete(id);
+            // Re-render tree to update the leader checkbox state (if all are now selected/deselected)
+            renderTree();
         }
-
-        // Re-render visualization based on new selection
-        renderVisualization();
-    };
-
-    const clearTreeSelection = () => {
-        const STATE = APP.StateManager.getState();
-        STATE.selectedAdvisors.clear();
-        ScheduleViewer.render();
-    };
-
-    // --- View Mode Logic (Daily/Weekly) ---
-
-    const handleViewToggle = (e) => {
-        const button = e.target.closest('.btn-toggle');
-        if (!button) return;
         
-        const view = button.dataset.view;
-        const STATE = APP.StateManager.getState();
-        STATE.scheduleViewMode = view;
-
-        // Update button active state
-        ELS.viewToggleGroup.querySelectorAll('.btn-toggle').forEach(btn => {
-            btn.classList.remove('active');
-        });
-        button.classList.add('active');
-
-        renderVisualization();
+        // Render the content based on the selection change
+        renderPlannerContent();
     };
 
-    const handleDayChange = (e) => {
-        const STATE = APP.StateManager.getState();
-        STATE.selectedDay = e.target.value;
-        renderVisualization();
+    const clearSelection = () => {
+        APP.StateManager.getState().selectedAdvisors.clear();
+        renderTree();
+        // Render the content based on the selection change
+        renderPlannerContent();
     };
 
-    // --- Visualization Logic (Gantt/Grid) ---
-
-    // V15.1: Handler for clicking on the visualization (Live Editing Trigger)
-    const handleVisualizationClick = (e) => {
+    // Renamed from renderPlanner. This assumes data is already loaded/cached.
+    const renderPlannerContent = () => {
         const STATE = APP.StateManager.getState();
-        
-        let advisorId = null;
-        let dayName = STATE.selectedDay; // Default for Daily view
-
         if (STATE.scheduleViewMode === 'daily') {
-            // Check if a timeline row (or name/track within it) was clicked
-            const row = e.target.closest('.timeline-row');
-            if (row) {
-                advisorId = row.dataset.advisorId;
-            }
-        } else if (STATE.scheduleViewMode === 'weekly') {
-            // Check if a weekly grid cell was clicked
-            const cell = e.target.closest('.weekly-cell');
-            if (cell) {
-                advisorId = cell.dataset.advisorId;
-                // Note: Ensure weekly render uses data-day-name attribute
-                dayName = cell.dataset.dayName; 
-            }
-        }
-
-        if (advisorId && dayName && STATE.weekStart) {
-            // We have the necessary context, trigger the Live Editor (SequentialBuilder)
-            openLiveEditor(advisorId, dayName, STATE.weekStart);
-        }
-    };
-
-    // V15.1: Function to open the SequentialBuilder in 'exception' mode.
-    const openLiveEditor = (advisorId, dayName, weekStartISO) => {
-        const advisor = APP.StateManager.getAdvisorById(advisorId);
-        if (!advisor) return;
-
-        // Determine the specific date
-        const dateISO = APP.Utils.getISODateForDayName(weekStartISO, dayName);
-        if (!dateISO) return;
-
-        // Calculate the current effective schedule for this day
-        const { segments, reason } = APP.ScheduleCalculator.calculateSegments(advisorId, dayName, weekStartISO);
-
-        // Open the builder
-        if (APP.Components.SequentialBuilder) {
-            APP.Components.SequentialBuilder.open({
-                mode: 'exception',
-                id: advisorId,
-                title: `Live Editor: ${advisor.name} (${dayName}, ${APP.Utils.convertISOToUKDate(dateISO)})`,
-                structure: segments,
-                date: dateISO,
-                reason: reason // Pass existing reason if it was an exception
-            });
-        }
-    };
-
-
-    const renderVisualization = () => {
-        if (!ELS.container) return;
-        const STATE = APP.StateManager.getState();
-        
-        // Filter advisors to only those selected AND present in the current data load
-        const selectedAdvisors = Array.from(STATE.selectedAdvisors)
-                                      .map(id => APP.StateManager.getAdvisorById(id))
-                                      .filter(Boolean)
-                                      .sort((a, b) => a.name.localeCompare(b.name));
-
-        if (selectedAdvisors.length === 0) {
-            ELS.container.innerHTML = '<div class="visualization-empty">Select advisors from the list to view their schedules.</div>';
-            if (ELS.scheduleViewTitle) ELS.scheduleViewTitle.textContent = "Schedule Visualization";
-            return;
-        }
-
-        if (ELS.scheduleViewTitle) ELS.scheduleViewTitle.textContent = `Schedule Visualization (${selectedAdvisors.length} Advisors)`;
-
-
-        if (STATE.scheduleViewMode === 'daily') {
-            renderDailyTimeline(selectedAdvisors);
-            // Show the day toggle
-            if (ELS.dayToggleContainer) ELS.dayToggleContainer.style.display = 'flex';
+            renderDailyPlanner();
         } else {
-            renderWeeklyGrid(selectedAdvisors);
-            // Hide the day toggle
-            if (ELS.dayToggleContainer) ELS.dayToggleContainer.style.display = 'none';
+            renderWeeklyPlanner();
         }
     };
 
-    // --- Daily Timeline (Gantt) Renderer ---
-    const renderDailyTimeline = (advisors) => {
-        const STATE = APP.StateManager.getState();
-        const dayName = STATE.selectedDay;
-        const weekStartISO = STATE.weekStart;
+    // --- DAILY VIEW (GANTT) ---
 
-        let html = '<div class="timeline-container">';
+    const renderDailyPlanner = () => {
+        // Updated time range in title
+        ELS.scheduleViewTitle.textContent = "Schedule Visualization (Daily 05:00 - 23:00)";
+
+        // Setup the structure for the Gantt chart
+        ELS.visualizationContainer.innerHTML = `
+            <div class="timeline-container" id="timelineContainer">
+                <div class="timeline-header">
+                    <div class="header-name">Name</div>
+                    <div class="header-timeline" id="timeHeader"></div>
+                </div>
+                <div class="timeline-body" id="plannerBody"></div>
+                <div id="currentTimeIndicator" class="current-time-indicator"></div>
+                <div id="mouseTimeIndicator" class="mouse-time-indicator"></div>
+                <div id="mouseTimeTooltip" class="mouse-time-tooltip">00:00</div>
+            </div>
+        `;
         
-        // 1. Header
-        html += `<div class="timeline-header">
-                    <div class="header-name">Advisor</div>
-                    <div class="header-timeline" id="headerTimeline">
-                        ${generateTimeTicks()}
-                    </div>
-                 </div>`;
+        // Cache dynamic elements
+        const ELS_DAILY = {
+            timeHeader: document.getElementById('timeHeader'),
+            plannerBody: document.getElementById('plannerBody'),
+            timelineContainer: document.getElementById('timelineContainer'),
+            currentTimeIndicator: document.getElementById('currentTimeIndicator'),
+            mouseTimeIndicator: document.getElementById('mouseTimeIndicator'),
+            mouseTimeTooltip: document.getElementById('mouseTimeTooltip')
+        };
 
-        // 2. Body Rows
-        advisors.forEach(advisor => {
-            // Calculate schedule for the selected day
-            const { segments, source } = APP.ScheduleCalculator.calculateSegments(advisor.id, dayName, weekStartISO);
-            
-            // V15.1: Add 'is-exception' class if the source is an exception
-            const rowClass = source === 'exception' ? 'timeline-row is-exception' : 'timeline-row';
-
-            // V15.1: Add data-advisor-id for click handling
-            html += `<div class="${rowClass}" data-advisor-id="${advisor.id}">
-                        <div class="timeline-name">${advisor.name}</div>
-                        <div class="timeline-track">
-                            ${generateTimelineBars(segments)}
-                        </div>
-                     </div>`;
-        });
-
-        html += '</div>';
-        ELS.container.innerHTML = html;
-    };
-
-    const generateTimeTicks = () => {
-        const { TIMELINE_START_MIN, TIMELINE_END_MIN, TIMELINE_DURATION_MIN } = APP.Config;
-        let ticksHtml = '';
-        // Generate ticks every hour
-        for (let min = TIMELINE_START_MIN; min <= TIMELINE_END_MIN; min += 60) {
-            const positionPct = ((min - TIMELINE_START_MIN) / TIMELINE_DURATION_MIN) * 100;
-            const timeLabel = APP.Utils.formatMinutesToTime(min);
-            ticksHtml += `<div class="time-tick" style="left: ${positionPct}%">${timeLabel}</div>`;
-        }
-        return ticksHtml;
-    };
-
-    const generateTimelineBars = (segments) => {
-        const { TIMELINE_START_MIN, TIMELINE_DURATION_MIN } = APP.Config;
-        let barsHtml = '';
-
-        segments.forEach(seg => {
-            const component = APP.StateManager.getComponentById(seg.component_id);
-            if (!component) return;
-
-            // Calculate position and width
-            const startPos = ((seg.start_min - TIMELINE_START_MIN) / TIMELINE_DURATION_MIN) * 100;
-            const duration = seg.end_min - seg.start_min;
-            const width = (duration / TIMELINE_DURATION_MIN) * 100;
-
-            // Basic clipping for visualization (if shift starts before/ends after visualized range)
-            const visibleStart = Math.max(0, startPos);
-            const visibleEnd = Math.min(100, startPos + width);
-            const visibleWidth = visibleEnd - visibleStart;
-
-            if (visibleWidth <= 0) return;
-
-            // Determine styling based on component type (for visualization matching screenshot)
-            let barClass = 'timeline-bar';
-            if (component.type === 'Break' || component.type === 'Lunch') {
-                barClass += ' is-gap';
-            } else if (component.type === 'Activity') {
-                barClass += ' is-activity';
-            }
-            // We use CSS classes for primary styling now, but keep the component color as a fallback or for other visualizations
-            const color = component.color; 
-            // const textColor = APP.Utils.getContrastingTextColor(color);
-
-            barsHtml += `<div class="${barClass}" 
-                              style="left: ${visibleStart}%; width: ${visibleWidth}%; /* background-color: ${color}; color: ${textColor}; */"
-                              title="${component.name} (${APP.Utils.formatMinutesToTime(seg.start_min)} - ${APP.Utils.formatMinutesToTime(seg.end_min)})">
-                         </div>`;
-        });
-        return barsHtml;
-    };
-
-    // --- Weekly Grid Renderer ---
-    const renderWeeklyGrid = (advisors) => {
-        const STATE = APP.StateManager.getState();
-        const weekStartISO = STATE.weekStart;
-        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-        let html = '<table class="weekly-grid">';
+        renderTimeHeader(ELS_DAILY.timeHeader);
         
-        // 1. Header
-        html += '<thead><tr><th>Advisor</th>';
-        days.forEach(day => {
-            const dateISO = APP.Utils.getISODateForDayName(weekStartISO, day);
-            const dateUK = APP.Utils.convertISOToUKDate(dateISO);
-            html += `<th>${day} (${dateUK})</th>`;
-        });
-        html += '</tr></thead><tbody>';
-
-        // 2. Body Rows
-        advisors.forEach(advisor => {
-            html += `<tr><td>${advisor.name}</td>`;
-            
-            days.forEach(dayName => {
-                const { segments, source } = APP.ScheduleCalculator.calculateSegments(advisor.id, dayName, weekStartISO);
+        const STATE = APP.StateManager.getState();
+        const selected = Array.from(STATE.selectedAdvisors);
+        
+        if (selected.length > 0) {
+            const advisorsToRender = STATE.advisors
+                .filter(a => selected.includes(a.id))
+                .sort((a,b) => a.name.localeCompare(b.name));
                 
-                // V15.1: Add 'is-exception' class and data attributes for click handling
-                const cellClass = source === 'exception' ? 'weekly-cell is-exception' : 'weekly-cell';
+            let html = '';
+            advisorsToRender.forEach(adv => {
+                // Use the centralized ScheduleCalculator
+                const { segments, source } = APP.ScheduleCalculator.calculateSegments(adv.id, STATE.selectedDay);
+                
+                // Add exception styling class if source is 'exception'
+                const rowClass = (source === 'exception') ? 'is-exception' : '';
 
-                html += `<td class="${cellClass}" data-advisor-id="${advisor.id}" data-day-name="${dayName}">`;
-
-                if (segments.length > 0) {
-                    // Determine shift summary (start/end times)
-                    const startTime = segments[0].start_min;
-                    const endTime = segments[segments.length - 1].end_min;
-                    
-                    // Determine the "Code" to display. If it's a rotation, we can try to find the original code.
-                    // If it's an exception, or if the structure changed, we might just show "Custom".
-                    // For simplicity here, we show the times.
-                    
-                    html += `<div class="weekly-cell-content">
-                                <span class="weekly-shift-code">${APP.Utils.formatMinutesToTime(startTime)} - ${APP.Utils.formatMinutesToTime(endTime)}</span>
-                             </div>`;
-                } else {
-                    html += '<div class="weekly-rdo">RDO</div>';
-                }
-                html += `</td>`;
+                // Add data-advisor-id for click handling
+                html += `
+                <div class="timeline-row ${rowClass}" data-advisor-id="${adv.id}">
+                    <div class="timeline-name">${adv.name}</div>
+                    <div class="timeline-track">
+                        ${renderSegments(segments)}
+                    </div>
+                </div>
+                `;
             });
-            html += `</tr>`;
-        });
+            ELS_DAILY.plannerBody.innerHTML = html;
+        } else {
+             ELS_DAILY.plannerBody.innerHTML = '<div class="visualization-empty">Select advisors to view schedules.</div>';
+        }
 
-        html += '</tbody></table>';
-        ELS.container.innerHTML = html;
+        setupIntradayIndicators(ELS_DAILY);
     };
 
+    const renderTimeHeader = (headerElement) => {
+        const startHour = Math.floor(Config.TIMELINE_START_MIN / 60);
+        const endHour = Math.floor(Config.TIMELINE_END_MIN / 60);
+        const totalHours = Config.TIMELINE_DURATION_MIN / 60;
+        
+        let html = '';
+        // Loop through each hour in the range
+        for (let h = startHour; h <= endHour; h++) {
+            const pct = (h - startHour) / totalHours * 100;
+            const label = h.toString().padStart(2, '0') + ':00';
+            html += `<div class="time-tick" style="left: ${pct}%;">${label}</div>`;
+        }
+        // Note: The final tick (e.g., 20:00) is often omitted as the lines represent the start of the hour block.
+
+        headerElement.innerHTML = html;
+    };
+
+    // Made public as it's used by TradeCenter preview as well
+    ScheduleViewer.renderSegments = (segments) => {
+        if (!segments || segments.length === 0) {
+            return ''; // RDO
+        }
+        
+        return segments.map(seg => {
+            const component = APP.StateManager.getComponentById(seg.component_id);
+            if (!component) return '';
+
+            // Calculate position and width percentage
+            const startPct = ((seg.start_min - Config.TIMELINE_START_MIN) / Config.TIMELINE_DURATION_MIN) * 100;
+            const widthPct = ((seg.end_min - seg.start_min) / Config.TIMELINE_DURATION_MIN) * 100;
+            
+            // Determine styling class based on component type
+            let barClass = '';
+            if (component.type === 'Break' || component.type === 'Lunch') {
+                barClass = 'is-gap';
+            } else if (component.type === 'Activity') {
+                barClass = 'is-activity';
+            }
+            
+            // Apply specific color if no predefined class matches
+            const style = (barClass === '') ? `background-color: ${component.color}; color: ${APP.Utils.getContrastingTextColor(component.color)};` : '';
+
+            // The 'title' attribute provides the native browser tooltip on hover.
+            return `
+            <div class="timeline-bar ${barClass}" style="left: ${startPct}%; width: ${widthPct}%; ${style}" title="${component.name} (${APP.Utils.formatMinutesToTime(seg.start_min)} - ${APP.Utils.formatMinutesToTime(seg.end_min)})">
+            </div>
+            `;
+        }).join('');
+    };
+    // Alias for internal use
+    const renderSegments = ScheduleViewer.renderSegments;
+
+    // --- WEEKLY VIEW ---
+
+    const renderWeeklyPlanner = () => {
+        ELS.scheduleViewTitle.textContent = "Schedule Visualization (Weekly Overview)";
+
+        // Initialize the structure of the weekly planner
+        ELS.visualizationContainer.innerHTML = `
+            <div class="table-container">
+                <table class="weekly-grid" id="weeklyGrid">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>MON</th>
+                            <th>TUE</th>
+                            <th>WED</th>
+                            <th>THU</th>
+                            <th>FRI</th>
+                            <th>SAT</th>
+                            <th>SUN</th>
+                        </tr>
+                    </thead>
+                    <tbody id="weeklyBody">
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        const ELS_WEEKLY = {
+            weeklyBody: document.getElementById('weeklyBody')
+        };
+
+        const STATE = APP.StateManager.getState();
+        const selected = Array.from(STATE.selectedAdvisors);
+        const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        
+        if (selected.length > 0) {
+            const advisorsToRender = STATE.advisors
+                .filter(a => selected.includes(a.id))
+                .sort((a,b) => a.name.localeCompare(b.name));
+
+            let html = '';
+            advisorsToRender.forEach(adv => {
+                html += `<tr><td>${adv.name}</td>`;
+                
+                daysOfWeek.forEach(day => {
+                    // Use the centralized ScheduleCalculator
+                    const { segments, source } = APP.ScheduleCalculator.calculateSegments(adv.id, day);
+                    
+                    // Determine class and get the specific date for this cell
+                    const cellClass = (source === 'exception') ? 'is-exception' : '';
+                    const dateISO = APP.Utils.getISODateForDayName(STATE.weekStart, day);
+
+                    // Add 'weekly-cell' class and data attributes for click handling
+                    html += `<td class="weekly-cell ${cellClass}" data-advisor-id="${adv.id}" data-date="${dateISO}">
+                                ${renderWeeklyCell(segments, source)}
+                             </td>`;
+                });
+                
+                html += `</tr>`;
+            });
+            ELS_WEEKLY.weeklyBody.innerHTML = html;
+        } else {
+             ELS_WEEKLY.weeklyBody.innerHTML = `<tr><td colspan="8" class="visualization-empty">Select advisors to view schedules.</td></tr>`;
+        }
+    };
+
+    // Updated to handle source for exception visualization
+    const renderWeeklyCell = (segments, source) => {
+        if (!segments || segments.length === 0) {
+            return `<div class="weekly-cell-content"><span class="weekly-rdo">RDO</span></div>`;
+        }
+        
+        let shiftCode = 'N/A';
+
+        // If the source is 'rotation', try to find the matching definition code.
+        if (source === 'rotation') {
+            const STATE = APP.StateManager.getState();
+            // Match by structure comparison (requires segments to be sorted consistently)
+            const definition = STATE.shiftDefinitions.find(def => {
+                if (!def.structure) return false;
+                // Ensure comparison is robust by sorting the definition structure as well
+                const sortedDefStructure = JSON.parse(JSON.stringify(def.structure)).sort((a, b) => a.start_min - b.start_min);
+                return JSON.stringify(sortedDefStructure) === JSON.stringify(segments);
+            });
+            if (definition) {
+                shiftCode = definition.code;
+            }
+        } else if (source === 'exception') {
+            // If it's an exception, label it as 'Custom'.
+            shiftCode = 'Custom';
+        }
+        
+        const startMin = segments[0].start_min;
+        const endMin = segments[segments.length - 1].end_min;
+        const timeString = `${APP.Utils.formatMinutesToTime(startMin)} - ${APP.Utils.formatMinutesToTime(endMin)}`;
+
+        return `
+            <div class="weekly-cell-content">
+                <span class="weekly-shift-code">${shiftCode}</span>
+                <span class="weekly-shift-time">${timeString}</span>
+            </div>
+        `;
+    };
+
+
+    // --- INTRADAY INDICATORS (Daily View Only) ---
+    
+    const setupIntradayIndicators = (ELS_DAILY) => {
+       // Clear previous interval to prevent stacking
+       if (timeIndicatorInterval) clearInterval(timeIndicatorInterval);
+       // Update current time indicator every minute
+       timeIndicatorInterval = setInterval(() => updateCurrentTimeIndicator(ELS_DAILY), 60000);
+       updateCurrentTimeIndicator(ELS_DAILY);
+
+       // Setup mouse tracking for precision cursor
+       if (ELS_DAILY.timelineContainer) {
+           ELS_DAILY.timelineContainer.addEventListener('mousemove', (e) => updateMouseTimeIndicator(e, ELS_DAILY));
+           ELS_DAILY.timelineContainer.addEventListener('mouseenter', () => showMouseIndicator(ELS_DAILY));
+           ELS_DAILY.timelineContainer.addEventListener('mouseleave', () => hideMouseIndicator(ELS_DAILY));
+       }
+   };
+   
+   const updateCurrentTimeIndicator = (ELS_DAILY) => {
+       if (!ELS_DAILY || !ELS_DAILY.currentTimeIndicator || !ELS_DAILY.timelineContainer) return;
+
+        // NOTE: This relies on the client's local time.
+       const now = new Date();
+       
+       const STATE = APP.StateManager.getState();
+       // Get the specific date ISO for the selected day in the view
+       const viewDateISO = APP.Utils.getISODateForDayName(STATE.weekStart, STATE.selectedDay);
+       const todayISO = APP.Utils.formatDateToISO(now);
+
+       // Only show if the view is 'daily' AND the date being viewed is today's date
+       if (STATE.scheduleViewMode !== 'daily' || viewDateISO !== todayISO) {
+           ELS_DAILY.currentTimeIndicator.style.display = 'none';
+           return;
+       }
+
+       const currentMinutes = now.getHours() * 60 + now.getMinutes();
+       
+       if (currentMinutes < Config.TIMELINE_START_MIN || currentMinutes > Config.TIMELINE_END_MIN) {
+           ELS_DAILY.currentTimeIndicator.style.display = 'none';
+           return;
+       }
+
+       const pct = ((currentMinutes - Config.TIMELINE_START_MIN) / Config.TIMELINE_DURATION_MIN) * 100;
+       
+       const nameColElement = ELS_DAILY.timelineContainer.querySelector('.header-name');
+       // Use offsetWidth for accurate measurement of the sticky name column
+       const nameColWidth = nameColElement ? nameColElement.offsetWidth : 220;
+
+       ELS_DAILY.currentTimeIndicator.style.display = 'block';
+       // Position correctly relative to the start of the container, accounting for the name column width
+       ELS_DAILY.currentTimeIndicator.style.left = `calc(${nameColWidth}px + ${pct}%)`;
+   };
+
+   // Updated mouse tracking to correctly account for horizontal scrolling
+   const updateMouseTimeIndicator = (e, ELS_DAILY) => {
+       if (!ELS_DAILY || !ELS_DAILY.mouseTimeIndicator || !ELS_DAILY.timelineContainer) return;
+
+       // We need the container element of the visualization area for scroll position
+       const vizContainer = document.getElementById('visualizationContainer');
+       if (!vizContainer) return;
+
+       const containerRect = ELS_DAILY.timelineContainer.getBoundingClientRect();
+       // Calculate mouse position relative to the container, accounting for the visualization container's scrollLeft
+       const mouseX = e.clientX - containerRect.left + vizContainer.scrollLeft;
+       
+       const nameColElement = ELS_DAILY.timelineContainer.querySelector('.header-name');
+       const nameColWidth = nameColElement ? nameColElement.offsetWidth : 220;
+       const headerHeight = ELS_DAILY.timeHeader ? ELS_DAILY.timeHeader.offsetHeight : 48;
+
+       // Hide if the mouse is over the name column
+       if (mouseX < nameColWidth) {
+           hideMouseIndicator(ELS_DAILY);
+           return;
+       }
+
+       // Calculate the width of the actual timeline track area
+       const trackWidth = ELS_DAILY.timeHeader.offsetWidth;
+       const relativeX = mouseX - nameColWidth;
+       
+       // Calculate time based on percentage position within the track
+       const pct = relativeX / trackWidth;
+       
+       // Constrain percentage between 0 and 1
+       const constrainedPct = Math.max(0, Math.min(1, pct));
+       
+       const timeInMinutes = Config.TIMELINE_START_MIN + (constrainedPct * Config.TIMELINE_DURATION_MIN);
+
+       // Position the vertical line at the mouse X position
+       ELS_DAILY.mouseTimeIndicator.style.left = `${mouseX}px`;
+       
+       // Update and position the tooltip
+       ELS_DAILY.mouseTimeTooltip.textContent = APP.Utils.formatMinutesToTime(timeInMinutes);
+       ELS_DAILY.mouseTimeTooltip.style.top = `${headerHeight - 30}px`; 
+       ELS_DAILY.mouseTimeTooltip.style.left = `${mouseX}px`;
+   };
+
+   const showMouseIndicator = (ELS_DAILY) => {
+       if (ELS_DAILY.mouseTimeIndicator) ELS_DAILY.mouseTimeIndicator.style.display = 'block';
+       if (ELS_DAILY.mouseTimeTooltip) ELS_DAILY.mouseTimeTooltip.style.display = 'block';
+   };
+
+   const hideMouseIndicator = (ELS_DAILY) => {
+       if (ELS_DAILY.mouseTimeIndicator) ELS_DAILY.mouseTimeIndicator.style.display = 'none';
+       if (ELS_DAILY.mouseTimeTooltip) ELS_DAILY.mouseTimeTooltip.style.display = 'none';
+   };
 
     APP.Components = APP.Components || {};
     APP.Components.ScheduleViewer = ScheduleViewer;
@@ -2909,7 +2838,7 @@ window.APP = window.APP || {};
 (function(APP) {
     const ShiftTradeCenter = {};
     const ELS = {};
-    
+
     // Local state for the trade center
     const TRADE_STATE = {
         advisor1: null,
@@ -2918,47 +2847,62 @@ window.APP = window.APP || {};
         advisor2: null,
         date2: null,
         schedule2: null,
-        reason: '',
+        reason: null,
     };
 
     ShiftTradeCenter.initialize = () => {
-        ELS.advisor1Select = document.getElementById('tradeAdvisor1');
-        ELS.date1Input = document.getElementById('tradeDate1');
+        ELS.advisor1 = document.getElementById('tradeAdvisor1');
+        ELS.date1 = document.getElementById('tradeDate1');
         ELS.preview1 = document.getElementById('tradePreview1');
-        ELS.advisor2Select = document.getElementById('tradeAdvisor2');
-        ELS.date2Input = document.getElementById('tradeDate2');
+        ELS.advisor2 = document.getElementById('tradeAdvisor2');
+        ELS.date2 = document.getElementById('tradeDate2');
         ELS.preview2 = document.getElementById('tradePreview2');
+        ELS.btnExecuteTrade = document.getElementById('btnExecuteTrade');
         ELS.reasonInput = document.getElementById('tradeReason');
-        ELS.btnExecute = document.getElementById('btnExecuteTrade');
 
         // Event Listeners
-        if (ELS.advisor1Select) ELS.advisor1Select.addEventListener('change', (e) => updateTradeState('advisor1', e.target.value));
-        if (ELS.advisor2Select) ELS.advisor2Select.addEventListener('change', (e) => updateTradeState('advisor2', e.target.value));
+        if (ELS.advisor1) ELS.advisor1.addEventListener('change', (e) => handleSelectionChange('1', 'advisor', e.target.value));
+        if (ELS.advisor2) ELS.advisor2.addEventListener('change', (e) => handleSelectionChange('2', 'advisor', e.target.value));
+        if (ELS.btnExecuteTrade) ELS.btnExecuteTrade.addEventListener('click', executeTrade);
         if (ELS.reasonInput) ELS.reasonInput.addEventListener('input', (e) => {
             TRADE_STATE.reason = e.target.value;
             validateTrade();
         });
-        if (ELS.btnExecute) ELS.btnExecute.addEventListener('click', executeTrade);
+
 
         // Initialize Date Pickers (Flatpickr)
         if (typeof flatpickr !== 'undefined') {
-            if (ELS.date1Input) {
-                flatpickr(ELS.date1Input, {
-                    dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y',
-                    onChange: (dates, dateStr) => updateTradeState('date1', dateStr)
+            if (ELS.date1) {
+                flatpickr(ELS.date1, {
+                    dateFormat: 'Y-m-d',
+                    altInput: true,
+                    altFormat: 'D, d M Y', // Friendly display format
+                    onChange: (selectedDates, dateStr) => handleSelectionChange('1', 'date', dateStr)
                 });
             }
-            if (ELS.date2Input) {
-                 flatpickr(ELS.date2Input, {
-                    dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y',
-                    onChange: (dates, dateStr) => updateTradeState('date2', dateStr)
+            if (ELS.date2) {
+                 flatpickr(ELS.date2, {
+                    dateFormat: 'Y-m-d',
+                    altInput: true,
+                    altFormat: 'D, d M Y',
+                    onChange: (selectedDates, dateStr) => handleSelectionChange('2', 'date', dateStr)
                 });
             }
         }
     };
 
-    // Renders the initial state (populates dropdowns)
     ShiftTradeCenter.render = () => {
+        renderAdvisorDropdowns();
+        // Previews are rendered dynamically on selection change
+    };
+
+    const renderAdvisorDropdowns = () => {
+        // Check if elements exist (they might not if the tab content was manipulated)
+        if (!ELS.advisor1 || !ELS.advisor2) return;
+
+        // Check if already populated to prevent redundant rendering
+        if (ELS.advisor1.options.length > 1) return;
+
         const STATE = APP.StateManager.getState();
         const advisors = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name));
         
@@ -2967,52 +2911,61 @@ window.APP = window.APP || {};
             opts += `<option value="${adv.id}">${adv.name}</option>`;
         });
 
-        if (ELS.advisor1Select) ELS.advisor1Select.innerHTML = opts;
-        if (ELS.advisor2Select) ELS.advisor2Select.innerHTML = opts;
-        
-        // Reset local state when view is rendered
-        Object.keys(TRADE_STATE).forEach(key => TRADE_STATE[key] = null);
-        TRADE_STATE.reason = '';
-        if (ELS.reasonInput) ELS.reasonInput.value = '';
-        if (ELS.date1Input && ELS.date1Input._flatpickr) ELS.date1Input._flatpickr.clear();
-        if (ELS.date2Input && ELS.date2Input._flatpickr) ELS.date2Input._flatpickr.clear();
-
-        renderPreview(1);
-        renderPreview(2);
-        validateTrade();
+        ELS.advisor1.innerHTML = opts;
+        ELS.advisor2.innerHTML = opts;
     };
 
-    // Updates the local state and triggers preview/validation
-    const updateTradeState = async (field, value) => {
-        TRADE_STATE[field] = value;
+    const handleSelectionChange = async (slot, type, value) => {
+        TRADE_STATE[`${type}${slot}`] = value || null;
         
-        const slotNum = field.includes('1') ? 1 : 2;
-        const advisorId = TRADE_STATE[`advisor${slotNum}`];
-        const dateISO = TRADE_STATE[`date${slotNum}`];
+        const advisorId = TRADE_STATE[`advisor${slot}`];
+        const dateISO = TRADE_STATE[`date${slot}`];
 
         if (advisorId && dateISO) {
-            // Calculate the schedule for the preview
-            const dayName = APP.Utils.getDayNameFromISO(dateISO);
-            // We must determine the Monday start for this specific date to calculate correctly
-            const weekStartISO = APP.Utils.getMondayForDate(dateISO);
-            
-            // Crucial: Ensure historical data for that specific week is loaded before calculation
-            await APP.StateManager.loadEffectiveAssignments(weekStartISO);
-
-            const { segments } = APP.ScheduleCalculator.calculateSegments(advisorId, dayName, weekStartISO);
-            TRADE_STATE[`schedule${slotNum}`] = segments;
+            // Fetch and render the schedule preview
+            TRADE_STATE[`schedule${slot}`] = await fetchScheduleForDate(advisorId, dateISO);
+            renderPreview(slot);
         } else {
-            TRADE_STATE[`schedule${slotNum}`] = null;
+            // Clear the preview
+            TRADE_STATE[`schedule${slot}`] = null;
+            renderPreview(slot);
         }
-
-        renderPreview(slotNum);
         validateTrade();
     };
 
-    // Renders the schedule preview panel
-    const renderPreview = (slotNum) => {
-        const previewEl = ELS[`preview${slotNum}`];
-        const schedule = TRADE_STATE[`schedule${slotNum}`];
+    // Helper to fetch the schedule for a specific advisor and date.
+    const fetchScheduleForDate = async (advisorId, dateISO) => {
+        try {
+            // 1. Determine Day Name and Week Start
+            const weekStartISO = APP.Utils.getMondayForDate(dateISO);
+
+            // Check if date calculation was successful
+            if (!weekStartISO) {
+                console.error("Could not determine week start for date:", dateISO);
+                return null;
+            }
+
+            const dayName = APP.Utils.getDayNameFromISO(dateISO);
+            
+
+            // 2. Ensure historical data is loaded for that specific week start
+            // This leverages the StateManager's caching mechanism.
+            await APP.StateManager.loadEffectiveAssignments(weekStartISO);
+
+            // 3. Use the centralized calculation logic.
+             const result = APP.ScheduleCalculator.calculateSegments(advisorId, dayName, weekStartISO);
+             return result;
+
+        } catch (e) {
+            console.error("Error fetching schedule for trade preview:", e);
+            return null;
+        }
+    };
+
+    // Renders the preview panel for the specified slot
+    const renderPreview = (slot) => {
+        const previewEl = ELS[`preview${slot}`];
+        const schedule = TRADE_STATE[`schedule${slot}`];
 
         if (!previewEl) return;
 
@@ -3021,91 +2974,126 @@ window.APP = window.APP || {};
             return;
         }
 
-        let html = '<div class="trade-preview-details">';
-
-        if (schedule.length === 0) {
-            html += '<h4>Rest Day Off (RDO)</h4>';
-        } else {
-            const startTime = schedule[0].start_min;
-            const endTime = schedule[schedule.length - 1].end_min;
-            html += `<h4>Shift: ${APP.Utils.formatMinutesToTime(startTime)} - ${APP.Utils.formatMinutesToTime(endTime)}</h4>`;
-            html += '<ul>';
-            schedule.forEach(seg => {
-                const component = APP.StateManager.getComponentById(seg.component_id);
-                const name = component ? component.name : 'Unknown';
-                html += `<li>${APP.Utils.formatMinutesToTime(seg.start_min)} - ${APP.Utils.formatMinutesToTime(seg.end_min)}: ${name}</li>`;
-            });
-            html += '</ul>';
-        }
-        html += '</div>';
-        previewEl.innerHTML = html;
-    };
-
-    // Validates if the trade can proceed
-    const validateTrade = () => {
-        if (!ELS.btnExecute) return;
-        
-        const isValid = TRADE_STATE.advisor1 && TRADE_STATE.date1 &&
-                        TRADE_STATE.advisor2 && TRADE_STATE.date2 &&
-                        TRADE_STATE.reason && TRADE_STATE.reason.trim().length > 0;
-
-        // Prevent trading with self on the same day
-        const isSelfTrade = TRADE_STATE.advisor1 === TRADE_STATE.advisor2 && TRADE_STATE.date1 === TRADE_STATE.date2;
-
-        ELS.btnExecute.disabled = !isValid || isSelfTrade;
-    };
-
-    // Executes the trade by creating two exceptions
-    const executeTrade = async () => {
-        if (ELS.btnExecute.disabled) return;
-
-        // Confirmation dialog
-        const adv1Name = APP.StateManager.getAdvisorById(TRADE_STATE.advisor1).name;
-        const adv2Name = APP.StateManager.getAdvisorById(TRADE_STATE.advisor2).name;
-        const date1UK = APP.Utils.convertISOToUKDate(TRADE_STATE.date1);
-        const date2UK = APP.Utils.convertISOToUKDate(TRADE_STATE.date2);
-
-        if (!confirm(`Confirm Trade:\n\n${adv1Name}'s schedule on ${date1UK} will be replaced by ${adv2Name}'s schedule from ${date2UK}.\n\nAND\n\n${adv2Name}'s schedule on ${date2UK} will be replaced by ${adv1Name}'s schedule from ${date1UK}.\n\nProceed?`)) {
+        if (schedule.segments.length === 0) {
+            previewEl.innerHTML = `<div class="trade-preview-details"><h4>Rest Day Off (RDO)</h4></div>`;
             return;
         }
 
-        // Define the two exceptions
-        // Exception 1: Advisor 1 gets Advisor 2's schedule
+        const startMin = schedule.segments[0].start_min;
+        const endMin = schedule.segments[schedule.segments.length - 1].end_min;
+        const timeString = `${APP.Utils.formatMinutesToTime(startMin)} - ${APP.Utils.formatMinutesToTime(endMin)}`;
+
+        let html = `<div class="trade-preview-details">
+            <h4>${timeString} (${schedule.source === 'exception' ? 'Exception' : 'Rotation'})</h4>
+            <ul>`;
+        
+        schedule.segments.forEach(seg => {
+            const component = APP.StateManager.getComponentById(seg.component_id);
+            const duration = seg.end_min - seg.start_min;
+            html += `<li>${APP.Utils.formatMinutesToTime(seg.start_min)}: ${component ? component.name : 'Unknown'} (${duration}m)</li>`;
+        });
+
+        html += `</ul></div>`;
+        previewEl.innerHTML = html;
+    };
+
+    // Validates if the trade is possible and enables/disables the button
+    const validateTrade = () => {
+        const { advisor1, date1, schedule1, advisor2, date2, schedule2, reason } = TRADE_STATE;
+        
+        let isValid = true;
+
+        // 1. All inputs must be selected and reason provided
+        if (!advisor1 || !date1 || !advisor2 || !date2 || !reason || reason.trim() === '') {
+            isValid = false;
+        }
+
+        // 2. Schedules must be successfully loaded
+        else if (!schedule1 || !schedule2) {
+             isValid = false;
+        }
+
+        // 3. Cannot trade with oneself on the same day
+        else if (advisor1 === advisor2 && date1 === date2) {
+             isValid = false;
+        }
+        
+        if (ELS.btnExecuteTrade) {
+            ELS.btnExecuteTrade.disabled = !isValid;
+        }
+        return isValid;
+    };
+
+    const executeTrade = async () => {
+        if (!validateTrade()) return;
+
+        const { advisor1, date1, schedule1, advisor2, date2, schedule2, reason } = TRADE_STATE;
+
+        const adv1Name = APP.StateManager.getAdvisorById(advisor1)?.name || advisor1;
+        const adv2Name = APP.StateManager.getAdvisorById(advisor2)?.name || advisor2;
+
+        if (!confirm(`Confirm Trade:\n\n${adv1Name} on ${APP.Utils.convertISOToUKDate(date1)} will receive ${adv2Name}'s schedule from ${APP.Utils.convertISOToUKDate(date2)}.\n\n${adv2Name} on ${APP.Utils.convertISOToUKDate(date2)} will receive ${adv1Name}'s schedule from ${APP.Utils.convertISOToUKDate(date1)}.\n\nReason: ${reason}\n\nProceed?`)) {
+            return;
+        }
+
+        // Create the two exceptions
+        // Exception 1: Advisor 1 gets Schedule 2 on Date 1
         const exception1 = {
-            advisor_id: TRADE_STATE.advisor1,
-            exception_date: TRADE_STATE.date1,
-            structure: TRADE_STATE.schedule2, // Advisor 1 gets Schedule 2
-            reason: `Trade with ${adv2Name} (${TRADE_STATE.reason})`
+            advisor_id: advisor1,
+            exception_date: date1,
+            // Must use a deep copy of the segments (handle RDO by setting structure to empty array)
+            structure: schedule2.segments.length > 0 ? JSON.parse(JSON.stringify(schedule2.segments)) : [], 
+            reason: `${reason} (Trade with ${adv2Name} on ${APP.Utils.convertISOToUKDate(date2)})`
         };
 
-        // Exception 2: Advisor 2 gets Advisor 1's schedule
+        // Exception 2: Advisor 2 gets Schedule 1 on Date 2
         const exception2 = {
-            advisor_id: TRADE_STATE.advisor2,
-            exception_date: TRADE_STATE.date2,
-            structure: TRADE_STATE.schedule1, // Advisor 2 gets Schedule 1
-            reason: `Trade with ${adv1Name} (${TRADE_STATE.reason})`
+            advisor_id: advisor2,
+            exception_date: date2,
+            // Must use a deep copy of the segments
+            structure: schedule1.segments.length > 0 ? JSON.parse(JSON.stringify(schedule1.segments)) : [],
+            reason: `${reason} (Trade with ${adv1Name} on ${APP.Utils.convertISOToUKDate(date1)})`
         };
 
-        // Execute database operations (Upsert based on advisor_id, exception_date)
-        const [res1, res2] = await Promise.all([
-            APP.DataService.saveRecord('schedule_exceptions', exception1, 'advisor_id, exception_date'),
-            APP.DataService.saveRecord('schedule_exceptions', exception2, 'advisor_id, exception_date')
-        ]);
+        // Save both exceptions (ideally in a transaction, but sequentially here)
+        const res1 = await APP.DataService.saveRecord('schedule_exceptions', exception1, 'advisor_id, exception_date');
+        const res2 = await APP.DataService.saveRecord('schedule_exceptions', exception2, 'advisor_id, exception_date');
 
         if (!res1.error && !res2.error) {
-            // Sync state and save history
             APP.StateManager.syncRecord('schedule_exceptions', res1.data);
             APP.StateManager.syncRecord('schedule_exceptions', res2.data);
             APP.StateManager.saveHistory("Execute Shift Trade");
-
-            APP.Utils.showToast("Shift trade executed successfully!", "success");
+            APP.Utils.showToast("Shift trade executed successfully.", "success");
             
-            // Re-render the view to clear the form and update previews (which now reflect the trade)
-            ShiftTradeCenter.render();
-
+            // Clear the form and re-render previews
+            clearTradeForm();
+            
+            // Re-render the main schedule view if it's currently active
+            if (APP.Components.ScheduleViewer) {
+                 APP.Components.ScheduleViewer.render();
+            }
+            
         } else {
-            APP.Utils.showToast("Error executing trade. Please check console for details.", "danger");
+            // Error toasts handled by DataService
+            if (res1.error) console.error("Trade Error (Part 1):", res1.error);
+            if (res2.error) console.error("Trade Error (Part 2):", res2.error);
         }
+    };
+
+    const clearTradeForm = () => {
+        // Reset state
+        Object.keys(TRADE_STATE).forEach(key => TRADE_STATE[key] = null);
+        
+        // Reset UI elements
+        if (ELS.advisor1) ELS.advisor1.value = "";
+        if (ELS.advisor2) ELS.advisor2.value = "";
+        if (ELS.date1 && ELS.date1._flatpickr) ELS.date1._flatpickr.clear();
+        if (ELS.date2 && ELS.date2._flatpickr) ELS.date2._flatpickr.clear();
+        if (ELS.reasonInput) ELS.reasonInput.value = '';
+        
+        renderPreview('1');
+        renderPreview('2');
+        validateTrade();
     };
 
 
@@ -3124,170 +3112,291 @@ window.APP = window.APP || {};
 
     // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v15.9) Initializing...");
+        console.log("WFM Intelligence Platform (v15.8.1) Initializing...");
         
         // Initialize foundational services
         APP.Utils.cacheDOMElements();
         if (!APP.DataService.initialize()) {
-            console.error("DataService failed to initialize. Halting boot.");
+            console.error("Fatal Error: DataService failed to initialize.");
             return;
         }
 
-        // Load initial data
+        // Cache Core DOM elements
+        cacheCoreDOMElements();
+        
+        // Set the default week to the current week
+        setDefaultWeek();
+
+        // Load data
         const initialData = await APP.DataService.loadCoreData();
         if (!initialData) {
-            console.error("Failed to load core data. Halting boot.");
+            console.error("Fatal Error: Failed to load core data.");
+             if (document.body) {
+                document.body.innerHTML = "<h1>Fatal Error: Failed to load core data from database. Check connection and schema.</h1>";
+            }
             return;
         }
 
         // Initialize State Manager
         APP.StateManager.initialize(initialData);
 
-        // Cache Core DOM elements
-        ELS.mainNavigation = document.getElementById('main-navigation');
-        ELS.weekStartInput = document.getElementById('weekStart');
-        ELS.prevWeekBtn = document.getElementById('prevWeek');
-        ELS.nextWeekBtn = document.getElementById('nextWeek');
+        // Initialize UI Components
+        try {
+            APP.Components.ComponentManager.initialize();
+            APP.Components.AssignmentManager.initialize();
+            // Initialize the shared builder first
+            APP.Components.SequentialBuilder.initialize(); 
+            APP.Components.ShiftDefinitionEditor.initialize();
+            APP.Components.RotationEditor.initialize();
+            APP.Components.ScheduleViewer.initialize();
+            // Initialize the Trade Center
+            if (APP.Components.ShiftTradeCenter) {
+                APP.Components.ShiftTradeCenter.initialize();
+            }
+        } catch (error) {
+            console.error("CRITICAL ERROR during UI Component Initialization:", error);
+            APP.Utils.showToast("Fatal Error during UI initialization. Check console logs.", "danger", 10000);
+            return; 
+        }
+
+        // Render all components
+        // This triggers the initial render chain, including the first historical data fetch.
+        Core.renderAll();
+
+        // Wire global event handlers
+        wireGlobalEvents();
+        
+        console.log("Initialization complete.");
+    };
+
+    const cacheCoreDOMElements = () => {
+        ELS.weekStart = document.getElementById('weekStart');
+        ELS.prevWeek = document.getElementById('prevWeek');
+        ELS.nextWeek = document.getElementById('nextWeek');
         ELS.btnUndo = document.getElementById('btnUndo');
         ELS.btnRedo = document.getElementById('btnRedo');
+        ELS.tabNav = document.getElementById('main-navigation');
+        ELS.tabs = document.querySelectorAll('.tab-content');
+    };
 
-        // Initialize Components
-        APP.Components.ComponentManager.initialize();
-        APP.Components.ShiftDefinitionEditor.initialize();
-        APP.Components.RotationEditor.initialize();
-        APP.Components.AssignmentManager.initialize();
-        APP.Components.ScheduleViewer.initialize();
-        APP.Components.SequentialBuilder.initialize();
-        APP.Components.ShiftTradeCenter.initialize();
+    // Set the default week view to the Monday of the current week.
+    const setDefaultWeek = () => {
+        let d = new Date();
+        let day = d.getDay();
+        // Calculate the date of the current week's Monday
+        let diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        const localMonday = new Date(d.getFullYear(), d.getMonth(), diff);
+        
+        // Format as YYYY-MM-DD and set in state
+        APP.StateManager.getState().weekStart = APP.Utils.formatDateToISO(localMonday);
+    };
 
-        // Wire global events
-        if (ELS.mainNavigation) ELS.mainNavigation.addEventListener('click', handleTabNavigation);
-        if (ELS.prevWeekBtn) ELS.prevWeekBtn.addEventListener('click', () => changeWeek(-7));
-        if (ELS.nextWeekBtn) ELS.nextWeekBtn.addEventListener('click', () => changeWeek(7));
-        if (ELS.btnUndo) ELS.btnUndo.addEventListener('click', () => APP.StateManager.applyHistory('undo'));
-        if (ELS.btnRedo) ELS.btnRedo.addEventListener('click', () => APP.StateManager.applyHistory('redo'));
-
-
-        // Initialize Week Picker (Flatpickr)
-        if (ELS.weekStartInput && typeof flatpickr !== 'undefined') {
-            flatpickr(ELS.weekStartInput, {
-                // Configure Flatpickr to select weeks starting on Monday
-                weekNumbers: true,
-                dateFormat: 'Y-m-d', // Store as ISO
-                altInput: true,
-                altFormat: 'd/m/Y', // Display as UK format
-                locale: {
-                    "firstDayOfWeek": 1 // Monday
-                },
-                onChange: function(selectedDates, dateStr, instance) {
-                    // When a date is picked, find the Monday of that week
-                    if (selectedDates.length > 0) {
-                        const date = selectedDates[0];
-                        const day = date.getDay();
-                        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
-                        const monday = new Date(date.setDate(diff));
-                        const mondayISO = APP.Utils.formatDateToISO(monday);
-                        
-                        // Update the input display and the state
-                        instance.setDate(mondayISO, false);
-                        handleWeekChange(mondayISO);
-                    }
+    // This is the NEW code to paste
+const wireGlobalEvents = () => {
+    // Week Navigation
+    if (ELS.weekStart) {
+        if (typeof flatpickr !== 'function') {
+            console.error("CRITICAL ERROR: flatpickr library not loaded (Global Events)."); //
+        } else {
+            // Configure Week Picker (Flatpickr)
+            flatpickr(ELS.weekStart, {
+                dateFormat: "Y-m-d", // ISO format for consistency
+                defaultDate: APP.StateManager.getState().weekStart,
+          
+                "locale": { "firstDayOfWeek": 1 }, // Monday start
+                onChange: (selectedDates, dateStr) => {
+                    // Update state and re-render visualization on date change
+                    APP.StateManager.getState().weekStart = dateStr;
+ 
+                    // ScheduleViewer.render() coordinates the historical data fetch and subsequent renders.
+                    APP.Components.ScheduleViewer.render(); //
                 }
             });
         }
+    }
+    if (ELS.prevWeek) ELS.prevWeek.addEventListener('click', () => updateWeek(-7)); //
+    if (ELS.nextWeek) ELS.nextWeek.addEventListener('click', () => updateWeek(7)); //
 
-        // Initial Render
-        // Set initial week to the current week
-        const today = new Date();
-        const initialWeekStart = APP.Utils.getMondayForDate(APP.Utils.formatDateToISO(today));
-        if (ELS.weekStartInput && ELS.weekStartInput._flatpickr) {
-             ELS.weekStartInput._flatpickr.setDate(initialWeekStart, false);
+    // Undo/Redo
+    if (ELS.btnUndo) ELS.btnUndo.addEventListener('click', () => APP.StateManager.applyHistory('undo')); //
+    if (ELS.btnRedo) ELS.btnRedo.addEventListener('click', () => APP.StateManager.applyHistory('redo')); //
+
+    // Tab Navigation
+    if (ELS.tabNav) ELS.tabNav.addEventListener('click', handleTabNavigation); //
+
+    // --- BEGIN CACHE-BYPASS FIX (v2) ---
+    // Forcefully injects the 'Shift Swop' button AND panel if 
+    // a stale, cached index.html file is loaded without them.
+    try {
+        // 1. INJECT THE BUTTON (if missing)
+        if (ELS.tabNav) {
+            const tradeButtonExists = ELS.tabNav.querySelector('[data-tab="tab-trade-center"]');
+            if (!tradeButtonExists) {
+                console.warn("WFM: 'Shift Swop' button not found. Injecting manually...");
+                
+                const buttonHTML = `
+                <button class="tab-link" data-tab="tab-trade-center" title="Shift Swop">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
+                    <span>Shift Swop</span>
+                </button>
+                `;
+
+                let planningSeparator = null;
+                ELS.tabNav.querySelectorAll('.nav-separator').forEach(sep => {
+                    if (sep.textContent.trim().toUpperCase() === 'PLANNING') {
+                        planningSeparator = sep;
+                    }
+                });
+
+                if (planningSeparator) {
+                    planningSeparator.insertAdjacentHTML('afterend', buttonHTML);
+                    console.log("WFM: Successfully injected 'Shift Swop' button.");
+                }
+            }
         }
-        handleWeekChange(initialWeekStart); // This triggers the initial renderAll()
 
-        console.log("Initialization Complete.");
-    };
+        // 2. INJECT THE PANEL (if missing)
+        const tradePanelExists = document.getElementById('tab-trade-center');
+        if (!tradePanelExists) {
+            console.warn("WFM: 'Shift Swop' panel not found. Injecting manually...");
+            
+            // This is the full HTML for the panel, copied from your correct index.html file
+            const panelHTML = `
+            <section id="tab-trade-center" class="tab-content">
+              <div class="card">
+                <h2>Shift Swop</h2>
+                <p class="helper-text">Select two advisors and the corresponding dates to trade their schedules. This creates exceptions for the selected dates only.</p>
+                <div class="trade-layout">
+                  <div class="trade-panel">
+                    <h3>Trade Slot 1</h3>
+                    <div class="form-group">
+                      <label for="tradeAdvisor1">Advisor 1</label>
+                      <select id="tradeAdvisor1" class="form-select trade-advisor"></select>
+                    </div>
+                    <div class="form-group">
+                      <label for="tradeDate1">Date 1</label>
+                      <input type="text" id="tradeDate1" class="form-input trade-date-picker" placeholder="Select date...">
+                    </div>
+                    <div class="trade-preview" id="tradePreview1">Select advisor and date to preview schedule.</div>
+                  </div>
+                  <div class="trade-swap-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
+                  </div>
+                  <div class="trade-panel">
+                    <h3>Trade Slot 2</h3>
+                    <div class="form-group">
+                      <label for="tradeAdvisor2">Advisor 2</label>
+                      <select id="tradeAdvisor2" class="form-select trade-advisor"></select>
+                    </div>
+                    <div class="form-group">
+                      <label for="tradeDate2">Date 2</label>
+                      <input type="text" id="tradeDate2" class="form-input trade-date-picker" placeholder="Select date...">
+                    </div>
+                    <div class="trade-preview" id="tradePreview2">Select advisor and date to preview schedule.</div>
+                  </div>
+                </div>
+                <div class="trade-actions">
+                  <div class="form-group" style="max-width: 500px; margin: 0 auto 16px auto;">
+                    <label for="tradeReason">Reason for Trade (Required)</label>
+                    <input type="text" id="tradeReason" class="form-input" placeholder="e.g., Mutual agreement, Operational need...">
+                  </div>
+                  <button id="btnExecuteTrade" class="btn btn-primary btn-lg" disabled>Execute Trade</button>
+                </div>
+              </div>
+            </section>
+            `;
 
-    // Handles tab switching
-    const handleTabNavigation = (e) => {
-        const tabLink = e.target.closest('.tab-link');
-        if (!tabLink || tabLink.classList.contains('disabled')) return;
-
-        const tabId = tabLink.dataset.tab;
-        if (!tabId) return;
-
-        // Deactivate current tabs
-        document.querySelectorAll('.tab-link').forEach(link => link.classList.remove('active'));
-        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-
-        // Activate new tab
-        tabLink.classList.add('active');
-        const activeTab = document.getElementById(tabId);
-        if (activeTab) activeTab.classList.add('active');
-
-        // Trigger render for the newly active tab
-        Core.renderAll();
-    };
-
-    // Handles the change of the global week context
-    const handleWeekChange = (weekStartISO) => {
-        if (!weekStartISO) return;
-        APP.StateManager.getState().weekStart = weekStartISO;
-        // Changing the week requires a full application re-render
-        Core.renderAll();
-    };
-
-    // Helper to change week by +/- days
-    const changeWeek = (days) => {
-        const currentWeekStart = APP.StateManager.getState().weekStart;
-        if (!currentWeekStart) return;
-        
-        const newWeekStart = APP.Utils.addDaysISO(currentWeekStart, days);
-        
-        if (ELS.weekStartInput && ELS.weekStartInput._flatpickr) {
-             ELS.weekStartInput._flatpickr.setDate(newWeekStart, false);
+            const mainContentArea = document.getElementById('main-content-area'); //
+            
+            if (mainContentArea) {
+                mainContentArea.insertAdjacentHTML('beforeend', panelHTML);
+                console.log("WFM: Successfully injected 'Shift Swop' panel.");
+                
+                // 3. CRITICAL: Re-run the initialize for that specific component
+                // This wires up all the new buttons and dropdowns inside the panel.
+                if (APP.Components.ShiftTradeCenter) {
+                    APP.Components.ShiftTradeCenter.initialize(); //
+                    console.log("WFM: Re-initialized ShiftTradeCenter component.");
+                }
+                
+                // 4. CRITICAL: Re-cache the ELS.tabs NodeList so the tab switcher works
+                ELS.tabs = document.querySelectorAll('.tab-content'); //
+            } else {
+                console.error("WFM: Could not find 'main-content-area' to inject panel.");
+            }
         }
-        handleWeekChange(newWeekStart);
-    };
+    } catch (e) {
+        console.error("WFM: Error during cache-bypass fix:", e);
+    }
+    // --- END CACHE-BYPASS FIX ---
+
+    // V15.8 FIX: Removed the unnecessary JS injection of the Shift Swop button here.
+    // It is now correctly defined in index.html.
+};
     
-    // Centralized rendering function (calls specific component renders)
-    Core.renderAll = () => {
-        // Optimization: Only render the active tab's components
-        const activeTab = document.querySelector('.tab-content.active');
-        if (!activeTab) return;
-
-        // Note: ScheduleViewer.render() handles the necessary data loading (history cache) 
-        // required by both the Schedule View and the Assignments View.
-
-        switch (activeTab.id) {
-            case 'tab-schedule-view':
-            case 'tab-advisor-assignments':
-                // Calling ScheduleViewer.render() will ensure data is loaded and then 
-                // render the appropriate view (ScheduleViewer or AssignmentManager) based on the active tab ID.
+    const handleTabNavigation = (e) => {
+        const target = e.target.closest('.tab-link');
+        if (target && !target.classList.contains('disabled')) {
+            const tabId = target.dataset.tab;
+            
+            // Deactivate all tabs and links
+            ELS.tabNav.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
+            ELS.tabs.forEach(t => t.classList.remove('active'));
+            
+            // Activate the selected one
+            target.classList.add('active');
+            const activeTab = document.getElementById(tabId);
+            if (activeTab) activeTab.classList.add('active');
+            
+            // Force re-render on tab switch to ensure visualization is updated correctly
+            // This also handles fetching historical data if switching to ScheduleView or Assignments
+            if (tabId === 'tab-schedule-view') {
                 APP.Components.ScheduleViewer.render();
-                break;
-            case 'tab-rotation-editor':
-                APP.Components.RotationEditor.render();
-                break;
-            case 'tab-shift-definitions':
-                APP.Components.ShiftDefinitionEditor.render();
-                break;
-            case 'tab-component-manager':
-                APP.Components.ComponentManager.render();
-                break;
-            case 'tab-trade-center':
-                APP.Components.ShiftTradeCenter.render();
-                break;
+            } else if (tabId === 'tab-advisor-assignments') {
+                // When switching to the Assignments tab, we must ensure the data is loaded and rendered.
+                // ScheduleViewer.render() handles the coordination of fetching data and rendering the AssignmentManager if the tab is active.
+                APP.Components.ScheduleViewer.render();
+            } else if (tabId === 'tab-trade-center') {
+                // Ensure Trade Center is rendered when activated
+                if (APP.Components.ShiftTradeCenter) {
+                    APP.Components.ShiftTradeCenter.render();
+                }
+            }
         }
-        
-        // Update global UI elements
-        Core.updateUndoRedoButtons(APP.StateManager.getState().historyIndex, APP.StateManager.getState().history.length);
     };
 
-    // Update the state of Undo/Redo buttons
+    const updateWeek = (days) => {
+        if (!ELS.weekStart || !ELS.weekStart._flatpickr) return;
+
+        const flatpickrInstance = ELS.weekStart._flatpickr;
+        
+        const currentDate = flatpickrInstance.selectedDates[0] || new Date();
+        currentDate.setDate(currentDate.getDate() + days);
+        // Set the new date and trigger the onChange event
+        flatpickrInstance.setDate(currentDate, true);
+    };
+
+    // Expose function to update Undo/Redo button states
     Core.updateUndoRedoButtons = (index, length) => {
-        if (ELS.btnUndo) ELS.btnUndo.disabled = (index <= 0);
-        if (ELS.btnRedo) ELS.btnRedo.disabled = (index >= length - 1);
+        if (ELS.btnUndo) ELS.btnUndo.disabled = index <= 0;
+        if (ELS.btnRedo) ELS.btnRedo.disabled = index >= length - 1;
+    };
+
+    // Expose function to trigger a full application re-render
+    Core.renderAll = () => {
+        if (!APP.StateManager.getState().isBooted) return;
+        APP.Components.ComponentManager.render();
+        // AssignmentManager.render() is implicitly called by ScheduleViewer.render() coordination
+        APP.Components.ShiftDefinitionEditor.render();
+        APP.Components.RotationEditor.render();
+        
+        // Render the Trade Center
+        if (APP.Components.ShiftTradeCenter) {
+             APP.Components.ShiftTradeCenter.render();
+        }
+
+        // ScheduleViewer.render() coordinates historical data fetch and rendering of both Viewer and Assignments tabs.
+        APP.Components.ScheduleViewer.render();
     };
 
     APP.Core = Core;

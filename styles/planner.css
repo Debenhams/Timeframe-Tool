@@ -1,8 +1,7 @@
 /**
- * WFM Intelligence Platform - Styles (v15.9)
+ * WFM Intelligence Platform - Styles (v15.8)
  * Includes Base Layout, Components, Editors, Visualization (Daily/Weekly), and Trade Center.
  * MODIFIED: Added Authentication Overlay Styles.
- * V15.9: Added styles for Advanced Live Editor (SequentialBuilder visualization and interactions).
 */
 
 /* === VARIABLES & CONFIGURATION === */
@@ -1219,11 +1218,9 @@ tbody tr:hover {
 
 
 /* === SEQUENTIAL BUILDER MODAL (Shared) === */
-/* V15.9: Enhanced Modal Styling for Advanced Live Editor */
 .modal-backdrop { display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(17, 24, 39, 0.5); align-items: center; justify-content: center; }
 .modal-content { background-color: var(--color-panel-bg); margin: auto; border-radius: var(--border-radius); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; max-height: 85vh; }
-/* V15.9: Increased modal width to accommodate visualization */
-.modal-lg { width: 95%; max-width: 1200px; }
+.modal-lg { width: 90%; max-width: 1000px; }
 .modal-header, .modal-footer { padding: 20px 24px; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-border); }
 .modal-footer { border-top: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; }
@@ -1232,83 +1229,8 @@ tbody tr:hover {
 
 /* Layout inside the modal */
 .sequential-layout { display: flex; flex-direction: column; height: 100%; }
-.builder-controls { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; } /* Reduced margin-bottom */
+.builder-controls { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
 .time-picker-input { width: 120px; }
-
-/* V15.9: New Interactive Visualization Area */
-.builder-visualization {
-    margin-bottom: 24px;
-    padding: 16px;
-    background-color: var(--color-hover-bg);
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
-    /* Prevents accidental text selection during drag */
-    user-select: none; 
-}
-
-/* V15.9: Adds a class when dragging is active to optimize performance/visuals */
-.builder-visualization.is-dragging {
-    /* Optional: Add a subtle overlay or change cursor globally */
-    cursor: col-resize;
-}
-
-
-.builder-timeline {
-    display: flex;
-    height: 50px;
-    width: 100%;
-    position: relative;
-}
-
-.builder-timeline-bar {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    font-weight: 600;
-    position: relative;
-    overflow: hidden;
-    /* Use optimized transition for smooth real-time updates during drag */
-    transition: width 0.05s linear; 
-}
-
-/* V15.9: Resize Handles */
-.resize-handle {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 8px;
-    cursor: col-resize;
-    z-index: 10;
-    /* Visual style for the handle (subtle line) */
-    background-color: rgba(0, 0, 0, 0.1);
-}
-
-.resize-handle.left {
-    left: 0;
-    /* Adjust hit area slightly outside the bar for easier grabbing */
-    transform: translateX(-4px); 
-}
-
-.resize-handle.right {
-    right: 0;
-    transform: translateX(4px);
-}
-
-/* Visual feedback on handle hover */
-.resize-handle:hover {
-    background-color: var(--brand-primary);
-}
-
-/* Hide handles at the very start and end of the shift (as these change overall time) */
-.builder-timeline-bar:first-child .resize-handle.left {
-    display: none;
-}
-.builder-timeline-bar:last-child .resize-handle.right {
-    display: none;
-}
-
 
 /* Scrollable grid container */
 .builder-grid-container { flex-grow: 1; overflow-y: auto; border-radius: var(--border-radius); }
@@ -1344,7 +1266,7 @@ tbody tr:hover {
 
 /* V15.1: Exception Reason Input */
 .exception-reason-group {
-    margin-bottom: 16px; /* Reduced margin-bottom */
+    margin-bottom: 24px;
 }
 
 #modalExceptionReason {
