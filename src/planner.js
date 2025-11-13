@@ -1012,12 +1012,14 @@ Utils.addDaysISO = (iso, days) => {
         let rotationName = undefined;
         let inputStartDateISO = undefined;
 
+        // 1. Check pending changes
         if (PENDING_CHANGES.has(advisorId)) {
             const pending = PENDING_CHANGES.get(advisorId);
             if (pending.rotation_name !== undefined) rotationName = pending.rotation_name;
             if (pending.start_date !== undefined) inputStartDateISO = pending.start_date;
         } 
         
+        // 2. Fallback to DOM
         if (rotationName === undefined || inputStartDateISO === undefined) {
              const rotationSel = row.querySelector('.assign-rotation');
              const dateInput = row.querySelector('.assign-start-date');
@@ -1071,9 +1073,13 @@ Utils.addDaysISO = (iso, days) => {
 
         if (res?.error) return;
 
+        // --- INSTANT UPDATE FIX START ---
         PENDING_CHANGES.delete(advisorId);
+        
+        // 1. Clear the cache so the viewer is forced to re-fetch fresh data
         APP.StateManager.clearEffectiveAssignmentsCache();
         
+        // 2. Update local state snapshot for immediate UI feedback
         const { data: updatedSnapshot } = await APP.DataService.fetchSnapshotForAdvisor(advisorId);
         if (updatedSnapshot) {
             APP.StateManager.syncRecord('rotation_assignments', updatedSnapshot);
@@ -1082,7 +1088,13 @@ Utils.addDaysISO = (iso, days) => {
         }
 
         APP.StateManager.saveHistory(`Assignment Action: ${action}`);
-        if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
+        
+        // 3. Force Re-render of the Schedule View immediately
+        if (APP.Components.ScheduleViewer) {
+             // This triggers the re-fetch because cache was cleared in step 1
+             await APP.Components.ScheduleViewer.render(); 
+        }
+        // --- INSTANT UPDATE FIX END ---
 
         APP.Utils.showToast('Assignment updated successfully.', 'success');
       } catch (e) {
