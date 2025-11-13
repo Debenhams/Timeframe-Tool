@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>WFM Intelligence Platform (v15.8.2)</title>
+  <title>WFM Intelligence Platform (v15.8.3)</title>
   
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
@@ -12,7 +12,7 @@
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-  <link rel="stylesheet" href="./styles/planner.css?v=15.8.2" />
+  <link rel="stylesheet" href="./styles/planner.css?v=15.8.3" />
 </head>
 <body>
 
@@ -57,7 +57,7 @@
     </blockquote>
 
     <div class="auth-footer">
-            WFM Intelligence Platform (v15.8.2)
+            WFM Intelligence Platform (v15.8.3)
         </div>
       </div>
     </div>
@@ -352,51 +352,74 @@ blocks for shifts (Activities, Breaks, Lunch, etc.).</p>
            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
       </div>
-      <div class="modal-body sequential-layout" id="visualEditorBody">
+      
+      <div class="modal-body sequential-layout">
         
-        <div class="visual-editor-layout">
+        <div id="visualEditorContainer" style="display: none; width: 100%;">
+            <div class="visual-editor-layout">
 
-          <div class="ve-toolbox">
-            <div class="ve-toolbox-header">
-                <strong>Component Toolbox</strong>
-                <p>Drag or click to add an activity.</p>
+              <div class="ve-toolbox">
+                <div class="ve-toolbox-header">
+                    <strong>Component Toolbox</strong>
+                    <p>Drag or click to add an activity.</p>
+                </div>
+                <div class="ve-toolbox-list" id="visualEditorToolbox">
+                  </div>
+              </div>
+
+              <div class="ve-timeline-container">
+                
+                <div class="ve-time-ruler" id="visualEditorTimeRuler">
+                  </div>
+
+                <div class="ve-timeline-track" id="visualEditorTimeline">
+                  </div>
+                
+                <div class="ve-drop-cursor" id="visualEditorDropCursor" style="display: none;"></div>
+
+              </div>
+
+            <div class="ve-add-popup" id="visualEditorAddPopup" style="display: none;">
+              <h4 id="ve-add-popup-title">Add Component</h4>
+              <div class="form-group">
+                <label for="ve-add-start-time">Start Time (HH:MM)</label>
+                <input type="text" id="ve-add-start-time" class="form-input" placeholder="e.g., 14:00">
+              </div>
+              <div class="form-group">
+                <label for="ve-add-duration">Duration (minutes)</label>
+                <input type="number" id="ve-add-duration" class="form-input" min="5" step="5" value="30">
+              </div>
+              <div class="ve-add-popup-actions">
+                <button class="btn btn-sm btn-secondary" id="ve-add-popup-cancel">Cancel</button>
+                <button class="btn btn-sm btn-primary" id="ve-add-popup-save">Add</button>
+              </div>
             </div>
-            <div class="ve-toolbox-list" id="visualEditorToolbox">
-              </div>
           </div>
-
-          <div class="ve-timeline-container">
-            
-            <div class="ve-time-ruler" id="visualEditorTimeRuler">
-              </div>
-
-            <div class="ve-timeline-track" id="visualEditorTimeline">
-              </div>
-            
-            <div class="ve-drop-cursor" id="visualEditorDropCursor" style="display: none;"></div>
-
-          </div>
-
-    
-
-        <div class="ve-add-popup" id="visualEditorAddPopup" style="display: none;">
-          <h4 id="ve-add-popup-title">Add Component</h4>
-          <div class="form-group">
-            <label for="ve-add-start-time">Start Time (HH:MM)</label>
-            <input type="text" id="ve-add-start-time" class="form-input" placeholder="e.g., 14:00">
-          </div>
-          <div class="form-group">
-            <label for="ve-add-duration">Duration (minutes)</label>
-            <input type="number" id="ve-add-duration" class="form-input" min="5" step="5" value="30">
-          </div>
-          <div class="ve-add-popup-actions">
-            <button class="btn btn-sm btn-secondary" id="ve-add-popup-cancel">Cancel</button>
-            <button class="btn btn-sm btn-primary" id="ve-add-popup-save">Add</button>
-          </div>
-        </div>
-
-      </div>
-      <div class="modal-footer">
+        </div> <div id="legacyEditorContainer" style="display: none; width: 100%;">
+            <div class="builder-controls">
+                <div class="form-group">
+                    <label>Start Time</label>
+                    <input type="text" id="modalStartTime" class="form-input time-picker-input">
+                </div>
+                <button id="modalAddActivity" class="btn btn-secondary">[+] Add Activity (Bottom)</button>
+            </div>
+            <div class="builder-grid-container">
+                <table class="builder-grid">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Activity/Component</th>
+                            <th>Duration (m)</th>
+                            <th>Start Time</th>
+                            <th>End Time</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="modalSequenceBody">
+                        </tbody>
+                </table>
+            </div>
+        </div> </div> <div class="modal-footer">
 
     <div class="modal-footer-left">
       <div class="form-group" id="exceptionReasonGroup" style="display: none;">
@@ -406,7 +429,7 @@ blocks for shifts (Activities, Breaks, Lunch, etc.).</p>
     </div>
 
     <div class="modal-footer-right">
-      <div class="ve-undo-redo">
+      <div class="ve-undo-redo" id="visualEditorControlsGroup">
         <button class="btn-icon" id="ve-undo" title="Undo (Ctrl+Z)" disabled>
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"></path><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l-3 2.7"></path></svg>
         </button>
@@ -419,7 +442,7 @@ blocks for shifts (Activities, Breaks, Lunch, etc.).</p>
           Total: <strong id="modalTotalTime">0h 00m</strong> | Paid: <strong id="modalPaidTime">0h 00m</strong>
       </div>
 
-      <button id="modalSaveStructure" class="btn btn-primary">Save Exception</button>
+      <button id="modalSaveStructure" class="btn btn-primary">Save</button>
     </div>
 
   </div>
@@ -428,8 +451,8 @@ blocks for shifts (Activities, Breaks, Lunch, etc.).</p>
   
   <div id="notification-container"></div>
 
-    <script src="./src/planner.js?v=15.8.2"></script>
-  <script src="./src/init.js?v=15.8.2"></script>
+    <script src="./src/planner.js?v=15.8.3"></script>
+  <script src="./src/init.js?v=15.8.3"></script>
 
 </body>
 </html>

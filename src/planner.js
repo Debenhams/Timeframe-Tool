@@ -1,6 +1,8 @@
 /**
- * WFM Intelligence Platform - Application Logic (v15.8.1)
+ * WFM Intelligence Platform - Application Logic (v15.8.3)
  * 
+ * V15.8.3: Resolved "Edit Structure" button failure by restoring legacy editor support in SequentialBuilder and index.html.
+ *          Implemented "Pending Changes" in AssignmentManager to fix button behavior and date synchronization issues.
  * V15.8.1: Added "Delete Last Week" functionality to Rotation Editor.
  *          Incorporated AssignmentManager sync fix (fetchSnapshotForAdvisor).
  *          Fixed error handling logic in DataService (insertError check).
@@ -1139,10 +1141,14 @@ const toggleRowEditMode = (id, isEditing) => {
 /**
  * MODULE: APP.Components.AssignmentManager
  * Manages the assignment of Rotations to Advisors, utilizing the rotation_assignments_history table.
+ * V15.8.3: Implemented PENDING_CHANGES to resolve date synchronization and button reliability issues.
  */
 (function(APP) {
     const AssignmentManager = {};
     const ELS = {};
+    // V15.8.3 FIX: Store pending changes (Key: advisorId, Value: { rotation_name, start_date })
+    // This map holds user inputs in the grid before they press a button.
+    const PENDING_CHANGES = new Map(); 
 
     AssignmentManager.initialize = () => {
         ELS.grid = document.getElementById('assignmentGrid');
@@ -1175,12 +1181,17 @@ const toggleRowEditMode = (id, isEditing) => {
             // Determine the effective assignment for this week based on the history cache.
             const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
 
-            // We rely on the effective map (which includes history logic and fallback logic in DataService)
-            const assignment = effective
-                ? { advisor_id: adv.id, rotation_name: effective.rotation_name, start_date: effective.start_date }
-                : null; 
+            // V15.8.3 FIX: Determine display values considering pending changes.
+            let displayRotation = effective ? effective.rotation_name : '';
+            let displayStartDate = effective ? effective.start_date : '';
 
-            const startDate = (assignment && assignment.start_date) ? assignment.start_date : '';
+            // If the user has typed something but not saved it, show that instead of the effective data.
+            if (PENDING_CHANGES.has(adv.id)) {
+                const pending = PENDING_CHANGES.get(adv.id);
+                // Check if the specific field exists (is not undefined) in the pending changes before overwriting
+                if (pending.rotation_name !== undefined) displayRotation = pending.rotation_name;
+                if (pending.start_date !== undefined) displayStartDate = pending.start_date;
+            }
 
 
             // V15.8 FIX (Bug 2): Corrected the HTML structure to resolve button duplication ("spam").
@@ -1188,7 +1199,7 @@ const toggleRowEditMode = (id, isEditing) => {
             html += `<tr data-advisor-id="${adv.id}">
                   <td>${adv.name}</td>
                   <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
-                  <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${startDate}" /></td>
+                  <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${displayStartDate}" /></td>
                    <td class="actions">
                       <button class="btn btn-sm btn-primary act-assign-week" data-advisor-id="${adv.id}">Assign from this week</button>
                       <button class="btn btn-sm btn-primary act-change-forward" data-advisor-id="${adv.id}">Change from this week forward</button>
@@ -1215,19 +1226,30 @@ const toggleRowEditMode = (id, isEditing) => {
 
         // Initialize Flatpickr and set dropdown values after HTML insertion
         advisors.forEach(adv => {
-            // Re-determine the assignment used for rendering to set the correct dropdown value
+            // V15.8.3 FIX: Re-determine display values for setting input values after insertion (Crucial for dropdowns)
             const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
-             const assignment = effective
-                ? { rotation_name: effective.rotation_name, start_date: effective.start_date }
-                : null;
+            let displayRotation = effective ? effective.rotation_name : '';
+            // Start date is handled by Flatpickr initialization based on the input's value attribute set above.
+
+            if (PENDING_CHANGES.has(adv.id)) {
+                const pending = PENDING_CHANGES.get(adv.id);
+                if (pending.rotation_name !== undefined) displayRotation = pending.rotation_name;
+            }
 
             const row = ELS.grid.querySelector(`tr[data-advisor-id="${adv.id}"]`);
             if (!row) return;
 
             const rotSelect = row.querySelector('.assign-rotation');
             if (rotSelect) {
-                // Set the dropdown to the currently effective rotation for this week.
-                rotSelect.value = (assignment && assignment.rotation_name) ? assignment.rotation_name : '';
+                // Set the dropdown to the currently effective (or pending) rotation.
+                rotSelect.value = displayRotation || '';
+                
+                // V15.8.3 FIX: Wire onChange for rotation select to update PENDING_CHANGES
+                rotSelect.addEventListener('change', (e) => {
+                    const pending = PENDING_CHANGES.get(adv.id) || {};
+                    pending.rotation_name = e.target.value;
+                    PENDING_CHANGES.set(adv.id, pending);
+                });
             }
 
             const dateInput = row.querySelector('.assign-start-date');
@@ -1241,9 +1263,12 @@ const toggleRowEditMode = (id, isEditing) => {
                   altFormat: 'd/m/Y',             
                   allowInput: true,
                   locale: { "firstDayOfWeek": 1 }, // Monday
-                  // Changes are handled exclusively by the action buttons.
+                  
+                  // V15.8.3 FIX: Update onChange to update PENDING_CHANGES
                   onChange: function(selectedDates, dateStr, instance) {
-                    // Do nothing here.
+                    const pending = PENDING_CHANGES.get(adv.id) || {};
+                    pending.start_date = dateStr; // dateStr is the ISO format
+                    PENDING_CHANGES.set(adv.id, pending);
                   }
                 });
             }
@@ -1252,17 +1277,42 @@ const toggleRowEditMode = (id, isEditing) => {
 
     // Handle per-row actions (change forward / one-week swap)
     // V15.8 FIX (Bug 2): Implemented logic using the newly added DataService methods.
+    // V15.8.3 FIX: Updated to use PENDING_CHANGES map.
     const handleRowAction = async (action, advisorId) => {
       try {
-        // Row + inputs
+        
+        // V15.8.3 FIX: Read inputs primarily from PENDING_CHANGES if available, otherwise fetch from DOM as fallback/initial state
         const row = document.querySelector(`tr[data-advisor-id="${advisorId}"]`);
         if (!row) return APP.Utils.showToast('Row not found', 'danger');
 
-        const rotationSel = row.querySelector('.assign-rotation');
-        const dateInput   = row.querySelector('.assign-start-date');
+        let rotationName = undefined;
+        let inputStartDateISO = undefined;
+
+        // 1. Check pending changes first
+        if (PENDING_CHANGES.has(advisorId)) {
+            const pending = PENDING_CHANGES.get(advisorId);
+            // We check specifically if the key exists, as the value might be "" (e.g., unassigned rotation)
+            if (pending.rotation_name !== undefined) rotationName = pending.rotation_name;
+            if (pending.start_date !== undefined) inputStartDateISO = pending.start_date;
+        } 
+        
+        // 2. Fallback if PENDING_CHANGES didn't have the data (e.g., user clicked button without changing inputs first)
+        // We check if the variables are still undefined.
+        if (rotationName === undefined || inputStartDateISO === undefined) {
+             const rotationSel = row.querySelector('.assign-rotation');
+             const dateInput   = row.querySelector('.assign-start-date');
+
+             if (rotationName === undefined) {
+                 rotationName = rotationSel ? rotationSel.value : '';
+             }
+             if (inputStartDateISO === undefined) {
+                 // Read the ISO value managed by Flatpickr from the DOM (this is the hidden input value)
+                 inputStartDateISO = (dateInput) ? dateInput.value.trim() : '';
+             }
+        }
+
         const globalWeekStartISO = APP.StateManager.getState().weekStart; // Use global context
 
-        const rotationName = rotationSel ? rotationSel.value : '';
 
         // Validation: For swaps, rotation must be selected.
         if (!rotationName && action === 'change_one_week') {
@@ -1270,34 +1320,31 @@ const toggleRowEditMode = (id, isEditing) => {
         }
 
         // Determine the start date for the action.
-        let startISO = globalWeekStartISO;
-        // Default to current week context for swaps
+        let actionStartISO = globalWeekStartISO; // Default for swaps (change_one_week)
 
         if (action === 'assign_from_week') {
-            // For these actions, we use the date specified in the input field.
-            // Get the underlying ISO value managed by Flatpickr if available, otherwise the raw value.
-            let rawInput = '';
-            if (dateInput) {
-                 // Flatpickr stores the ISO value in the actual input element when altInput is used.
-                 rawInput = dateInput.value.trim();
-            }
-
-            if (!rawInput) {
+            // For these actions (Assign from / Change forward), we use the date specified in the input field (inputStartDateISO).
+            
+            if (!inputStartDateISO) {
                 return APP.Utils.showToast('Start date is required for this action.', 'danger');
             }
 
-            // Handle potential UK format if user somehow typed manually and Flatpickr didn't parse
-            if (rawInput.includes('/')) {
-                const iso = APP.Utils.convertUKToISODate(rawInput);
+            // Handle potential UK format if user somehow typed manually and PENDING_CHANGES stored UK format (shouldn't happen with Flatpickr config, but safe check)
+            if (inputStartDateISO.includes('/')) {
+                const iso = APP.Utils.convertUKToISODate(inputStartDateISO);
                 if (!iso) return APP.Utils.showToast('Invalid date format (dd/mm/yyyy expected).', 'danger');
-                startISO = iso;
+                actionStartISO = iso;
             } else {
-                startISO = rawInput;
+                actionStartISO = inputStartDateISO;
             }
         }
 
 
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(startISO)) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(actionStartISO)) {
+          // Check if global context is missing, which might happen if the page loaded directly on this tab
+          if (!globalWeekStartISO && action === 'change_one_week') {
+              return APP.Utils.showToast('Global week context missing. Please select a week in the top bar first.', 'danger');
+          }
           return APP.Utils.showToast('Start date looks invalid (YYYY-MM-DD expected).', 'danger');
         }
 
@@ -1309,11 +1356,11 @@ const toggleRowEditMode = (id, isEditing) => {
           res = await APP.DataService.assignFromWeek({
             advisor_id: advisorId,
             rotation_name: rotationName,
-            start_date: startISO
+            start_date: actionStartISO
           });
         } else if (action === 'change_one_week') {
           // Ensure the start date is a Monday for the one-week swap (important if user changed date context)
-          const weekStart = APP.Utils.getMondayForDate(startISO);
+          const weekStart = APP.Utils.getMondayForDate(actionStartISO);
           if (!weekStart) return APP.Utils.showToast('Invalid week start date for swap.', 'danger');
 
           res = await APP.DataService.changeOnlyWeek({
@@ -1330,6 +1377,9 @@ const toggleRowEditMode = (id, isEditing) => {
           // Error handling is primarily done within DataService, but we check here too.
           return;
         }
+
+        // V15.8.3 FIX: Clear the pending change for this advisor upon success
+        PENDING_CHANGES.delete(advisorId);
 
         // V15.8: Clear the cache explicitly as data has changed.
         // We don't need to syncRecord for history table, just clear the cache.
@@ -1374,9 +1424,10 @@ const toggleRowEditMode = (id, isEditing) => {
 }(window.APP));
 
 /**
- * MODULE: APP.Components.SequentialBuilder (v16.3 - TYPO FIX)
+ * MODULE: APP.Components.SequentialBuilder (v16.3.1)
  * Supports Shift Definitions (legacy) and Visual Exceptions (Live Editing).
  * INCLUDES: Time Ruler, Smart Tooltips, Drag-Drop, Ripple-Pay fix.
+ * V16.3.1: Corrected initialization logic to handle shared modal structure (fixes "Edit Structure" button crash).
  */
 (function(APP) {
     const SequentialBuilder = {};
@@ -1392,7 +1443,7 @@ const toggleRowEditMode = (id, isEditing) => {
         segments: [], // { component_id, duration_min }
         reason: null,
         
-        // --- New Visual State ---
+        // --- Visual State ---
         dragState: {
             isDragging: false,
             segmentIndex: -1, // The index of the segment *before* the handle
@@ -1408,7 +1459,7 @@ const toggleRowEditMode = (id, isEditing) => {
             editIndex: -1
         },
 
-        // --- NEW: Internal Undo/Redo History (Step 6) ---
+        // --- Internal Undo/Redo History ---
         visualHistory: [],
         visualHistoryIndex: -1,
         contextMenuIndex: -1
@@ -1424,6 +1475,7 @@ const toggleRowEditMode = (id, isEditing) => {
         return h * 60 + m;
     };
 
+    // V16.3.1 FIX: Updated initialization to handle new shared modal structure.
     SequentialBuilder.initialize = () => {
         // Cache Modal Elements
         ELS.modal = document.getElementById('shiftBuilderModal');
@@ -1438,14 +1490,16 @@ const toggleRowEditMode = (id, isEditing) => {
         ELS.modalExceptionReason = document.getElementById('modalExceptionReason');
 
         // --- New Visual Editor Elements ---
-        ELS.visualEditorBody = document.getElementById('visualEditorBody');
+        // V16.3.1 FIX: Cache the container wrapper and controls group
+        ELS.visualEditorContainer = document.getElementById('visualEditorContainer');
+        ELS.visualEditorControlsGroup = document.getElementById('visualEditorControlsGroup'); // Undo/Redo group
         ELS.visualEditorToolbox = document.getElementById('visualEditorToolbox');
         ELS.visualEditorTimeline = document.getElementById('visualEditorTimeline');
         ELS.visualEditorTimeRuler = document.getElementById('visualEditorTimeRuler');
         ELS.visualEditorDropCursor = document.getElementById('visualEditorDropCursor');
-        ELS.visualEditorContextMenu = document.getElementById('visualEditorContextMenu'); // <-- Step 5
-        ELS.veUndo = document.getElementById('ve-undo'); // <-- Step 6
-        ELS.veRedo = document.getElementById('ve-redo'); // <-- Step 6
+        ELS.visualEditorContextMenu = document.getElementById('visualEditorContextMenu');
+        ELS.veUndo = document.getElementById('ve-undo');
+        ELS.veRedo = document.getElementById('ve-redo');
         
         // Add Pop-up
         ELS.visualEditorAddPopup = document.getElementById('visualEditorAddPopup');
@@ -1456,6 +1510,8 @@ const toggleRowEditMode = (id, isEditing) => {
         ELS.veAddPopupSave = document.getElementById('ve-add-popup-save');
 
         // --- Legacy Elements (for Shift Definition Editor) ---
+        // V16.3.1 FIX: Cache the legacy container wrapper and elements
+        ELS.legacyEditorContainer = document.getElementById('legacyEditorContainer');
         ELS.modalStartTime = document.getElementById('modalStartTime');
         ELS.modalAddActivity = document.getElementById('modalAddActivity');
         ELS.modalSequenceBody = document.getElementById('modalSequenceBody');
@@ -1483,7 +1539,7 @@ const toggleRowEditMode = (id, isEditing) => {
             ELS.visualEditorTimeline.addEventListener('dragover', handleTimelineDragOver); // For drag/drop
             ELS.visualEditorTimeline.addEventListener('dragleave', handleTimelineDragLeave); // For drag/drop
             ELS.visualEditorTimeline.addEventListener('drop', handleTimelineDrop); // For drag/drop
-            ELS.visualEditorTimeline.addEventListener('contextmenu', handleTimelineContextMenu); // <-- Step 5
+            ELS.visualEditorTimeline.addEventListener('contextmenu', handleTimelineContextMenu);
         }
         if (ELS.veAddPopupCancel) ELS.veAddPopupCancel.addEventListener('click', closeAddPopup);
         if (ELS.veAddPopupSave) ELS.veAddPopupSave.addEventListener('click', handleAddPopupSave);
@@ -1491,13 +1547,44 @@ const toggleRowEditMode = (id, isEditing) => {
         // Mouse move/up listeners on the whole document to catch drags
         document.addEventListener('mousemove', handleDragMove);
         document.addEventListener('mouseup', handleDragEnd);
-        document.addEventListener('click', closeContextMenu); // <-- Step 5
-        if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.addEventListener('click', handleContextMenuClick); // <-- Step 5
-        if (ELS.veUndo) ELS.veUndo.addEventListener('click', handleUndo); // <-- Step 6
-        if (ELS.veRedo) ELS.veRedo.addEventListener('click', handleRedo); // <-- Step 6
+        document.addEventListener('click', closeContextMenu);
+        if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.addEventListener('click', handleContextMenuClick);
+        if (ELS.veUndo) ELS.veUndo.addEventListener('click', handleUndo);
+        if (ELS.veRedo) ELS.veRedo.addEventListener('click', handleRedo);
+
+        // --- V16.3.1 FIX: Wire Legacy Listeners during initialization (more robust) ---
+        if (ELS.modalSequenceBody) {
+            ELS.modalSequenceBody.addEventListener('change', handleLegacySequenceChange);
+            ELS.modalSequenceBody.addEventListener('click', handleLegacySequenceClick);
+        }
+        if (ELS.modalAddActivity) {
+            ELS.modalAddActivity.addEventListener('click', handleLegacyAddActivity);
+        }
+
+        // Initialize Flatpickr for the legacy start time input if it exists
+        if (ELS.modalStartTime && typeof flatpickr !== 'undefined') {
+             flatpickr(ELS.modalStartTime, {
+                enableTime: true,
+                noCalendar: true,
+                dateFormat: "H:i",
+                time_24hr: true,
+                minuteIncrement: 5,
+                onChange: (selectedDates, dateStr) => {
+                    const newTimeMin = parseTimeToMinutes(dateStr);
+                    if (newTimeMin !== null && newTimeMin !== BUILDER_STATE.startTimeMin) {
+                        BUILDER_STATE.startTimeMin = newTimeMin;
+                        // Only re-render if the builder is open and in legacy mode
+                        if (BUILDER_STATE.isOpen && BUILDER_STATE.mode === 'definition') {
+                            renderLegacyTable();
+                        }
+                    }
+                }
+            });
+        }
     };
 
     // Generalized open function
+    // V16.3.1 FIX: Updated toggling logic to use the new container elements.
     SequentialBuilder.open = (config) => {
         // 1. Convert absolute times (structure) to sequential format (segments)
         const sequentialSegments = [];
@@ -1524,19 +1611,30 @@ const toggleRowEditMode = (id, isEditing) => {
         BUILDER_STATE.segments = JSON.parse(JSON.stringify(sequentialSegments));
         BUILDER_STATE.reason = config.reason || null;
 
-        // --- NEW: Reset History (Step 6) ---
+        // --- Reset History ---
         BUILDER_STATE.visualHistory = [];
         BUILDER_STATE.visualHistoryIndex = -1;
 
         // 3. Initialize UI
         ELS.modalTitle.textContent = config.title;
 
+        // V16.3.1 FIX: Ensure both containers are hidden before selectively showing one
+        if (ELS.visualEditorContainer) ELS.visualEditorContainer.style.display = 'none';
+        if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'none';
+        // Also hide visual editor specific controls (Undo/Redo) initially
+        if (ELS.visualEditorControlsGroup) ELS.visualEditorControlsGroup.style.display = 'none';
+
+
         // Show/Hide exception reason input based on mode
         if (config.mode === 'exception') {
             // --- This is the NEW "Smart-Visual Editor" flow ---
-            if (ELS.visualEditorBody) ELS.visualEditorBody.style.display = 'block';
-            if (ELS.modalSequenceBody) ELS.visualEditorBody.closest('.modal-body').style.display = 'block'; // Show new body
-            if (ELS.modalSequenceBody) ELS.modalSequenceBody.closest('.modal-body').style.display = 'none'; // Hide old table
+            if (ELS.visualEditorContainer) {
+                // Display block is sufficient as the parent modal-body handles the flex layout
+                ELS.visualEditorContainer.style.display = 'block';
+            }
+            // Show visual editor controls
+            if (ELS.visualEditorControlsGroup) ELS.visualEditorControlsGroup.style.display = 'flex';
+
 
             ELS.exceptionReasonGroup.style.display = 'block';
             ELS.modalExceptionReason.value = BUILDER_STATE.reason || '';
@@ -1546,52 +1644,46 @@ const toggleRowEditMode = (id, isEditing) => {
             renderTimeline();
             
         } else {
-            // --- This is the OLD "Shift Definition" flow ---
-            if (ELS.visualEditorBody) ELS.visualEditorBody.style.display = 'none';
-            if (ELS.modalSequenceBody) ELS.visualEditorBody.closest('.modal-body').style.display = 'none'; // Hide new body
-            if (ELS.modalSequenceBody) ELS.modalSequenceBody.closest('.modal-body').style.display = 'block'; // Show old table
+            // --- This is the OLD "Shift Definition" flow (config.mode === 'definition') ---
+            if (ELS.legacyEditorContainer) {
+                // Display block is sufficient as the parent modal-body handles the flex layout
+                ELS.legacyEditorContainer.style.display = 'block';
+            }
 
             ELS.exceptionReasonGroup.style.display = 'none';
             ELS.modalSave.textContent = "Save Definition";
 
-            // We must support the old editor for Shift Definitions
+            // Update the start time input if Flatpickr is initialized
             if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
                 ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
             }
-            if (ELS.modalSequenceBody) {
-                ELS.modalSequenceBody.addEventListener('change', handleLegacySequenceChange);
-                ELS.modalSequenceBody.addEventListener('click', handleLegacySequenceClick);
-            }
-            if (ELS.modalAddActivity) {
-                ELS.modalAddActivity.addEventListener('click', handleLegacyAddActivity);
-            }
+            
+            // V16.3.1 FIX: Listeners are now handled in initialize(), so we just call render.
             renderLegacyTable();
         }
         
-        // --- NEW: Save initial state and update buttons (Step 6) ---
+        // --- Save initial state and update buttons ---
         saveVisualHistory(); 
         updateUndoRedoButtons(); 
         
         ELS.modal.style.display = 'flex';
     };
 
+    // V16.3.1 FIX: Removed listener cleanup as it's handled in initialize().
     SequentialBuilder.close = () => {
         BUILDER_STATE.isOpen = false;
         if (ELS.modal) ELS.modal.style.display = 'none';
         closeAddPopup(); // Ensure pop-up is closed
         closeContextMenu(); // Ensure context menu is closed
-        
-        // Clean up legacy listeners if they were added
-        if (ELS.modalSequenceBody) {
-            ELS.modalSequenceBody.removeEventListener('change', handleLegacySequenceChange);
-            ELS.modalSequenceBody.removeEventListener('click', handleLegacySequenceClick);
-        }
     };
 
     // --- NEW: Smart-Visual Editor Functions ---
 
     // 1. Render Toolbox (Left side)
     const renderToolbox = () => {
+        // Check if toolbox element exists (it might not if initialization failed or HTML is corrupted)
+        if (!ELS.visualEditorToolbox) return; 
+
         const STATE = APP.StateManager.getState();
         const components = STATE.scheduleComponents.sort((a, b) => a.name.localeCompare(b.name));
         
@@ -1605,6 +1697,9 @@ const toggleRowEditMode = (id, isEditing) => {
 
     // 2. Render Timeline (Right side)
     const renderTimeline = () => {
+        // Check if timeline element exists
+        if (!ELS.visualEditorTimeline) return;
+
         renderTimeRuler(); // Draw the time ruler
         
         const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
@@ -1687,8 +1782,8 @@ const toggleRowEditMode = (id, isEditing) => {
             }
         });
 
-        ELS.modalTotalTime.textContent = APP.Utils.formatDuration(totalDuration);
-        ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
+        if (ELS.modalTotalTime) ELS.modalTotalTime.textContent = APP.Utils.formatDuration(totalDuration);
+        if (ELS.modalPaidTime) ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
     };
 
     // 5. Handle Clicks on Toolbox (Pop-up)
@@ -1715,7 +1810,7 @@ const toggleRowEditMode = (id, isEditing) => {
 
     const closeAddPopup = () => {
         BUILDER_STATE.addPopupState.isOpen = false;
-        ELS.visualEditorAddPopup.style.display = 'none';
+        if (ELS.visualEditorAddPopup) ELS.visualEditorAddPopup.style.display = 'none';
     };
 
     // 6. Reusable "Carve-Out" function (used by pop-up AND drag-drop)
@@ -2032,7 +2127,6 @@ const toggleRowEditMode = (id, isEditing) => {
         const action = item.dataset.action;
         const index = BUILDER_STATE.contextMenuIndex; // Get the stored index
         
-        // **TYPO FIX:** Was BUILDT_STATE
         if (isNaN(index) || !BUILDER_STATE.segments[index]) return;
 
         const segment = BUILDER_STATE.segments[index];
@@ -2112,7 +2206,6 @@ const toggleRowEditMode = (id, isEditing) => {
         }
         
         // Add new state
-        // **TYPO FIX:** Was BUILDES_STATE
         BUILDER_STATE.visualHistory.push(JSON.parse(JSON.stringify(BUILDER_STATE.segments)));
         BUILDER_STATE.visualHistoryIndex++;
         
@@ -2223,10 +2316,19 @@ const toggleRowEditMode = (id, isEditing) => {
 
     // --- LEGACY FUNCTIONS (For Shift Definition Editor) ---
     const renderLegacyTable = () => {
+        // V16.3.1 FIX: Check if the body element exists before attempting to render (prevents crash if HTML is missing)
+        if (!ELS.modalSequenceBody) {
+            console.error("CRITICAL ERROR: Legacy editor HTML (modalSequenceBody) not found.");
+            // Attempt to provide a fallback UI within the container if possible
+            if (ELS.legacyEditorContainer) {
+                ELS.legacyEditorContainer.innerHTML = "<p style='color: red; text-align: center; padding: 20px;'>Error: Editor structure missing. Please check HTML integrity.</p>";
+            }
+            return;
+        }
+        
         let html = '';
         let currentTime = BUILDER_STATE.startTimeMin;
-        let totalDuration = 0;
-        let paidDuration = 0;
+        
         const STATE = APP.StateManager.getState();
         const componentOptions = STATE.scheduleComponents
             .sort((a, b) => a.name.localeCompare(b.name))
@@ -2234,7 +2336,6 @@ const toggleRowEditMode = (id, isEditing) => {
             .join('');
 
         BUILDER_STATE.segments.forEach((seg, index) => {
-            const component = APP.StateManager.getComponentById(seg.component_id);
             const startTime = currentTime;
             const endTime = currentTime + seg.duration_min;
             html += `
@@ -2267,10 +2368,6 @@ const toggleRowEditMode = (id, isEditing) => {
                     </td>
                 </tr>`;
             currentTime = endTime;
-            totalDuration += seg.duration_min;
-            if (component && component.is_paid) {
-                paidDuration += seg.duration_min;
-            }
         });
 
         ELS.modalSequenceBody.innerHTML = html;
@@ -2280,8 +2377,8 @@ const toggleRowEditMode = (id, isEditing) => {
                 selectEl.value = seg.component_id || '';
             }
         });
-        ELS.modalTotalTime.textContent = APP.Utils.formatDuration(totalDuration);
-        ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
+        // Summary is updated via the shared renderSummary function.
+        renderSummary();
     };
 
     const handleLegacyAddActivity = () => {
@@ -2315,7 +2412,11 @@ const toggleRowEditMode = (id, isEditing) => {
                 return;
             }
             if (index === 0) {
+                // V16.3.1 FIX: Update the start time input field as well
                 BUILDER_STATE.startTimeMin = newStartTimeMin;
+                if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
+                     ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(newStartTimeMin), false);
+                }
             } else {
                 const durationDiff = newStartTimeMin - originalStartTimeMin;
                 const prevDuration = BUILDER_STATE.segments[index - 1].duration_min;
@@ -3756,7 +3857,8 @@ const toggleRowEditMode = (id, isEditing) => {
 
     // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v15.8.1) Initializing...");
+        // Updated version logging
+        console.log("WFM Intelligence Platform (v15.8.3) Initializing...");
         
         // Initialize foundational services
         APP.Utils.cacheDOMElements();
