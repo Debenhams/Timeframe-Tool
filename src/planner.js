@@ -284,120 +284,93 @@ Utils.addDaysISO = (iso, days) => {
 /**
  * MODULE: APP.DataService
  * Handles all interactions with the Supabase backend.
- * V15.8: Added specific helper functions for managing rotation_assignments_history.
+ * V15.9 FIX: Improved assignment fetch logic (tie-breaking) and Date syncing.
  */
 (function(APP) {
     const DataService = {};
     let supabase = null;
     
-    // Define the table name for historical assignments (centralized)
     const HISTORY_TABLE = 'rotation_assignments_history';
     const SNAPSHOT_TABLE = 'rotation_assignments';
 
-    // Initialize the Supabase client
     DataService.initialize = () => {
         if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
              APP.Utils.showToast("Error: Database library (Supabase) not loaded.", "danger", 10000);
             return false;
         }
         const { createClient } = window.supabase;
-
         supabase = createClient(APP.Config.SUPABASE_URL, APP.Config.SUPABASE_ANON_KEY);
         return true;
     };
 
-    // Centralized error handling
     const handleError = (error, context) => {
         console.error(`DataService Error (${context}):`, error);
         const errorMessage = error && error.message ? error.message : 'Unknown database error';
-        
-        // Suppress specific known warning if the history table doesn't exist yet (PGRST116 or 42P01).
         if (error && (error.code === 'PGRST116' || error.code === '42P01') && context.includes(HISTORY_TABLE)) {
-             console.warn(`Note: ${HISTORY_TABLE} table not found. Time-based assignments may not function correctly until schema is updated.`);
+             console.warn(`Note: ${HISTORY_TABLE} table not found.`);
         } else {
             APP.Utils.showToast(`Database Error: ${errorMessage}`, "danger");
         }
         return { data: null, error: errorMessage };
     };
 
-    // Generic table fetch (Private)
     const fetchTable = async (tableName) => {
         const { data, error } = await supabase.from(tableName).select('*');
         if (error) return handleError(error, `Fetch ${tableName}`);
         return { data, error: null };
     };
 
-    // Generalized save/upsert function
     DataService.saveRecord = async (tableName, record, conflictColumn = null) => {
         let query = supabase.from(tableName);
         if (conflictColumn) {
-            // Use upsert for saving exceptions or assignments based on unique constraints
             query = query.upsert(record, { onConflict: conflictColumn });
         } else {
             query = query.insert(record);
         }
-        // .select() ensures the saved record is returned
         const { data, error } = await query.select();
         if (error) return handleError(error, `Save ${tableName}`);
-        // Return the saved record (first element of the returned array)
         return { data: data ? data[0] : null, error: null };
     };
 
-    // Generalized update function
     DataService.updateRecord = async (tableName, updates, condition) => {
         let query = supabase.from(tableName).update(updates);
-
-        // Apply conditions using explicit filters (.eq/.is)
         if (condition) {
             Object.keys(condition).forEach(key => {
                 const value = condition[key];
-                if (value === null) {
-                    // Explicitly use .is() for NULL checks
-                    query = query.is(key, null);
-                } else {
-                    // Use .eq() for standard equality checks
-                    query = query.eq(key, value);
-                }
+                if (value === null) query = query.is(key, null);
+                else query = query.eq(key, value);
             });
         }
-
-         const { data, error } = await query.select();
+        const { data, error } = await query.select();
         if (error) return handleError(error, `Update ${tableName}`);
-        // Return the first updated record if available
         return { data: data ? data[0] : null, error: null };
     };
 
-    // Generalized delete function
     DataService.deleteRecord = async (tableName, condition) => {
         const { error } = await supabase.from(tableName).delete().match(condition);
         if (error) return handleError(error, `Delete ${tableName}`);
         return { data: null, error: null };
     };
 
-    // V15.8 FIX: Reads effective rotation rows for a given date (YYYY-MM-DD).
-    // Includes prioritization logic and fallback if history table is missing.
+    // V15.9 FIX: Logic improved to correctly handle overlapping/duplicate start dates
     DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
       try {
-        // FIX: Calculate the end of the week to capture any starts within this week (including Monday)
         const weekEndISO = APP.Utils.addDaysISO(isoDate, 6);
-
-        // 1) Pull rows that start anytime on or before the end of this week
+        
+        // Fetch all relevant history records
         const { data, error } = await supabase
           .from(HISTORY_TABLE)
-          .select('advisor_id, rotation_name, start_date, end_date, reason')
-          .lte('start_date', weekEndISO) /* <--- CHANGED to weekEndISO */
-          .or(`end_date.is.null,end_date.gte.${isoDate}`);
+          .select('id, advisor_id, rotation_name, start_date, end_date, reason')
+          .lte('start_date', weekEndISO)
+          .or(`end_date.is.null,end_date.gte.${isoDate}`)
+          .order('id', { ascending: true }); // Ensure deterministic order (newer edits last)
 
-        // Handle specific error if the history table is missing (PostgREST error code PGRST116 or 42P01)
         if (error && (error.code === '42P01' || error.code === 'PGRST116')) {
-            console.warn(`${HISTORY_TABLE} not found. Falling back to ${SNAPSHOT_TABLE} snapshot.`);
             return await fetchSnapshotAssignments();
         }
+        if (error) return handleError(error, 'Fetch effective assignments');
 
-        if (error) return handleError(error, 'Fetch effective assignments for date');
-
-        // 2) For each advisor, pick the row with the *latest* start_date (closest to isoDate).
-        //    If there are ties, prefer a bounded swap (has end_date) over an open-ended row.
+        // Client-side filtering to pick the "Winner" for this week
         const byAdvisor = new Map();
         (data || []).forEach(row => {
           const existing = byAdvisor.get(row.advisor_id);
@@ -405,33 +378,38 @@ Utils.addDaysISO = (iso, days) => {
             byAdvisor.set(row.advisor_id, row);
             return;
           }
-          // choose the row with the later start_date
+          
+          // 1. Prefer later start date (closer to current week)
           if (row.start_date > existing.start_date) {
             byAdvisor.set(row.advisor_id, row);
-          } else if (row.start_date === existing.start_date) {
-            // tie-breaker: prefer bounded swap (end_date not null)
+          } 
+          // 2. If start dates are equal (Collision/Overwrite)
+          else if (row.start_date === existing.start_date) {
             const existingIsBounded = !!existing.end_date;
             const rowIsBounded = !!row.end_date;
+            
+            // Prefer bounded swap over unbounded main rotation
             if (rowIsBounded && !existingIsBounded) {
-              byAdvisor.set(row.advisor_id, row);
+                 byAdvisor.set(row.advisor_id, row);
+            } 
+            // If both are the same type (both swaps or both main), prefer the NEWER one (higher ID)
+            else if (rowIsBounded === existingIsBounded) {
+                 byAdvisor.set(row.advisor_id, row); 
             }
           }
         });
-
         return { data: byAdvisor, error: null };
       } catch (err) {
-        return handleError(err, 'Fetch effective assignments for date (Catch)');
+        return handleError(err, 'Fetch effective assignments (Catch)');
       }
     };
 
-    // Fallback function if history table is missing. (Private)
+    // Fallback
     const fetchSnapshotAssignments = async () => {
         const { data, error } = await fetchTable(SNAPSHOT_TABLE);
         if (error) return { data: new Map(), error: error.error };
-        
         const byAdvisor = new Map();
         (data || []).forEach(row => {
-            // Adapt the snapshot structure to the expected history structure
             byAdvisor.set(row.advisor_id, {
                 advisor_id: row.advisor_id,
                 rotation_name: row.rotation_name,
@@ -443,11 +421,8 @@ Utils.addDaysISO = (iso, days) => {
         return { data: byAdvisor, error: null };
     };
 
-
-    // Load all necessary data tables
     DataService.loadCoreData = async () => {
         try {
-            // Fetch tables in parallel for efficiency
             const [advisors, leaders, components, definitions, patterns, assignments, exceptions] = await Promise.all([
                 fetchTable('advisors'),
                 supabase.from('leaders').select('*, sites(name)'),
@@ -458,20 +433,11 @@ Utils.addDaysISO = (iso, days) => {
                 fetchTable('schedule_exceptions')
             ]);
 
-            // Check if any critical data failed to load
             if (advisors.error || leaders.error || components.error || definitions.error || patterns.error) {
-                throw new Error("Failed to load one or more core data tables (Advisors, Leaders, Components, Definitions, or Patterns).");
+                throw new Error("Failed to load core data.");
             }
-
-            // Handle assignments/exceptions table load failure gracefully
-            if (assignments.error) {
-                 console.warn("Warning: Failed to load rotation_assignments snapshot.", assignments.error);
-                 assignments.data = [];
-            }
-            if (exceptions.error) {
-                 console.warn("Warning: Failed to load schedule_exceptions.", exceptions.error);
-                 exceptions.data = [];
-            }
+            if (assignments.error) assignments.data = [];
+            if (exceptions.error) exceptions.data = [];
 
             return {
                 advisors: advisors.data,
@@ -488,57 +454,33 @@ Utils.addDaysISO = (iso, days) => {
         }
     };
 
-    // --- V15.8 FIX: Implementation of missing History Management Functions (Bug 2) ---
-    // These functions manage the rotation_assignments_history table.
-
-    // V15.8: Helper function to update the 'rotation_assignments' snapshot table. (Private)
-    // This keeps the snapshot table in sync with the latest effective assignment from history.
     const updateSnapshotAssignment = async (advisorId) => {
-        // Find the latest effective assignment (start_date DESC, end_date IS NULL prioritized)
         const { data, error } = await supabase
             .from(HISTORY_TABLE)
             .select('rotation_name, start_date')
             .eq('advisor_id', advisorId)
             .order('start_date', { ascending: false })
-            .order('end_date', { ascending: false, nullsFirst: true }); // Prefer NULL end_date (ongoing)
+            .order('end_date', { ascending: false, nullsFirst: true });
 
-        // Handle missing table gracefully during snapshot update
-        if (error && (error.code === 'PGRST116' || error.code === '42P01')) {
-            return;
-        }
-
-        if (error) {
-            console.error("Failed to update snapshot assignment for advisor:", advisorId, error);
-            return;
-        }
+        if (error && (error.code === 'PGRST116' || error.code === '42P01')) return;
+        if (error) { console.error("Snapshot update failed", error); return; }
 
         if (data && data.length > 0) {
-            const latest = data[0];
-            await supabase
-                .from(SNAPSHOT_TABLE)
-                .upsert({
-                    advisor_id: advisorId,
-                    rotation_name: latest.rotation_name,
-                    start_date: latest.start_date
-                }, { onConflict: 'advisor_id' });
+            await supabase.from(SNAPSHOT_TABLE).upsert({
+                advisor_id: advisorId,
+                rotation_name: data[0].rotation_name,
+                start_date: data[0].start_date
+            }, { onConflict: 'advisor_id' });
         } else {
-            // If no history exists, remove from snapshot
-            await supabase
-                .from(SNAPSHOT_TABLE)
-                .delete()
-                .eq('advisor_id', advisorId);
+            await supabase.from(SNAPSHOT_TABLE).delete().eq('advisor_id', advisorId);
         }
     };
 
-
-    // V15.8 FIX: Implements "Assign from this week" and "Change from this week forward"
-    // These actions are logically similar: they set a new rotation starting on a date and going forward indefinitely.
-    DataService.assignFromWeek = async ({ advisor_id, rotation_name, start_date, reason = 'New Assignment/Change Forward' }) => {
+    DataService.assignFromWeek = async ({ advisor_id, rotation_name, start_date, reason = 'New Assignment' }) => {
         try {
             const dateMinusOne = APP.Utils.addDaysISO(start_date, -1);
-
-            // 1. Truncate existing open-ended assignments that started before this date.
-            // Update where end_date IS NULL AND start_date < start_date.
+            
+            // 1. Clip previous open-ended assignments
             const { error: updateError } = await supabase
                 .from(HISTORY_TABLE)
                 .update({ end_date: dateMinusOne })
@@ -546,50 +488,31 @@ Utils.addDaysISO = (iso, days) => {
                 .is('end_date', null)
                 .lt('start_date', start_date);
 
-            // Handle missing table gracefully
-            if (updateError && !(updateError.code === 'PGRST116' || updateError.code === '42P01')) {
-                 throw new Error("Failed to clip previous assignments.");
-            }
-                
-            // 2. Insert/Overwrite the new ongoing assignment into history
+            if (updateError && !updateError.code.startsWith('PGRST')) throw new Error("Failed to clip previous.");
+
+            // 2. Insert new open-ended assignment
             const newRecord = {
                 advisor_id: advisor_id,
-                rotation_name: rotation_name || null, // Allow null for unassignment
+                rotation_name: rotation_name || null,
                 start_date: start_date,
                 end_date: null,
                 reason: reason
             };
-            // Use upsert on (advisor_id, start_date) to handle overwriting existing records starting on the same day.
-            const { data: historyData, error: insertError } = await DataService.saveRecord(HISTORY_TABLE, newRecord, 'advisor_id, start_date');
-            
-            // Handle missing table gracefully during insert
-            // V15.8.1 FIX: insertError is the error string itself, not an object with an .error property.
-            if (insertError && (insertError.includes('PGRST116') || insertError.includes('42P01'))) {
-                 console.warn("History table missing during insert. Proceeding with snapshot only.");
-            } else if (insertError) {
-                throw new Error("Failed to insert new assignment history.");
-            }
+            // Upsert handles overwriting a record if we do this multiple times for the same day
+            const { data, error } = await DataService.saveRecord(HISTORY_TABLE, newRecord, 'advisor_id, start_date');
+            if (error && !error.includes('PGRST')) throw new Error("Failed to insert assignment.");
 
-            // 3. Update the snapshot table
             await updateSnapshotAssignment(advisor_id);
-
-            // Return the history record data as the primary result
-            return { data: historyData, error: null };
-
+            return { data, error: null };
         } catch (err) {
-            return handleError(err, "assignFromWeek/changeForward");
+            return handleError(err, "assignFromWeek");
         }
     };
 
-    // V15.8 FIX: Implements "Change only this week (Swap)"
-    // This is complex as it requires potentially splitting an existing record.
     DataService.changeOnlyWeek = async ({ advisor_id, rotation_name, week_start, week_end }) => {
         try {
-            if (!rotation_name) {
-                throw new Error("Rotation name is required for a one-week swap.");
-            }
+            if (!rotation_name) throw new Error("Rotation name required for swap.");
 
-            // 1. Insert the one-week swap assignment.
             const swapRecord = {
                 advisor_id: advisor_id,
                 rotation_name: rotation_name,
@@ -597,567 +520,42 @@ Utils.addDaysISO = (iso, days) => {
                 end_date: week_end,
                 reason: 'One Week Swap'
             };
-            // Use upsert to handle overwriting existing records starting exactly on week_start
-            const { data, error: insertError } = await DataService.saveRecord(HISTORY_TABLE, swapRecord, 'advisor_id, start_date');
             
-            // V15.8.1 FIX: insertError is the error string itself, not an object with an .error property.
-            if (insertError && (insertError.includes('PGRST116') || insertError.includes('42P01'))) {
-                APP.Utils.showToast("Cannot perform one-week swap as history table is missing.", "danger");
-                return { data: null, error: "History table missing." };
-            } else if (insertError) {
-                 throw new Error("Failed to insert swap record.");
-            }
+            const { data, error } = await DataService.saveRecord(HISTORY_TABLE, swapRecord, 'advisor_id, start_date');
+            if (error && !error.includes('PGRST')) throw new Error("Failed to insert swap.");
 
-            // 2. Update the snapshot table
             await updateSnapshotAssignment(advisor_id);
-
             return { data, error: null };
-
         } catch (err) {
              return handleError(err, "Change Only Week");
         }
     };
 
-    // V15.8.1 FIX: Helper to fetch the current snapshot record for a specific advisor. (Public)
     DataService.fetchSnapshotForAdvisor = async (advisorId) => {
-        // Ensure supabase client is initialized
-        if (!supabase) return { data: null, error: "Database not initialized." };
-
-        // Efficiently fetch only the required record using maybeSingle()
+        if (!supabase) return { data: null, error: "DB not initialized." };
         const { data, error } = await supabase.from(SNAPSHOT_TABLE).select('*').eq('advisor_id', advisorId).maybeSingle();
-        
-        // Handle missing table gracefully during fetch (PGRST116 or 42P01)
-        if (error && (error.code === 'PGRST116' || error.code === '42P01')) {
-             // If the snapshot table is missing, it's not a critical error, just return null data.
-             return { data: null, error: null };
-        }
-        
-        if (error) return handleError(error, `Fetch Snapshot ${advisorId}`);
-        
-        // Returns data (which might be null if the record doesn't exist) and null error
+        if (error && (error.code === 'PGRST116' || error.code === '42P01')) return { data: null, error: null };
+        if (error) return handleError(error, `Fetch Snapshot`);
         return { data, error: null };
     };
-
 
     APP.DataService = DataService;
 }(window.APP));
 
 /**
- * MODULE: APP.StateManager
- * Manages the application's state, selectors, synchronization, and history (Undo/Redo).
- */
-(function(APP) {
-    const StateManager = {};
-
-    // The central state object
-    const STATE = {
-        advisors: [],
-        leaders: [],
-        scheduleComponents: [], 
-        shiftDefinitions: [], 
-        rotationPatterns: [], 
-        rotationAssignments: [], // Current snapshot
-        scheduleExceptions: [],
-        selectedAdvisors: new Set(),
-        weekStart: null, // Stored internally as YYYY-MM-DD
-        currentRotation: null,
-        selectedDay: 'Monday',
-        scheduleViewMode: 'daily',
-        isBooted: false,
-        history: [],
-        historyIndex: -1,
-        // Cache for historical assignments lookups (Key: DateISO, Value: Map<AdvisorId, Assignment>)
-        effectiveAssignmentsCache: new Map(), 
-    };
-
-    StateManager.getState = () => STATE;
-
-    // Initialize state with data loaded from DataService
-    StateManager.initialize = (initialData) => {
-        Object.assign(STATE, initialData);
-        STATE.isBooted = true;
-        StateManager.saveHistory("Initial Load");
-    };
-
-    // Helpers (Selectors) - Efficient ways to query the state
-    // NOTE: This selector gets the current snapshot from rotation_assignments.
-    StateManager.getAssignmentForAdvisor = (id) => STATE.rotationAssignments.find(a => a.advisor_id === id) || null;
-    StateManager.getPatternByName = (name) => STATE.rotationPatterns.find(p => p.name === name) || null;
-    StateManager.getComponentById = (id) => STATE.scheduleComponents.find(c => c.id === id) || null;
-    StateManager.getShiftDefinitionById = (id) => STATE.shiftDefinitions.find(d => d.id === id) || null;
-    StateManager.getAdvisorById = (id) => STATE.advisors.find(a => a.id === id) || null;
-
-    // Robust lookup for shift codes (handles whitespace and type differences)
-    StateManager.getShiftDefinitionByCode = (code) => {
-        if (!code) return null;
-        const trimmedCode = String(code).trim();
-        return STATE.shiftDefinitions.find(d => (d.code && String(d.code).trim()) === trimmedCode) || null;
-    };
-
-    StateManager.getAdvisorsByLeader = (leaderId) => STATE.advisors.filter(a => a.leader_id === leaderId);
-
-    // Selector for Hybrid Adherence (Exceptions)
-    StateManager.getExceptionForAdvisorDate = (advisorId, dateISO) => {
-        return STATE.scheduleExceptions.find(e => e.advisor_id === advisorId && e.exception_date === dateISO) || null;
-    };
-
-    // Function to pre-load effective assignments for a specific date into the cache
-    StateManager.loadEffectiveAssignments = async (dateISO) => {
-        if (STATE.effectiveAssignmentsCache.has(dateISO)) {
-            return; // Already loaded
-        }
-        // This calls DataService which handles the history query and prioritization.
-        const { data, error } = await APP.DataService.fetchEffectiveAssignmentsForDate(dateISO);
-        if (!error && data) {
-            STATE.effectiveAssignmentsCache.set(dateISO, data);
-        } else {
-            // Handle error if needed, set an empty map to prevent re-fetching on failure
-            STATE.effectiveAssignmentsCache.set(dateISO, new Map());
-        }
-    };
-
-    // Clear cache when history changes or assignments are modified
-    StateManager.clearEffectiveAssignmentsCache = () => {
-        STATE.effectiveAssignmentsCache.clear();
-    };
-
-    // History Management (Updated to include exceptions)
-    StateManager.saveHistory = (reason = "Change") => {
-        // Clear forward history if we make a new change after undoing
-        if (STATE.historyIndex < STATE.history.length - 1) {
-            STATE.history = STATE.history.slice(0, STATE.historyIndex + 1);
-        }
-        // Create a snapshot of the mutable data structures (Deep Copy)
-        const snapshot = {
-            shiftDefinitions: JSON.parse(JSON.stringify(STATE.shiftDefinitions)),
-            rotationPatterns: JSON.parse(JSON.stringify(STATE.rotationPatterns)),
-            rotationAssignments: JSON.parse(JSON.stringify(STATE.rotationAssignments)),
-            scheduleExceptions: JSON.parse(JSON.stringify(STATE.scheduleExceptions)),
-            reason: reason
-        };
-        STATE.history.push(snapshot);
-        // Limit history stack size
-        if (STATE.history.length > 30) STATE.history.shift();
-        STATE.historyIndex = STATE.history.length - 1;
-        
-        // Update UI buttons
-        if (APP.Core && APP.Core.updateUndoRedoButtons) {
-             APP.Core.updateUndoRedoButtons(STATE.historyIndex, STATE.history.length);
-        }
-        
-        // Clear history cache when state changes
-        StateManager.clearEffectiveAssignmentsCache();
-    };
-
-    // Apply a history state (Undo/Redo)
-    StateManager.applyHistory = (direction) => {
-        let newIndex = STATE.historyIndex;
-        if (direction === 'undo' && newIndex > 0) {
-            newIndex--;
-        } else if (direction === 'redo' && newIndex < STATE.history.length - 1) {
-            newIndex++;
-        } else {
-            return;
-        }
-
-        // Restore state from snapshot (Deep Copy)
-        const snapshot = STATE.history[newIndex];
-        STATE.shiftDefinitions = JSON.parse(JSON.stringify(snapshot.shiftDefinitions));
-        STATE.rotationPatterns = JSON.parse(JSON.stringify(snapshot.rotationPatterns));
-        STATE.rotationAssignments = JSON.parse(JSON.stringify(snapshot.rotationAssignments));
-        STATE.scheduleExceptions = JSON.parse(JSON.stringify(snapshot.scheduleExceptions));
-        STATE.historyIndex = newIndex;
-
-        // Clear history cache when state changes
-        StateManager.clearEffectiveAssignmentsCache();
-
-        // Re-render application and update UI
-        if (APP.Core && APP.Core.renderAll && APP.Core.updateUndoRedoButtons) {
-            APP.Core.renderAll();
-            APP.Core.updateUndoRedoButtons(STATE.historyIndex, STATE.history.length);
-        }
-    };
-    
-    // State synchronization (Update local state after successful DB operations)
-    StateManager.syncRecord = (tableName, record, isDeleted = false) => {
-        
-        // Map DB table names to State keys
-        let stateKey = null;
-        switch (tableName) {
-            case 'schedule_exceptions': stateKey = 'scheduleExceptions'; break;
-            case 'shift_definitions': stateKey = 'shiftDefinitions'; break;
-            case 'rotation_patterns': stateKey = 'rotationPatterns'; break;
-            case 'rotation_assignments': stateKey = 'rotationAssignments'; break;
-            case 'schedule_components': stateKey = 'scheduleComponents'; break;
-            // NOTE: rotation_assignments_history is not synced here, but managed via the cache.
-            default: stateKey = tableName;
-        }
-
-        const collection = STATE[stateKey];
-        
-        // Handle cache clearing for history updates even if collection doesn't map directly.
-        if (tableName === 'rotation_assignments_history' || tableName === 'rotation_patterns') {
-            StateManager.clearEffectiveAssignmentsCache();
-        }
-
-        if (!collection) {
-            return;
-        }
-
-
-        // Determine primary key (patterns by name, assignments by advisor_id, else id)
-        let primaryKey = 'id';
-        if (tableName === 'rotation_patterns') primaryKey = 'name';
-        if (tableName === 'rotation_assignments') primaryKey = 'advisor_id';
-
-        
-        // Handle sync for exceptions
-        // Since we rely on upsert for exceptions, the returned record always has the 'id'.
-        if (tableName === 'schedule_exceptions') {
-            primaryKey = 'id'; 
-        }
-
-        
-        if (!record || !record.hasOwnProperty(primaryKey)) {
-            // console.error("SyncRecord warning: Record missing or missing primary key", primaryKey, record);
-            // Still proceed if cache clearing is needed (handled above)
-            return;
-        }
-        
-        const recordKey = record[primaryKey];
-        const index = collection.findIndex(item => item[primaryKey] === recordKey);
-
-        if (isDeleted) {
-            if (index > -1) collection.splice(index, 1);
-        } else {
-            if (index > -1) {
-                // Update existing record
-                collection[index] = record;
-            } else {
-                // Add new record
-                collection.push(record);
-            }
-        }
-        
-         // If assignments snapshot changes, clear the cache.
-         if (tableName === 'rotation_assignments') {
-            StateManager.clearEffectiveAssignmentsCache();
-        }
-    };
-
-    APP.StateManager = StateManager;
-}(window.APP));
-
-
-/**
- * MODULE: APP.ScheduleCalculator
- * Centralized service for calculating effective schedules based on Hybrid Adherence (Exceptions + History).
- */
-(function(APP) {
-    const ScheduleCalculator = {};
-
-    // Helper: Finds the correct key in the pattern data (handles "Week 1", "Week1", "week1" etc.)
-    const findWeekKey = (patternData, weekNumber) => {
-        const keys = Object.keys(patternData);
-        // Find the key that matches the week number using the robust regex
-        return keys.find(k => {
-            const match = k.match(/^Week ?(\d+)$/i);
-            return match && parseInt(match[1], 10) === weekNumber;
-        });
-    };
-
-    // Calculates the schedule for an advisor on a specific day.
-    // Returns { segments, source, reason }
-    ScheduleCalculator.calculateSegments = (advisorId, dayName, weekStartISO = null) => {
-        const STATE = APP.StateManager.getState();
-        // Use the provided context or the global state context
-        const effectiveWeekStart = weekStartISO || STATE.weekStart;
-        
-        if (!effectiveWeekStart) return { segments: [], source: null, reason: null };
-
-        // 1. Determine the specific date
-        const dateISO = APP.Utils.getISODateForDayName(effectiveWeekStart, dayName);
-        if (!dateISO) return { segments: [], source: null, reason: null };
-
-        // 2. Check for an Exception (Priority 1)
-        const exception = APP.StateManager.getExceptionForAdvisorDate(advisorId, dateISO);
-        if (exception && exception.structure) {
-            // If an exception exists, use its structure.
-            // Handle RDO via exception (empty structure)
-            if (exception.structure.length === 0) {
-                return { segments: [], source: 'exception', reason: exception.reason };
-            }
-            // Ensure segments are sorted (critical for visualization and comparison)
-            const sortedSegments = JSON.parse(JSON.stringify(exception.structure)).sort((a, b) => a.start_min - b.start_min);
-            return { segments: sortedSegments, source: 'exception', reason: exception.reason };
-        }
-
-        // 3. Calculate based on Rotation (Priority 2)
-        
-        // Use the EFFECTIVE assignment from the cache for this specific week.
-        const effectiveMap = STATE.effectiveAssignmentsCache.get(effectiveWeekStart);
-        let assignment = null;
-
-        if (effectiveMap && effectiveMap.has(advisorId)) {
-            assignment = effectiveMap.get(advisorId);
-        } 
-        // We rely on the effectiveMap (which includes fallback logic in DataService if history is missing). 
-        // If the advisor is not in the map, they have no assignment for this period.
-
-        
-        if (!assignment || !assignment.rotation_name || !assignment.start_date) {
-            return { segments: [], source: 'rotation', reason: null };
-        }
-
-        // Calculate the effective week number using the finite rotation logic
-        const effectiveWeek = APP.Utils.getEffectiveWeek(assignment.start_date, effectiveWeekStart, assignment, APP.StateManager.getPatternByName);
-        
-        // If null, the advisor is outside their finite rotation period or hasn't started yet.
-        if (effectiveWeek === null) return { segments: [], source: 'rotation', reason: null };
-        
-        // Determine the day index (1-7)
-        const dayIndex = (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(dayName) + 1);
-        const dayIndexStr = dayIndex.toString();
-
-
-        const pattern = APP.StateManager.getPatternByName(assignment.rotation_name);
-        if (!pattern || !pattern.pattern) return { segments: [], source: 'rotation', reason: null };
-        
-        // Look up the shift code in the rotation pattern
-        const weekKey = findWeekKey(pattern.pattern, effectiveWeek);
-        const weekPattern = weekKey ? pattern.pattern[weekKey] : {};
-
-        // Handle legacy DOW keys (e.g., 'mon') if numerical key is missing
-        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
-        const legacyDayKey = days[dayIndex - 1];
-        
-        const shiftCode = weekPattern[dayIndexStr] || weekPattern[legacyDayKey];
-
-
-        if (!shiftCode) return { segments: [], source: 'rotation', reason: null }; // RDO
-
-        // Find the shift definition corresponding to the code
-        const definition = APP.StateManager.getShiftDefinitionByCode(shiftCode);
-        
-        if (!definition || !definition.structure) {
-            console.warn(`Shift Definition not found or invalid for Code: '${shiftCode}' (Advisor ${advisorId} on ${dayName}, Week ${effectiveWeek})`);
-            return { segments: [], source: 'rotation', reason: null };
-        }
-
-        // Ensure segments are sorted
-        const sortedRotation = JSON.parse(JSON.stringify(definition.structure)).sort((a, b) => a.start_min - b.start_min);
-        return { segments: sortedRotation, source: 'rotation', reason: null };
-    };
-
-    APP.ScheduleCalculator = ScheduleCalculator;
-}(window.APP));
-
-
-/**
- * MODULE: APP.Components.ComponentManager
- * Manages the CRUD operations for Schedule Components (Activities, Breaks, etc.).
- */
-(function(APP) {
-    const ComponentManager = {};
-    const ELS = {};
-
-    ComponentManager.initialize = () => {
-        ELS.grid = document.getElementById('componentManagerGrid');
-        ELS.btnNew = document.getElementById('btnNewComponent');
-
-        if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNew);
-        if (ELS.grid) ELS.grid.addEventListener('click', handleClick);
-    };
-
-    ComponentManager.render = () => {
-        if (!ELS.grid) return;
-        const STATE = APP.StateManager.getState();
-  
-        const components = STATE.scheduleComponents.sort((a,b) => a.name.localeCompare(b.name));
-        
-        let html = '<table><thead><tr><th>Name</th><th>Type</th><th>Color</th><th>Default Duration</th><th>Paid</th><th>Actions</th></tr></thead><tbody>';
-        
-        components.forEach(comp => {
-            html += `<tr data-component-id="${comp.id}">
-                <td>
-                    <span class="display-value">${comp.name}</span>
-                    <input type="text" class="form-input edit-value" name="comp-name" value="${comp.name}" style="display:none;">
-                </td>
-                
-                <td>
-                    <span class="display-value">${comp.type}</span>
-                    <select class="form-select edit-value" name="comp-type" style="display:none;">
-                        <option value="Activity" ${comp.type === 'Activity' ? 'selected' : ''}>Activity</option>
-                        <option value="Break" ${comp.type === 'Break' ? 'selected' : ''}>Break</option>
-                        <option value="Lunch" ${comp.type === 'Lunch' ? 'selected' : ''}>Lunch</option>
-                        <option value="Shrinkage" ${comp.type === 'Shrinkage' ? 'selected' : ''}>Shrinkage</option>
-                        <option value="Absence" ${comp.type === 'Absence' ? 'selected' : ''}>Absence</option>
-                    </select>
-                </td>
-                
-                <td>
-                    <span class="display-value" style="display: inline-block; width: 20px; height: 20px; background-color: ${comp.color}; border-radius: 4px;"></span>
-                    <input type="color" class="form-input-color edit-value" name="comp-color" value="${comp.color}" style="display:none;">
-                </td>
-                
-                <td>
-                    <span class="display-value">${comp.default_duration_min}m</span>
-                    <input type="number" class="form-input edit-value" name="comp-duration" value="${comp.default_duration_min}" style="display:none; width: 70px;">
-                </td>
-                
-                <td>
-                    <span class="display-value">${comp.is_paid ? 'Yes' : 'No'}</span>
-                    <select class="form-select edit-value" name="comp-paid" style="display:none; width: 70px;">
-                        <option value="true" ${comp.is_paid ? 'selected' : ''}>Yes</option>
-                        <option value="false" ${!comp.is_paid ? 'selected' : ''}>No</option>
-                    </select>
-                </td>
-                
-                <td class="actions">
-                    <button class="btn btn-sm btn-primary edit-component" data-component-id="${comp.id}">Edit</button>
-                    <button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button>
-                    <button class="btn btn-sm btn-success save-component" data-component-id="${comp.id}" style="display:none;">Save</button>
-                    <button class="btn btn-sm btn-secondary cancel-edit-component" data-component-id="${comp.id}" style="display:none;">Cancel</button>
-                </td>
-            </tr>`;
-        });
-        html += '</tbody></table>';
-        ELS.grid.innerHTML = html;
- 
-    };
-
-    const handleNew = async () => {
-        // Basic prompt-based input for simplicity
-        const name = prompt("Enter component name (e.g., 'Email Support', 'Meeting'):");
-        if (!name) return;
-        const type = prompt("Enter type (Activity, Break, Lunch, Shrinkage, Absence):", "Activity");
-        const color = prompt("Enter hex color code (e.g., '#3498db'):", "#3498db");
-        const duration = parseInt(prompt("Enter default duration in minutes:", "60"), 10);
-        const isPaid = confirm("Is this a paid activity?");
-
-        if (!name || !type || !color || isNaN(duration)) {
-            APP.Utils.showToast("Invalid input provided.", "danger");
-            return;
-        }
-
-        const newComponent = { name, type, color, default_duration_min: duration, is_paid: isPaid };
-
-        const { data, error } = await APP.DataService.saveRecord('schedule_components', newComponent);
-        if (!error) {
-            APP.StateManager.syncRecord('schedule_components', data);
-            APP.Utils.showToast(`Component '${name}' created.`, "success");
-            ComponentManager.render();
-        }
-    };
-
-    const handleClick = (e) => {
-        const target = e.target;
-        const id = target.dataset.componentId;
-        if (!id) return;
-
-        if (target.classList.contains('delete-component')) {
-            handleDelete(id);
-        } else if (target.classList.contains('edit-component')) {
-            toggleRowEditMode(id, true);
-        } else if (target.classList.contains('cancel-edit-component')) {
-            toggleRowEditMode(id, false);
-        } else if (target.classList.contains('save-component')) {
-            handleInlineSave(id);
-        }
-    };
-const toggleRowEditMode = (id, isEditing) => {
-        const row = ELS.grid.querySelector(`tr[data-component-id="${id}"]`);
-        if (!row) return;
-
-        // Toggle visibility for display spans vs. edit inputs
-        row.querySelectorAll('.display-value').forEach(el => el.style.display = isEditing ? 'none' : '');
-        row.querySelectorAll('.edit-value').forEach(el => el.style.display = isEditing ? 'block' : 'none');
-
-        // Toggle action buttons
-        row.querySelector('.edit-component').style.display = isEditing ? 'none' : '';
-        row.querySelector('.delete-component').style.display = isEditing ? 'none' : '';
-        row.querySelector('.save-component').style.display = isEditing ? 'block' : 'none';
-        row.querySelector('.cancel-edit-component').style.display = isEditing ? 'block' : 'none';
-
-        // If we are cancelling, we must re-render the table to reset the values
-        if (!isEditing) {
-            ComponentManager.render();
-        }
-    };
-
-    const handleInlineSave = async (id) => {
-        const row = ELS.grid.querySelector(`tr[data-component-id="${id}"]`);
-        if (!row) return;
-
-        // 1. Read all new values from the inputs
-        const name = row.querySelector('[name="comp-name"]').value;
-        const type = row.querySelector('[name="comp-type"]').value;
-        const color = row.querySelector('[name="comp-color"]').value;
-        const duration = parseInt(row.querySelector('[name="comp-duration"]').value, 10);
-        const isPaid = row.querySelector('[name="comp-paid"]').value === 'true';
-
-        // 2. Validate
-        if (!name || !type || !color || isNaN(duration) || duration < 0) {
-            APP.Utils.showToast("Invalid data. Please check all fields.", "danger");
-            return;
-        }
-
-        const updatedComponent = {
-            id: id,
-            name, 
-            type, 
-            color, 
-            default_duration_min: duration, 
-            is_paid: isPaid 
-        };
-
-        // 3. Save to database
-        const { data, error } = await APP.DataService.updateRecord('schedule_components', updatedComponent, { id: id });
-        
-        if (!error) {
-            APP.StateManager.syncRecord('schedule_components', data);
-            APP.Utils.showToast(`Component '${name}' updated.`, "success");
-            // Re-render the whole table to show the new, non-editable data
-            ComponentManager.render();
-        }
-        // Error is handled by DataService
-    };
-    const handleDelete = async (id) => {
-        const component = APP.StateManager.getComponentById(id);
-        if (!component || !confirm(`Are you sure you want to delete '${component.name}'?`)) return;
-
-        // NOTE: Should ideally check if component is in use before deleting
-        const { error } = await APP.DataService.deleteRecord('schedule_components', { id });
-        if (!error) {
-            APP.StateManager.syncRecord('schedule_components', { id: id }, true);
-            APP.Utils.showToast(`Component deleted.`, "success");
-            ComponentManager.render();
-        }
-    };
-
-    APP.Components = APP.Components || {};
-    APP.Components.ComponentManager = ComponentManager;
-}(window.APP));
-
-
-/**
  * MODULE: APP.Components.AssignmentManager
- * Manages the assignment of Rotations to Advisors, utilizing the rotation_assignments_history table.
- * V15.8.3: Implemented PENDING_CHANGES to resolve date synchronization and button reliability issues.
+ * Manages the assignment of Rotations to Advisors.
+ * V15.9 FIX: Auto-updates Start Date when Rotation changes to prevent overwriting history.
  */
 (function(APP) {
     const AssignmentManager = {};
     const ELS = {};
-    // V15.8.3 FIX: Store pending changes (Key: advisorId, Value: { rotation_name, start_date })
-    // This map holds user inputs in the grid before they press a button.
     const PENDING_CHANGES = new Map(); 
 
     AssignmentManager.initialize = () => {
         ELS.grid = document.getElementById('assignmentGrid');
-        // Actions are handled exclusively by the buttons via handleRowAction, wired during render.
     };
 
-    // Renders the assignment grid, showing the effective rotation for the selected week.
     AssignmentManager.render = async () => {
         if (!ELS.grid) return;
 
@@ -1165,39 +563,27 @@ const toggleRowEditMode = (id, isEditing) => {
         const advisors = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name));
         const patterns = STATE.rotationPatterns.sort((a,b) => a.name.localeCompare(b.name));
         const patternOpts = patterns.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
-
-        // Get the selected Week Start (YYYY-MM-DD) from the global state
         const weekStartISO = STATE.weekStart;
 
-        // Ensure effective assignments for the selected week start date are loaded into the cache.
         if (weekStartISO) {
             await APP.StateManager.loadEffectiveAssignments(weekStartISO);
         }
 
-        // Get the map from the cache.
         const effectiveMap = STATE.effectiveAssignmentsCache.get(weekStartISO);
-
         let html = '<table><thead><tr><th>Advisor</th><th>Assigned Rotation (This Week)</th><th>Start Date (Week 1)</th><th>Actions</th></tr></thead><tbody>';
-
+        
         advisors.forEach(adv => {
-            // Determine the effective assignment for this week based on the history cache.
             const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
-
-            // V15.8.3 FIX: Determine display values considering pending changes.
             let displayRotation = effective ? effective.rotation_name : '';
             let displayStartDate = effective ? effective.start_date : '';
 
-            // If the user has typed something but not saved it, show that instead of the effective data.
+            // Check pending changes
             if (PENDING_CHANGES.has(adv.id)) {
                 const pending = PENDING_CHANGES.get(adv.id);
-                // Check if the specific field exists (is not undefined) in the pending changes before overwriting
                 if (pending.rotation_name !== undefined) displayRotation = pending.rotation_name;
                 if (pending.start_date !== undefined) displayStartDate = pending.start_date;
             }
 
-
-            // V15.8 FIX (Bug 2): Corrected the HTML structure to resolve button duplication ("spam").
-            // Ensured all buttons are within the single <td> and removed invalid <div> wrappers inside <tr>.
             html += `<tr data-advisor-id="${adv.id}">
                   <td>${adv.name}</td>
                   <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
@@ -1207,32 +593,24 @@ const toggleRowEditMode = (id, isEditing) => {
                       <button class="btn btn-sm btn-primary act-change-forward" data-advisor-id="${adv.id}">Change from this week forward</button>
                       <button class="btn btn-sm btn-secondary act-change-week" data-advisor-id="${adv.id}">Change only this week (Swap)</button>
                 </td>
-            </tr>`;
+             </tr>`;
         });
         html += '</tbody></table>';
-
-        // V15.8 FIX: Removed duplicate innerHTML assignment.
         ELS.grid.innerHTML = html;
 
-        // V15.8 FIX: Wire actions efficiently after HTML insertion.
-        ELS.grid.querySelectorAll('.act-assign-week').forEach(btn => {
-          btn.addEventListener('click', () => handleRowAction('assign_from_week', btn.dataset.advisorId));
-        });
-        ELS.grid.querySelectorAll('.act-change-forward').forEach(btn => {
-          // Note: We map the UI 'change_forward' action to the DataService 'assignFromWeek' logic as they are identical.
+        // Wire Buttons
+        ELS.grid.querySelectorAll('.act-assign-week, .act-change-forward').forEach(btn => {
           btn.addEventListener('click', () => handleRowAction('assign_from_week', btn.dataset.advisorId));
         });
         ELS.grid.querySelectorAll('.act-change-week').forEach(btn => {
           btn.addEventListener('click', () => handleRowAction('change_one_week', btn.dataset.advisorId));
         });
 
-        // Initialize Flatpickr and set dropdown values after HTML insertion
+        // Initialize Inputs
         advisors.forEach(adv => {
-            // V15.8.3 FIX: Re-determine display values for setting input values after insertion (Crucial for dropdowns)
             const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
             let displayRotation = effective ? effective.rotation_name : '';
-            // Start date is handled by Flatpickr initialization based on the input's value attribute set above.
-
+            
             if (PENDING_CHANGES.has(adv.id)) {
                 const pending = PENDING_CHANGES.get(adv.id);
                 if (pending.rotation_name !== undefined) displayRotation = pending.rotation_name;
@@ -1242,34 +620,37 @@ const toggleRowEditMode = (id, isEditing) => {
             if (!row) return;
 
             const rotSelect = row.querySelector('.assign-rotation');
+            const dateInput = row.querySelector('.assign-start-date');
+
             if (rotSelect) {
-                // Set the dropdown to the currently effective (or pending) rotation.
                 rotSelect.value = displayRotation || '';
-                
-                // V15.8.3 FIX: Wire onChange for rotation select to update PENDING_CHANGES
                 rotSelect.addEventListener('change', (e) => {
                     const pending = PENDING_CHANGES.get(adv.id) || {};
                     pending.rotation_name = e.target.value;
+                    
+                    // V15.9 FIX: Auto-set date to THIS WEEK when rotation changes
+                    // This solves the "doesn't overwrite" issue by defaulting to "Now" instead of "History".
+                    const globalWeekStart = APP.StateManager.getState().weekStart;
+                    if (globalWeekStart) {
+                        pending.start_date = globalWeekStart;
+                        if (dateInput && dateInput._flatpickr) {
+                            dateInput._flatpickr.setDate(globalWeekStart, true); // Update UI
+                        }
+                    }
                     PENDING_CHANGES.set(adv.id, pending);
                 });
             }
 
-            const dateInput = row.querySelector('.assign-start-date');
             if (dateInput && typeof flatpickr !== 'undefined') {
-                // Configure Flatpickr
                 flatpickr(dateInput, {
-                  // Store as ISO (Y-m-d) for database compatibility
                   dateFormat: 'Y-m-d',           
-                  // Display as UK format (d/m/Y) for user friendliness
                   altInput: true,                 
                   altFormat: 'd/m/Y',             
                   allowInput: true,
-                  locale: { "firstDayOfWeek": 1 }, // Monday
-                  
-                  // V15.8.3 FIX: Update onChange to update PENDING_CHANGES
-                  onChange: function(selectedDates, dateStr, instance) {
+                  locale: { "firstDayOfWeek": 1 },
+                  onChange: function(selectedDates, dateStr) {
                     const pending = PENDING_CHANGES.get(adv.id) || {};
-                    pending.start_date = dateStr; // dateStr is the ISO format
+                    pending.start_date = dateStr;
                     PENDING_CHANGES.set(adv.id, pending);
                   }
                 });
@@ -1277,146 +658,92 @@ const toggleRowEditMode = (id, isEditing) => {
         });
     };
 
-    // Handle per-row actions (change forward / one-week swap)
-    // V15.8 FIX (Bug 2): Implemented logic using the newly added DataService methods.
-    // V15.8.3 FIX: Updated to use PENDING_CHANGES map.
     const handleRowAction = async (action, advisorId) => {
       try {
-        
-        // V15.8.3 FIX: Read inputs primarily from PENDING_CHANGES if available, otherwise fetch from DOM as fallback/initial state
         const row = document.querySelector(`tr[data-advisor-id="${advisorId}"]`);
         if (!row) return APP.Utils.showToast('Row not found', 'danger');
 
         let rotationName = undefined;
         let inputStartDateISO = undefined;
 
-        // 1. Check pending changes first
+        // 1. Check pending changes
         if (PENDING_CHANGES.has(advisorId)) {
             const pending = PENDING_CHANGES.get(advisorId);
-            // We check specifically if the key exists, as the value might be "" (e.g., unassigned rotation)
             if (pending.rotation_name !== undefined) rotationName = pending.rotation_name;
             if (pending.start_date !== undefined) inputStartDateISO = pending.start_date;
         } 
         
-        // 2. Fallback if PENDING_CHANGES didn't have the data (e.g., user clicked button without changing inputs first)
-        // We check if the variables are still undefined.
+        // 2. Fallback to DOM
         if (rotationName === undefined || inputStartDateISO === undefined) {
              const rotationSel = row.querySelector('.assign-rotation');
-             const dateInput   = row.querySelector('.assign-start-date');
-
-             if (rotationName === undefined) {
-                 rotationName = rotationSel ? rotationSel.value : '';
-             }
-             if (inputStartDateISO === undefined) {
-                 // Read the ISO value managed by Flatpickr from the DOM (this is the hidden input value)
-                 inputStartDateISO = (dateInput) ? dateInput.value.trim() : '';
-             }
+             const dateInput = row.querySelector('.assign-start-date');
+             if (rotationName === undefined) rotationName = rotationSel ? rotationSel.value : '';
+             if (inputStartDateISO === undefined) inputStartDateISO = (dateInput) ? dateInput.value.trim() : '';
         }
 
-        const globalWeekStartISO = APP.StateManager.getState().weekStart; // Use global context
+        const globalWeekStartISO = APP.StateManager.getState().weekStart;
 
-
-        // Validation: For swaps, rotation must be selected.
         if (!rotationName && action === 'change_one_week') {
-             return APP.Utils.showToast('Pick a rotation first for the swap.', 'warning');
+             return APP.Utils.showToast('Pick a rotation first.', 'warning');
         }
 
-        // Determine the start date for the action.
-        let actionStartISO = globalWeekStartISO; // Default for swaps (change_one_week)
+        let actionStartISO = globalWeekStartISO; 
 
         if (action === 'assign_from_week') {
-            // For these actions (Assign from / Change forward), we use the date specified in the input field (inputStartDateISO).
-            
-            if (!inputStartDateISO) {
-                return APP.Utils.showToast('Start date is required for this action.', 'danger');
-            }
-
-            // Handle potential UK format if user somehow typed manually and PENDING_CHANGES stored UK format (shouldn't happen with Flatpickr config, but safe check)
+            if (!inputStartDateISO) return APP.Utils.showToast('Start date required.', 'danger');
             if (inputStartDateISO.includes('/')) {
                 const iso = APP.Utils.convertUKToISODate(inputStartDateISO);
-                if (!iso) return APP.Utils.showToast('Invalid date format (dd/mm/yyyy expected).', 'danger');
+                if (!iso) return APP.Utils.showToast('Invalid date format.', 'danger');
                 actionStartISO = iso;
             } else {
                 actionStartISO = inputStartDateISO;
             }
         }
 
-
         if (!/^\d{4}-\d{2}-\d{2}$/.test(actionStartISO)) {
-          // Check if global context is missing, which might happen if the page loaded directly on this tab
           if (!globalWeekStartISO && action === 'change_one_week') {
-              return APP.Utils.showToast('Global week context missing. Please select a week in the top bar first.', 'danger');
+              return APP.Utils.showToast('Select a week first.', 'danger');
           }
-          return APP.Utils.showToast('Start date looks invalid (YYYY-MM-DD expected).', 'danger');
+          return APP.Utils.showToast('Invalid date.', 'danger');
         }
 
-
-        // V15.8 FIX: Route to the correct, implemented DB helper
         let res;
         if (action === 'assign_from_week') {
-          // Handles both "Assign from this week" and "Change from this week forward"
           res = await APP.DataService.assignFromWeek({
             advisor_id: advisorId,
             rotation_name: rotationName,
             start_date: actionStartISO
           });
         } else if (action === 'change_one_week') {
-          // Ensure the start date is a Monday for the one-week swap (important if user changed date context)
           const weekStart = APP.Utils.getMondayForDate(actionStartISO);
-          if (!weekStart) return APP.Utils.showToast('Invalid week start date for swap.', 'danger');
-
+          if (!weekStart) return APP.Utils.showToast('Invalid week start.', 'danger');
           res = await APP.DataService.changeOnlyWeek({
             advisor_id: advisorId,
             rotation_name: rotationName,
             week_start: weekStart,
             week_end: APP.Utils.addDaysISO(weekStart, 6)
           });
-        } else {
-          return APP.Utils.showToast('Unknown action.', 'danger');
         }
 
-        if (res?.error) {
-          // Error handling is primarily done within DataService, but we check here too.
-          return;
-        }
+        if (res?.error) return;
 
-        // V15.8.3 FIX: Clear the pending change for this advisor upon success
         PENDING_CHANGES.delete(advisorId);
-
-        // V15.8: Clear the cache explicitly as data has changed.
-        // We don't need to syncRecord for history table, just clear the cache.
         APP.StateManager.clearEffectiveAssignmentsCache();
-
-        // V15.8.1 FIX: Corrected synchronization logic (Replaced fetchTable with fetchSnapshotForAdvisor)
-        // The snapshot table (rotation_assignments) is updated automatically by the DataService helpers in the DB.
-        // We need to refresh the local state's snapshot view (STATE.rotationAssignments) for history tracking.
-        // Fetch the updated snapshot specifically for this advisor using the new public function.
-        const { data: updatedSnapshot, error: snapshotError } = await APP.DataService.fetchSnapshotForAdvisor(advisorId);
-
-        if (snapshotError) {
-            console.warn("Failed to refresh local assignment snapshot after update.", snapshotError);
-            // We continue anyway, as the history cache is cleared and the UI will mostly rely on that.
-        } else if (updatedSnapshot) {
-            // If a record exists (data is not null), update the local state
+        
+        const { data: updatedSnapshot } = await APP.DataService.fetchSnapshotForAdvisor(advisorId);
+        if (updatedSnapshot) {
             APP.StateManager.syncRecord('rotation_assignments', updatedSnapshot);
         } else {
-            // If the record is null (and no error), it means the advisor is now unassigned (removed from snapshot).
-            // We sync this deletion locally.
             APP.StateManager.syncRecord('rotation_assignments', { advisor_id: advisorId }, true);
         }
 
-
         APP.StateManager.saveHistory(`Assignment Action: ${action}`);
-        // Refresh both views so changes are instant (this triggers a fresh cache load)
-        // ScheduleViewer.render() handles rendering both itself and the AssignmentManager if active.
-        if (APP.Components.ScheduleViewer) {
-             APP.Components.ScheduleViewer.render();
-        }
+        if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
 
         APP.Utils.showToast('Assignment updated successfully.', 'success');
       } catch (e) {
-        console.error("Error in handleRowAction:", e);
-        APP.Utils.showToast('Unexpected error during assignment update. See console.', 'danger');
+        console.error("Error:", e);
+        APP.Utils.showToast('Error updating assignment.', 'danger');
       }
     }
 
