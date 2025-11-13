@@ -1426,25 +1426,25 @@ const toggleRowEditMode = (id, isEditing) => {
 }(window.APP));
 
 /**
- * MODULE: APP.Components.SequentialBuilder (v16.7 - Fixed Shift & Smart Drag)
+ * MODULE: APP.Components.SequentialBuilder (v16.9 - Enterprise WFM Logic)
  * Supports Shift Definitions (legacy) and Visual Exceptions (Live Editing).
- * V16.7: Implements "Fixed Shift" logic (shift start/end never changes).
- * Implements "Smart Displacement" (Breaks move only as needed, then eat Work).
- * Adds Drag-and-Drop for existing segments.
- * Full Legacy Editor support maintained.
+ * V16.9: IMPLEMENTS "STREAM" LOGIC (Standard WFM Approach).
+ * 1. Shift Start/End are fixed walls.
+ * 2. Moving a segment "Cuts" (gap closes) and "Inserts" (slides right).
+ * 3. Overflow at the end of the shift is automatically trimmed.
  */
 (function(APP) {
     const SequentialBuilder = {};
-    const ELS = {}; // DOM Cache
+    const ELS = {}; 
 
     // State specific to the Builder Modal
     const BUILDER_STATE = {
         isOpen: false,
-        mode: null, // 'definition' or 'exception'
+        mode: null, 
         contextId: null,
         exceptionDate: null,
         startTimeMin: 480, // Default 08:00
-        segments: [], // { component_id, duration_min }
+        segments: [], 
         reason: null,
         
         // --- Visual State ---
@@ -1454,9 +1454,7 @@ const toggleRowEditMode = (id, isEditing) => {
             segmentIndex: -1,
             startX: 0,
             originalDurations: [],
-            minDuration: 5,
-            draggedComponentId: null,
-            draggedDuration: 0
+            minDuration: 5
         },
         addPopupState: {
             isOpen: false,
@@ -1470,7 +1468,6 @@ const toggleRowEditMode = (id, isEditing) => {
         contextMenuIndex: -1
     };
 
-    // Helper to parse HH:MM string to minutes
     const parseTimeToMinutes = (timeStr) => {
         const parts = (timeStr || "").split(':');
         if (parts.length !== 2) return null;
@@ -1510,7 +1507,7 @@ const toggleRowEditMode = (id, isEditing) => {
         ELS.veAddPopupCancel = document.getElementById('ve-add-popup-cancel');
         ELS.veAddPopupSave = document.getElementById('ve-add-popup-save');
 
-        // Legacy Elements (Table Editor)
+        // Legacy Elements
         ELS.legacyEditorContainer = document.getElementById('legacyEditorContainer');
         ELS.modalStartTime = document.getElementById('modalStartTime');
         ELS.modalAddActivity = document.getElementById('modalAddActivity');
@@ -1526,7 +1523,6 @@ const toggleRowEditMode = (id, isEditing) => {
             });
         }
         
-        // Visual Editor Listeners
         if (ELS.visualEditorToolbox) {
             ELS.visualEditorToolbox.addEventListener('click', handleToolboxClick);
             ELS.visualEditorToolbox.addEventListener('dragstart', handleToolboxDragStart);
@@ -1540,11 +1536,9 @@ const toggleRowEditMode = (id, isEditing) => {
             ELS.visualEditorTimeline.addEventListener('drop', handleTimelineDrop);
             ELS.visualEditorTimeline.addEventListener('contextmenu', handleTimelineContextMenu);
         }
-        
         if (ELS.veAddPopupCancel) ELS.veAddPopupCancel.addEventListener('click', closeAddPopup);
         if (ELS.veAddPopupSave) ELS.veAddPopupSave.addEventListener('click', handleAddPopupSave);
         
-        // Native Drag Listeners
         document.addEventListener('mousemove', handleDragMove);
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('click', closeContextMenu);
@@ -1553,7 +1547,6 @@ const toggleRowEditMode = (id, isEditing) => {
         if (ELS.veUndo) ELS.veUndo.addEventListener('click', handleUndo);
         if (ELS.veRedo) ELS.veRedo.addEventListener('click', handleRedo);
 
-        // Legacy Listeners (Restored)
         if (ELS.modalSequenceBody) {
             ELS.modalSequenceBody.addEventListener('change', handleLegacySequenceChange);
             ELS.modalSequenceBody.addEventListener('click', handleLegacySequenceClick);
@@ -1562,7 +1555,6 @@ const toggleRowEditMode = (id, isEditing) => {
             ELS.modalAddActivity.addEventListener('click', handleLegacyAddActivity);
         }
 
-        // Flatpickr
         if (ELS.modalStartTime && typeof flatpickr !== 'undefined') {
              flatpickr(ELS.modalStartTime, {
                 enableTime: true, noCalendar: true, dateFormat: "H:i", time_24hr: true, minuteIncrement: 5,
@@ -1624,7 +1616,6 @@ const toggleRowEditMode = (id, isEditing) => {
             }
             renderLegacyTable();
         }
-        
         saveVisualHistory();
         updateUndoRedoButtons(); 
         ELS.modal.style.display = 'flex';
@@ -1637,7 +1628,7 @@ const toggleRowEditMode = (id, isEditing) => {
         closeContextMenu();
     };
 
-    // --- VISUAL EDITOR RENDERERS ---
+    // --- VISUAL RENDERERS ---
 
     const renderToolbox = () => {
         if (!ELS.visualEditorToolbox) return;
@@ -1657,7 +1648,7 @@ const toggleRowEditMode = (id, isEditing) => {
         
         const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
         if (totalDuration === 0) {
-            ELS.visualEditorTimeline.innerHTML = '<div style="padding: 16px; color: #6B7280;">No activities in this shift (RDO). Drop an activity to start.</div>';
+            ELS.visualEditorTimeline.innerHTML = '<div style="padding: 16px; color: #6B7280;">No activities (RDO).</div>';
             renderSummary();
             return;
         }
@@ -1672,7 +1663,6 @@ const toggleRowEditMode = (id, isEditing) => {
             
             const tooltip = `${component.name}\nTime: ${APP.Utils.formatMinutesToTime(currentTime)} - ${APP.Utils.formatMinutesToTime(currentTime + seg.duration_min)}\nDuration: ${seg.duration_min}m`;
 
-            // Added draggable="true" here for drag-and-drop
             return `
                 <div class="ve-segment" draggable="true" style="width: ${widthPct}%; background-color: ${component.color};" 
                      data-index="${index}" title="${tooltip}">
@@ -1711,138 +1701,88 @@ const toggleRowEditMode = (id, isEditing) => {
         BUILDER_STATE.segments.forEach(seg => {
             const component = APP.StateManager.getComponentById(seg.component_id);
             totalDuration += seg.duration_min;
-            if (component && component.is_paid) {
-                paidDuration += seg.duration_min;
-            }
+            if (component && component.is_paid) paidDuration += seg.duration_min;
         });
         if (ELS.modalTotalTime) ELS.modalTotalTime.textContent = APP.Utils.formatDuration(totalDuration);
         if (ELS.modalPaidTime) ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
     };
 
-    // --- POP-UP & TOOLBOX HANDLERS ---
+    // --- CORE LOGIC: ENTERPRISE "STREAM" (Cut, Insert, Trim) ---
 
-    const handleToolboxClick = (e) => {
-        const item = e.target.closest('.ve-toolbox-item');
-        if (!item) return;
-        const { componentId, componentName } = item.dataset;
-        
-        BUILDER_STATE.addPopupState = { isOpen: true, componentId, componentName, isEditing: false, editIndex: -1 };
-        ELS.veAddPopupTitle.textContent = `Add: ${componentName}`;
-        ELS.veAddStartTime.value = '';
-        ELS.veAddDuration.value = '30';
-        ELS.visualEditorAddPopup.style.display = 'block';
-        ELS.veAddStartTime.focus();
-    };
+    const performStreamInsert = (componentId, dropTime, duration) => {
+        const shiftStart = BUILDER_STATE.startTimeMin;
+        // Calculate FIXED shift length based on current segments
+        const fixedShiftLength = BUILDER_STATE.segments.reduce((sum, s) => sum + s.duration_min, 0);
+        const shiftEnd = shiftStart + fixedShiftLength;
 
-    const closeAddPopup = () => {
-        BUILDER_STATE.addPopupState.isOpen = false;
-        if (ELS.visualEditorAddPopup) ELS.visualEditorAddPopup.style.display = 'none';
-    };
-
-    // --- CORE LOGIC: FIXED SHIFT & SMART DISPLACEMENT ---
-    const handleAddComponent = (componentId, startTime, durationToAdd) => {
-        const MIN_SEGMENT_DUR = 5;
-
-        if (startTime === null) {
-            APP.Utils.showToast("Invalid start time.", "danger");
-            return false;
-        }
-        
-        // 1. CONSTRAINT: Fixed Shift Length
-        const totalDuration = BUILDER_STATE.segments.reduce((sum, s) => sum + s.duration_min, 0);
-        const shiftEndMin = BUILDER_STATE.startTimeMin + totalDuration;
-        const newStart = startTime;
-        const newEnd = startTime + durationToAdd;
-
-        // Reject if outside shift boundaries
-        if (newStart < BUILDER_STATE.startTimeMin || newEnd > shiftEndMin) {
-            APP.Utils.showToast("Action blocked: Cannot extend shift length.", "danger");
+        // 1. Validate
+        if (dropTime < shiftStart || dropTime >= shiftEnd) {
+            APP.Utils.showToast("Cannot drop outside shift hours.", "danger");
             return false;
         }
 
-        // 2. Flatten to Absolute Time
-        let currentAbsTime = BUILDER_STATE.startTimeMin;
-        let absSegments = BUILDER_STATE.segments.map(seg => {
-            const s = { ...seg, absStart: currentAbsTime, absEnd: currentAbsTime + seg.duration_min };
-            currentAbsTime += seg.duration_min;
-            return s;
-        });
+        // 2. Split and Insert
+        let runningTime = shiftStart;
+        let inserted = false;
+        const newSegments = [];
 
-        // 3. Build New Schedule
-        // A: Keep segments strictly BEFORE the new item
-        let resultSegments = absSegments.filter(s => s.absEnd <= newStart);
-        
-        // B: Add the new segment
-        resultSegments.push({ component_id: componentId, absStart: newStart, absEnd: newEnd });
-
-        // C: Process segments AFTER the new item
-        let remainingSegments = absSegments.filter(s => s.absEnd > newStart);
-        let nextAvailableTime = newEnd;
-
-        for (let i = 0; i < remainingSegments.length; i++) {
-            const seg = remainingSegments[i];
-            const component = APP.StateManager.getComponentById(seg.component_id);
-            const isFixed = component && (component.type === 'Break' || component.type === 'Lunch');
-
-            // Case 1: No overlap (Segment starts after our cursor) - Keep as is
-            if (seg.absStart >= nextAvailableTime) {
-                resultSegments.push(seg);
-                nextAvailableTime = seg.absEnd; 
-                continue;
-            }
-
-            // Case 2: Conflict
-            if (isFixed) {
-                // It's a Break/Lunch. Move it to nextAvailableTime.
-                // DO NOT shrink it.
-                const movedBreak = {
-                    ...seg,
-                    absStart: nextAvailableTime,
-                    absEnd: nextAvailableTime + seg.duration_min
-                };
+        for (const seg of BUILDER_STATE.segments) {
+            const segEnd = runningTime + seg.duration_min;
+            
+            if (!inserted && dropTime >= runningTime && dropTime < segEnd) {
+                // A. Time before split
+                const timeBefore = dropTime - runningTime;
+                if (timeBefore > 0) newSegments.push({ component_id: seg.component_id, duration_min: timeBefore });
                 
-                // Check boundary: If break is pushed past shift end, we must abort/clip.
-                if (movedBreak.absEnd > shiftEndMin) {
-                     // Edge case: Break doesn't fit anymore.
-                     // To preserve strict shift length, we stop adding here. 
-                     // (In a real app we might warn the user, but here we just clip/stop).
-                     break; 
-                }
+                // B. Insert New Item
+                newSegments.push({ component_id: componentId, duration_min: duration });
                 
-                resultSegments.push(movedBreak);
-                nextAvailableTime = movedBreak.absEnd;
+                // C. Time after split (pushed right)
+                const timeAfter = segEnd - dropTime;
+                if (timeAfter > 0) newSegments.push({ component_id: seg.component_id, duration_min: timeAfter });
+                
+                inserted = true;
             } else {
-                // It's Work/Activity. Eat/Shrink it.
-                // It starts at nextAvailableTime.
-                // It ENDS at its ORIGINAL end time (This preserves the shift structure/length).
-                if (seg.absEnd > nextAvailableTime) {
-                    const shrunkDuration = seg.absEnd - nextAvailableTime;
-                    if (shrunkDuration >= MIN_SEGMENT_DUR) {
-                        resultSegments.push({
-                            ...seg,
-                            absStart: nextAvailableTime,
-                            absEnd: seg.absEnd 
-                        });
-                        nextAvailableTime = seg.absEnd;
-                    }
+                // Just push regular segment
+                newSegments.push(seg);
+            }
+            runningTime += seg.duration_min;
+        }
+
+        // 3. Re-assemble and Trim Tail
+        // Merge same-type neighbors first
+        const merged = [];
+        if (newSegments.length > 0) {
+            let current = newSegments[0];
+            for (let i = 1; i < newSegments.length; i++) {
+                if (current.component_id === newSegments[i].component_id) {
+                    current.duration_min += newSegments[i].duration_min;
+                } else {
+                    merged.push(current);
+                    current = newSegments[i];
                 }
+            }
+            merged.push(current);
+        }
+
+        // 4. Trim excess from the END to enforce fixed shift length
+        let currentLength = merged.reduce((sum, s) => sum + s.duration_min, 0);
+        
+        while (currentLength > fixedShiftLength && merged.length > 0) {
+            const excess = currentLength - fixedShiftLength;
+            const lastSeg = merged[merged.length - 1];
+            
+            if (lastSeg.duration_min > excess) {
+                lastSeg.duration_min -= excess;
+                currentLength -= excess;
+            } else {
+                // Remove whole last segment if it's smaller than excess (unlikely, but safe)
+                currentLength -= lastSeg.duration_min;
+                merged.pop();
             }
         }
 
-        // 4. Convert back to relative durations
-        const finalSegments = [];
-        resultSegments.sort((a, b) => a.absStart - b.absStart);
-
-        resultSegments.forEach(s => {
-            const dur = s.absEnd - s.absStart;
-            if (dur >= MIN_SEGMENT_DUR) {
-                finalSegments.push({ component_id: s.component_id, duration_min: dur });
-            }
-        });
-
-        BUILDER_STATE.segments = finalSegments;
-        renderTimeline();
-        saveVisualHistory();
+        BUILDER_STATE.segments = merged;
         return true;
     };
 
@@ -1852,23 +1792,20 @@ const toggleRowEditMode = (id, isEditing) => {
         const durationToAdd = parseInt(ELS.veAddDuration.value, 10);
         
         if (isEditing) {
-            const deletedDuration = BUILDER_STATE.segments[editIndex].duration_min;
+            // If editing, we remove the old block (gap closes), then insert new.
+            // This mimics "move" logic.
             BUILDER_STATE.segments.splice(editIndex, 1);
-            // Payback to neighbor to fill gap before insert
-            const paybackIndex = (editIndex > 0) ? editIndex - 1 : 0;
-            if (BUILDER_STATE.segments[paybackIndex]) {
-                BUILDER_STATE.segments[paybackIndex].duration_min += deletedDuration;
-            }
-            const success = handleAddComponent(componentId, startTime, durationToAdd);
-            if (success) closeAddPopup();
-            else renderTimeline();
-        } else {
-            const success = handleAddComponent(componentId, startTime, durationToAdd);
-            if (success) closeAddPopup();
+        }
+
+        const success = performStreamInsert(componentId, startTime, durationToAdd);
+        if (success) {
+            renderTimeline();
+            saveVisualHistory();
+            closeAddPopup();
         }
     };
 
-    // --- DRAG AND DROP HANDLERS ---
+    // --- DRAG AND DROP (Cut & Paste Logic) ---
 
     const handleTimelineMouseDown = (e) => {
         const handle = e.target.closest('.ve-drag-handle');
@@ -1886,7 +1823,7 @@ const toggleRowEditMode = (id, isEditing) => {
         }
     };
 
-    // Native Drag Start (Move Segment)
+    // Drag Start
     document.addEventListener('dragstart', (e) => {
         if (e.target.classList && e.target.classList.contains('ve-segment')) {
             const index = parseInt(e.target.dataset.index, 10);
@@ -1972,21 +1909,25 @@ const toggleRowEditMode = (id, isEditing) => {
             if (data.type === 'toolbox-add') {
                 const component = APP.StateManager.getComponentById(data.componentId);
                 if (component) {
-                    handleAddComponent(data.componentId, absoluteTime, component.default_duration_min);
+                    const success = performStreamInsert(data.componentId, absoluteTime, component.default_duration_min);
+                    if (success) {
+                        renderTimeline();
+                        saveVisualHistory();
+                    }
                 }
             } else if (data.type === 'segment-move') {
                 const oldIndex = data.index;
                 const duration = data.duration;
                 
-                // Remove from old spot
+                // 1. CUT (Remove from old spot, gap closes)
                 BUILDER_STATE.segments.splice(oldIndex, 1);
-                // Patch gap
-                const paybackIndex = (oldIndex > 0) ? oldIndex - 1 : 0;
-                if (BUILDER_STATE.segments[paybackIndex]) {
-                    BUILDER_STATE.segments[paybackIndex].duration_min += duration;
+                
+                // 2. PASTE (Insert at new spot, others slide right)
+                const success = performStreamInsert(data.componentId, absoluteTime, duration);
+                if (success) {
+                    renderTimeline();
+                    saveVisualHistory();
                 }
-                // Insert at new spot
-                handleAddComponent(data.componentId, absoluteTime, duration);
             }
         } catch (err) {
             console.error("Drop error", err);
@@ -1994,6 +1935,7 @@ const toggleRowEditMode = (id, isEditing) => {
     };
 
     const handleDragMove = (e) => {
+        // Resize Logic (Stays the same)
         if (!BUILDER_STATE.dragState.isDragging || BUILDER_STATE.dragState.type !== 'resize') return;
         const { segmentIndex, startX, originalDurations, minDuration } = BUILDER_STATE.dragState;
         const totalDuration = originalDurations[0] + originalDurations[1];
@@ -2023,7 +1965,25 @@ const toggleRowEditMode = (id, isEditing) => {
         }
     };
 
-    // --- CONTEXT MENU ---
+    // --- CONTEXT MENU & POPUP ---
+    
+    const handleToolboxClick = (e) => {
+        const item = e.target.closest('.ve-toolbox-item');
+        if (!item) return;
+        const { componentId, componentName } = item.dataset;
+        BUILDER_STATE.addPopupState = { isOpen: true, componentId, componentName, isEditing: false, editIndex: -1 };
+        ELS.veAddPopupTitle.textContent = `Add: ${componentName}`;
+        ELS.veAddStartTime.value = '';
+        ELS.veAddDuration.value = '30';
+        ELS.visualEditorAddPopup.style.display = 'block';
+        ELS.veAddStartTime.focus();
+    };
+
+    const closeAddPopup = () => {
+        BUILDER_STATE.addPopupState.isOpen = false;
+        if (ELS.visualEditorAddPopup) ELS.visualEditorAddPopup.style.display = 'none';
+    };
+
     const handleTimelineContextMenu = (e) => {
         e.preventDefault();
         closeContextMenu();
@@ -2051,11 +2011,12 @@ const toggleRowEditMode = (id, isEditing) => {
         const segment = BUILDER_STATE.segments[index];
         
         if (action === 'delete') {
+            // Delete and fill with neighbors (extend previous)
             const deletedDuration = segment.duration_min;
             BUILDER_STATE.segments.splice(index, 1);
-            const paybackIndex = (index > 0) ? index - 1 : 0;
-            if (BUILDER_STATE.segments[paybackIndex]) {
-                BUILDER_STATE.segments[paybackIndex].duration_min += deletedDuration;
+            const fillIndex = (index > 0) ? index - 1 : 0;
+            if (BUILDER_STATE.segments[fillIndex]) {
+                BUILDER_STATE.segments[fillIndex].duration_min += deletedDuration;
             }
         } else if (action === 'split') {
             if (segment.duration_min < 10) {
@@ -2081,12 +2042,14 @@ const toggleRowEditMode = (id, isEditing) => {
             ELS.visualEditorAddPopup.style.display = 'block';
             ELS.veAddStartTime.focus();
         }
+        
         renderTimeline();
         saveVisualHistory();
         closeContextMenu();
     };
 
     // --- HISTORY & SAVE ---
+
     const saveVisualHistory = () => {
         if (BUILDER_STATE.visualHistoryIndex < BUILDER_STATE.visualHistory.length - 1) {
             BUILDER_STATE.visualHistory = BUILDER_STATE.visualHistory.slice(0, BUILDER_STATE.visualHistoryIndex + 1);
@@ -2164,7 +2127,7 @@ const toggleRowEditMode = (id, isEditing) => {
         }
     };
 
-    // --- LEGACY FUNCTIONS (Restored for Table View Editor) ---
+    // --- LEGACY FUNCTIONS (Restored) ---
     const renderLegacyTable = () => {
         if (!ELS.modalSequenceBody) return;
         let html = '';
@@ -2175,22 +2138,7 @@ const toggleRowEditMode = (id, isEditing) => {
         BUILDER_STATE.segments.forEach((seg, index) => {
             const start = currentTime;
             const end = currentTime + seg.duration_min;
-            html += `
-             <tr data-index="${index}">
-                    <td>${index + 1}</td>
-                    <td><select class="form-select sequence-component" data-index="${index}"><option value="">-- Select --</option>${componentOptions}</select></td>
-                    <td><input type="number" class="form-input sequence-duration" data-index="${index}" value="${seg.duration_min}" min="5" step="5"></td>
-                    <td><input type="text" class="form-input sequence-start-time" data-index="${index}" value="${APP.Utils.formatMinutesToTime(start)}" data-minutes="${start}"></td>
-                    <td>${APP.Utils.formatMinutesToTime(end)}</td>
-                    <td class="actions-cell">
-                      <div class="btn-group">
-                         <button class="btn btn-sm" data-action="insert-before" data-index="${index}">+ Above</button>
-                         <button class="btn btn-sm" data-action="insert-after" data-index="${index}">+ Below</button>
-                         <button class="btn btn-sm" data-action="split-row" data-index="${index}">Split</button>
-                         <button class="btn btn-sm btn-danger delete-sequence-item" data-index="${index}">X</button>
-                      </div>
-                    </td>
-                </tr>`;
+            html += `<tr data-index="${index}"><td>${index + 1}</td><td><select class="form-select sequence-component" data-index="${index}"><option value="">-- Select --</option>${componentOptions}</select></td><td><input type="number" class="form-input sequence-duration" data-index="${index}" value="${seg.duration_min}" min="5" step="5"></td><td><input type="text" class="form-input sequence-start-time" data-index="${index}" value="${APP.Utils.formatMinutesToTime(start)}" data-minutes="${start}"></td><td>${APP.Utils.formatMinutesToTime(end)}</td><td class="actions-cell"><div class="btn-group"><button class="btn btn-sm" data-action="insert-before" data-index="${index}">+ Above</button><button class="btn btn-sm" data-action="insert-after" data-index="${index}">+ Below</button><button class="btn btn-sm" data-action="split-row" data-index="${index}">Split</button><button class="btn btn-sm btn-danger delete-sequence-item" data-index="${index}">X</button></div></td></tr>`;
             currentTime = end;
         });
         ELS.modalSequenceBody.innerHTML = html;
