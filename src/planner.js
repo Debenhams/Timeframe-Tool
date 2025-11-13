@@ -1426,12 +1426,12 @@ const toggleRowEditMode = (id, isEditing) => {
 }(window.APP));
 
 /**
- * MODULE: APP.Components.SequentialBuilder (v16.11 - Water Pipe & Auto-Fuse)
+ * MODULE: APP.Components.SequentialBuilder (v16.12 - Toolbox Drag & Resize)
  * Supports Shift Definitions (legacy) and Visual Exceptions (Live Editing).
- * V16.11 FEATURES: 
- * 1. "Water Pipe" Logic: Fixed shift length. Gap closes on lift, others slide on drop.
- * 2. "Auto-Fuse": Adjacent segments of the same type merge into one solid block.
- * 3. Colors: Uses strict component colors (no hardcoded overrides).
+ * V16.12 FEATURES:
+ * 1. TOOLBOX DRAG: Drag items from toolbox to insert into timeline.
+ * 2. RESIZE: Drag right edge of segments to expand/reduce (pushes/pulls neighbors).
+ * 3. WATER PIPE: Fixed shift length maintained automatically.
  */
 (function(APP) {
     const SequentialBuilder = {};
@@ -1447,10 +1447,15 @@ const toggleRowEditMode = (id, isEditing) => {
         segments: [], 
         reason: null,
         
-        // Drag State
-        isDragging: false,
-        draggedSegment: null, 
-        baseSegments: [],     
+        // Interaction State
+        interaction: {
+            type: null, // 'move', 'resize', 'toolbox-drag'
+            segmentIndex: -1,
+            startX: 0,
+            startDuration: 0,
+            draggedSegment: null,
+            baseSegments: [] // Snapshot before manipulation
+        },
         
         addPopupState: { isOpen: false, componentId: null, componentName: null, isEditing: false, editIndex: -1 },
         visualHistory: [],
@@ -1484,6 +1489,7 @@ const toggleRowEditMode = (id, isEditing) => {
         ELS.visualEditorToolbox = document.getElementById('visualEditorToolbox');
         ELS.visualEditorTimeline = document.getElementById('visualEditorTimeline');
         ELS.visualEditorTimeRuler = document.getElementById('visualEditorTimeRuler');
+        ELS.visualEditorDropCursor = document.getElementById('visualEditorDropCursor');
         ELS.visualEditorContextMenu = document.getElementById('visualEditorContextMenu');
         ELS.veUndo = document.getElementById('ve-undo');
         ELS.veRedo = document.getElementById('ve-redo');
@@ -1512,14 +1518,24 @@ const toggleRowEditMode = (id, isEditing) => {
             });
         }
         
+        // Toolbox Listeners
         if (ELS.visualEditorToolbox) {
             ELS.visualEditorToolbox.addEventListener('click', handleToolboxClick);
+            ELS.visualEditorToolbox.addEventListener('dragstart', handleToolboxDragStart);
+            ELS.visualEditorToolbox.addEventListener('dragend', handleToolboxDragEnd);
         }
+
+        // Timeline Listeners
         if (ELS.visualEditorTimeline) {
             ELS.visualEditorTimeline.addEventListener('mousedown', handleTimelineMouseDown);
             ELS.visualEditorTimeline.addEventListener('contextmenu', handleTimelineContextMenu);
+            // Native Drag & Drop for Toolbox items
+            ELS.visualEditorTimeline.addEventListener('dragover', handleTimelineDragOver);
+            ELS.visualEditorTimeline.addEventListener('drop', handleTimelineDrop);
+            ELS.visualEditorTimeline.addEventListener('dragleave', handleTimelineDragLeave);
         }
         
+        // Global Mouse (for Resize & Move interaction)
         document.addEventListener('mousemove', handleGlobalMouseMove);
         document.addEventListener('mouseup', handleGlobalMouseUp);
         document.addEventListener('click', closeContextMenu);
@@ -1575,9 +1591,9 @@ const toggleRowEditMode = (id, isEditing) => {
         BUILDER_STATE.startTimeMin = startTimeMin;
         BUILDER_STATE.segments = JSON.parse(JSON.stringify(sequentialSegments));
         
-        // FIXED PIPE CAPACITY: Calculate total shift duration once and lock it.
+        // FIXED PIPE CAPACITY: Locked to initial length
         BUILDER_STATE.fixedShiftLength = BUILDER_STATE.segments.reduce((sum, s) => sum + s.duration_min, 0);
-        if (BUILDER_STATE.fixedShiftLength === 0) BUILDER_STATE.fixedShiftLength = 60; // Default if empty
+        if (BUILDER_STATE.fixedShiftLength === 0) BUILDER_STATE.fixedShiftLength = 60;
 
         BUILDER_STATE.reason = config.reason || null;
         BUILDER_STATE.visualHistory = [];
@@ -1595,7 +1611,7 @@ const toggleRowEditMode = (id, isEditing) => {
             ELS.modalExceptionReason.value = BUILDER_STATE.reason || '';
             ELS.modalSave.textContent = "Save Exception";
             
-            // AUTO-FUSE on load to ensure neatness
+            // Auto-fuse on load
             BUILDER_STATE.segments = fuseNeighbors(BUILDER_STATE.segments);
             
             renderToolbox();
@@ -1628,7 +1644,7 @@ const toggleRowEditMode = (id, isEditing) => {
         ELS.visualEditorToolbox.innerHTML = components.map(comp => {
             const textColor = APP.Utils.getContrastingTextColor(comp.color);
             return `
-            <div class="ve-toolbox-item" data-component-id="${comp.id}" data-component-name="${comp.name}" style="border-left: 4px solid ${comp.color};">
+            <div class="ve-toolbox-item" draggable="true" data-component-id="${comp.id}" data-component-name="${comp.name}" style="border-left: 4px solid ${comp.color};">
                 ${comp.name}
             </div>
         `}).join('');
@@ -1638,7 +1654,7 @@ const toggleRowEditMode = (id, isEditing) => {
         if (!ELS.visualEditorTimeline) return;
         renderTimeRuler();
         
-        const totalDuration = BUILDER_STATE.fixedShiftLength;
+        const totalDuration = BUILDER_STATE.fixedShiftLength > 0 ? BUILDER_STATE.fixedShiftLength : 60;
         
         if (BUILDER_STATE.segments.length === 0) {
             ELS.visualEditorTimeline.innerHTML = '<div style="padding: 16px; color: #6B7280;">Empty Schedule (RDO).</div>';
@@ -1657,8 +1673,6 @@ const toggleRowEditMode = (id, isEditing) => {
             const startStr = APP.Utils.formatMinutesToTime(currentTime);
             const endStr = APP.Utils.formatMinutesToTime(currentTime + seg.duration_min);
             const tooltip = `${component.name}\n${startStr} - ${endStr}\n(${seg.duration_min}m)`;
-            
-            // STRICT COLOR: Use component color directly
             const textColor = APP.Utils.getContrastingTextColor(component.color);
 
             html += `
@@ -1667,6 +1681,7 @@ const toggleRowEditMode = (id, isEditing) => {
                     <span class="ve-segment-label" style="padding-left:4px; white-space:nowrap; overflow:hidden; pointer-events:none;">
                         ${component.name}
                     </span>
+                    <div class="ve-drag-handle" data-handle-index="${index}"></div>
                 </div>
             `;
             currentTime += seg.duration_min;
@@ -1707,17 +1722,14 @@ const toggleRowEditMode = (id, isEditing) => {
         if (ELS.modalPaidTime) ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
     };
 
-    // --- LOGIC: THE "FUSE" FUNCTION ---
-    // Merges adjacent blocks of the same component type.
+    // --- LOGIC: NEIGHBOR FUSION & NORMALIZATION ---
     const fuseNeighbors = (segments) => {
         if (segments.length < 2) return segments;
         const fused = [];
         let current = segments[0];
-        
         for (let i = 1; i < segments.length; i++) {
             const next = segments[i];
             if (current.component_id === next.component_id) {
-                // Merge them
                 current.duration_min += next.duration_min;
             } else {
                 fused.push(current);
@@ -1728,13 +1740,46 @@ const toggleRowEditMode = (id, isEditing) => {
         return fused;
     };
 
-    // --- LOGIC: WATER PIPE (Lift & Insert) ---
+    // Ensures total duration equals fixed shift length by trimming or extending the LAST segment
+    const normalizeShiftLength = (segments) => {
+        let currentTotal = segments.reduce((sum, s) => sum + s.duration_min, 0);
+        const target = BUILDER_STATE.fixedShiftLength;
+
+        if (currentTotal === target) return segments;
+
+        // Create a copy to avoid mutation issues
+        let adjusted = JSON.parse(JSON.stringify(segments));
+
+        // 1. Trim Excess (Drain)
+        while (currentTotal > target && adjusted.length > 0) {
+            const excess = currentTotal - target;
+            const last = adjusted[adjusted.length - 1];
+            if (last.duration_min > excess) {
+                last.duration_min -= excess;
+                currentTotal -= excess;
+            } else {
+                currentTotal -= last.duration_min;
+                adjusted.pop();
+            }
+        }
+
+        // 2. Fill Gap (Refill)
+        if (currentTotal < target && adjusted.length > 0) {
+            const deficit = target - currentTotal;
+            adjusted[adjusted.length - 1].duration_min += deficit;
+        }
+
+        return adjusted;
+    };
+
+    // --- LOGIC: CORE MANIPULATIONS ---
 
     const liftStone = (segments, indexToRemove) => {
         const newSegments = JSON.parse(JSON.stringify(segments));
         newSegments.splice(indexToRemove, 1); 
-        // Gap closes automatically (array splice), then fuse neighbors
-        return fuseNeighbors(newSegments);
+        // Gap closes, fuse neighbors, then fill gap at the end
+        let fused = fuseNeighbors(newSegments);
+        return normalizeShiftLength(fused);
     };
 
     const insertStone = (baseSegments, componentId, duration, insertTimeAbs) => {
@@ -1749,7 +1794,7 @@ const toggleRowEditMode = (id, isEditing) => {
             const segEnd = runningTime + seg.duration_min;
 
             if (!inserted && insertTimeAbs >= segStart && insertTimeAbs < segEnd) {
-                // SPLIT Logic: Wedge the stone in
+                // WEDGE IN
                 const timeBefore = insertTimeAbs - segStart;
                 const timeAfter = segEnd - insertTimeAbs;
 
@@ -1764,90 +1809,163 @@ const toggleRowEditMode = (id, isEditing) => {
             runningTime += seg.duration_min;
         }
 
-        // If dropped past the end of current segments, append it
         if (!inserted) {
             result.push({ component_id: componentId, duration_min: duration });
         }
 
-        // TRIM OVERFLOW (The Drain)
-        // Ensures shift length stays exactly fixed
-        let currentTotal = result.reduce((sum, s) => sum + s.duration_min, 0);
-        const maxCapacity = BUILDER_STATE.fixedShiftLength;
-
-        while (currentTotal > maxCapacity && result.length > 0) {
-            const overflow = currentTotal - maxCapacity;
-            const lastSeg = result[result.length - 1];
-
-            if (lastSeg.duration_min > overflow) {
-                // Trim the end
-                lastSeg.duration_min -= overflow;
-                currentTotal -= overflow;
-            } else {
-                // Remove segment entirely
-                currentTotal -= lastSeg.duration_min;
-                result.pop();
-            }
-        }
-
-        // Fuse again after insertion to ensure neatness
-        return fuseNeighbors(result);
+        // Clean up
+        let merged = fuseNeighbors(result);
+        return normalizeShiftLength(merged);
     };
 
     // --- INTERACTION HANDLERS ---
 
     const handleTimelineMouseDown = (e) => {
+        const handle = e.target.closest('.ve-drag-handle');
         const segmentEl = e.target.closest('.ve-segment');
-        if (!segmentEl) return;
+        
+        if (handle && segmentEl) {
+            // === START RESIZE ===
+            e.preventDefault();
+            const index = parseInt(segmentEl.dataset.index, 10);
+            BUILDER_STATE.interaction = {
+                type: 'resize',
+                segmentIndex: index,
+                startX: e.clientX,
+                startDuration: BUILDER_STATE.segments[index].duration_min,
+                baseSegments: JSON.parse(JSON.stringify(BUILDER_STATE.segments))
+            };
+        } else if (segmentEl) {
+            // === START MOVE (LIFT STONE) ===
+            e.preventDefault();
+            const index = parseInt(segmentEl.dataset.index, 10);
+            const stone = BUILDER_STATE.segments[index];
+            const baseWater = liftStone(BUILDER_STATE.segments, index);
 
-        const index = parseInt(segmentEl.dataset.index, 10);
-        if (isNaN(index)) return;
-
-        e.preventDefault();
-
-        const stone = BUILDER_STATE.segments[index];
-        const baseWater = liftStone(BUILDER_STATE.segments, index);
-
-        BUILDER_STATE.isDragging = true;
-        BUILDER_STATE.draggedSegment = stone;
-        BUILDER_STATE.baseSegments = baseWater; 
-        // Dragging starts immediately
+            BUILDER_STATE.interaction = {
+                type: 'move',
+                draggedSegment: stone,
+                baseSegments: baseWater
+            };
+        }
     };
 
     const handleGlobalMouseMove = (e) => {
-        if (!BUILDER_STATE.isDragging || !ELS.visualEditorTimeline) return;
+        const { type } = BUILDER_STATE.interaction;
+        if (!type || !ELS.visualEditorTimeline) return;
 
         const rect = ELS.visualEditorTimeline.getBoundingClientRect();
-        let relativeX = e.clientX - rect.left;
-        relativeX = Math.max(0, Math.min(relativeX, rect.width));
-
-        const pct = relativeX / rect.width;
         const pipeCapacity = BUILDER_STATE.fixedShiftLength;
-        const relativeMinutes = Math.round(pct * pipeCapacity);
-        // Snap to grid (5 mins)
-        const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
-        const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
 
-        // SIMULATE INSERTION (Live Preview)
-        const previewSegments = insertStone(
-            BUILDER_STATE.baseSegments, 
-            BUILDER_STATE.draggedSegment.component_id, 
-            BUILDER_STATE.draggedSegment.duration_min, 
-            insertTimeAbs
-        );
+        if (type === 'resize') {
+            // === HANDLE RESIZE ===
+            const { startX, startDuration, segmentIndex, baseSegments } = BUILDER_STATE.interaction;
+            const pixelDiff = e.clientX - startX;
+            // Calculate minutes delta based on pixels
+            const pxPerMin = rect.width / pipeCapacity;
+            const minDiff = Math.round(pixelDiff / pxPerMin / 5) * 5; // Snap to 5m
 
-        BUILDER_STATE.segments = previewSegments;
-        renderTimeline();
+            let newDuration = Math.max(5, startDuration + minDiff);
+            
+            // Clone base segments to manipulate
+            let workingSegments = JSON.parse(JSON.stringify(baseSegments));
+            workingSegments[segmentIndex].duration_min = newDuration;
+            
+            // Apply fixed shift logic (Trim or Extend end)
+            BUILDER_STATE.segments = normalizeShiftLength(workingSegments);
+            renderTimeline();
+
+        } else if (type === 'move') {
+            // === HANDLE MOVE (STONE) ===
+            let relativeX = e.clientX - rect.left;
+            relativeX = Math.max(0, Math.min(relativeX, rect.width));
+            const pct = relativeX / rect.width;
+            const relativeMinutes = Math.round(pct * pipeCapacity);
+            const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
+            const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
+
+            const previewSegments = insertStone(
+                BUILDER_STATE.interaction.baseSegments, 
+                BUILDER_STATE.interaction.draggedSegment.component_id, 
+                BUILDER_STATE.interaction.draggedSegment.duration_min, 
+                insertTimeAbs
+            );
+            BUILDER_STATE.segments = previewSegments;
+            renderTimeline();
+        }
     };
 
     const handleGlobalMouseUp = (e) => {
-        if (!BUILDER_STATE.isDragging) return;
-        BUILDER_STATE.isDragging = false;
-        BUILDER_STATE.draggedSegment = null;
-        BUILDER_STATE.baseSegments = [];
+        if (BUILDER_STATE.interaction.type) {
+            BUILDER_STATE.interaction = { type: null };
+            saveVisualHistory();
+        }
+    };
+
+    // --- TOOLBOX DRAG & DROP HANDLERS ---
+
+    const handleToolboxDragStart = (e) => {
+        const item = e.target.closest('.ve-toolbox-item');
+        if (!item) return;
+        e.dataTransfer.setData('text/plain', item.dataset.componentId);
+        e.dataTransfer.effectAllowed = 'copy';
+    };
+
+    const handleToolboxDragEnd = (e) => {
+        if (ELS.visualEditorDropCursor) ELS.visualEditorDropCursor.style.display = 'none';
+    };
+
+    const handleTimelineDragOver = (e) => {
+        e.preventDefault(); // Allow drop
+        const rect = ELS.visualEditorTimeline.getBoundingClientRect();
+        const x = e.clientX - rect.left; 
+        const width = ELS.visualEditorTimeline.clientWidth;
+        const pct = Math.max(0, Math.min(1, x / width)); 
+        
+        if (ELS.visualEditorDropCursor) {
+            ELS.visualEditorDropCursor.style.display = 'block';
+            ELS.visualEditorDropCursor.style.left = `${pct * 100}%`;
+        }
+    };
+
+    const handleTimelineDragLeave = (e) => {
+        if (ELS.visualEditorDropCursor) ELS.visualEditorDropCursor.style.display = 'none';
+    };
+
+    const handleTimelineDrop = (e) => {
+        e.preventDefault();
+        if (ELS.visualEditorDropCursor) ELS.visualEditorDropCursor.style.display = 'none';
+
+        const componentId = e.dataTransfer.getData('text/plain');
+        const component = APP.StateManager.getComponentById(componentId);
+        if (!component) return;
+
+        const rect = ELS.visualEditorTimeline.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const pct = Math.max(0, Math.min(1, x / rect.width));
+        
+        const pipeCapacity = BUILDER_STATE.fixedShiftLength;
+        const relativeMinutes = Math.round(pct * pipeCapacity);
+        const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
+        const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
+
+        // Insert new stone
+        const newSegments = insertStone(
+            BUILDER_STATE.segments,
+            componentId,
+            component.default_duration_min,
+            insertTimeAbs
+        );
+
+        BUILDER_STATE.segments = newSegments;
+        renderTimeline();
         saveVisualHistory();
     };
 
+    // --- POPUP & MENU ---
+    
     const handleToolboxClick = (e) => {
+        // Click fallback for touch/non-drag users
         const item = e.target.closest('.ve-toolbox-item');
         if (!item) return;
         const { componentId, componentName } = item.dataset;
@@ -1871,14 +1989,9 @@ const toggleRowEditMode = (id, isEditing) => {
         const durationToAdd = parseInt(ELS.veAddDuration.value, 10);
         
         let base = BUILDER_STATE.segments;
-
-        if (isEditing) {
-            // If editing via popup, lift old one out first
-            base = liftStone(base, editIndex);
-        }
+        if (isEditing) base = liftStone(base, editIndex);
 
         const newSegments = insertStone(base, componentId, durationToAdd, startTime);
-        
         BUILDER_STATE.segments = newSegments;
         renderTimeline();
         saveVisualHistory();
@@ -1892,7 +2005,6 @@ const toggleRowEditMode = (id, isEditing) => {
         const segment = e.target.closest('.ve-segment');
         if (!segment) return;
         const index = parseInt(segment.dataset.index, 10);
-        if (isNaN(index)) return;
         BUILDER_STATE.contextMenuIndex = index;
         ELS.visualEditorContextMenu.style.display = 'block';
         ELS.visualEditorContextMenu.style.left = `${e.clientX}px`;
@@ -1908,41 +2020,23 @@ const toggleRowEditMode = (id, isEditing) => {
         if (!item) return;
         const action = item.dataset.action;
         const index = BUILDER_STATE.contextMenuIndex;
-        if (isNaN(index) || !BUILDER_STATE.segments[index]) return;
-        
-        const segment = BUILDER_STATE.segments[index];
         
         if (action === 'delete') {
-            // Delete via Lift (gap closes)
             BUILDER_STATE.segments = liftStone(BUILDER_STATE.segments, index);
-            // REFILL PIPE: If we delete, the shift shrinks. We must fill it back up.
-            // Rule: Extend the last segment to fill the void.
-            const currentLen = BUILDER_STATE.segments.reduce((s, i) => s + i.duration_min, 0);
-            const missing = BUILDER_STATE.fixedShiftLength - currentLen;
-            if (missing > 0 && BUILDER_STATE.segments.length > 0) {
-                BUILDER_STATE.segments[BUILDER_STATE.segments.length - 1].duration_min += missing;
-            }
-        } else if (action === 'split') {
-            if (segment.duration_min < 10) {
-                APP.Utils.showToast("Too short to split.", "warning");
-                return;
-            }
-            const dur1 = Math.floor(segment.duration_min / 2);
-            const dur2 = segment.duration_min - dur1;
-            segment.duration_min = dur1;
-            BUILDER_STATE.segments.splice(index + 1, 0, { component_id: segment.component_id, duration_min: dur2 });
         } else if (action === 'edit') {
-            const component = APP.StateManager.getComponentById(segment.component_id);
-            let startTime = BUILDER_STATE.startTimeMin;
-            for(let i = 0; i < index; i++) startTime += BUILDER_STATE.segments[i].duration_min;
-            
+            const seg = BUILDER_STATE.segments[index];
+            const component = APP.StateManager.getComponentById(seg.component_id);
+            // Find start time
+            let time = BUILDER_STATE.startTimeMin;
+            for(let i=0; i<index; i++) time += BUILDER_STATE.segments[i].duration_min;
+
             BUILDER_STATE.addPopupState = {
-                isOpen: true, componentId: segment.component_id, componentName: component.name,
+                isOpen: true, componentId: seg.component_id, componentName: component.name,
                 isEditing: true, editIndex: index
             };
             ELS.veAddPopupTitle.textContent = `Edit: ${component.name}`;
-            ELS.veAddStartTime.value = APP.Utils.formatMinutesToTime(startTime);
-            ELS.veAddDuration.value = segment.duration_min;
+            ELS.veAddStartTime.value = APP.Utils.formatMinutesToTime(time);
+            ELS.veAddDuration.value = seg.duration_min;
             ELS.visualEditorAddPopup.style.display = 'block';
             ELS.veAddStartTime.focus();
         }
@@ -1989,16 +2083,10 @@ const toggleRowEditMode = (id, isEditing) => {
         const absoluteTimeSegments = [];
         let currentTime = startTimeMin;
 
-        // Auto-fix small rounding errors (1m) to match fixed shift length
-        const totalDur = segments.reduce((s, i) => s + i.duration_min, 0);
-        if (Math.abs(totalDur - BUILDER_STATE.fixedShiftLength) > 0 && Math.abs(totalDur - BUILDER_STATE.fixedShiftLength) <= 5) {
-             const diff = BUILDER_STATE.fixedShiftLength - totalDur;
-             if (segments.length > 0) {
-                 segments[segments.length - 1].duration_min += diff;
-             }
-        }
+        // Final normalization
+        const normalized = normalizeShiftLength(segments);
 
-        for (const seg of segments) {
+        for (const seg of normalized) {
             if (!seg.component_id) {
                 APP.Utils.showToast("Error: Invalid activity.", "danger");
                 return;
@@ -2034,7 +2122,7 @@ const toggleRowEditMode = (id, isEditing) => {
         }
     };
 
-    // --- LEGACY FUNCTIONS (Restored) ---
+    // --- LEGACY FUNCTIONS ---
     const renderLegacyTable = () => {
         if (!ELS.modalSequenceBody) return;
         let html = '';
