@@ -1426,21 +1426,23 @@ const toggleRowEditMode = (id, isEditing) => {
 }(window.APP));
 
 /**
- * MODULE: APP.Components.SequentialBuilder (v16.3.1)
+ * MODULE: APP.Components.SequentialBuilder (v16.7 - Fixed Shift & Smart Drag)
  * Supports Shift Definitions (legacy) and Visual Exceptions (Live Editing).
- * INCLUDES: Time Ruler, Smart Tooltips, Drag-Drop, Ripple-Pay fix.
- * V16.3.1: Corrected initialization logic to handle shared modal structure (fixes "Edit Structure" button crash).
+ * V16.7: Implements "Fixed Shift" logic (shift start/end never changes).
+ * Implements "Smart Displacement" (Breaks move only as needed, then eat Work).
+ * Adds Drag-and-Drop for existing segments.
+ * Full Legacy Editor support maintained.
  */
 (function(APP) {
     const SequentialBuilder = {};
-    const ELS = {}; // Cached DOM Elements
+    const ELS = {}; // DOM Cache
 
     // State specific to the Builder Modal
     const BUILDER_STATE = {
         isOpen: false,
         mode: null, // 'definition' or 'exception'
-        contextId: null, // definitionId or advisorId
-        exceptionDate: null, // YYYY-MM-DD
+        contextId: null,
+        exceptionDate: null,
         startTimeMin: 480, // Default 08:00
         segments: [], // { component_id, duration_min }
         reason: null,
@@ -1448,10 +1450,13 @@ const toggleRowEditMode = (id, isEditing) => {
         // --- Visual State ---
         dragState: {
             isDragging: false,
-            segmentIndex: -1, // The index of the segment *before* the handle
+            type: null, // 'resize' or 'move'
+            segmentIndex: -1,
             startX: 0,
-            originalDurations: [], // [durationA, durationB]
-            minDuration: 5 // Min duration for a segment
+            originalDurations: [],
+            minDuration: 5,
+            draggedComponentId: null,
+            draggedDuration: 0
         },
         addPopupState: {
             isOpen: false,
@@ -1460,8 +1465,6 @@ const toggleRowEditMode = (id, isEditing) => {
             isEditing: false,
             editIndex: -1
         },
-
-        // --- Internal Undo/Redo History ---
         visualHistory: [],
         visualHistoryIndex: -1,
         contextMenuIndex: -1
@@ -1477,7 +1480,6 @@ const toggleRowEditMode = (id, isEditing) => {
         return h * 60 + m;
     };
 
-    // V16.3.1 FIX: Updated initialization to handle new shared modal structure.
     SequentialBuilder.initialize = () => {
         // Cache Modal Elements
         ELS.modal = document.getElementById('shiftBuilderModal');
@@ -1486,15 +1488,12 @@ const toggleRowEditMode = (id, isEditing) => {
         ELS.modalSave = document.getElementById('modalSaveStructure');
         ELS.modalTotalTime = document.getElementById('modalTotalTime');
         ELS.modalPaidTime = document.getElementById('modalPaidTime');
-        
-        // Exception specific elements
         ELS.exceptionReasonGroup = document.getElementById('exceptionReasonGroup');
         ELS.modalExceptionReason = document.getElementById('modalExceptionReason');
-
-        // --- New Visual Editor Elements ---
-        // V16.3.1 FIX: Cache the container wrapper and controls group
+        
+        // Visual Editor Elements
         ELS.visualEditorContainer = document.getElementById('visualEditorContainer');
-        ELS.visualEditorControlsGroup = document.getElementById('visualEditorControlsGroup'); // Undo/Redo group
+        ELS.visualEditorControlsGroup = document.getElementById('visualEditorControlsGroup');
         ELS.visualEditorToolbox = document.getElementById('visualEditorToolbox');
         ELS.visualEditorTimeline = document.getElementById('visualEditorTimeline');
         ELS.visualEditorTimeRuler = document.getElementById('visualEditorTimeRuler');
@@ -1511,8 +1510,7 @@ const toggleRowEditMode = (id, isEditing) => {
         ELS.veAddPopupCancel = document.getElementById('ve-add-popup-cancel');
         ELS.veAddPopupSave = document.getElementById('ve-add-popup-save');
 
-        // --- Legacy Elements (for Shift Definition Editor) ---
-        // V16.3.1 FIX: Cache the legacy container wrapper and elements
+        // Legacy Elements (Table Editor)
         ELS.legacyEditorContainer = document.getElementById('legacyEditorContainer');
         ELS.modalStartTime = document.getElementById('modalStartTime');
         ELS.modalAddActivity = document.getElementById('modalAddActivity');
@@ -1522,39 +1520,40 @@ const toggleRowEditMode = (id, isEditing) => {
         if (ELS.modalClose) ELS.modalClose.addEventListener('click', SequentialBuilder.close);
         if (ELS.modalSave) ELS.modalSave.addEventListener('click', handleSave);
 
-        // Reason field
         if (ELS.modalExceptionReason) {
             ELS.modalExceptionReason.addEventListener('input', (e) => {
                 BUILDER_STATE.reason = e.target.value;
             });
         }
         
-        // --- New Visual Editor Listeners ---
+        // Visual Editor Listeners
         if (ELS.visualEditorToolbox) {
-            ELS.visualEditorToolbox.addEventListener('click', handleToolboxClick); // For pop-up
-            ELS.visualEditorToolbox.addEventListener('dragstart', handleToolboxDragStart); // For drag/drop
-            ELS.visualEditorToolbox.addEventListener('dragend', handleToolboxDragEnd); // For drag/drop
+            ELS.visualEditorToolbox.addEventListener('click', handleToolboxClick);
+            ELS.visualEditorToolbox.addEventListener('dragstart', handleToolboxDragStart);
+            ELS.visualEditorToolbox.addEventListener('dragend', handleToolboxDragEnd);
         }
         if (ELS.visualEditorTimeline) {
-            ELS.visualEditorTimeline.addEventListener('mousedown', handleDragStart); // For drag handles
-            ELS.visualEditorTimeline.addEventListener('dragenter', handleTimelineDragEnter); // For drag/drop
-            ELS.visualEditorTimeline.addEventListener('dragover', handleTimelineDragOver); // For drag/drop
-            ELS.visualEditorTimeline.addEventListener('dragleave', handleTimelineDragLeave); // For drag/drop
-            ELS.visualEditorTimeline.addEventListener('drop', handleTimelineDrop); // For drag/drop
+            ELS.visualEditorTimeline.addEventListener('mousedown', handleTimelineMouseDown);
+            ELS.visualEditorTimeline.addEventListener('dragenter', handleTimelineDragEnter);
+            ELS.visualEditorTimeline.addEventListener('dragover', handleTimelineDragOver);
+            ELS.visualEditorTimeline.addEventListener('dragleave', handleTimelineDragLeave);
+            ELS.visualEditorTimeline.addEventListener('drop', handleTimelineDrop);
             ELS.visualEditorTimeline.addEventListener('contextmenu', handleTimelineContextMenu);
         }
+        
         if (ELS.veAddPopupCancel) ELS.veAddPopupCancel.addEventListener('click', closeAddPopup);
         if (ELS.veAddPopupSave) ELS.veAddPopupSave.addEventListener('click', handleAddPopupSave);
-
-        // Mouse move/up listeners on the whole document to catch drags
+        
+        // Native Drag Listeners
         document.addEventListener('mousemove', handleDragMove);
         document.addEventListener('mouseup', handleDragEnd);
         document.addEventListener('click', closeContextMenu);
+        
         if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.addEventListener('click', handleContextMenuClick);
         if (ELS.veUndo) ELS.veUndo.addEventListener('click', handleUndo);
         if (ELS.veRedo) ELS.veRedo.addEventListener('click', handleRedo);
 
-        // --- V16.3.1 FIX: Wire Legacy Listeners during initialization (more robust) ---
+        // Legacy Listeners (Restored)
         if (ELS.modalSequenceBody) {
             ELS.modalSequenceBody.addEventListener('change', handleLegacySequenceChange);
             ELS.modalSequenceBody.addEventListener('click', handleLegacySequenceClick);
@@ -1563,39 +1562,28 @@ const toggleRowEditMode = (id, isEditing) => {
             ELS.modalAddActivity.addEventListener('click', handleLegacyAddActivity);
         }
 
-        // Initialize Flatpickr for the legacy start time input if it exists
+        // Flatpickr
         if (ELS.modalStartTime && typeof flatpickr !== 'undefined') {
              flatpickr(ELS.modalStartTime, {
-                enableTime: true,
-                noCalendar: true,
-                dateFormat: "H:i",
-                time_24hr: true,
-                minuteIncrement: 5,
+                enableTime: true, noCalendar: true, dateFormat: "H:i", time_24hr: true, minuteIncrement: 5,
                 onChange: (selectedDates, dateStr) => {
                     const newTimeMin = parseTimeToMinutes(dateStr);
                     if (newTimeMin !== null && newTimeMin !== BUILDER_STATE.startTimeMin) {
                         BUILDER_STATE.startTimeMin = newTimeMin;
-                        // Only re-render if the builder is open and in legacy mode
-                        if (BUILDER_STATE.isOpen && BUILDER_STATE.mode === 'definition') {
-                            renderLegacyTable();
-                        }
+                        if (BUILDER_STATE.isOpen && BUILDER_STATE.mode === 'definition') renderLegacyTable();
                     }
                 }
             });
         }
     };
 
-    // Generalized open function
-    // V16.3.1 FIX: Updated toggling logic to use the new container elements.
     SequentialBuilder.open = (config) => {
-        // 1. Convert absolute times (structure) to sequential format (segments)
         const sequentialSegments = [];
         let startTimeMin = 480; // Default 8:00 AM
 
         if (config.structure && config.structure.length > 0) {
             const sortedStructure = JSON.parse(JSON.stringify(config.structure)).sort((a, b) => a.start_min - b.start_min);
             startTimeMin = sortedStructure[0].start_min;
-            
             sortedStructure.forEach(seg => {
                 sequentialSegments.push({
                     component_id: seg.component_id,
@@ -1604,7 +1592,6 @@ const toggleRowEditMode = (id, isEditing) => {
             });
         }
 
-        // 2. Set BUILDER_STATE
         BUILDER_STATE.isOpen = true;
         BUILDER_STATE.mode = config.mode;
         BUILDER_STATE.contextId = config.id;
@@ -1612,83 +1599,50 @@ const toggleRowEditMode = (id, isEditing) => {
         BUILDER_STATE.startTimeMin = startTimeMin;
         BUILDER_STATE.segments = JSON.parse(JSON.stringify(sequentialSegments));
         BUILDER_STATE.reason = config.reason || null;
-
-        // --- Reset History ---
         BUILDER_STATE.visualHistory = [];
         BUILDER_STATE.visualHistoryIndex = -1;
 
-        // 3. Initialize UI
         ELS.modalTitle.textContent = config.title;
-
-        // V16.3.1 FIX: Ensure both containers are hidden before selectively showing one
         if (ELS.visualEditorContainer) ELS.visualEditorContainer.style.display = 'none';
         if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'none';
-        // Also hide visual editor specific controls (Undo/Redo) initially
         if (ELS.visualEditorControlsGroup) ELS.visualEditorControlsGroup.style.display = 'none';
 
-
-        // Show/Hide exception reason input based on mode
         if (config.mode === 'exception') {
-            // --- This is the NEW "Smart-Visual Editor" flow ---
-            if (ELS.visualEditorContainer) {
-                // Display block is sufficient as the parent modal-body handles the flex layout
-                ELS.visualEditorContainer.style.display = 'block';
-            }
-            // Show visual editor controls
+            if (ELS.visualEditorContainer) ELS.visualEditorContainer.style.display = 'block';
             if (ELS.visualEditorControlsGroup) ELS.visualEditorControlsGroup.style.display = 'flex';
-
-
             ELS.exceptionReasonGroup.style.display = 'block';
             ELS.modalExceptionReason.value = BUILDER_STATE.reason || '';
             ELS.modalSave.textContent = "Save Exception";
-            
             renderToolbox();
             renderTimeline();
-            
         } else {
-            // --- This is the OLD "Shift Definition" flow (config.mode === 'definition') ---
-            if (ELS.legacyEditorContainer) {
-                // Display block is sufficient as the parent modal-body handles the flex layout
-                ELS.legacyEditorContainer.style.display = 'block';
-            }
-
+            if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'block';
             ELS.exceptionReasonGroup.style.display = 'none';
             ELS.modalSave.textContent = "Save Definition";
-
-            // Update the start time input if Flatpickr is initialized
             if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
                 ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
             }
-            
-            // V16.3.1 FIX: Listeners are now handled in initialize(), so we just call render.
             renderLegacyTable();
         }
         
-        // --- Save initial state and update buttons ---
-        saveVisualHistory(); 
+        saveVisualHistory();
         updateUndoRedoButtons(); 
-        
         ELS.modal.style.display = 'flex';
     };
 
-    // V16.3.1 FIX: Removed listener cleanup as it's handled in initialize().
     SequentialBuilder.close = () => {
         BUILDER_STATE.isOpen = false;
         if (ELS.modal) ELS.modal.style.display = 'none';
-        closeAddPopup(); // Ensure pop-up is closed
-        closeContextMenu(); // Ensure context menu is closed
+        closeAddPopup();
+        closeContextMenu();
     };
 
-    // --- NEW: Smart-Visual Editor Functions ---
+    // --- VISUAL EDITOR RENDERERS ---
 
-    // 1. Render Toolbox (Left side)
     const renderToolbox = () => {
-        // Check if toolbox element exists (it might not if initialization failed or HTML is corrupted)
-        if (!ELS.visualEditorToolbox) return; 
-
+        if (!ELS.visualEditorToolbox) return;
         const STATE = APP.StateManager.getState();
         const components = STATE.scheduleComponents.sort((a, b) => a.name.localeCompare(b.name));
-        
         ELS.visualEditorToolbox.innerHTML = components.map(comp => `
             <div class="ve-toolbox-item" draggable="true" data-component-id="${comp.id}" data-component-name="${comp.name}">
                 <div class="ve-toolbox-color" style="background-color: ${comp.color};"></div>
@@ -1697,16 +1651,13 @@ const toggleRowEditMode = (id, isEditing) => {
         `).join('');
     };
 
-    // 2. Render Timeline (Right side)
     const renderTimeline = () => {
-        // Check if timeline element exists
         if (!ELS.visualEditorTimeline) return;
-
-        renderTimeRuler(); // Draw the time ruler
+        renderTimeRuler();
         
         const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
         if (totalDuration === 0) {
-            ELS.visualEditorTimeline.innerHTML = '<div style="padding: 16px; color: #6B7280;">No activities in this shift (RDO).</div>';
+            ELS.visualEditorTimeline.innerHTML = '<div style="padding: 16px; color: #6B7280;">No activities in this shift (RDO). Drop an activity to start.</div>';
             renderSummary();
             return;
         }
@@ -1716,66 +1667,47 @@ const toggleRowEditMode = (id, isEditing) => {
             if (!component) return '';
 
             const widthPct = (seg.duration_min / totalDuration) * 100;
-
-            // --- THIS IS THE "SMART TOOLTIP" ---
             let currentTime = BUILDER_STATE.startTimeMin;
-            for (let i = 0; i < index; i++) {
-                currentTime += BUILDER_STATE.segments[i].duration_min;
-            }
-            const startTime = currentTime;
-            const endTime = currentTime + seg.duration_min;
+            for (let i = 0; i < index; i++) currentTime += BUILDER_STATE.segments[i].duration_min;
             
-            const tooltip = `${component.name}\nTime: ${APP.Utils.formatMinutesToTime(startTime)} - ${APP.Utils.formatMinutesToTime(endTime)}\nDuration: ${seg.duration_min}m`;
+            const tooltip = `${component.name}\nTime: ${APP.Utils.formatMinutesToTime(currentTime)} - ${APP.Utils.formatMinutesToTime(currentTime + seg.duration_min)}\nDuration: ${seg.duration_min}m`;
 
+            // Added draggable="true" here for drag-and-drop
             return `
-                <div class="ve-segment" style="width: ${widthPct}%; background-color: ${component.color};" data-index="${index}" title="${tooltip}">
+                <div class="ve-segment" draggable="true" style="width: ${widthPct}%; background-color: ${component.color};" 
+                     data-index="${index}" title="${tooltip}">
+                    <span class="ve-segment-label" style="padding-left:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${component.name}</span>
                     <div class="ve-drag-handle" data-handle-index="${index}"></div>
                 </div>
             `;
         }).join('');
 
-        renderSummary(); // Update totals
+        renderSummary();
     };
     
-    // 3. Render Time Ruler (Above Timeline)
     const renderTimeRuler = () => {
         if (!ELS.visualEditorTimeRuler) return;
-
         const { startTimeMin } = BUILDER_STATE;
         const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
-        
         if (totalDuration === 0) {
-            ELS.visualEditorTimeRuler.innerHTML = ''; // Clear ruler if RDO
+            ELS.visualEditorTimeRuler.innerHTML = '';
             return;
         }
-
         let html = '';
         const endTime = startTimeMin + totalDuration;
-
-        // Find the first "on the hour" marker (e.g., 09:00)
         let firstHourMarker = Math.ceil(startTimeMin / 60) * 60;
-
         for (let time = firstHourMarker; time < endTime; time += 60) {
-            // Calculate the percentage position of this hour marker
             const pct = ((time - startTimeMin) / totalDuration) * 100;
-            
-            // Only draw if it's not at the very beginning (0%)
             if (pct > 0 && pct < 100) {
-                html += `
-                    <div class="ve-time-marker" style="left: ${pct}%;">
-                        ${APP.Utils.formatMinutesToTime(time)}
-                    </div>
-                `;
+                html += `<div class="ve-time-marker" style="left: ${pct}%;">${APP.Utils.formatMinutesToTime(time)}</div>`;
             }
         }
         ELS.visualEditorTimeRuler.innerHTML = html;
     };
-    
-    // 4. Render Summary (Footer)
+
     const renderSummary = () => {
         let totalDuration = 0;
         let paidDuration = 0;
-
         BUILDER_STATE.segments.forEach(seg => {
             const component = APP.StateManager.getComponentById(seg.component_id);
             totalDuration += seg.duration_min;
@@ -1783,26 +1715,18 @@ const toggleRowEditMode = (id, isEditing) => {
                 paidDuration += seg.duration_min;
             }
         });
-
         if (ELS.modalTotalTime) ELS.modalTotalTime.textContent = APP.Utils.formatDuration(totalDuration);
         if (ELS.modalPaidTime) ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
     };
 
-    // 5. Handle Clicks on Toolbox (Pop-up)
+    // --- POP-UP & TOOLBOX HANDLERS ---
+
     const handleToolboxClick = (e) => {
         const item = e.target.closest('.ve-toolbox-item');
         if (!item) return;
-
         const { componentId, componentName } = item.dataset;
-        BUILDER_STATE.addPopupState = {
-            isOpen: true,
-            componentId,
-            componentName,
-            isEditing: false, // <-- Ensure this is reset
-            editIndex: -1   // <-- Ensure this is reset
-        };
-
-        // Open the pop-up
+        
+        BUILDER_STATE.addPopupState = { isOpen: true, componentId, componentName, isEditing: false, editIndex: -1 };
         ELS.veAddPopupTitle.textContent = `Add: ${componentName}`;
         ELS.veAddStartTime.value = '';
         ELS.veAddDuration.value = '30';
@@ -1815,171 +1739,270 @@ const toggleRowEditMode = (id, isEditing) => {
         if (ELS.visualEditorAddPopup) ELS.visualEditorAddPopup.style.display = 'none';
     };
 
-    // 6. Reusable "Carve-Out" function (used by pop-up AND drag-drop)
+    // --- CORE LOGIC: FIXED SHIFT & SMART DISPLACEMENT ---
     const handleAddComponent = (componentId, startTime, durationToAdd) => {
-        const MIN_SEGMENT_DUR = 5; // 5 minute minimum
+        const MIN_SEGMENT_DUR = 5;
 
         if (startTime === null) {
-            APP.Utils.showToast("Invalid start time. Use HH:MM format.", "danger");
+            APP.Utils.showToast("Invalid start time.", "danger");
             return false;
         }
-        if (isNaN(durationToAdd) || durationToAdd < MIN_SEGMENT_DUR) {
-            APP.Utils.showToast(`Invalid duration. Must be at least ${MIN_SEGMENT_DUR} minutes.`, "danger");
-            return false;
-        }
-
-        // Convert "absolute" time to "relative" time in shift
-        const relativeStartTime = startTime - BUILDER_STATE.startTimeMin;
-        const totalShiftDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
-
-        if (relativeStartTime < 0 || relativeStartTime >= totalShiftDuration) {
-            APP.Utils.showToast("Start time is outside the shift boundaries.", "danger");
-            return false;
-        }
-
-        let timeElapsed = 0;
-        let inserted = false;
-        const newSegments = [];
-
-        // --- THIS IS THE "RIPPLE-PAY" LOGIC ---
         
-        // 1. First, we build the new schedule by inserting and splitting
-        for (const seg of BUILDER_STATE.segments) {
-            const segStart = timeElapsed;
-            const segEnd = timeElapsed + seg.duration_min;
+        // 1. CONSTRAINT: Fixed Shift Length
+        const totalDuration = BUILDER_STATE.segments.reduce((sum, s) => sum + s.duration_min, 0);
+        const shiftEndMin = BUILDER_STATE.startTimeMin + totalDuration;
+        const newStart = startTime;
+        const newEnd = startTime + durationToAdd;
 
-            if (!inserted && relativeStartTime >= segStart && relativeStartTime < segEnd) {
-                // This is the segment to split
-                inserted = true;
-                const timeIntoSegment = relativeStartTime - segStart;
+        // Reject if outside shift boundaries
+        if (newStart < BUILDER_STATE.startTimeMin || newEnd > shiftEndMin) {
+            APP.Utils.showToast("Action blocked: Cannot extend shift length.", "danger");
+            return false;
+        }
 
-                // Part 1: First half of the split segment
-                if (timeIntoSegment >= MIN_SEGMENT_DUR) {
-                    newSegments.push({ component_id: seg.component_id, duration_min: timeIntoSegment });
+        // 2. Flatten to Absolute Time
+        let currentAbsTime = BUILDER_STATE.startTimeMin;
+        let absSegments = BUILDER_STATE.segments.map(seg => {
+            const s = { ...seg, absStart: currentAbsTime, absEnd: currentAbsTime + seg.duration_min };
+            currentAbsTime += seg.duration_min;
+            return s;
+        });
+
+        // 3. Build New Schedule
+        // A: Keep segments strictly BEFORE the new item
+        let resultSegments = absSegments.filter(s => s.absEnd <= newStart);
+        
+        // B: Add the new segment
+        resultSegments.push({ component_id: componentId, absStart: newStart, absEnd: newEnd });
+
+        // C: Process segments AFTER the new item
+        let remainingSegments = absSegments.filter(s => s.absEnd > newStart);
+        let nextAvailableTime = newEnd;
+
+        for (let i = 0; i < remainingSegments.length; i++) {
+            const seg = remainingSegments[i];
+            const component = APP.StateManager.getComponentById(seg.component_id);
+            const isFixed = component && (component.type === 'Break' || component.type === 'Lunch');
+
+            // Case 1: No overlap (Segment starts after our cursor) - Keep as is
+            if (seg.absStart >= nextAvailableTime) {
+                resultSegments.push(seg);
+                nextAvailableTime = seg.absEnd; 
+                continue;
+            }
+
+            // Case 2: Conflict
+            if (isFixed) {
+                // It's a Break/Lunch. Move it to nextAvailableTime.
+                // DO NOT shrink it.
+                const movedBreak = {
+                    ...seg,
+                    absStart: nextAvailableTime,
+                    absEnd: nextAvailableTime + seg.duration_min
+                };
+                
+                // Check boundary: If break is pushed past shift end, we must abort/clip.
+                if (movedBreak.absEnd > shiftEndMin) {
+                     // Edge case: Break doesn't fit anymore.
+                     // To preserve strict shift length, we stop adding here. 
+                     // (In a real app we might warn the user, but here we just clip/stop).
+                     break; 
                 }
-
-                // Part 2: The new segment we are adding
-                newSegments.push({ component_id: componentId, duration_min: durationToAdd });
-
-                // Part 3: The second half of the split segment
-                const remainingDurationInSegment = seg.duration_min - timeIntoSegment;
-                if (remainingDurationInSegment >= MIN_SEGMENT_DUR) {
-                    newSegments.push({ component_id: seg.component_id, duration_min: remainingDurationInSegment });
-                }
+                
+                resultSegments.push(movedBreak);
+                nextAvailableTime = movedBreak.absEnd;
             } else {
-                // This segment is unaffected by the split
-                newSegments.push(seg);
+                // It's Work/Activity. Eat/Shrink it.
+                // It starts at nextAvailableTime.
+                // It ENDS at its ORIGINAL end time (This preserves the shift structure/length).
+                if (seg.absEnd > nextAvailableTime) {
+                    const shrunkDuration = seg.absEnd - nextAvailableTime;
+                    if (shrunkDuration >= MIN_SEGMENT_DUR) {
+                        resultSegments.push({
+                            ...seg,
+                            absStart: nextAvailableTime,
+                            absEnd: seg.absEnd 
+                        });
+                        nextAvailableTime = seg.absEnd;
+                    }
+                }
             }
-            timeElapsed += seg.duration_min;
         }
 
-        // 2. Now, we "pay" for the `durationToAdd`
-        // We do this by shrinking other segments, starting from the end of the shift.
-        let debt = durationToAdd;
-        for (let i = newSegments.length - 1; i >= 0; i--) {
-            if (debt <= 0) break; // Debt is paid
-            
-            // Don't pay from the segment we just added
-            if (newSegments[i].component_id === componentId && newSegments[i].duration_min === durationToAdd) {
-                continue; 
+        // 4. Convert back to relative durations
+        const finalSegments = [];
+        resultSegments.sort((a, b) => a.absStart - b.absStart);
+
+        resultSegments.forEach(s => {
+            const dur = s.absEnd - s.absStart;
+            if (dur >= MIN_SEGMENT_DUR) {
+                finalSegments.push({ component_id: s.component_id, duration_min: dur });
             }
+        });
 
-            // How much can this segment pay?
-            const availableToPay = Math.max(0, newSegments[i].duration_min - MIN_SEGMENT_DUR);
-            const payment = Math.min(debt, availableToPay);
-
-            newSegments[i].duration_min -= payment;
-            debt -= payment;
-        }
-
-        // 3. Final step: filter out any segments that were "eaten"
-        BUILDER_STATE.segments = newSegments.filter(s => s.duration_min >= MIN_SEGMENT_DUR);
-
-        // If we still have debt, the new item was too large and must be trimmed
-        if (debt > 0) {
-             APP.Utils.showToast("Warning: Activity was too long and was trimmed to fit.", "warning");
-             const newSeg = BUILDER_STATE.segments.find(s => s.component_id === componentId && s.duration_min === durationToAdd);
-             if (newSeg) {
-                 newSeg.duration_min -= debt;
-                 // Refilter just in case it's now too small
-                 BUILDER_STATE.segments = BUILDER_STATE.segments.filter(s => s.duration_min >= MIN_SEGMENT_DUR);
-             }
-        }
-        
+        BUILDER_STATE.segments = finalSegments;
         renderTimeline();
-        saveVisualHistory(); // <-- Save Undo state
-        return true; // Success
+        saveVisualHistory();
+        return true;
     };
 
-    // 7. This is the "Save" button handler for the pop-up (FIXED IN STEP 5)
     const handleAddPopupSave = () => {
         const { componentId, isEditing, editIndex } = BUILDER_STATE.addPopupState;
         const startTime = parseTimeToMinutes(ELS.veAddStartTime.value);
         const durationToAdd = parseInt(ELS.veAddDuration.value, 10);
         
         if (isEditing) {
-            // --- THIS IS THE EDIT LOGIC ---
-            // 1. Delete the old segment (and pay back its time)
             const deletedDuration = BUILDER_STATE.segments[editIndex].duration_min;
             BUILDER_STATE.segments.splice(editIndex, 1);
-            
+            // Payback to neighbor to fill gap before insert
             const paybackIndex = (editIndex > 0) ? editIndex - 1 : 0;
             if (BUILDER_STATE.segments[paybackIndex]) {
                 BUILDER_STATE.segments[paybackIndex].duration_min += deletedDuration;
             }
-
-            // 2. Add the "new" (edited) segment
             const success = handleAddComponent(componentId, startTime, durationToAdd);
-            if (success) {
-                closeAddPopup();
-            } else {
-                // If add fails, re-render to restore the original state (since we deleted it)
-                renderTimeline(); 
-            }
-            
+            if (success) closeAddPopup();
+            else renderTimeline();
         } else {
-            // --- THIS IS THE "ADD NEW" LOGIC ---
             const success = handleAddComponent(componentId, startTime, durationToAdd);
-            if (success) {
-                closeAddPopup();
-            }
+            if (success) closeAddPopup();
         }
     };
 
-    // 8. Handle Drag-to-Adjust (The "Drag" Ripple)
-    const handleDragStart = (e) => {
-        const handle = e.target.closest('.ve-drag-handle');
-        if (!handle) return;
+    // --- DRAG AND DROP HANDLERS ---
 
-        e.preventDefault(); // Prevent text selection
-        const segmentIndex = parseInt(handle.dataset.handleIndex, 10);
+    const handleTimelineMouseDown = (e) => {
+        const handle = e.target.closest('.ve-drag-handle');
+        if (handle) {
+            e.preventDefault();
+            const segmentIndex = parseInt(handle.dataset.handleIndex, 10);
+            BUILDER_STATE.dragState = {
+                isDragging: true, type: 'resize', segmentIndex: segmentIndex, startX: e.clientX,
+                originalDurations: [
+                    BUILDER_STATE.segments[segmentIndex].duration_min,
+                    BUILDER_STATE.segments[segmentIndex + 1].duration_min
+                ],
+                minDuration: 5
+            };
+        }
+    };
+
+    // Native Drag Start (Move Segment)
+    document.addEventListener('dragstart', (e) => {
+        if (e.target.classList && e.target.classList.contains('ve-segment')) {
+            const index = parseInt(e.target.dataset.index, 10);
+            const segment = BUILDER_STATE.segments[index];
+            if (!segment) return;
+
+            BUILDER_STATE.dragState = {
+                isDragging: true, type: 'move', segmentIndex: index,
+                draggedComponentId: segment.component_id, draggedDuration: segment.duration_min
+            };
+            
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('application/json', JSON.stringify({
+                type: 'segment-move', index: index, componentId: segment.component_id, duration: segment.duration_min
+            }));
+            setTimeout(() => e.target.style.opacity = '0.5', 0);
+        }
+    });
+    
+    document.addEventListener('dragend', (e) => {
+        if (e.target.classList && e.target.classList.contains('ve-segment')) {
+             e.target.style.opacity = '1';
+             if (ELS.visualEditorDropCursor) ELS.visualEditorDropCursor.style.display = 'none';
+             BUILDER_STATE.dragState.isDragging = false;
+        }
+    });
+
+    const handleToolboxDragStart = (e) => {
+        const item = e.target.closest('.ve-toolbox-item');
+        if (!item) { e.preventDefault(); return; }
+        e.dataTransfer.effectAllowed = 'copy';
+        e.dataTransfer.setData('application/json', JSON.stringify({
+            type: 'toolbox-add', componentId: item.dataset.componentId
+        }));
+        setTimeout(() => item.classList.add('is-dragging'), 0);
+    };
+
+    const handleToolboxDragEnd = (e) => {
+        const item = e.target.closest('.ve-toolbox-item.is-dragging');
+        if (item) item.classList.remove('is-dragging');
+        if (ELS.visualEditorDropCursor) ELS.visualEditorDropCursor.style.display = 'none';
+    };
+
+    const handleTimelineDragEnter = (e) => {
+        e.preventDefault();
+        if (ELS.visualEditorDropCursor) ELS.visualEditorDropCursor.style.display = 'block';
+    };
+
+    const handleTimelineDragOver = (e) => {
+        e.preventDefault();
+        if (!ELS.visualEditorTimeline) return;
+        const rect = ELS.visualEditorTimeline.getBoundingClientRect();
+        const x = e.clientX - rect.left; 
+        const width = ELS.visualEditorTimeline.clientWidth;
+        const pct = Math.max(0, Math.min(1, x / width)); 
+        const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
+        const relativeTime = Math.round(pct * totalDuration);
+        const absoluteTime = BUILDER_STATE.startTimeMin + relativeTime;
         
-        BUILDER_STATE.dragState = {
-            isDragging: true,
-            segmentIndex: segmentIndex,
-            startX: e.clientX,
-            originalDurations: [
-                BUILDER_STATE.segments[segmentIndex].duration_min,
-                BUILDER_STATE.segments[segmentIndex + 1].duration_min
-            ],
-            minDuration: 5
-        };
+        if (ELS.visualEditorDropCursor) {
+            ELS.visualEditorDropCursor.style.left = `${pct * 100}%`;
+            ELS.visualEditorDropCursor.title = `Drop at: ${APP.Utils.formatMinutesToTime(absoluteTime)}`;
+        }
+    };
+    
+    const handleTimelineDragLeave = (e) => { /* optional */ };
+
+    const handleTimelineDrop = (e) => {
+        e.preventDefault();
+        if (ELS.visualEditorDropCursor) ELS.visualEditorDropCursor.style.display = 'none';
+
+        const rect = ELS.visualEditorTimeline.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const width = ELS.visualEditorTimeline.clientWidth;
+        const pct = Math.max(0, Math.min(1, x / width));
+        const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
+        const relativeTime = Math.round(pct * totalDuration);
+        const absoluteTime = BUILDER_STATE.startTimeMin + relativeTime;
+
+        try {
+            const data = JSON.parse(e.dataTransfer.getData('application/json'));
+
+            if (data.type === 'toolbox-add') {
+                const component = APP.StateManager.getComponentById(data.componentId);
+                if (component) {
+                    handleAddComponent(data.componentId, absoluteTime, component.default_duration_min);
+                }
+            } else if (data.type === 'segment-move') {
+                const oldIndex = data.index;
+                const duration = data.duration;
+                
+                // Remove from old spot
+                BUILDER_STATE.segments.splice(oldIndex, 1);
+                // Patch gap
+                const paybackIndex = (oldIndex > 0) ? oldIndex - 1 : 0;
+                if (BUILDER_STATE.segments[paybackIndex]) {
+                    BUILDER_STATE.segments[paybackIndex].duration_min += duration;
+                }
+                // Insert at new spot
+                handleAddComponent(data.componentId, absoluteTime, duration);
+            }
+        } catch (err) {
+            console.error("Drop error", err);
+        }
     };
 
     const handleDragMove = (e) => {
-        if (!BUILDER_STATE.dragState.isDragging) return;
-
+        if (!BUILDER_STATE.dragState.isDragging || BUILDER_STATE.dragState.type !== 'resize') return;
         const { segmentIndex, startX, originalDurations, minDuration } = BUILDER_STATE.dragState;
         const totalDuration = originalDurations[0] + originalDurations[1];
-        
         const deltaX = e.clientX - startX;
-        const deltaMinutes = Math.round(deltaX / 2); // Slow down the drag speed
+        const deltaMinutes = Math.round(deltaX / 2); 
 
-        // Calculate new durations
         let newDurationA = originalDurations[0] + deltaMinutes;
         let newDurationB = originalDurations[1] - deltaMinutes;
 
-        // Enforce minimums (the "ripple" stop)
         if (newDurationA < minDuration) {
             newDurationA = minDuration;
             newDurationB = totalDuration - minDuration;
@@ -1988,278 +2011,126 @@ const toggleRowEditMode = (id, isEditing) => {
             newDurationA = totalDuration - minDuration;
         }
 
-        // Update the state
         BUILDER_STATE.segments[segmentIndex].duration_min = newDurationA;
         BUILDER_STATE.segments[segmentIndex + 1].duration_min = newDurationB;
-
-        // Re-render the timeline
         renderTimeline();
     };
 
     const handleDragEnd = () => {
-        if (BUILDER_STATE.dragState.isDragging) {
+        if (BUILDER_STATE.dragState.isDragging && BUILDER_STATE.dragState.type === 'resize') {
             BUILDER_STATE.dragState.isDragging = false;
-            saveVisualHistory(); // <-- Save Undo state
+            saveVisualHistory();
         }
     };
 
-    // --- NEW: Drag-and-Drop Handlers (Step 4) ---
-
-    // 9. Handle Drag from Toolbox
-    const handleToolboxDragStart = (e) => {
-        const item = e.target.closest('.ve-toolbox-item');
-        if (!item) {
-            e.preventDefault();
-            return;
-        }
-        
-        e.dataTransfer.effectAllowed = 'copy';
-        e.dataTransfer.setData('text/plain', item.dataset.componentId);
-        
-        setTimeout(() => {
-            item.classList.add('is-dragging');
-        }, 0);
-    };
-
-    // 10. Clean up after drag
-    const handleToolboxDragEnd = (e) => {
-        const item = e.target.closest('.ve-toolbox-item.is-dragging'); // Find the one that was dragging
-        if (item) {
-            item.classList.remove('is-dragging');
-        }
-    };
-
-    // 11. Handle moving over the timeline
-    const handleTimelineDragEnter = (e) => {
-        e.preventDefault();
-        if (ELS.visualEditorDropCursor) {
-            ELS.visualEditorDropCursor.style.display = 'block';
-        }
-    };
-
-    // 12. Handle leaving the timeline
-    const handleTimelineDragLeave = (e) => {
-        if (ELS.visualEditorDropCursor) {
-            ELS.visualEditorDropCursor.style.display = 'none';
-        }
-    };
-
-    // 13. Calculate cursor position
-    const handleTimelineDragOver = (e) => {
-        e.preventDefault(); 
-        if (!ELS.visualEditorTimeline) return;
-
-        const rect = ELS.visualEditorTimeline.getBoundingClientRect();
-        const x = e.clientX - rect.left; 
-        const width = ELS.visualEditorTimeline.clientWidth;
-        const pct = Math.max(0, Math.min(1, x / width)); 
-
-        const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
-        const relativeTime = Math.round(pct * totalDuration);
-        const absoluteTime = BUILDER_STATE.startTimeMin + relativeTime;
-
-        if (ELS.visualEditorDropCursor) {
-            ELS.visualEditorDropCursor.style.left = `${pct * 100}%`;
-            ELS.visualEditorDropCursor.title = `Drop at: ${APP.Utils.formatMinutesToTime(absoluteTime)}`;
-        }
-    };
-
-    // 14. Handle the drop
-    const handleTimelineDrop = (e) => {
-        e.preventDefault();
-        if (ELS.visualEditorDropCursor) {
-            ELS.visualEditorDropCursor.style.display = 'none'; // Hide cursor
-        }
-
-        const componentId = e.dataTransfer.getData('text/plain');
-        const component = APP.StateManager.getComponentById(componentId);
-        if (!component) return;
-
-        const rect = ELS.visualEditorTimeline.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const width = ELS.visualEditorTimeline.clientWidth;
-        const pct = Math.max(0, Math.min(1, x / width));
-        
-        const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
-        const relativeTime = Math.round(pct * totalDuration);
-        const absoluteTime = BUILDER_STATE.startTimeMin + relativeTime;
-        
-        handleAddComponent(
-            componentId, 
-            absoluteTime, 
-            component.default_duration_min 
-        );
-    };
-    
-    // --- End Drag-and-Drop Handlers ---
-
-    // --- NEW: Right-Click Context Menu Handlers (Step 5) ---
-    
+    // --- CONTEXT MENU ---
     const handleTimelineContextMenu = (e) => {
-        e.preventDefault(); // Stop the browser's default right-click menu
-        closeContextMenu(); // Close any existing one
-
+        e.preventDefault();
+        closeContextMenu();
         const segment = e.target.closest('.ve-segment');
-        if (!segment) return; // Didn't click on a segment
-
+        if (!segment) return;
         const index = parseInt(segment.dataset.index, 10);
         if (isNaN(index)) return;
-
-        // Store the index of the segment we clicked
-        BUILDER_STATE.contextMenuIndex = index; 
-
-        // Show the menu at the mouse position
+        BUILDER_STATE.contextMenuIndex = index;
         ELS.visualEditorContextMenu.style.display = 'block';
         ELS.visualEditorContextMenu.style.left = `${e.clientX}px`;
         ELS.visualEditorContextMenu.style.top = `${e.clientY}px`;
     };
 
-    // Closes the context menu
     const closeContextMenu = () => {
-        if (ELS.visualEditorContextMenu) {
-            ELS.visualEditorContextMenu.style.display = 'none';
-        }
+        if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.style.display = 'none';
     };
 
-    // Handles clicks on the menu's buttons
     const handleContextMenuClick = (e) => {
         const item = e.target.closest('.ve-context-menu-item');
         if (!item) return;
-
         const action = item.dataset.action;
-        const index = BUILDER_STATE.contextMenuIndex; // Get the stored index
-        
+        const index = BUILDER_STATE.contextMenuIndex;
         if (isNaN(index) || !BUILDER_STATE.segments[index]) return;
-
+        
         const segment = BUILDER_STATE.segments[index];
-        const MIN_SEGMENT_DUR = 5;
-
+        
         if (action === 'delete') {
-            // --- Delete Logic (with "anti-ripple") ---
             const deletedDuration = segment.duration_min;
-            
-            // Remove the segment
             BUILDER_STATE.segments.splice(index, 1);
-
-            // "Pay back" the duration to the previous segment (or next, if it was the first)
             const paybackIndex = (index > 0) ? index - 1 : 0;
-            
             if (BUILDER_STATE.segments[paybackIndex]) {
                 BUILDER_STATE.segments[paybackIndex].duration_min += deletedDuration;
             }
-        }
-        else if (action === 'split') {
-            // --- Split Logic ---
-            if (segment.duration_min < (MIN_SEGMENT_DUR * 2)) {
-                APP.Utils.showToast("Segment is too short to split.", "warning");
+        } else if (action === 'split') {
+            if (segment.duration_min < 10) {
+                APP.Utils.showToast("Too short to split.", "warning");
                 return;
             }
-            
             const dur1 = Math.floor(segment.duration_min / 2);
             const dur2 = segment.duration_min - dur1;
-            
-            // Update original segment
             segment.duration_min = dur1;
-            
-            // Insert the new segment
-            BUILDER_STATE.segments.splice(index + 1, 0, {
-                component_id: segment.component_id,
-                duration_min: dur2
-            });
-        }
-        else if (action === 'edit') {
-            // --- Edit Logic (Re-uses the pop-up) ---
+            BUILDER_STATE.segments.splice(index + 1, 0, { component_id: segment.component_id, duration_min: dur2 });
+        } else if (action === 'edit') {
             const component = APP.StateManager.getComponentById(segment.component_id);
-            BUILDER_STATE.addPopupState = {
-                isOpen: true,
-                componentId: segment.component_id,
-                componentName: component.name,
-                isEditing: true, // Set edit mode
-                editIndex: index // Store the index we are editing
-            };
-
-            // Calculate the segment's absolute start time
             let startTime = BUILDER_STATE.startTimeMin;
-            for(let i = 0; i < index; i++) {
-                startTime += BUILDER_STATE.segments[i].duration_min;
-            }
-
-            // Open and pre-fill the pop-up
+            for(let i = 0; i < index; i++) startTime += BUILDER_STATE.segments[i].duration_min;
+            
+            BUILDER_STATE.addPopupState = {
+                isOpen: true, componentId: segment.component_id, componentName: component.name,
+                isEditing: true, editIndex: index
+            };
             ELS.veAddPopupTitle.textContent = `Edit: ${component.name}`;
             ELS.veAddStartTime.value = APP.Utils.formatMinutesToTime(startTime);
             ELS.veAddDuration.value = segment.duration_min;
             ELS.visualEditorAddPopup.style.display = 'block';
             ELS.veAddStartTime.focus();
         }
-        
-        // Re-render the timeline to show all changes
         renderTimeline();
-        saveVisualHistory(); // <-- Save Undo state
+        saveVisualHistory();
         closeContextMenu();
     };
 
-    // --- NEW: Internal History Functions (Step 6) ---
-
-    // Saves a snapshot of the current segments
+    // --- HISTORY & SAVE ---
     const saveVisualHistory = () => {
-        // Clear any "redo" history
         if (BUILDER_STATE.visualHistoryIndex < BUILDER_STATE.visualHistory.length - 1) {
             BUILDER_STATE.visualHistory = BUILDER_STATE.visualHistory.slice(0, BUILDER_STATE.visualHistoryIndex + 1);
         }
-        
-        // Add new state
         BUILDER_STATE.visualHistory.push(JSON.parse(JSON.stringify(BUILDER_STATE.segments)));
         BUILDER_STATE.visualHistoryIndex++;
-        
         updateUndoRedoButtons();
     };
 
-    // Handles the Undo button click
     const handleUndo = () => {
         if (BUILDER_STATE.visualHistoryIndex > 0) {
             BUILDER_STATE.visualHistoryIndex--;
-            const segments = JSON.parse(JSON.stringify(BUILDER_STATE.visualHistory[BUILDER_STATE.visualHistoryIndex]));
-            BUILDER_STATE.segments = segments;
-            renderTimeline(); // Re-render with the old state
+            BUILDER_STATE.segments = JSON.parse(JSON.stringify(BUILDER_STATE.visualHistory[BUILDER_STATE.visualHistoryIndex]));
+            renderTimeline();
             updateUndoRedoButtons();
         }
     };
 
-    // Handles the Redo button click
     const handleRedo = () => {
         if (BUILDER_STATE.visualHistoryIndex < BUILDER_STATE.visualHistory.length - 1) {
             BUILDER_STATE.visualHistoryIndex++;
-            const segments = JSON.parse(JSON.stringify(BUILDER_STATE.visualHistory[BUILDER_STATE.visualHistoryIndex]));
-            BUILDER_STATE.segments = segments;
-            renderTimeline(); // Re-render with the new state
+            BUILDER_STATE.segments = JSON.parse(JSON.stringify(BUILDER_STATE.visualHistory[BUILDER_STATE.visualHistoryIndex]));
+            renderTimeline();
             updateUndoRedoButtons();
         }
     };
     
-    // Updates the enabled/disabled state of the buttons
     const updateUndoRedoButtons = () => {
         if (ELS.veUndo) ELS.veUndo.disabled = BUILDER_STATE.visualHistoryIndex <= 0;
         if (ELS.veRedo) ELS.veRedo.disabled = BUILDER_STATE.visualHistoryIndex >= BUILDER_STATE.visualHistory.length - 1;
     };
 
-    // --- UNIVERSAL SAVE FUNCTION ---
     const handleSave = async () => {
         const { mode, contextId, segments, startTimeMin, exceptionDate, reason } = BUILDER_STATE;
-        
         const absoluteTimeSegments = [];
         let currentTime = startTimeMin;
 
-        if (segments.length === 0) {
-             if (mode === 'exception') {
-                if (!confirm("This will clear the schedule for the selected day (RDO/Absence). Proceed?")) {
-                    return;
-                }
-             }
+        if (segments.length === 0 && mode === 'exception') {
+            if (!confirm("This will clear the schedule for the selected day (RDO). Proceed?")) return;
         }
 
         for (const seg of segments) {
             if (!seg.component_id) {
-                APP.Utils.showToast("Error: All activities must have a component selected.", "danger");
+                APP.Utils.showToast("Error: Invalid activity in sequence.", "danger");
                 return;
             }
             const start = currentTime;
@@ -2270,116 +2141,63 @@ const toggleRowEditMode = (id, isEditing) => {
 
         let result;
         if (mode === 'definition') {
-            result = await saveShiftDefinition(contextId, absoluteTimeSegments);
+            result = await APP.DataService.updateRecord('shift_definitions', { structure: absoluteTimeSegments }, { id: contextId });
+            if (!result.error) {
+                APP.StateManager.syncRecord('shift_definitions', result.data);
+                APP.StateManager.saveHistory("Update Shift Structure");
+                APP.Utils.showToast("Shift definition saved.", "success");
+                if (APP.Components.ShiftDefinitionEditor) APP.Components.ShiftDefinitionEditor.render();
+            }
         } else if (mode === 'exception') {
-            result = await saveScheduleException(contextId, exceptionDate, absoluteTimeSegments, reason);
+            const record = { advisor_id: contextId, exception_date: exceptionDate, structure: absoluteTimeSegments, reason: reason || null };
+            result = await APP.DataService.saveRecord('schedule_exceptions', record, 'advisor_id, exception_date');
+            if (!result.error) {
+                APP.StateManager.syncRecord('schedule_exceptions', result.data);
+                APP.StateManager.saveHistory("Save Schedule Exception");
+                APP.Utils.showToast("Schedule exception saved.", "success");
+            }
         }
 
         if (result && !result.error) {
             SequentialBuilder.close();
-            if (APP.Components.ScheduleViewer) {
-                APP.Components.ScheduleViewer.render();
-            }
+            if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
         }
     };
 
-    // Specific save handler for Shift Definitions
-    const saveShiftDefinition = async (definitionId, structure) => {
-        const { data, error } = await APP.DataService.updateRecord('shift_definitions', { structure: structure }, { id: definitionId });
-        if (!error) {
-            APP.StateManager.syncRecord('shift_definitions', data);
-            APP.StateManager.saveHistory("Update Shift Structure");
-            APP.Utils.showToast("Shift definition saved successfully.", "success");
-            if (APP.Components.ShiftDefinitionEditor) {
-                APP.Components.ShiftDefinitionEditor.render();
-            }
-        }
-        return { data, error };
-    };
-
-    // Specific save handler for Schedule Exceptions
-    const saveScheduleException = async (advisorId, dateISO, structure, reason) => {
-        const record = {
-            advisor_id: advisorId,
-            exception_date: dateISO,
-            structure: structure,
-            reason: reason || null
-        };
-
-        const { data, error } = await APP.DataService.saveRecord('schedule_exceptions', record, 'advisor_id, exception_date');
-        if (!error) {
-            APP.StateManager.syncRecord('schedule_exceptions', data);
-            APP.StateManager.saveHistory("Save Schedule Exception");
-            APP.Utils.showToast("Schedule exception saved successfully.", "success");
-        }
-        return { data, error };
-    };
-
-
-    // --- LEGACY FUNCTIONS (For Shift Definition Editor) ---
+    // --- LEGACY FUNCTIONS (Restored for Table View Editor) ---
     const renderLegacyTable = () => {
-        // V16.3.1 FIX: Check if the body element exists before attempting to render (prevents crash if HTML is missing)
-        if (!ELS.modalSequenceBody) {
-            console.error("CRITICAL ERROR: Legacy editor HTML (modalSequenceBody) not found.");
-            // Attempt to provide a fallback UI within the container if possible
-            if (ELS.legacyEditorContainer) {
-                ELS.legacyEditorContainer.innerHTML = "<p style='color: red; text-align: center; padding: 20px;'>Error: Editor structure missing. Please check HTML integrity.</p>";
-            }
-            return;
-        }
-        
+        if (!ELS.modalSequenceBody) return;
         let html = '';
         let currentTime = BUILDER_STATE.startTimeMin;
-        
         const STATE = APP.StateManager.getState();
-        const componentOptions = STATE.scheduleComponents
-            .sort((a, b) => a.name.localeCompare(b.name))
-            .map(c => `<option value="${c.id}">${c.name} (${c.type})</option>`)
-            .join('');
-
+        const componentOptions = STATE.scheduleComponents.sort((a, b) => a.name.localeCompare(b.name))
+            .map(c => `<option value="${c.id}">${c.name} (${c.type})</option>`).join('');
         BUILDER_STATE.segments.forEach((seg, index) => {
-            const startTime = currentTime;
-            const endTime = currentTime + seg.duration_min;
+            const start = currentTime;
+            const end = currentTime + seg.duration_min;
             html += `
              <tr data-index="${index}">
                     <td>${index + 1}</td>
-                    <td>
-                        <select class="form-select sequence-component" data-index="${index}">
-                           <option value="">-- Select Activity --</option>
-                            ${componentOptions}
-                        </select>
-                    </td>
-                    <td>
-                        <input type="number" class="form-input duration-input sequence-duration" data-index="${index}" value="${seg.duration_min}" min="5" step="5">
-                    </td>
-                    <td>
-                         <input type="text" class="form-input duration-input sequence-start-time" 
-                                data-index="${index}" value="${APP.Utils.formatMinutesToTime(startTime)}" data-minutes="${startTime}">
-                    </td>
-                    <td>
-                        <input type="text" class="form-input duration-input sequence-end-time" 
-                               data-index="${index}" value="${APP.Utils.formatMinutesToTime(endTime)}" data-minutes="${endTime}">
-                    </td>
+                    <td><select class="form-select sequence-component" data-index="${index}"><option value="">-- Select --</option>${componentOptions}</select></td>
+                    <td><input type="number" class="form-input sequence-duration" data-index="${index}" value="${seg.duration_min}" min="5" step="5"></td>
+                    <td><input type="text" class="form-input sequence-start-time" data-index="${index}" value="${APP.Utils.formatMinutesToTime(start)}" data-minutes="${start}"></td>
+                    <td>${APP.Utils.formatMinutesToTime(end)}</td>
                     <td class="actions-cell">
                       <div class="btn-group">
                          <button class="btn btn-sm" data-action="insert-before" data-index="${index}">+ Above</button>
-                        <button class="btn btn-sm" data-action="insert-after" data-index="${index}">+ Below</button>
-                        <button class="btn btn-sm" data-action="split-row" data-index="${index}">Split</button>
-                         <button class="btn btn-sm btn-danger delete-sequence-item" data-index="${index}">Remove</button>
+                         <button class="btn btn-sm" data-action="insert-after" data-index="${index}">+ Below</button>
+                         <button class="btn btn-sm" data-action="split-row" data-index="${index}">Split</button>
+                         <button class="btn btn-sm btn-danger delete-sequence-item" data-index="${index}">X</button>
                       </div>
                     </td>
                 </tr>`;
-            currentTime = endTime;
+            currentTime = end;
         });
-
         ELS.modalSequenceBody.innerHTML = html;
         BUILDER_STATE.segments.forEach((seg, index) => {
-            const selectEl = ELS.modalSequenceBody.querySelector(`.sequence-component[data-index="${index}"]`);
-            if (selectEl) {
-                selectEl.value = seg.component_id || '';
-            }
+            const el = ELS.modalSequenceBody.querySelector(`.sequence-component[data-index="${index}"]`);
+            if (el) el.value = seg.component_id || '';
         });
-        // Summary is updated via the shared renderSummary function.
         renderSummary();
     };
 
@@ -2396,9 +2214,7 @@ const toggleRowEditMode = (id, isEditing) => {
             const componentId = target.value;
             BUILDER_STATE.segments[index].component_id = componentId || null;
             const component = APP.StateManager.getComponentById(componentId);
-            if (component) {
-                BUILDER_STATE.segments[index].duration_min = component.default_duration_min;
-            }
+            if (component) BUILDER_STATE.segments[index].duration_min = component.default_duration_min;
         } else if (target.classList.contains('sequence-duration')) {
             const duration = parseInt(target.value, 10);
             if (isNaN(duration) || duration < 5) {
@@ -2414,7 +2230,6 @@ const toggleRowEditMode = (id, isEditing) => {
                 return;
             }
             if (index === 0) {
-                // V16.3.1 FIX: Update the start time input field as well
                 BUILDER_STATE.startTimeMin = newStartTimeMin;
                 if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
                      ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(newStartTimeMin), false);
@@ -2426,43 +2241,12 @@ const toggleRowEditMode = (id, isEditing) => {
                 const newPrevDuration = prevDuration + durationDiff;
                 const newCurrDuration = currDuration - durationDiff;
                 if (newPrevDuration < 5 || newCurrDuration < 5) {
-                    APP.Utils.showToast("Cannot adjust: an activity would become too short.", "warning");
-                    target.value = APP.Utils.formatMinutesToTime(originalStartTimeMin); // Revert
+                    APP.Utils.showToast("Cannot adjust: activity too short.", "warning");
+                    target.value = APP.Utils.formatMinutesToTime(originalStartTimeMin);
                     return;
                 }
                 BUILDER_STATE.segments[index - 1].duration_min = newPrevDuration;
                 BUILDER_STATE.segments[index].duration_min = newCurrDuration;
-            }
-        } else if (target.classList.contains('sequence-end-time')) {
-            const newEndTimeMin = parseTimeToMinutes(target.value);
-            const originalEndTimeMin = parseInt(target.dataset.minutes, 10);
-            if (newEndTimeMin === null || newEndTimeMin === originalEndTimeMin) {
-                target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin);
-                return;
-            }
-            const isLastRow = index === BUILDER_STATE.segments.length - 1;
-            if (isLastRow) {
-                const durationDiff = newEndTimeMin - originalEndTimeMin;
-                const newLastDuration = BUILDER_STATE.segments[index].duration_min + durationDiff;
-                if (newLastDuration < 5) {
-                     APP.Utils.showToast("Cannot adjust: the last activity would be too short.", "warning");
-                     target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin); // Revert
-                     return;
-                }
-                BUILDER_STATE.segments[index].duration_min = newLastDuration;
-            } else {
-                const durationDiff = newEndTimeMin - originalEndTimeMin;
-                const currDuration = BUILDER_STATE.segments[index].duration_min;
-                const nextDuration = BUILDER_STATE.segments[index + 1].duration_min;
-                const newCurrDuration = currDuration + durationDiff;
-                const newNextDuration = nextDuration - durationDiff;
-                if (newCurrDuration < 5 || newNextDuration < 5) {
-                    APP.Utils.showToast("Cannot adjust: an activity would become too short.", "warning");
-                    target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin); // Revert
-                    return;
-                }
-                BUILDER_STATE.segments[index].duration_min = newCurrDuration;
-                BUILDER_STATE.segments[index + 1].duration_min = newNextDuration;
             }
         }
         renderLegacyTable();
@@ -2487,9 +2271,7 @@ const toggleRowEditMode = (id, isEditing) => {
             const adjustIndex = action === 'insert-before' ? index + 1 : index;
             if (BUILDER_STATE.segments[adjustIndex]) {
                 const cur = BUILDER_STATE.segments[adjustIndex];
-                if (cur.duration_min > NEW_DURATION + 5) {
-                    cur.duration_min = cur.duration_min - NEW_DURATION;
-                }
+                if (cur.duration_min > NEW_DURATION + 5) cur.duration_min -= NEW_DURATION;
             }
             renderLegacyTable();
             return;
@@ -2497,7 +2279,7 @@ const toggleRowEditMode = (id, isEditing) => {
         if (action === 'split-row') {
             const seg = BUILDER_STATE.segments[index];
             if (!seg || seg.duration_min < 10) {
-                APP.Utils.showToast("Cannot split activity shorter than 10 minutes.", "warning");
+                APP.Utils.showToast("Too short to split.", "warning");
                 return;
             }
             let first = clamp(Math.floor(seg.duration_min / 2));
@@ -2505,12 +2287,9 @@ const toggleRowEditMode = (id, isEditing) => {
             seg.duration_min = first;
             BUILDER_STATE.segments.splice(index + 1, 0, { component_id: seg.component_id, duration_min: second });
             renderLegacyTable();
-            return;
         }
     };
     
-    // --- End Legacy Functions ---
-
     APP.Components = APP.Components || {};
     APP.Components.SequentialBuilder = SequentialBuilder;
 }(window.APP));
