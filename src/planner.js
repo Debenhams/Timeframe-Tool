@@ -1536,12 +1536,21 @@ const toggleRowEditMode = (id, isEditing) => {
             ELS.visualEditorToolbox.addEventListener('dragend', handleToolboxDragEnd); // For drag/drop
         }
         if (ELS.visualEditorTimeline) {
-            ELS.visualEditorTimeline.addEventListener('mousedown', handleDragStart); // For drag handles
-            ELS.visualEditorTimeline.addEventListener('dragenter', handleTimelineDragEnter); // For drag/drop
-            ELS.visualEditorTimeline.addEventListener('dragover', handleTimelineDragOver); // For drag/drop
-            ELS.visualEditorTimeline.addEventListener('dragleave', handleTimelineDragLeave); // For drag/drop
-            ELS.visualEditorTimeline.addEventListener('drop', handleTimelineDrop); // For drag/drop
+            ELS.visualEditorTimeline.addEventListener('mousedown', handleDragStart);
+            // For drag handles
+            ELS.visualEditorTimeline.addEventListener('dragenter', handleTimelineDragEnter);
+            // For drag/drop
+            ELS.visualEditorTimeline.addEventListener('dragover', handleTimelineDragOver);
+            // For drag/drop
+            ELS.visualEditorTimeline.addEventListener('dragleave', handleTimelineDragLeave);
+            // For drag/drop
+            ELS.visualEditorTimeline.addEventListener('drop', handleTimelineDrop);
+            // For drag/drop
             ELS.visualEditorTimeline.addEventListener('contextmenu', handleTimelineContextMenu);
+
+            // --- NEW: Listeners for Zero-Sum Shuffle ---
+            ELS.visualEditorTimeline.addEventListener('dragstart', handleSegmentDragStart);
+            ELS.visualEditorTimeline.addEventListener('dragend', handleSegmentDragEnd);
         }
         if (ELS.veAddPopupCancel) ELS.veAddPopupCancel.addEventListener('click', closeAddPopup);
         if (ELS.veAddPopupSave) ELS.veAddPopupSave.addEventListener('click', handleAddPopupSave);
@@ -1728,7 +1737,7 @@ const toggleRowEditMode = (id, isEditing) => {
             const tooltip = `${component.name}\nTime: ${APP.Utils.formatMinutesToTime(startTime)} - ${APP.Utils.formatMinutesToTime(endTime)}\nDuration: ${seg.duration_min}m`;
 
             return `
-                <div class="ve-segment" style="width: ${widthPct}%; background-color: ${component.color};" data-index="${index}" title="${tooltip}">
+                <div class="ve-segment" draggable="true" style="width: ${widthPct}%; background-color: ${component.color};" data-index="${index}" title="${tooltip}">
                     <div class="ve-drag-handle" data-handle-index="${index}"></div>
                 </div>
             `;
@@ -2002,6 +2011,98 @@ const toggleRowEditMode = (id, isEditing) => {
             saveVisualHistory(); // <-- Save Undo state
         }
     };
+    // --- NEW: Zero-Sum Shuffle (Re-order) Functions ---
+
+    /**
+     * Handles the start of a drag on an existing timeline segment.
+     * This initiates the "Zero-Sum Shuffle" (Extraction).
+     */
+    const handleSegmentDragStart = (e) => {
+        const segment = e.target.closest('.ve-segment');
+        if (!segment) {
+            e.preventDefault();
+            return;
+        }
+
+        const index = parseInt(segment.dataset.index, 10);
+        if (isNaN(index)) return;
+
+        // Store the segment's data for the drop handler
+        // We use 'application/json' to differentiate from a toolbox drag
+        try {
+            const segmentData = JSON.parse(JSON.stringify(BUILDER_STATE.segments[index]));
+            e.dataTransfer.setData('application/json', JSON.stringify(segmentData));
+        } catch (err) {
+            console.error("Failed to serialize segment data for drag:", err);
+            return;
+        }
+
+        // --- ADVANCED: Key-Modified Clone Logic ---
+        // If user holds ALT, we COPY instead of MOVE
+        const isCloning = e.altKey; 
+        
+        e.dataTransfer.effectAllowed = isCloning ? 'copy' : 'move';
+
+        // Add visual class to the segment being dragged (Ghost effect)
+        setTimeout(() => {
+            segment.classList.add('is-dragging');
+        }, 0);
+
+        // --- THE MAGIC: Conditional Extraction ---
+        if (isCloning) {
+            // If cloning, we leave the original there.
+        } else {
+            // If moving, we extract it immediately to close the gap (Zero-Sum)
+            executeSegmentExtraction(index);
+        }
+    };
+
+    /**
+     * Helper function to perform the "Extraction" part of the shuffle.
+     * It removes the segment and "pays back" the time to the previous activity.
+     */
+    const executeSegmentExtraction = (index) => {
+        if (!BUILDER_STATE.segments[index]) return;
+
+        // 1. Get the duration of the segment being extracted
+        const deletedDuration = BUILDER_STATE.segments[index].duration_min;
+
+        // 2. Remove the segment from the state array
+        BUILDER_STATE.segments.splice(index, 1);
+
+        // 3. "Pay back" its duration to a neighbor to maintain zero-sum
+        //    (We prefer paying back to the *previous* segment to close the gap naturally)
+        const paybackIndex = (index > 0) ? index - 1 : 0; 
+        
+        if (BUILDER_STATE.segments[paybackIndex]) {
+            BUILDER_STATE.segments[paybackIndex].duration_min += deletedDuration;
+        } else if (BUILDER_STATE.segments.length > 0) {
+            // Fallback: If we deleted the first item, pay forward to the new first item
+            BUILDER_STATE.segments[0].duration_min += deletedDuration;
+        }
+
+        // 4. Re-render the timeline to show the "closed gap" immediately
+        renderTimeline();
+    };
+
+    /**
+     * Cleans up dragging UI if the drag is cancelled or finished.
+     */
+    const handleSegmentDragEnd = (e) => {
+        // Clean up any 'is-dragging' ghost classes
+        const segment = document.querySelector('.ve-segment.is-dragging');
+        if (segment) {
+            segment.classList.remove('is-dragging');
+        }
+        
+        // Also clean up any toolbox items just in case
+        const toolboxItem = document.querySelector('.ve-toolbox-item.is-dragging');
+        if (toolboxItem) {
+            toolboxItem.classList.remove('is-dragging');
+        }
+    };
+    
+    // --- End Zero-Sum Shuffle Functions ---
 
     // --- NEW: Drag-and-Drop Handlers (Step 4) ---
 
@@ -2046,7 +2147,7 @@ const toggleRowEditMode = (id, isEditing) => {
 
     // 13. Calculate cursor position
     const handleTimelineDragOver = (e) => {
-        e.preventDefault(); 
+        e.preventDefault();
         if (!ELS.visualEditorTimeline) return;
 
         const rect = ELS.visualEditorTimeline.getBoundingClientRect();
@@ -2055,11 +2156,18 @@ const toggleRowEditMode = (id, isEditing) => {
         const pct = Math.max(0, Math.min(1, x / width)); 
 
         const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
-        const relativeTime = Math.round(pct * totalDuration);
-        const absoluteTime = BUILDER_STATE.startTimeMin + relativeTime;
+
+        // --- NEW: Snap-to-Grid Logic (5 minutes) ---
+        const timeInMinutes = (pct * totalDuration);
+        const snappedRelativeTime = Math.round(timeInMinutes / 5) * 5;
+        const absoluteTime = BUILDER_STATE.startTimeMin + snappedRelativeTime;
+
+        // Position cursor based on the *snapped* percentage
+        // This ensures the visual red line matches exactly where the drop will happen
+        const snappedPct = (totalDuration > 0) ? (snappedRelativeTime / totalDuration) * 100 : 0;
 
         if (ELS.visualEditorDropCursor) {
-            ELS.visualEditorDropCursor.style.left = `${pct * 100}%`;
+            ELS.visualEditorDropCursor.style.left = `${snappedPct}%`;
             ELS.visualEditorDropCursor.title = `Drop at: ${APP.Utils.formatMinutesToTime(absoluteTime)}`;
         }
     };
@@ -2071,24 +2179,55 @@ const toggleRowEditMode = (id, isEditing) => {
             ELS.visualEditorDropCursor.style.display = 'none'; // Hide cursor
         }
 
-        const componentId = e.dataTransfer.getData('text/plain');
-        const component = APP.StateManager.getComponentById(componentId);
-        if (!component) return;
-
+        // --- Calculate Drop Position (with Snap-to-Grid) ---
         const rect = ELS.visualEditorTimeline.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const width = ELS.visualEditorTimeline.clientWidth;
         const pct = Math.max(0, Math.min(1, x / width));
-        
         const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
-        const relativeTime = Math.round(pct * totalDuration);
-        const absoluteTime = BUILDER_STATE.startTimeMin + relativeTime;
         
-        handleAddComponent(
-            componentId, 
-            absoluteTime, 
-            component.default_duration_min 
-        );
+        // --- NEW: Add Snap-to-Grid Logic (5 minutes) ---
+        const timeInMinutes = (pct * totalDuration);
+        const snappedRelativeTime = Math.round(timeInMinutes / 5) * 5; // Snap!
+        
+        const absoluteTime = BUILDER_STATE.startTimeMin + snappedRelativeTime;
+
+        // --- NEW: Differentiate between a RE-ORDER and a NEW-COMPONENT ---
+        
+        const reorderData = e.dataTransfer.getData('application/json');
+        const componentId = e.dataTransfer.getData('text/plain'); // Legacy/Toolbox
+
+        if (reorderData) {
+            // --- This is a RE-ORDER (Zero-Sum Shuffle) ---
+            try {
+                const segment = JSON.parse(reorderData);
+                if (segment && segment.component_id && segment.duration_min) {
+                    // Re-use the existing "Ripple-Pay" function for insertion
+                    // This keeps everything zero-sum!
+                    handleAddComponent(segment.component_id, absoluteTime, segment.duration_min);
+                }
+            } catch (err) {
+                console.error("Failed to parse re-order data:", err);
+                APP.Utils.showToast("Re-order failed. Please Undo.", "danger");
+            }
+        } else if (componentId) {
+            // --- EXISTING: This is a NEW component from the toolbox ---
+            const component = APP.StateManager.getComponentById(componentId);
+            if (!component) return;
+
+            handleAddComponent(
+                componentId, 
+                absoluteTime, 
+                component.default_duration_min 
+            );
+        }
+
+        // --- Universal Cleanup ---
+        // Find *any* element that was being dragged and remove its class.
+        const draggingEl = document.querySelector('.is-dragging');
+        if (draggingEl) {
+            draggingEl.classList.remove('is-dragging');
+        }
     };
     
     // --- End Drag-and-Drop Handlers ---
