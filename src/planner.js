@@ -284,7 +284,7 @@ Utils.addDaysISO = (iso, days) => {
 /**
  * MODULE: APP.DataService
  * Handles all interactions with the Supabase backend.
- * V15.9 FIX: Improved assignment fetch logic (tie-breaking) and Date syncing.
+ * V16.0 FIX: Force Overwrite - Clears conflicting Exceptions when changing Rotations.
  */
 (function(APP) {
     const DataService = {};
@@ -292,6 +292,7 @@ Utils.addDaysISO = (iso, days) => {
     
     const HISTORY_TABLE = 'rotation_assignments_history';
     const SNAPSHOT_TABLE = 'rotation_assignments';
+    const EXCEPTIONS_TABLE = 'schedule_exceptions';
 
     DataService.initialize = () => {
         if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
@@ -352,25 +353,23 @@ Utils.addDaysISO = (iso, days) => {
         return { data: null, error: null };
     };
 
-    // V15.9 FIX: Logic improved to correctly handle overlapping/duplicate start dates
+    // V15.9 Logic: Tie-breaker for overlapping assignments
     DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
       try {
         const weekEndISO = APP.Utils.addDaysISO(isoDate, 6);
         
-        // Fetch all relevant history records
         const { data, error } = await supabase
           .from(HISTORY_TABLE)
           .select('id, advisor_id, rotation_name, start_date, end_date, reason')
           .lte('start_date', weekEndISO)
           .or(`end_date.is.null,end_date.gte.${isoDate}`)
-          .order('id', { ascending: true }); 
+          .order('id', { ascending: true });
 
         if (error && (error.code === '42P01' || error.code === 'PGRST116')) {
             return await fetchSnapshotAssignments();
         }
         if (error) return handleError(error, 'Fetch effective assignments');
 
-        // Client-side filtering to pick the "Winner" for this week
         const byAdvisor = new Map();
         (data || []).forEach(row => {
           const existing = byAdvisor.get(row.advisor_id);
@@ -379,19 +378,14 @@ Utils.addDaysISO = (iso, days) => {
             return;
           }
           
-          // 1. Prefer later start date (closer to current week)
           if (row.start_date > existing.start_date) {
             byAdvisor.set(row.advisor_id, row);
-          } 
-          // 2. If start dates are equal (Collision/Overwrite)
-          else if (row.start_date === existing.start_date) {
+          } else if (row.start_date === existing.start_date) {
             const existingIsBounded = !!existing.end_date;
             const rowIsBounded = !!row.end_date;
-            
             if (rowIsBounded && !existingIsBounded) {
                  byAdvisor.set(row.advisor_id, row);
-            } 
-            else if (rowIsBounded === existingIsBounded) {
+            } else if (rowIsBounded === existingIsBounded) {
                  byAdvisor.set(row.advisor_id, row); 
             }
           }
@@ -476,6 +470,8 @@ Utils.addDaysISO = (iso, days) => {
     DataService.assignFromWeek = async ({ advisor_id, rotation_name, start_date, reason = 'New Assignment' }) => {
         try {
             const dateMinusOne = APP.Utils.addDaysISO(start_date, -1);
+            
+            // 1. Clip previous
             const { error: updateError } = await supabase
                 .from(HISTORY_TABLE)
                 .update({ end_date: dateMinusOne })
@@ -485,6 +481,7 @@ Utils.addDaysISO = (iso, days) => {
 
             if (updateError && !updateError.code.startsWith('PGRST')) throw new Error("Failed to clip previous.");
 
+            // 2. Insert new
             const newRecord = {
                 advisor_id: advisor_id,
                 rotation_name: rotation_name || null,
@@ -494,6 +491,12 @@ Utils.addDaysISO = (iso, days) => {
             };
             const { data, error } = await DataService.saveRecord(HISTORY_TABLE, newRecord, 'advisor_id, start_date');
             if (error && !error.includes('PGRST')) throw new Error("Failed to insert assignment.");
+
+            // 3. V16.0 FIX: Wipe conflicting exceptions for the future to ensure rotation is visible
+            await supabase.from(EXCEPTIONS_TABLE)
+                .delete()
+                .eq('advisor_id', advisor_id)
+                .gte('exception_date', start_date);
 
             await updateSnapshotAssignment(advisor_id);
             return { data, error: null };
@@ -516,6 +519,13 @@ Utils.addDaysISO = (iso, days) => {
             
             const { data, error } = await DataService.saveRecord(HISTORY_TABLE, swapRecord, 'advisor_id, start_date');
             if (error && !error.includes('PGRST')) throw new Error("Failed to insert swap.");
+
+            // 3. V16.0 FIX: Wipe conflicting exceptions for THIS week to ensure swap is visible
+            await supabase.from(EXCEPTIONS_TABLE)
+                .delete()
+                .eq('advisor_id', advisor_id)
+                .gte('exception_date', week_start)
+                .lte('exception_date', week_end);
 
             await updateSnapshotAssignment(advisor_id);
             return { data, error: null };
