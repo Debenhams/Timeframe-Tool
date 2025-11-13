@@ -1,10 +1,12 @@
 /**
- * WFM Intelligence Platform - Application Logic (v16.3 FINAL)
- * * INCLUDES:
- * 1. Smart Visual Editor (Timeline, Drag-drop, Undo/Redo, Time Ruler).
- * 2. Assignment Manager Fix (Event Delegation for robust buttons).
- * 3. Layout Fix (Professional footer layout).
- * 4. Tie-Breaker Logic (Prioritizes swaps over rotations).
+ * WFM Intelligence Platform - Application Logic (v15.8.1)
+ * 
+ * V15.8.1: Added "Delete Last Week" functionality to Rotation Editor.
+ *          Incorporated AssignmentManager sync fix (fetchSnapshotForAdvisor).
+ *          Fixed error handling logic in DataService (insertError check).
+ * V15.8:   CRITICAL FIX: Resolved major structural/syntax errors.
+ *          CRITICAL FIX: Fixed Assignments tab "Button Spam".
+ *          CRITICAL FIX: Implemented missing DataService functions for assignment history.
  */
 
 // Global Namespace Initialization
@@ -16,33 +18,39 @@ window.APP = window.APP || {};
 (function(APP) {
     const Config = {};
 
-    // Supabase Configuration
+    // Supabase Configuration (Centralized)
+    // NOTE: These are placeholder credentials. Replace with environment variables in production.
     Config.SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
     Config.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95cGRuanhoanBncHdta2x0em1rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4Nzk0MTEsImV4cCI6MjA3NTQ1NTQxMX0.Hqf1L4RHpIPUD4ut2uVsiGDsqKXvAjdwKuotmme4_Is";
 
     // Timeline Visualization Constants (05:00-23:00)
-    Config.TIMELINE_START_MIN = 5 * 60; // 05:00
-    Config.TIMELINE_END_MIN = 23 * 60; // 23:00
-    Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_MIN;
+Config.TIMELINE_START_MIN = 5 * 60; // 05:00
+Config.TIMELINE_END_MIN = 23 * 60; // 23:00
+Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_MIN; // 18 hours
 
     APP.Config = Config;
 }(window.APP));
 
+
 /**
  * MODULE: APP.Utils
+ * Utility functions for date handling, formatting, and UI feedback.
  */
 (function(APP) {
     const Utils = {};
-    const ELS = {}; 
+    
+    const ELS = {}; // DOM Cache for Utils
 
     Utils.cacheDOMElements = () => {
         ELS.notificationContainer = document.getElementById('notification-container');
     };
 
+    // Display a toast notification
     Utils.showToast = (message, type = "success", duration = 3000) => {
         if (!ELS.notificationContainer) Utils.cacheDOMElements();
         if (!ELS.notificationContainer) return;
         
+        // Map various types to standard classes
         let toastClass = 'is-success';
         if (type === 'danger' || type === 'error' || type === 'warning') {
             toastClass = 'is-danger';
@@ -52,6 +60,7 @@ window.APP = window.APP || {};
         toast.className = `toast ${toastClass}`;
         toast.textContent = message;
         ELS.notificationContainer.appendChild(toast);
+        // Auto-remove the toast
         setTimeout(() => { 
             if (ELS.notificationContainer && toast.parentNode === ELS.notificationContainer) {
                 ELS.notificationContainer.removeChild(toast);
@@ -59,40 +68,62 @@ window.APP = window.APP || {};
         }, duration);
     };
 
+    // Format minutes since midnight (e.g., 480) to HH:MM (e.g., "08:00")
     Utils.formatMinutesToTime = (minutes) => {
         if (minutes === null || isNaN(minutes)) return "";
         let roundedMinutes = Math.round(minutes);
-        if (roundedMinutes >= 1440) roundedMinutes -= 1440;
+        
+        // Handle times past midnight gracefully for display
+        if (roundedMinutes >= 1440) {
+             roundedMinutes -= 1440;
+        }
+        
         const h = Math.floor(roundedMinutes / 60);
         const m = roundedMinutes % 60;
-        if (m === 60) return `${String(h + 1).padStart(2, '0')}:00`;
+        
+        // Handle rounding resulting in 60 minutes
+        if (m === 60) {
+             return `${String(h + 1).padStart(2, '0')}:00`;
+        }
+        
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     };
 
+    // Format duration in minutes (e.g., 90) to hours and minutes (e.g., "1h 30m")
     Utils.formatDuration = (minutes) => {
         const h = Math.floor(minutes / 60);
         const m = minutes % 60;
         return `${h}h ${String(m).padStart(2, '0')}m`;
     };
 
+    // Determine contrasting text color (black or white) based on background brightness
     Utils.getContrastingTextColor = (hexColor) => {
         if (!hexColor) return '#000000';
         try {
             const r = parseInt(hexColor.substr(1, 2), 16);
             const g = parseInt(hexColor.substr(3, 2), 16);
             const b = parseInt(hexColor.substr(5, 2), 16);
+            // Formula for luminance perception
             const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
             return (brightness > 128) ? '#000000' : '#FFFFFF';
-        } catch (e) { return '#FFFFFF'; }
+        } catch (e) {
+            // Fallback if hex color is invalid
+            return '#FFFFFF';
+        }
     };
 
+    // Converts dd/mm/yyyy (UK format) to yyyy-mm-dd (ISO format)
     Utils.convertUKToISODate = (ukDateStr) => {
         if (!ukDateStr) return null;
         const parts = ukDateStr.split('/');
         if (parts.length !== 3) return null;
-        return `${parts[2]}-${parts[1]}-${parts[0].padStart(2, '0')}`;
+        const d = parts[0].padStart(2, '0');
+        const m = parts[1].padStart(2, '0');
+        const y = parts[2];
+        return `${y}-${m}-${d}`;
     };
 
+    // Converts yyyy-mm-dd (ISO format) to dd/mm/yyyy (UK format)
     Utils.convertISOToUKDate = (isoDateStr) => {
         if (!isoDateStr) return '';
         const parts = isoDateStr.split('-');
@@ -100,17 +131,22 @@ window.APP = window.APP || {};
         return `${parts[2]}/${parts[1]}/${parts[0]}`;
     };
 
+    // Get ISO date for a specific day name within a given week (defined by weekStartISO)
     Utils.getISODateForDayName = (weekStartISO, dayName) => {
         if (!weekStartISO) return null;
         const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         const dayIndex = days.indexOf(dayName);
         if (dayIndex === -1) return null;
+
         const [y, m, d] = weekStartISO.split('-').map(Number);
+        // Use local time calculation for visualization consistency
         const date = new Date(y, m - 1, d);
         date.setDate(date.getDate() + dayIndex);
+
         return Utils.formatDateToISO(date);
     };
 
+    // Helper to format Date object to YYYY-MM-DD
     Utils.formatDateToISO = (dateObj) => {
          const yyyy = dateObj.getFullYear();
         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
@@ -118,74 +154,126 @@ window.APP = window.APP || {};
         return `${yyyy}-${mm}-${dd}`;
     };
 
+    // Helper to get the Monday ISO date for any given ISO date
     Utils.getMondayForDate = (isoDateStr) => {
-        if (!isoDateStr || typeof isoDateStr !== 'string') return null;
-        if (isoDateStr.split('-').length !== 3) {
-            const maybeISO = Utils.convertUKToISODate(isoDateStr);
-            if (maybeISO) return Utils.getMondayForDate(maybeISO);
+        if (!isoDateStr || typeof isoDateStr !== 'string' || isoDateStr.split('-').length !== 3) {
+            console.error("Invalid ISO date string provided to getMondayForDate:", isoDateStr);
             return null;
         }
         const [y, m, d] = isoDateStr.split('-').map(Number);
         const date = new Date(y, m - 1, d);
-        if (isNaN(date.getTime())) return null;
+         if (isNaN(date.getTime())) {
+            console.error("Invalid Date object created in getMondayForDate:", isoDateStr);
+            return null;
+        }
         const day = date.getDay();
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+        // Calculate difference to Monday (1 for Monday, 0 for Sunday)
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1); 
         const monday = new Date(date.setDate(diff));
         return Utils.formatDateToISO(monday);
     };
 
+     // Helper to get the Day Name from an ISO Date
     Utils.getDayNameFromISO = (isoDateStr) => {
         if (!isoDateStr) return null;
         try {
             const [y, m, d] = isoDateStr.split('-').map(Number);
+            // Use UTC to ensure consistent day name regardless of client timezone
             const dateObj = new Date(Date.UTC(y, m - 1, d));
             return dateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
-         } catch (err) { return null; }
+         } catch (err) {
+             console.error("Error parsing date for getDayNameFromISO:", isoDateStr, err);
+             return null;
+         }
     };
 
+    // Helper: Calculate the length (in weeks) of a rotation pattern
     Utils.calculateRotationLength = (pattern) => {
         let numWeeks = 0;
         if (pattern && pattern.pattern && Object.keys(pattern.pattern).length > 0) {
             const keys = Object.keys(pattern.pattern);
+            // Robust method to find the max week number defined in the pattern (supports "Week1" and "Week 1")
             const weekNumbers = keys.map(k => {
                 const match = k.match(/^Week ?(\d+)$/i);
                 return match ? parseInt(match[1], 10) : 0;
             });
             const maxWeek = Math.max(0, ...weekNumbers);
-            if (maxWeek > 0) numWeeks = maxWeek;
+
+            if (maxWeek > 0) {
+                numWeeks = maxWeek;
+            }
         }
         return numWeeks;
     };
 
+
+    // Updated for FINITE (Non-Repeating) Rotations
+    // Calculates the effective week number based on the assignment start date.
     Utils.getEffectiveWeek = (startDateISO, weekStartISO, assignment, getPatternByName) => {
         try {
             if (!startDateISO || !weekStartISO || !assignment) return null;
+            
+            // Robust parsing of "YYYY-MM-DD"
             const [y1, m1, d1] = startDateISO.split('-').map(Number);
             const [y2, m2, d2] = weekStartISO.split('-').map(Number);
-            if (isNaN(y1) || isNaN(y2)) return null; 
+
+            if (isNaN(y1) || isNaN(y2)) {
+                 console.error("Failed to parse dates:", startDateISO, weekStartISO);
+                 return null; 
+            }
             
+            // Use UTC to avoid timezone shifts affecting week boundaries
             const startUTC = Date.UTC(y1, m1 - 1, d1);
             const checkUTC = Date.UTC(y2, m2 - 1, d2);
+            
             const diffTime = checkUTC - startUTC;
+            
+            // If the checked week is before the rotation's "Week 1 Day 1", it's invalid.
             if (diffTime < 0) return null;
 
+            // Calculate the number of weeks elapsed since the start date (0-based index)
             const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
+            
+            // Determine rotation length
             const pattern = getPatternByName(assignment.rotation_name);
+            
+            // Use the helper function for consistency
             let numWeeksInRotation = Utils.calculateRotationLength(pattern);
-            if (numWeeksInRotation === 0) return null;
-            if (diffWeeks >= numWeeksInRotation) return null;
+            
+            if (numWeeksInRotation === 0) {
+                // Fallback if pattern is empty or invalid
+                return null;
+            }
+                
+            // Check if the elapsed weeks exceed the rotation length.
+            // If it does, the rotation is finished (Finite Rotation).
+            if (diffWeeks >= numWeeksInRotation) {
+                return null;
+            }
 
-            return diffWeeks + 1;
-        } catch (e) { return null; }
-    };
+            // Calculate the effective week number (1-based index)
+            const effectiveWeek = diffWeeks + 1;
+            return effectiveWeek;
+        } catch (e) {
+            console.error("Error calculating effective week:", e);
+            return null;
+        }
+   
+};
 
-    Utils.addDaysISO = (iso, days) => {
-      if (!iso) return null;
-      const d = new Date(iso + 'T00:00:00Z');
-      if (isNaN(d.getTime())) return null;
-      d.setUTCDate(d.getUTCDate() + days);
-      return d.toISOString().slice(0,10);
-    };
+// Robust ISO date arithmetic using UTC
+Utils.addDaysISO = (iso, days) => {
+  if (!iso) return null;
+  // Use UTC midnight to prevent timezone issues when calculating date differences
+  const d = new Date(iso + 'T00:00:00Z');
+  if (isNaN(d.getTime())) {
+      console.error("Invalid ISO date provided to addDaysISO:", iso);
+      return null;
+  }
+  d.setUTCDate(d.getUTCDate() + days);
+  // Return the YYYY-MM-DD part of the ISO string (toISOString slice works correctly because we are in UTC)
+  return d.toISOString().slice(0,10);
+};
 
     APP.Utils = Utils;
 }(window.APP));
@@ -193,83 +281,119 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.DataService
+ * Handles all interactions with the Supabase backend.
+ * V15.8: Added specific helper functions for managing rotation_assignments_history.
  */
 (function(APP) {
     const DataService = {};
     let supabase = null;
+    
+    // Define the table name for historical assignments (centralized)
     const HISTORY_TABLE = 'rotation_assignments_history';
     const SNAPSHOT_TABLE = 'rotation_assignments';
 
+    // Initialize the Supabase client
     DataService.initialize = () => {
         if (typeof window.supabase === 'undefined' || !window.supabase.createClient) {
              APP.Utils.showToast("Error: Database library (Supabase) not loaded.", "danger", 10000);
             return false;
         }
         const { createClient } = window.supabase;
+
         supabase = createClient(APP.Config.SUPABASE_URL, APP.Config.SUPABASE_ANON_KEY);
         return true;
     };
 
+    // Centralized error handling
     const handleError = (error, context) => {
         console.error(`DataService Error (${context}):`, error);
         const errorMessage = error && error.message ? error.message : 'Unknown database error';
+        
+        // Suppress specific known warning if the history table doesn't exist yet (PGRST116 or 42P01).
         if (error && (error.code === 'PGRST116' || error.code === '42P01') && context.includes(HISTORY_TABLE)) {
-             console.warn(`Note: ${HISTORY_TABLE} table not found.`);
+             console.warn(`Note: ${HISTORY_TABLE} table not found. Time-based assignments may not function correctly until schema is updated.`);
         } else {
             APP.Utils.showToast(`Database Error: ${errorMessage}`, "danger");
         }
         return { data: null, error: errorMessage };
     };
 
+    // Generic table fetch (Private)
     const fetchTable = async (tableName) => {
         const { data, error } = await supabase.from(tableName).select('*');
         if (error) return handleError(error, `Fetch ${tableName}`);
         return { data, error: null };
     };
 
+    // Generalized save/upsert function
     DataService.saveRecord = async (tableName, record, conflictColumn = null) => {
         let query = supabase.from(tableName);
-        if (conflictColumn) query = query.upsert(record, { onConflict: conflictColumn });
-        else query = query.insert(record);
+        if (conflictColumn) {
+            // Use upsert for saving exceptions or assignments based on unique constraints
+            query = query.upsert(record, { onConflict: conflictColumn });
+        } else {
+            query = query.insert(record);
+        }
+        // .select() ensures the saved record is returned
         const { data, error } = await query.select();
         if (error) return handleError(error, `Save ${tableName}`);
+        // Return the saved record (first element of the returned array)
         return { data: data ? data[0] : null, error: null };
     };
 
+    // Generalized update function
     DataService.updateRecord = async (tableName, updates, condition) => {
         let query = supabase.from(tableName).update(updates);
+
+        // Apply conditions using explicit filters (.eq/.is)
         if (condition) {
             Object.keys(condition).forEach(key => {
                 const value = condition[key];
-                if (value === null) query = query.is(key, null);
-                else query = query.eq(key, value);
+                if (value === null) {
+                    // Explicitly use .is() for NULL checks
+                    query = query.is(key, null);
+                } else {
+                    // Use .eq() for standard equality checks
+                    query = query.eq(key, value);
+                }
             });
         }
+
          const { data, error } = await query.select();
         if (error) return handleError(error, `Update ${tableName}`);
+        // Return the first updated record if available
         return { data: data ? data[0] : null, error: null };
     };
 
+    // Generalized delete function
     DataService.deleteRecord = async (tableName, condition) => {
         const { error } = await supabase.from(tableName).delete().match(condition);
         if (error) return handleError(error, `Delete ${tableName}`);
         return { data: null, error: null };
     };
 
+    // V15.8 FIX: Reads effective rotation rows for a given date (YYYY-MM-DD).
+    // Includes prioritization logic and fallback if history table is missing.
     DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
       try {
+        // 1) Pull only rows that *cover* this date from history:
+        //    start_date <= isoDate AND (end_date IS NULL OR end_date >= isoDate)
         const { data, error } = await supabase
           .from(HISTORY_TABLE)
           .select('advisor_id, rotation_name, start_date, end_date, reason')
           .lte('start_date', isoDate)
           .or(`end_date.is.null,end_date.gte.${isoDate}`);
 
+        // Handle specific error if the history table is missing (PostgREST error code PGRST116 or 42P01)
         if (error && (error.code === '42P01' || error.code === 'PGRST116')) {
+            console.warn(`${HISTORY_TABLE} not found. Falling back to ${SNAPSHOT_TABLE} snapshot.`);
             return await fetchSnapshotAssignments();
         }
+
         if (error) return handleError(error, 'Fetch effective assignments for date');
 
-        // 2) Tie-breaker logic
+        // 2) For each advisor, pick the row with the *latest* start_date (closest to isoDate).
+        //    If there are ties, prefer a bounded swap (has end_date) over an open-ended row.
         const byAdvisor = new Map();
         (data || []).forEach(row => {
           const existing = byAdvisor.get(row.advisor_id);
@@ -289,17 +413,21 @@ window.APP = window.APP || {};
             }
           }
         });
+
         return { data: byAdvisor, error: null };
       } catch (err) {
         return handleError(err, 'Fetch effective assignments for date (Catch)');
       }
     };
 
+    // Fallback function if history table is missing. (Private)
     const fetchSnapshotAssignments = async () => {
         const { data, error } = await fetchTable(SNAPSHOT_TABLE);
         if (error) return { data: new Map(), error: error.error };
+        
         const byAdvisor = new Map();
         (data || []).forEach(row => {
+            // Adapt the snapshot structure to the expected history structure
             byAdvisor.set(row.advisor_id, {
                 advisor_id: row.advisor_id,
                 rotation_name: row.rotation_name,
@@ -311,9 +439,12 @@ window.APP = window.APP || {};
         return { data: byAdvisor, error: null };
     };
 
+
+    // Load all necessary data tables
     DataService.loadCoreData = async () => {
         try {
-            const [advisors, leadersResult, components, definitions, patterns, assignments, exceptions] = await Promise.all([
+            // Fetch tables in parallel for efficiency
+            const [advisors, leaders, components, definitions, patterns, assignments, exceptions] = await Promise.all([
                 fetchTable('advisors'),
                 supabase.from('leaders').select('*, sites(name)'),
                 fetchTable('schedule_components'),
@@ -322,14 +453,21 @@ window.APP = window.APP || {};
                 fetchTable(SNAPSHOT_TABLE), 
                 fetchTable('schedule_exceptions')
             ]);
-            
-            const leaders = { data: leadersResult.data, error: leadersResult.error };
 
+            // Check if any critical data failed to load
             if (advisors.error || leaders.error || components.error || definitions.error || patterns.error) {
-                throw new Error("Failed to load one or more core data tables.");
+                throw new Error("Failed to load one or more core data tables (Advisors, Leaders, Components, Definitions, or Patterns).");
             }
-            if (assignments.error) assignments.data = [];
-            if (exceptions.error) exceptions.data = [];
+
+            // Handle assignments/exceptions table load failure gracefully
+            if (assignments.error) {
+                 console.warn("Warning: Failed to load rotation_assignments snapshot.", assignments.error);
+                 assignments.data = [];
+            }
+            if (exceptions.error) {
+                 console.warn("Warning: Failed to load schedule_exceptions.", exceptions.error);
+                 exceptions.data = [];
+            }
 
             return {
                 advisors: advisors.data,
@@ -346,59 +484,108 @@ window.APP = window.APP || {};
         }
     };
 
+    // --- V15.8 FIX: Implementation of missing History Management Functions (Bug 2) ---
+    // These functions manage the rotation_assignments_history table.
+
+    // V15.8: Helper function to update the 'rotation_assignments' snapshot table. (Private)
+    // This keeps the snapshot table in sync with the latest effective assignment from history.
     const updateSnapshotAssignment = async (advisorId) => {
+        // Find the latest effective assignment (start_date DESC, end_date IS NULL prioritized)
         const { data, error } = await supabase
             .from(HISTORY_TABLE)
             .select('rotation_name, start_date')
             .eq('advisor_id', advisorId)
             .order('start_date', { ascending: false })
-            .order('end_date', { ascending: false, nullsFirst: true });
+            .order('end_date', { ascending: false, nullsFirst: true }); // Prefer NULL end_date (ongoing)
 
-        if (error && (error.code === 'PGRST116' || error.code === '42P01')) return;
-        if (error) return;
+        // Handle missing table gracefully during snapshot update
+        if (error && (error.code === 'PGRST116' || error.code === '42P01')) {
+            return;
+        }
+
+        if (error) {
+            console.error("Failed to update snapshot assignment for advisor:", advisorId, error);
+            return;
+        }
 
         if (data && data.length > 0) {
             const latest = data[0];
-            await supabase.from(SNAPSHOT_TABLE).upsert({
+            await supabase
+                .from(SNAPSHOT_TABLE)
+                .upsert({
                     advisor_id: advisorId,
                     rotation_name: latest.rotation_name,
                     start_date: latest.start_date
-            }, { onConflict: 'advisor_id' });
+                }, { onConflict: 'advisor_id' });
         } else {
-            await supabase.from(SNAPSHOT_TABLE).delete().eq('advisor_id', advisorId);
+            // If no history exists, remove from snapshot
+            await supabase
+                .from(SNAPSHOT_TABLE)
+                .delete()
+                .eq('advisor_id', advisorId);
         }
     };
 
+
+    // V15.8 FIX: Implements "Assign from this week" and "Change from this week forward"
+    // These actions are logically similar: they set a new rotation starting on a date and going forward indefinitely.
     DataService.assignFromWeek = async ({ advisor_id, rotation_name, start_date, reason = 'New Assignment/Change Forward' }) => {
         try {
             const dateMinusOne = APP.Utils.addDaysISO(start_date, -1);
-            const { error: updateError } = await supabase
-                .from(HISTORY_TABLE).update({ end_date: dateMinusOne })
-                .eq('advisor_id', advisor_id).is('end_date', null).lt('start_date', start_date);
 
-            if (updateError && !(updateError.code === 'PGRST116' || updateError.code === '42P01')) throw new Error("Failed to clip previous assignments.");
+            // 1. Truncate existing open-ended assignments that started before this date.
+            // Update where end_date IS NULL AND start_date < start_date.
+            const { error: updateError } = await supabase
+                .from(HISTORY_TABLE)
+                .update({ end_date: dateMinusOne })
+                .eq('advisor_id', advisor_id)
+                .is('end_date', null)
+                .lt('start_date', start_date);
+
+            // Handle missing table gracefully
+            if (updateError && !(updateError.code === 'PGRST116' || updateError.code === '42P01')) {
+                 throw new Error("Failed to clip previous assignments.");
+            }
                 
+            // 2. Insert/Overwrite the new ongoing assignment into history
             const newRecord = {
                 advisor_id: advisor_id,
-                rotation_name: rotation_name || null,
+                rotation_name: rotation_name || null, // Allow null for unassignment
                 start_date: start_date,
                 end_date: null,
                 reason: reason
             };
+            // Use upsert on (advisor_id, start_date) to handle overwriting existing records starting on the same day.
             const { data: historyData, error: insertError } = await DataService.saveRecord(HISTORY_TABLE, newRecord, 'advisor_id, start_date');
+            
+            // Handle missing table gracefully during insert
+            // V15.8.1 FIX: insertError is the error string itself, not an object with an .error property.
             if (insertError && (insertError.includes('PGRST116') || insertError.includes('42P01'))) {
-                 console.warn("History table missing during insert.");
+                 console.warn("History table missing during insert. Proceeding with snapshot only.");
             } else if (insertError) {
                 throw new Error("Failed to insert new assignment history.");
             }
+
+            // 3. Update the snapshot table
             await updateSnapshotAssignment(advisor_id);
+
+            // Return the history record data as the primary result
             return { data: historyData, error: null };
-        } catch (err) { return handleError(err, "assignFromWeek/changeForward"); }
+
+        } catch (err) {
+            return handleError(err, "assignFromWeek/changeForward");
+        }
     };
 
+    // V15.8 FIX: Implements "Change only this week (Swap)"
+    // This is complex as it requires potentially splitting an existing record.
     DataService.changeOnlyWeek = async ({ advisor_id, rotation_name, week_start, week_end }) => {
         try {
-            if (!rotation_name) throw new Error("Rotation name is required for a one-week swap.");
+            if (!rotation_name) {
+                throw new Error("Rotation name is required for a one-week swap.");
+            }
+
+            // 1. Insert the one-week swap assignment.
             const swapRecord = {
                 advisor_id: advisor_id,
                 rotation_name: rotation_name,
@@ -406,78 +593,137 @@ window.APP = window.APP || {};
                 end_date: week_end,
                 reason: 'One Week Swap'
             };
+            // Use upsert to handle overwriting existing records starting exactly on week_start
             const { data, error: insertError } = await DataService.saveRecord(HISTORY_TABLE, swapRecord, 'advisor_id, start_date');
+            
+            // V15.8.1 FIX: insertError is the error string itself, not an object with an .error property.
             if (insertError && (insertError.includes('PGRST116') || insertError.includes('42P01'))) {
                 APP.Utils.showToast("Cannot perform one-week swap as history table is missing.", "danger");
                 return { data: null, error: "History table missing." };
             } else if (insertError) {
                  throw new Error("Failed to insert swap record.");
             }
+
+            // 2. Update the snapshot table
             await updateSnapshotAssignment(advisor_id);
+
             return { data, error: null };
-        } catch (err) { return handleError(err, "Change Only Week"); }
+
+        } catch (err) {
+             return handleError(err, "Change Only Week");
+        }
     };
 
+    // V15.8.1 FIX: Helper to fetch the current snapshot record for a specific advisor. (Public)
     DataService.fetchSnapshotForAdvisor = async (advisorId) => {
+        // Ensure supabase client is initialized
         if (!supabase) return { data: null, error: "Database not initialized." };
+
+        // Efficiently fetch only the required record using maybeSingle()
         const { data, error } = await supabase.from(SNAPSHOT_TABLE).select('*').eq('advisor_id', advisorId).maybeSingle();
-        if (error && (error.code === 'PGRST116' || error.code === '42P01')) return { data: null, error: null };
+        
+        // Handle missing table gracefully during fetch (PGRST116 or 42P01)
+        if (error && (error.code === 'PGRST116' || error.code === '42P01')) {
+             // If the snapshot table is missing, it's not a critical error, just return null data.
+             return { data: null, error: null };
+        }
+        
         if (error) return handleError(error, `Fetch Snapshot ${advisorId}`);
+        
+        // Returns data (which might be null if the record doesn't exist) and null error
         return { data, error: null };
     };
+
 
     APP.DataService = DataService;
 }(window.APP));
 
 /**
  * MODULE: APP.StateManager
+ * Manages the application's state, selectors, synchronization, and history (Undo/Redo).
  */
 (function(APP) {
     const StateManager = {};
+
+    // The central state object
     const STATE = {
-        advisors: [], leaders: [], scheduleComponents: [], shiftDefinitions: [], 
-        rotationPatterns: [], rotationAssignments: [], scheduleExceptions: [],
-        selectedAdvisors: new Set(), weekStart: null, currentRotation: null,
-        selectedDay: 'Monday', scheduleViewMode: 'daily', isBooted: false,
-        history: [], historyIndex: -1, effectiveAssignmentsCache: new Map(), 
+        advisors: [],
+        leaders: [],
+        scheduleComponents: [], 
+        shiftDefinitions: [], 
+        rotationPatterns: [], 
+        rotationAssignments: [], // Current snapshot
+        scheduleExceptions: [],
+        selectedAdvisors: new Set(),
+        weekStart: null, // Stored internally as YYYY-MM-DD
+        currentRotation: null,
+        selectedDay: 'Monday',
+        scheduleViewMode: 'daily',
+        isBooted: false,
+        history: [],
+        historyIndex: -1,
+        // Cache for historical assignments lookups (Key: DateISO, Value: Map<AdvisorId, Assignment>)
+        effectiveAssignmentsCache: new Map(), 
     };
 
     StateManager.getState = () => STATE;
 
+    // Initialize state with data loaded from DataService
     StateManager.initialize = (initialData) => {
         Object.assign(STATE, initialData);
         STATE.isBooted = true;
         StateManager.saveHistory("Initial Load");
     };
 
+    // Helpers (Selectors) - Efficient ways to query the state
+    // NOTE: This selector gets the current snapshot from rotation_assignments.
     StateManager.getAssignmentForAdvisor = (id) => STATE.rotationAssignments.find(a => a.advisor_id === id) || null;
     StateManager.getPatternByName = (name) => STATE.rotationPatterns.find(p => p.name === name) || null;
     StateManager.getComponentById = (id) => STATE.scheduleComponents.find(c => c.id === id) || null;
     StateManager.getShiftDefinitionById = (id) => STATE.shiftDefinitions.find(d => d.id === id) || null;
     StateManager.getAdvisorById = (id) => STATE.advisors.find(a => a.id === id) || null;
-    
+
+    // Robust lookup for shift codes (handles whitespace and type differences)
     StateManager.getShiftDefinitionByCode = (code) => {
         if (!code) return null;
         const trimmedCode = String(code).trim();
         return STATE.shiftDefinitions.find(d => (d.code && String(d.code).trim()) === trimmedCode) || null;
     };
+
     StateManager.getAdvisorsByLeader = (leaderId) => STATE.advisors.filter(a => a.leader_id === leaderId);
+
+    // Selector for Hybrid Adherence (Exceptions)
     StateManager.getExceptionForAdvisorDate = (advisorId, dateISO) => {
         return STATE.scheduleExceptions.find(e => e.advisor_id === advisorId && e.exception_date === dateISO) || null;
     };
 
+    // Function to pre-load effective assignments for a specific date into the cache
     StateManager.loadEffectiveAssignments = async (dateISO) => {
-        if (!dateISO) return;
-        if (STATE.effectiveAssignmentsCache.has(dateISO)) return;
+        if (STATE.effectiveAssignmentsCache.has(dateISO)) {
+            return; // Already loaded
+        }
+        // This calls DataService which handles the history query and prioritization.
         const { data, error } = await APP.DataService.fetchEffectiveAssignmentsForDate(dateISO);
-        if (!error && data) STATE.effectiveAssignmentsCache.set(dateISO, data);
-        else STATE.effectiveAssignmentsCache.set(dateISO, new Map());
+        if (!error && data) {
+            STATE.effectiveAssignmentsCache.set(dateISO, data);
+        } else {
+            // Handle error if needed, set an empty map to prevent re-fetching on failure
+            STATE.effectiveAssignmentsCache.set(dateISO, new Map());
+        }
     };
 
-    StateManager.clearEffectiveAssignmentsCache = () => { STATE.effectiveAssignmentsCache.clear(); };
+    // Clear cache when history changes or assignments are modified
+    StateManager.clearEffectiveAssignmentsCache = () => {
+        STATE.effectiveAssignmentsCache.clear();
+    };
 
+    // History Management (Updated to include exceptions)
     StateManager.saveHistory = (reason = "Change") => {
-        if (STATE.historyIndex < STATE.history.length - 1) STATE.history = STATE.history.slice(0, STATE.historyIndex + 1);
+        // Clear forward history if we make a new change after undoing
+        if (STATE.historyIndex < STATE.history.length - 1) {
+            STATE.history = STATE.history.slice(0, STATE.historyIndex + 1);
+        }
+        // Create a snapshot of the mutable data structures (Deep Copy)
         const snapshot = {
             shiftDefinitions: JSON.parse(JSON.stringify(STATE.shiftDefinitions)),
             rotationPatterns: JSON.parse(JSON.stringify(STATE.rotationPatterns)),
@@ -486,33 +732,52 @@ window.APP = window.APP || {};
             reason: reason
         };
         STATE.history.push(snapshot);
+        // Limit history stack size
         if (STATE.history.length > 30) STATE.history.shift();
         STATE.historyIndex = STATE.history.length - 1;
-        if (APP.Core && APP.Core.updateUndoRedoButtons) APP.Core.updateUndoRedoButtons(STATE.historyIndex, STATE.history.length);
+        
+        // Update UI buttons
+        if (APP.Core && APP.Core.updateUndoRedoButtons) {
+             APP.Core.updateUndoRedoButtons(STATE.historyIndex, STATE.history.length);
+        }
+        
+        // Clear history cache when state changes
         StateManager.clearEffectiveAssignmentsCache();
     };
 
+    // Apply a history state (Undo/Redo)
     StateManager.applyHistory = (direction) => {
         let newIndex = STATE.historyIndex;
-        if (direction === 'undo' && newIndex > 0) newIndex--;
-        else if (direction === 'redo' && newIndex < STATE.history.length - 1) newIndex++;
-        else return;
+        if (direction === 'undo' && newIndex > 0) {
+            newIndex--;
+        } else if (direction === 'redo' && newIndex < STATE.history.length - 1) {
+            newIndex++;
+        } else {
+            return;
+        }
 
+        // Restore state from snapshot (Deep Copy)
         const snapshot = STATE.history[newIndex];
         STATE.shiftDefinitions = JSON.parse(JSON.stringify(snapshot.shiftDefinitions));
         STATE.rotationPatterns = JSON.parse(JSON.stringify(snapshot.rotationPatterns));
         STATE.rotationAssignments = JSON.parse(JSON.stringify(snapshot.rotationAssignments));
         STATE.scheduleExceptions = JSON.parse(JSON.stringify(snapshot.scheduleExceptions));
         STATE.historyIndex = newIndex;
+
+        // Clear history cache when state changes
         StateManager.clearEffectiveAssignmentsCache();
-        
+
+        // Re-render application and update UI
         if (APP.Core && APP.Core.renderAll && APP.Core.updateUndoRedoButtons) {
             APP.Core.renderAll();
             APP.Core.updateUndoRedoButtons(STATE.historyIndex, STATE.history.length);
         }
     };
     
+    // State synchronization (Update local state after successful DB operations)
     StateManager.syncRecord = (tableName, record, isDeleted = false) => {
+        
+        // Map DB table names to State keys
         let stateKey = null;
         switch (tableName) {
             case 'schedule_exceptions': stateKey = 'scheduleExceptions'; break;
@@ -520,19 +785,39 @@ window.APP = window.APP || {};
             case 'rotation_patterns': stateKey = 'rotationPatterns'; break;
             case 'rotation_assignments': stateKey = 'rotationAssignments'; break;
             case 'schedule_components': stateKey = 'scheduleComponents'; break;
+            // NOTE: rotation_assignments_history is not synced here, but managed via the cache.
             default: stateKey = tableName;
         }
-        const collection = STATE[stateKey];
-        if (tableName === 'rotation_assignments_history' || tableName === 'rotation_patterns') StateManager.clearEffectiveAssignmentsCache();
-        if (!collection) return;
 
+        const collection = STATE[stateKey];
+        
+        // Handle cache clearing for history updates even if collection doesn't map directly.
+        if (tableName === 'rotation_assignments_history' || tableName === 'rotation_patterns') {
+            StateManager.clearEffectiveAssignmentsCache();
+        }
+
+        if (!collection) {
+            return;
+        }
+
+
+        // Determine primary key (patterns by name, assignments by advisor_id, else id)
         let primaryKey = 'id';
         if (tableName === 'rotation_patterns') primaryKey = 'name';
         if (tableName === 'rotation_assignments') primaryKey = 'advisor_id';
-        if (tableName === 'schedule_exceptions') primaryKey = 'id';
 
+        
+        // Handle sync for exceptions
+        // Since we rely on upsert for exceptions, the returned record always has the 'id'.
+        if (tableName === 'schedule_exceptions') {
+            primaryKey = 'id'; 
+        }
+
+        
         if (!record || !record.hasOwnProperty(primaryKey)) {
-             if (isDeleted && record && record.hasOwnProperty(primaryKey)) {} else return;
+            // console.error("SyncRecord warning: Record missing or missing primary key", primaryKey, record);
+            // Still proceed if cache clearing is needed (handled above)
+            return;
         }
         
         const recordKey = record[primaryKey];
@@ -541,70 +826,121 @@ window.APP = window.APP || {};
         if (isDeleted) {
             if (index > -1) collection.splice(index, 1);
         } else {
-            if (index > -1) collection[index] = record;
-            else collection.push(record);
+            if (index > -1) {
+                // Update existing record
+                collection[index] = record;
+            } else {
+                // Add new record
+                collection.push(record);
+            }
         }
-        if (tableName === 'rotation_assignments') StateManager.clearEffectiveAssignmentsCache();
+        
+         // If assignments snapshot changes, clear the cache.
+         if (tableName === 'rotation_assignments') {
+            StateManager.clearEffectiveAssignmentsCache();
+        }
     };
 
     APP.StateManager = StateManager;
 }(window.APP));
 
+
 /**
  * MODULE: APP.ScheduleCalculator
+ * Centralized service for calculating effective schedules based on Hybrid Adherence (Exceptions + History).
  */
 (function(APP) {
     const ScheduleCalculator = {};
 
+    // Helper: Finds the correct key in the pattern data (handles "Week 1", "Week1", "week1" etc.)
     const findWeekKey = (patternData, weekNumber) => {
         const keys = Object.keys(patternData);
+        // Find the key that matches the week number using the robust regex
         return keys.find(k => {
             const match = k.match(/^Week ?(\d+)$/i);
             return match && parseInt(match[1], 10) === weekNumber;
         });
     };
 
+    // Calculates the schedule for an advisor on a specific day.
+    // Returns { segments, source, reason }
     ScheduleCalculator.calculateSegments = (advisorId, dayName, weekStartISO = null) => {
         const STATE = APP.StateManager.getState();
+        // Use the provided context or the global state context
         const effectiveWeekStart = weekStartISO || STATE.weekStart;
+        
         if (!effectiveWeekStart) return { segments: [], source: null, reason: null };
 
+        // 1. Determine the specific date
         const dateISO = APP.Utils.getISODateForDayName(effectiveWeekStart, dayName);
         if (!dateISO) return { segments: [], source: null, reason: null };
 
+        // 2. Check for an Exception (Priority 1)
         const exception = APP.StateManager.getExceptionForAdvisorDate(advisorId, dateISO);
         if (exception && exception.structure) {
-            if (exception.structure.length === 0) return { segments: [], source: 'exception', reason: exception.reason };
+            // If an exception exists, use its structure.
+            // Handle RDO via exception (empty structure)
+            if (exception.structure.length === 0) {
+                return { segments: [], source: 'exception', reason: exception.reason };
+            }
+            // Ensure segments are sorted (critical for visualization and comparison)
             const sortedSegments = JSON.parse(JSON.stringify(exception.structure)).sort((a, b) => a.start_min - b.start_min);
             return { segments: sortedSegments, source: 'exception', reason: exception.reason };
         }
 
+        // 3. Calculate based on Rotation (Priority 2)
+        
+        // Use the EFFECTIVE assignment from the cache for this specific week.
         const effectiveMap = STATE.effectiveAssignmentsCache.get(effectiveWeekStart);
         let assignment = null;
-        if (effectiveMap && effectiveMap.has(advisorId)) assignment = effectiveMap.get(advisorId);
-        
-        if (!assignment || !assignment.rotation_name || !assignment.start_date) return { segments: [], source: 'rotation', reason: null };
 
+        if (effectiveMap && effectiveMap.has(advisorId)) {
+            assignment = effectiveMap.get(advisorId);
+        } 
+        // We rely on the effectiveMap (which includes fallback logic in DataService if history is missing). 
+        // If the advisor is not in the map, they have no assignment for this period.
+
+        
+        if (!assignment || !assignment.rotation_name || !assignment.start_date) {
+            return { segments: [], source: 'rotation', reason: null };
+        }
+
+        // Calculate the effective week number using the finite rotation logic
         const effectiveWeek = APP.Utils.getEffectiveWeek(assignment.start_date, effectiveWeekStart, assignment, APP.StateManager.getPatternByName);
+        
+        // If null, the advisor is outside their finite rotation period or hasn't started yet.
         if (effectiveWeek === null) return { segments: [], source: 'rotation', reason: null };
         
+        // Determine the day index (1-7)
         const dayIndex = (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(dayName) + 1);
         const dayIndexStr = dayIndex.toString();
+
 
         const pattern = APP.StateManager.getPatternByName(assignment.rotation_name);
         if (!pattern || !pattern.pattern) return { segments: [], source: 'rotation', reason: null };
         
+        // Look up the shift code in the rotation pattern
         const weekKey = findWeekKey(pattern.pattern, effectiveWeek);
         const weekPattern = weekKey ? pattern.pattern[weekKey] : {};
+
+        // Handle legacy DOW keys (e.g., 'mon') if numerical key is missing
         const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
         const legacyDayKey = days[dayIndex - 1];
+        
         const shiftCode = weekPattern[dayIndexStr] || weekPattern[legacyDayKey];
 
-        if (!shiftCode) return { segments: [], source: 'rotation', reason: null }; 
 
+        if (!shiftCode) return { segments: [], source: 'rotation', reason: null }; // RDO
+
+        // Find the shift definition corresponding to the code
         const definition = APP.StateManager.getShiftDefinitionByCode(shiftCode);
-        if (!definition || !definition.structure) return { segments: [], source: 'rotation', reason: null };
+        
+        if (!definition || !definition.structure) {
+            console.warn(`Shift Definition not found or invalid for Code: '${shiftCode}' (Advisor ${advisorId} on ${dayName}, Week ${effectiveWeek})`);
+            return { segments: [], source: 'rotation', reason: null };
+        }
 
+        // Ensure segments are sorted
         const sortedRotation = JSON.parse(JSON.stringify(definition.structure)).sort((a, b) => a.start_min - b.start_min);
         return { segments: sortedRotation, source: 'rotation', reason: null };
     };
@@ -612,8 +948,10 @@ window.APP = window.APP || {};
     APP.ScheduleCalculator = ScheduleCalculator;
 }(window.APP));
 
+
 /**
  * MODULE: APP.Components.ComponentManager
+ * Manages the CRUD operations for Schedule Components (Activities, Breaks, etc.).
  */
 (function(APP) {
     const ComponentManager = {};
@@ -622,115 +960,169 @@ window.APP = window.APP || {};
     ComponentManager.initialize = () => {
         ELS.grid = document.getElementById('componentManagerGrid');
         ELS.btnNew = document.getElementById('btnNewComponent');
+
         if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNew);
         if (ELS.grid) ELS.grid.addEventListener('click', handleClick);
-        
-        // Cache new modal elements
-        ELS.compEditModal = document.getElementById('componentEditorModal');
-        ELS.compEditForm = document.getElementById('comp-edit-form');
-        ELS.compEditTitle = document.getElementById('comp-edit-title');
-        ELS.compEditId = document.getElementById('comp-edit-id');
-        ELS.compEditName = document.getElementById('comp-edit-name');
-        ELS.compEditType = document.getElementById('comp-edit-type');
-        ELS.compEditDuration = document.getElementById('comp-edit-duration');
-        ELS.compEditColor = document.getElementById('comp-edit-color');
-        ELS.compEditPaid = document.getElementById('comp-edit-paid');
-        ELS.btnCompEditSave = document.getElementById('compEditSave');
-        ELS.btnCompEditCancel = document.getElementById('compEditCancel');
-        ELS.btnCompEditClose = document.getElementById('compEditClose');
-
-        // Wire up new modal buttons
-        if (ELS.btnCompEditSave) ELS.btnCompEditSave.addEventListener('click', handleSaveComponent);
-        if (ELS.btnCompEditCancel) ELS.btnCompEditCancel.addEventListener('click', handleCloseComponentModal);
-        if (ELS.btnCompEditClose) ELS.btnCompEditClose.addEventListener('click', handleCloseComponentModal);
     };
 
     ComponentManager.render = () => {
         if (!ELS.grid) return;
         const STATE = APP.StateManager.getState();
+  
         const components = STATE.scheduleComponents.sort((a,b) => a.name.localeCompare(b.name));
+        
         let html = '<table><thead><tr><th>Name</th><th>Type</th><th>Color</th><th>Default Duration</th><th>Paid</th><th>Actions</th></tr></thead><tbody>';
+        
         components.forEach(comp => {
             html += `<tr data-component-id="${comp.id}">
-                <td>${comp.name}</td>
-                <td>${comp.type}</td>
-                <td><span style="display: inline-block; width: 20px; height: 20px; background-color: ${comp.color}; border-radius: 4px;"></span></td>
-                <td>${comp.default_duration_min}m</td>
-                <td>${comp.is_paid ? 'Yes' : 'No'}</td>
+                <td>
+                    <span class="display-value">${comp.name}</span>
+                    <input type="text" class="form-input edit-value" name="comp-name" value="${comp.name}" style="display:none;">
+                </td>
+                
+                <td>
+                    <span class="display-value">${comp.type}</span>
+                    <select class="form-select edit-value" name="comp-type" style="display:none;">
+                        <option value="Activity" ${comp.type === 'Activity' ? 'selected' : ''}>Activity</option>
+                        <option value="Break" ${comp.type === 'Break' ? 'selected' : ''}>Break</option>
+                        <option value="Lunch" ${comp.type === 'Lunch' ? 'selected' : ''}>Lunch</option>
+                        <option value="Shrinkage" ${comp.type === 'Shrinkage' ? 'selected' : ''}>Shrinkage</option>
+                        <option value="Absence" ${comp.type === 'Absence' ? 'selected' : ''}>Absence</option>
+                    </select>
+                </td>
+                
+                <td>
+                    <span class="display-value" style="display: inline-block; width: 20px; height: 20px; background-color: ${comp.color}; border-radius: 4px;"></span>
+                    <input type="color" class="form-input-color edit-value" name="comp-color" value="${comp.color}" style="display:none;">
+                </td>
+                
+                <td>
+                    <span class="display-value">${comp.default_duration_min}m</span>
+                    <input type="number" class="form-input edit-value" name="comp-duration" value="${comp.default_duration_min}" style="display:none; width: 70px;">
+                </td>
+                
+                <td>
+                    <span class="display-value">${comp.is_paid ? 'Yes' : 'No'}</span>
+                    <select class="form-select edit-value" name="comp-paid" style="display:none; width: 70px;">
+                        <option value="true" ${comp.is_paid ? 'selected' : ''}>Yes</option>
+                        <option value="false" ${!comp.is_paid ? 'selected' : ''}>No</option>
+                    </select>
+                </td>
+                
                 <td class="actions">
                     <button class="btn btn-sm btn-primary edit-component" data-component-id="${comp.id}">Edit</button>
                     <button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button>
+                    <button class="btn btn-sm btn-success save-component" data-component-id="${comp.id}" style="display:none;">Save</button>
+                    <button class="btn btn-sm btn-secondary cancel-edit-component" data-component-id="${comp.id}" style="display:none;">Cancel</button>
                 </td>
             </tr>`;
         });
         html += '</tbody></table>';
         ELS.grid.innerHTML = html;
+ 
     };
 
     const handleNew = async () => {
-        ELS.compEditTitle.textContent = "New Component";
-        ELS.compEditId.value = "";
-        ELS.compEditForm.reset();
-        if(ELS.compEditModal) ELS.compEditModal.style.display = 'flex';
-    };
-
-    const handleClick = (e) => {
-        if (e.target.classList.contains('delete-component')) {
-            handleDelete(e.target.dataset.componentId);
-        } else if (e.target.classList.contains('edit-component')) {
-            handleEdit(e.target.dataset.componentId);
-        }
-    };
-
-    const handleEdit = (id) => {
-        const component = APP.StateManager.getComponentById(id);
-        if (!component) return;
-        ELS.compEditTitle.textContent = "Edit Component";
-        ELS.compEditId.value = component.id;
-        ELS.compEditName.value = component.name;
-        ELS.compEditType.value = component.type;
-        ELS.compEditDuration.value = component.default_duration_min;
-        ELS.compEditColor.value = component.color;
-        ELS.compEditPaid.checked = component.is_paid;
-        ELS.compEditModal.style.display = 'flex';
-    };
-
-    const handleCloseComponentModal = () => {
-        if (ELS.compEditModal) ELS.compEditModal.style.display = 'none';
-    };
-
-    const handleSaveComponent = async () => {
-        const id = ELS.compEditId.value;
-        const name = ELS.compEditName.value;
-        const type = ELS.compEditType.value;
-        const duration = parseInt(ELS.compEditDuration.value, 10);
-        const color = ELS.compEditColor.value;
-        const isPaid = ELS.compEditPaid.checked;
+        // Basic prompt-based input for simplicity
+        const name = prompt("Enter component name (e.g., 'Email Support', 'Meeting'):");
+        if (!name) return;
+        const type = prompt("Enter type (Activity, Break, Lunch, Shrinkage, Absence):", "Activity");
+        const color = prompt("Enter hex color code (e.g., '#3498db'):", "#3498db");
+        const duration = parseInt(prompt("Enter default duration in minutes:", "60"), 10);
+        const isPaid = confirm("Is this a paid activity?");
 
         if (!name || !type || !color || isNaN(duration)) {
             APP.Utils.showToast("Invalid input provided.", "danger");
             return;
         }
 
-        const componentData = { name, type, color, default_duration_min: duration, is_paid: isPaid };
-        let result;
-        if (id) {
-             result = await APP.DataService.updateRecord('schedule_components', componentData, { id: id });
-        } else {
-             result = await APP.DataService.saveRecord('schedule_components', componentData);
-        }
-        
-        if (!result.error) {
-            APP.StateManager.syncRecord('schedule_components', result.data);
-            APP.Utils.showToast(`Component '${name}' saved.`, "success");
-            ComponentManager.render(); 
-            handleCloseComponentModal(); 
+        const newComponent = { name, type, color, default_duration_min: duration, is_paid: isPaid };
+
+        const { data, error } = await APP.DataService.saveRecord('schedule_components', newComponent);
+        if (!error) {
+            APP.StateManager.syncRecord('schedule_components', data);
+            APP.Utils.showToast(`Component '${name}' created.`, "success");
+            ComponentManager.render();
         }
     };
 
+    const handleClick = (e) => {
+        const target = e.target;
+        const id = target.dataset.componentId;
+        if (!id) return;
+
+        if (target.classList.contains('delete-component')) {
+            handleDelete(id);
+        } else if (target.classList.contains('edit-component')) {
+            toggleRowEditMode(id, true);
+        } else if (target.classList.contains('cancel-edit-component')) {
+            toggleRowEditMode(id, false);
+        } else if (target.classList.contains('save-component')) {
+            handleInlineSave(id);
+        }
+    };
+const toggleRowEditMode = (id, isEditing) => {
+        const row = ELS.grid.querySelector(`tr[data-component-id="${id}"]`);
+        if (!row) return;
+
+        // Toggle visibility for display spans vs. edit inputs
+        row.querySelectorAll('.display-value').forEach(el => el.style.display = isEditing ? 'none' : '');
+        row.querySelectorAll('.edit-value').forEach(el => el.style.display = isEditing ? 'block' : 'none');
+
+        // Toggle action buttons
+        row.querySelector('.edit-component').style.display = isEditing ? 'none' : '';
+        row.querySelector('.delete-component').style.display = isEditing ? 'none' : '';
+        row.querySelector('.save-component').style.display = isEditing ? 'block' : 'none';
+        row.querySelector('.cancel-edit-component').style.display = isEditing ? 'block' : 'none';
+
+        // If we are cancelling, we must re-render the table to reset the values
+        if (!isEditing) {
+            ComponentManager.render();
+        }
+    };
+
+    const handleInlineSave = async (id) => {
+        const row = ELS.grid.querySelector(`tr[data-component-id="${id}"]`);
+        if (!row) return;
+
+        // 1. Read all new values from the inputs
+        const name = row.querySelector('[name="comp-name"]').value;
+        const type = row.querySelector('[name="comp-type"]').value;
+        const color = row.querySelector('[name="comp-color"]').value;
+        const duration = parseInt(row.querySelector('[name="comp-duration"]').value, 10);
+        const isPaid = row.querySelector('[name="comp-paid"]').value === 'true';
+
+        // 2. Validate
+        if (!name || !type || !color || isNaN(duration) || duration < 0) {
+            APP.Utils.showToast("Invalid data. Please check all fields.", "danger");
+            return;
+        }
+
+        const updatedComponent = {
+            id: id,
+            name, 
+            type, 
+            color, 
+            default_duration_min: duration, 
+            is_paid: isPaid 
+        };
+
+        // 3. Save to database
+        const { data, error } = await APP.DataService.updateRecord('schedule_components', updatedComponent, { id: id });
+        
+        if (!error) {
+            APP.StateManager.syncRecord('schedule_components', data);
+            APP.Utils.showToast(`Component '${name}' updated.`, "success");
+            // Re-render the whole table to show the new, non-editable data
+            ComponentManager.render();
+        }
+        // Error is handled by DataService
+    };
     const handleDelete = async (id) => {
         const component = APP.StateManager.getComponentById(id);
         if (!component || !confirm(`Are you sure you want to delete '${component.name}'?`)) return;
+
+        // NOTE: Should ideally check if component is in use before deleting
         const { error } = await APP.DataService.deleteRecord('schedule_components', { id });
         if (!error) {
             APP.StateManager.syncRecord('schedule_components', { id: id }, true);
@@ -743,8 +1135,10 @@ window.APP = window.APP || {};
     APP.Components.ComponentManager = ComponentManager;
 }(window.APP));
 
+
 /**
  * MODULE: APP.Components.AssignmentManager
+ * Manages the assignment of Rotations to Advisors, utilizing the rotation_assignments_history table.
  */
 (function(APP) {
     const AssignmentManager = {};
@@ -752,62 +1146,45 @@ window.APP = window.APP || {};
 
     AssignmentManager.initialize = () => {
         ELS.grid = document.getElementById('assignmentGrid');
-        // FIX: Use event delegation for robust button handling
-        if (ELS.grid) {
-            ELS.grid.addEventListener('click', handleGridClick);
-        }
+        // Actions are handled exclusively by the buttons via handleRowAction, wired during render.
     };
 
-    const handleGridClick = (e) => {
-        const target = e.target.closest('button');
-        if (!target || !target.dataset.advisorId) return;
-        const advisorId = target.dataset.advisorId;
-        if (target.classList.contains('act-assign-week')) {
-            handleRowAction('assign_from_week', advisorId);
-        } else if (target.classList.contains('act-change-forward')) {
-            handleRowAction('assign_from_week', advisorId);
-        } else if (target.classList.contains('act-change-week')) {
-            handleRowAction('change_one_week', advisorId);
-        }
-    };
-
+    // Renders the assignment grid, showing the effective rotation for the selected week.
     AssignmentManager.render = async () => {
         if (!ELS.grid) return;
+
         const STATE = APP.StateManager.getState();
         const advisors = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name));
         const patterns = STATE.rotationPatterns.sort((a,b) => a.name.localeCompare(b.name));
         const patternOpts = patterns.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+
+        // Get the selected Week Start (YYYY-MM-DD) from the global state
         const weekStartISO = STATE.weekStart;
 
-        if (weekStartISO) await APP.StateManager.loadEffectiveAssignments(weekStartISO);
-        const effectiveMap = STATE.effectiveAssignmentsCache.get(weekStartISO);
-
-        // DOM Preservation Logic
-        const existingTbody = ELS.grid.querySelector('tbody');
-        if (existingTbody) {
-            const existingRows = existingTbody.querySelectorAll('tr');
-            const advisorsMatch = existingRows.length === advisors.length && advisors.every((adv, index) => adv.id === existingRows[index].dataset.advisorId);
-            if (advisorsMatch) {
-                advisors.forEach((adv, index) => {
-                    const row = existingRows[index];
-                    const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
-                    const assignment = effective ? { rotation_name: effective.rotation_name } : null;
-                    const rotSelect = row.querySelector('.assign-rotation');
-                    if (rotSelect) {
-                        if (rotSelect.options.length <= 1) rotSelect.innerHTML = `<option value="">-- None --</option>${patternOpts}`;
-                        rotSelect.value = (assignment && assignment.rotation_name) ? assignment.rotation_name : '';
-                    }
-                });
-                return;
-            }
+        // Ensure effective assignments for the selected week start date are loaded into the cache.
+        if (weekStartISO) {
+            await APP.StateManager.loadEffectiveAssignments(weekStartISO);
         }
 
+        // Get the map from the cache.
+        const effectiveMap = STATE.effectiveAssignmentsCache.get(weekStartISO);
+
         let html = '<table><thead><tr><th>Advisor</th><th>Assigned Rotation (This Week)</th><th>Start Date (Week 1)</th><th>Actions</th></tr></thead><tbody>';
+
         advisors.forEach(adv => {
+            // Determine the effective assignment for this week based on the history cache.
             const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
-            const assignment = effective ? { advisor_id: adv.id, rotation_name: effective.rotation_name, start_date: effective.start_date } : null; 
+
+            // We rely on the effective map (which includes history logic and fallback logic in DataService)
+            const assignment = effective
+                ? { advisor_id: adv.id, rotation_name: effective.rotation_name, start_date: effective.start_date }
+                : null; 
+
             const startDate = (assignment && assignment.start_date) ? assignment.start_date : '';
 
+
+            // V15.8 FIX (Bug 2): Corrected the HTML structure to resolve button duplication ("spam").
+            // Ensured all buttons are within the single <td> and removed invalid <div> wrappers inside <tr>.
             html += `<tr data-advisor-id="${adv.id}">
                   <td>${adv.name}</td>
                   <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
@@ -820,42 +1197,96 @@ window.APP = window.APP || {};
             </tr>`;
         });
         html += '</tbody></table>';
+
+        // V15.8 FIX: Removed duplicate innerHTML assignment.
         ELS.grid.innerHTML = html;
 
+        // V15.8 FIX: Wire actions efficiently after HTML insertion.
+        ELS.grid.querySelectorAll('.act-assign-week').forEach(btn => {
+          btn.addEventListener('click', () => handleRowAction('assign_from_week', btn.dataset.advisorId));
+        });
+        ELS.grid.querySelectorAll('.act-change-forward').forEach(btn => {
+          // Note: We map the UI 'change_forward' action to the DataService 'assignFromWeek' logic as they are identical.
+          btn.addEventListener('click', () => handleRowAction('assign_from_week', btn.dataset.advisorId));
+        });
+        ELS.grid.querySelectorAll('.act-change-week').forEach(btn => {
+          btn.addEventListener('click', () => handleRowAction('change_one_week', btn.dataset.advisorId));
+        });
+
+        // Initialize Flatpickr and set dropdown values after HTML insertion
         advisors.forEach(adv => {
+            // Re-determine the assignment used for rendering to set the correct dropdown value
+            const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
+             const assignment = effective
+                ? { rotation_name: effective.rotation_name, start_date: effective.start_date }
+                : null;
+
             const row = ELS.grid.querySelector(`tr[data-advisor-id="${adv.id}"]`);
             if (!row) return;
-            const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
-            const assignment = effective ? { rotation_name: effective.rotation_name, start_date: effective.start_date } : null;
+
             const rotSelect = row.querySelector('.assign-rotation');
-            if (rotSelect) rotSelect.value = (assignment && assignment.rotation_name) ? assignment.rotation_name : '';
+            if (rotSelect) {
+                // Set the dropdown to the currently effective rotation for this week.
+                rotSelect.value = (assignment && assignment.rotation_name) ? assignment.rotation_name : '';
+            }
+
             const dateInput = row.querySelector('.assign-start-date');
             if (dateInput && typeof flatpickr !== 'undefined') {
+                // Configure Flatpickr
                 flatpickr(dateInput, {
-                  dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', allowInput: true, locale: { "firstDayOfWeek": 1 }, 
-                  onChange: function(selectedDates, dateStr, instance) {}
+                  // Store as ISO (Y-m-d) for database compatibility
+                  dateFormat: 'Y-m-d',           
+                  // Display as UK format (d/m/Y) for user friendliness
+                  altInput: true,                 
+                  altFormat: 'd/m/Y',             
+                  allowInput: true,
+                  locale: { "firstDayOfWeek": 1 }, // Monday
+                  // Changes are handled exclusively by the action buttons.
+                  onChange: function(selectedDates, dateStr, instance) {
+                    // Do nothing here.
+                  }
                 });
             }
         });
     };
 
+    // Handle per-row actions (change forward / one-week swap)
+    // V15.8 FIX (Bug 2): Implemented logic using the newly added DataService methods.
     const handleRowAction = async (action, advisorId) => {
       try {
-        const row = ELS.grid.querySelector(`tr[data-advisor-id="${advisorId}"]`);
+        // Row + inputs
+        const row = document.querySelector(`tr[data-advisor-id="${advisorId}"]`);
         if (!row) return APP.Utils.showToast('Row not found', 'danger');
+
         const rotationSel = row.querySelector('.assign-rotation');
         const dateInput   = row.querySelector('.assign-start-date');
-        const globalWeekStartISO = APP.StateManager.getState().weekStart;
+        const globalWeekStartISO = APP.StateManager.getState().weekStart; // Use global context
+
         const rotationName = rotationSel ? rotationSel.value : '';
 
-        if (!rotationName && action === 'change_one_week') return APP.Utils.showToast('Pick a rotation first for the swap.', 'warning');
+        // Validation: For swaps, rotation must be selected.
+        if (!rotationName && action === 'change_one_week') {
+             return APP.Utils.showToast('Pick a rotation first for the swap.', 'warning');
+        }
 
+        // Determine the start date for the action.
         let startISO = globalWeekStartISO;
+        // Default to current week context for swaps
+
         if (action === 'assign_from_week') {
+            // For these actions, we use the date specified in the input field.
+            // Get the underlying ISO value managed by Flatpickr if available, otherwise the raw value.
             let rawInput = '';
-            if (dateInput) rawInput = dateInput.value.trim();
-            if (!rawInput) return APP.Utils.showToast('Start date is required for this action.', 'danger');
-            
+            if (dateInput) {
+                 // Flatpickr stores the ISO value in the actual input element when altInput is used.
+                 rawInput = dateInput.value.trim();
+            }
+
+            if (!rawInput) {
+                return APP.Utils.showToast('Start date is required for this action.', 'danger');
+            }
+
+            // Handle potential UK format if user somehow typed manually and Flatpickr didn't parse
             if (rawInput.includes('/')) {
                 const iso = APP.Utils.convertUKToISODate(rawInput);
                 if (!iso) return APP.Utils.showToast('Invalid date format (dd/mm/yyyy expected).', 'danger');
@@ -865,33 +1296,71 @@ window.APP = window.APP || {};
             }
         }
 
+
         if (!/^\d{4}-\d{2}-\d{2}$/.test(startISO)) {
-          const recoveredISO = APP.Utils.getMondayForDate(startISO);
-          if (!recoveredISO) return APP.Utils.showToast('Start date looks invalid (YYYY-MM-DD or DD/MM/YYYY expected).', 'danger');
-          startISO = recoveredISO;
+          return APP.Utils.showToast('Start date looks invalid (YYYY-MM-DD expected).', 'danger');
         }
 
+
+        // V15.8 FIX: Route to the correct, implemented DB helper
         let res;
         if (action === 'assign_from_week') {
-          res = await APP.DataService.assignFromWeek({ advisor_id: advisorId, rotation_name: rotationName, start_date: startISO });
+          // Handles both "Assign from this week" and "Change from this week forward"
+          res = await APP.DataService.assignFromWeek({
+            advisor_id: advisorId,
+            rotation_name: rotationName,
+            start_date: startISO
+          });
         } else if (action === 'change_one_week') {
+          // Ensure the start date is a Monday for the one-week swap (important if user changed date context)
           const weekStart = APP.Utils.getMondayForDate(startISO);
           if (!weekStart) return APP.Utils.showToast('Invalid week start date for swap.', 'danger');
-          res = await APP.DataService.changeOnlyWeek({ advisor_id: advisorId, rotation_name: rotationName, week_start: weekStart, week_end: APP.Utils.addDaysISO(weekStart, 6) });
+
+          res = await APP.DataService.changeOnlyWeek({
+            advisor_id: advisorId,
+            rotation_name: rotationName,
+            week_start: weekStart,
+            week_end: APP.Utils.addDaysISO(weekStart, 6)
+          });
         } else {
           return APP.Utils.showToast('Unknown action.', 'danger');
         }
 
-        if (res?.error) return;
+        if (res?.error) {
+          // Error handling is primarily done within DataService, but we check here too.
+          return;
+        }
 
+        // V15.8: Clear the cache explicitly as data has changed.
+        // We don't need to syncRecord for history table, just clear the cache.
         APP.StateManager.clearEffectiveAssignmentsCache();
+
+        // V15.8.1 FIX: Corrected synchronization logic (Replaced fetchTable with fetchSnapshotForAdvisor)
+        // The snapshot table (rotation_assignments) is updated automatically by the DataService helpers in the DB.
+        // We need to refresh the local state's snapshot view (STATE.rotationAssignments) for history tracking.
+        // Fetch the updated snapshot specifically for this advisor using the new public function.
         const { data: updatedSnapshot, error: snapshotError } = await APP.DataService.fetchSnapshotForAdvisor(advisorId);
-        if (updatedSnapshot) APP.StateManager.syncRecord('rotation_assignments', updatedSnapshot);
-        else APP.StateManager.syncRecord('rotation_assignments', { advisor_id: advisorId }, true);
+
+        if (snapshotError) {
+            console.warn("Failed to refresh local assignment snapshot after update.", snapshotError);
+            // We continue anyway, as the history cache is cleared and the UI will mostly rely on that.
+        } else if (updatedSnapshot) {
+            // If a record exists (data is not null), update the local state
+            APP.StateManager.syncRecord('rotation_assignments', updatedSnapshot);
+        } else {
+            // If the record is null (and no error), it means the advisor is now unassigned (removed from snapshot).
+            // We sync this deletion locally.
+            APP.StateManager.syncRecord('rotation_assignments', { advisor_id: advisorId }, true);
+        }
+
 
         APP.StateManager.saveHistory(`Assignment Action: ${action}`);
-        if (APP.Core) APP.Core.renderAll();
-        else if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
+        // Refresh both views so changes are instant (this triggers a fresh cache load)
+        // ScheduleViewer.render() handles rendering both itself and the AssignmentManager if active.
+        if (APP.Components.ScheduleViewer) {
+             APP.Components.ScheduleViewer.render();
+        }
+
         APP.Utils.showToast('Assignment updated successfully.', 'success');
       } catch (e) {
         console.error("Error in handleRowAction:", e);
@@ -901,6 +1370,7 @@ window.APP = window.APP || {};
 
     APP.Components = APP.Components || {};
     APP.Components.AssignmentManager = AssignmentManager;
+
 }(window.APP));
 
 /**
@@ -910,21 +1380,41 @@ window.APP = window.APP || {};
  */
 (function(APP) {
     const SequentialBuilder = {};
-    const ELS = {}; 
+    const ELS = {}; // Cached DOM Elements
 
+    // State specific to the Builder Modal
     const BUILDER_STATE = {
         isOpen: false,
-        mode: null, 
-        contextId: null, 
-        exceptionDate: null, 
-        startTimeMin: 480, 
-        segments: [], 
+        mode: null, // 'definition' or 'exception'
+        contextId: null, // definitionId or advisorId
+        exceptionDate: null, // YYYY-MM-DD
+        startTimeMin: 480, // Default 08:00
+        segments: [], // { component_id, duration_min }
         reason: null,
-        dragState: { isDragging: false, segmentIndex: -1, startX: 0, originalDurations: [], minDuration: 5 },
-        addPopupState: { isOpen: false, componentId: null, componentName: null, isEditing: false, editIndex: -1 },
-        visualHistory: [], visualHistoryIndex: -1, contextMenuIndex: -1
+        
+        // --- New Visual State ---
+        dragState: {
+            isDragging: false,
+            segmentIndex: -1, // The index of the segment *before* the handle
+            startX: 0,
+            originalDurations: [], // [durationA, durationB]
+            minDuration: 5 // Min duration for a segment
+        },
+        addPopupState: {
+            isOpen: false,
+            componentId: null,
+            componentName: null,
+            isEditing: false,
+            editIndex: -1
+        },
+
+        // --- NEW: Internal Undo/Redo History (Step 6) ---
+        visualHistory: [],
+        visualHistoryIndex: -1,
+        contextMenuIndex: -1
     };
 
+    // Helper to parse HH:MM string to minutes
     const parseTimeToMinutes = (timeStr) => {
         const parts = (timeStr || "").split(':');
         if (parts.length !== 2) return null;
@@ -935,6 +1425,7 @@ window.APP = window.APP || {};
     };
 
     SequentialBuilder.initialize = () => {
+        // Cache Modal Elements
         ELS.modal = document.getElementById('shiftBuilderModal');
         ELS.modalTitle = document.getElementById('modalTitle');
         ELS.modalClose = document.getElementById('modalClose');
@@ -942,18 +1433,21 @@ window.APP = window.APP || {};
         ELS.modalTotalTime = document.getElementById('modalTotalTime');
         ELS.modalPaidTime = document.getElementById('modalPaidTime');
         
+        // Exception specific elements
         ELS.exceptionReasonGroup = document.getElementById('exceptionReasonGroup');
         ELS.modalExceptionReason = document.getElementById('modalExceptionReason');
 
+        // --- New Visual Editor Elements ---
         ELS.visualEditorBody = document.getElementById('visualEditorBody');
         ELS.visualEditorToolbox = document.getElementById('visualEditorToolbox');
         ELS.visualEditorTimeline = document.getElementById('visualEditorTimeline');
         ELS.visualEditorTimeRuler = document.getElementById('visualEditorTimeRuler');
         ELS.visualEditorDropCursor = document.getElementById('visualEditorDropCursor');
-        ELS.visualEditorContextMenu = document.getElementById('visualEditorContextMenu');
-        ELS.veUndo = document.getElementById('ve-undo');
-        ELS.veRedo = document.getElementById('ve-redo');
+        ELS.visualEditorContextMenu = document.getElementById('visualEditorContextMenu'); // <-- Step 5
+        ELS.veUndo = document.getElementById('ve-undo'); // <-- Step 6
+        ELS.veRedo = document.getElementById('ve-redo'); // <-- Step 6
         
+        // Add Pop-up
         ELS.visualEditorAddPopup = document.getElementById('visualEditorAddPopup');
         ELS.veAddPopupTitle = document.getElementById('ve-add-popup-title');
         ELS.veAddStartTime = document.getElementById('ve-add-start-time');
@@ -961,53 +1455,67 @@ window.APP = window.APP || {};
         ELS.veAddPopupCancel = document.getElementById('ve-add-popup-cancel');
         ELS.veAddPopupSave = document.getElementById('ve-add-popup-save');
 
+        // --- Legacy Elements (for Shift Definition Editor) ---
         ELS.modalStartTime = document.getElementById('modalStartTime');
         ELS.modalAddActivity = document.getElementById('modalAddActivity');
         ELS.modalSequenceBody = document.getElementById('modalSequenceBody');
 
+        // --- Event Listeners ---
         if (ELS.modalClose) ELS.modalClose.addEventListener('click', SequentialBuilder.close);
         if (ELS.modalSave) ELS.modalSave.addEventListener('click', handleSave);
 
+        // Reason field
         if (ELS.modalExceptionReason) {
-            ELS.modalExceptionReason.addEventListener('input', (e) => { BUILDER_STATE.reason = e.target.value; });
+            ELS.modalExceptionReason.addEventListener('input', (e) => {
+                BUILDER_STATE.reason = e.target.value;
+            });
         }
         
+        // --- New Visual Editor Listeners ---
         if (ELS.visualEditorToolbox) {
-            ELS.visualEditorToolbox.addEventListener('click', handleToolboxClick); 
-            ELS.visualEditorToolbox.addEventListener('dragstart', handleToolboxDragStart); 
-            ELS.visualEditorToolbox.addEventListener('dragend', handleToolboxDragEnd); 
+            ELS.visualEditorToolbox.addEventListener('click', handleToolboxClick); // For pop-up
+            ELS.visualEditorToolbox.addEventListener('dragstart', handleToolboxDragStart); // For drag/drop
+            ELS.visualEditorToolbox.addEventListener('dragend', handleToolboxDragEnd); // For drag/drop
         }
         if (ELS.visualEditorTimeline) {
-            ELS.visualEditorTimeline.addEventListener('mousedown', handleDragStart); 
-            ELS.visualEditorTimeline.addEventListener('dragenter', handleTimelineDragEnter); 
-            ELS.visualEditorTimeline.addEventListener('dragover', handleTimelineDragOver); 
-            ELS.visualEditorTimeline.addEventListener('dragleave', handleTimelineDragLeave); 
-            ELS.visualEditorTimeline.addEventListener('drop', handleTimelineDrop); 
-            ELS.visualEditorTimeline.addEventListener('contextmenu', handleTimelineContextMenu); 
+            ELS.visualEditorTimeline.addEventListener('mousedown', handleDragStart); // For drag handles
+            ELS.visualEditorTimeline.addEventListener('dragenter', handleTimelineDragEnter); // For drag/drop
+            ELS.visualEditorTimeline.addEventListener('dragover', handleTimelineDragOver); // For drag/drop
+            ELS.visualEditorTimeline.addEventListener('dragleave', handleTimelineDragLeave); // For drag/drop
+            ELS.visualEditorTimeline.addEventListener('drop', handleTimelineDrop); // For drag/drop
+            ELS.visualEditorTimeline.addEventListener('contextmenu', handleTimelineContextMenu); // <-- Step 5
         }
         if (ELS.veAddPopupCancel) ELS.veAddPopupCancel.addEventListener('click', closeAddPopup);
         if (ELS.veAddPopupSave) ELS.veAddPopupSave.addEventListener('click', handleAddPopupSave);
 
+        // Mouse move/up listeners on the whole document to catch drags
         document.addEventListener('mousemove', handleDragMove);
         document.addEventListener('mouseup', handleDragEnd);
-        document.addEventListener('click', closeContextMenu); 
-        if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.addEventListener('click', handleContextMenuClick); 
-        if (ELS.veUndo) ELS.veUndo.addEventListener('click', handleUndo); 
-        if (ELS.veRedo) ELS.veRedo.addEventListener('click', handleRedo); 
+        document.addEventListener('click', closeContextMenu); // <-- Step 5
+        if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.addEventListener('click', handleContextMenuClick); // <-- Step 5
+        if (ELS.veUndo) ELS.veUndo.addEventListener('click', handleUndo); // <-- Step 6
+        if (ELS.veRedo) ELS.veRedo.addEventListener('click', handleRedo); // <-- Step 6
     };
 
+    // Generalized open function
     SequentialBuilder.open = (config) => {
+        // 1. Convert absolute times (structure) to sequential format (segments)
         const sequentialSegments = [];
-        let startTimeMin = 480; 
+        let startTimeMin = 480; // Default 8:00 AM
 
         if (config.structure && config.structure.length > 0) {
             const sortedStructure = JSON.parse(JSON.stringify(config.structure)).sort((a, b) => a.start_min - b.start_min);
             startTimeMin = sortedStructure[0].start_min;
+            
             sortedStructure.forEach(seg => {
-                sequentialSegments.push({ component_id: seg.component_id, duration_min: seg.end_min - seg.start_min });
+                sequentialSegments.push({
+                    component_id: seg.component_id,
+                    duration_min: seg.end_min - seg.start_min
+                });
             });
         }
 
+        // 2. Set BUILDER_STATE
         BUILDER_STATE.isOpen = true;
         BUILDER_STATE.mode = config.mode;
         BUILDER_STATE.contextId = config.id;
@@ -1015,31 +1523,38 @@ window.APP = window.APP || {};
         BUILDER_STATE.startTimeMin = startTimeMin;
         BUILDER_STATE.segments = JSON.parse(JSON.stringify(sequentialSegments));
         BUILDER_STATE.reason = config.reason || null;
+
+        // --- NEW: Reset History (Step 6) ---
         BUILDER_STATE.visualHistory = [];
         BUILDER_STATE.visualHistoryIndex = -1;
 
+        // 3. Initialize UI
         ELS.modalTitle.textContent = config.title;
 
+        // Show/Hide exception reason input based on mode
         if (config.mode === 'exception') {
+            // --- This is the NEW "Smart-Visual Editor" flow ---
             if (ELS.visualEditorBody) ELS.visualEditorBody.style.display = 'block';
-            if (ELS.modalSequenceBody) ELS.visualEditorBody.closest('.modal-body').style.display = 'block'; 
-            if (ELS.modalSequenceBody) ELS.modalSequenceBody.closest('.modal-body').style.display = 'none'; 
+            if (ELS.modalSequenceBody) ELS.visualEditorBody.closest('.modal-body').style.display = 'block'; // Show new body
+            if (ELS.modalSequenceBody) ELS.modalSequenceBody.closest('.modal-body').style.display = 'none'; // Hide old table
 
-            ELS.exceptionReasonGroup.style.display = 'none'; // Handled by new footer layout
-            if (ELS.modalExceptionReason) ELS.modalExceptionReason.value = BUILDER_STATE.reason || '';
+            ELS.exceptionReasonGroup.style.display = 'block';
+            ELS.modalExceptionReason.value = BUILDER_STATE.reason || '';
             ELS.modalSave.textContent = "Save Exception";
             
             renderToolbox();
             renderTimeline();
             
         } else {
+            // --- This is the OLD "Shift Definition" flow ---
             if (ELS.visualEditorBody) ELS.visualEditorBody.style.display = 'none';
-            if (ELS.modalSequenceBody) ELS.visualEditorBody.closest('.modal-body').style.display = 'none'; 
-            if (ELS.modalSequenceBody) ELS.modalSequenceBody.closest('.modal-body').style.display = 'block'; 
+            if (ELS.modalSequenceBody) ELS.visualEditorBody.closest('.modal-body').style.display = 'none'; // Hide new body
+            if (ELS.modalSequenceBody) ELS.modalSequenceBody.closest('.modal-body').style.display = 'block'; // Show old table
 
             ELS.exceptionReasonGroup.style.display = 'none';
             ELS.modalSave.textContent = "Save Definition";
 
+            // We must support the old editor for Shift Definitions
             if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
                 ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
             }
@@ -1053,25 +1568,33 @@ window.APP = window.APP || {};
             renderLegacyTable();
         }
         
+        // --- NEW: Save initial state and update buttons (Step 6) ---
         saveVisualHistory(); 
         updateUndoRedoButtons(); 
+        
         ELS.modal.style.display = 'flex';
     };
 
     SequentialBuilder.close = () => {
         BUILDER_STATE.isOpen = false;
         if (ELS.modal) ELS.modal.style.display = 'none';
-        closeAddPopup(); 
-        closeContextMenu(); 
+        closeAddPopup(); // Ensure pop-up is closed
+        closeContextMenu(); // Ensure context menu is closed
+        
+        // Clean up legacy listeners if they were added
         if (ELS.modalSequenceBody) {
             ELS.modalSequenceBody.removeEventListener('change', handleLegacySequenceChange);
             ELS.modalSequenceBody.removeEventListener('click', handleLegacySequenceClick);
         }
     };
 
+    // --- NEW: Smart-Visual Editor Functions ---
+
+    // 1. Render Toolbox (Left side)
     const renderToolbox = () => {
         const STATE = APP.StateManager.getState();
         const components = STATE.scheduleComponents.sort((a, b) => a.name.localeCompare(b.name));
+        
         ELS.visualEditorToolbox.innerHTML = components.map(comp => `
             <div class="ve-toolbox-item" draggable="true" data-component-id="${comp.id}" data-component-name="${comp.name}">
                 <div class="ve-toolbox-color" style="background-color: ${comp.color};"></div>
@@ -1080,8 +1603,10 @@ window.APP = window.APP || {};
         `).join('');
     };
 
+    // 2. Render Timeline (Right side)
     const renderTimeline = () => {
-        renderTimeRuler(); 
+        renderTimeRuler(); // Draw the time ruler
+        
         const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
         if (totalDuration === 0) {
             ELS.visualEditorTimeline.innerHTML = '<div style="padding: 16px; color: #6B7280;">No activities in this shift (RDO).</div>';
@@ -1092,13 +1617,17 @@ window.APP = window.APP || {};
         ELS.visualEditorTimeline.innerHTML = BUILDER_STATE.segments.map((seg, index) => {
             const component = APP.StateManager.getComponentById(seg.component_id);
             if (!component) return '';
+
             const widthPct = (seg.duration_min / totalDuration) * 100;
+
+            // --- THIS IS THE "SMART TOOLTIP" ---
             let currentTime = BUILDER_STATE.startTimeMin;
             for (let i = 0; i < index; i++) {
                 currentTime += BUILDER_STATE.segments[i].duration_min;
             }
             const startTime = currentTime;
             const endTime = currentTime + seg.duration_min;
+            
             const tooltip = `${component.name}\nTime: ${APP.Utils.formatMinutesToTime(startTime)} - ${APP.Utils.formatMinutesToTime(endTime)}\nDuration: ${seg.duration_min}m`;
 
             return `
@@ -1107,48 +1636,76 @@ window.APP = window.APP || {};
                 </div>
             `;
         }).join('');
-        renderSummary(); 
+
+        renderSummary(); // Update totals
     };
     
+    // 3. Render Time Ruler (Above Timeline)
     const renderTimeRuler = () => {
         if (!ELS.visualEditorTimeRuler) return;
+
         const { startTimeMin } = BUILDER_STATE;
         const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
         
         if (totalDuration === 0) {
-            ELS.visualEditorTimeRuler.innerHTML = ''; 
+            ELS.visualEditorTimeRuler.innerHTML = ''; // Clear ruler if RDO
             return;
         }
+
         let html = '';
         const endTime = startTimeMin + totalDuration;
+
+        // Find the first "on the hour" marker (e.g., 09:00)
         let firstHourMarker = Math.ceil(startTimeMin / 60) * 60;
 
         for (let time = firstHourMarker; time < endTime; time += 60) {
+            // Calculate the percentage position of this hour marker
             const pct = ((time - startTimeMin) / totalDuration) * 100;
+            
+            // Only draw if it's not at the very beginning (0%)
             if (pct > 0 && pct < 100) {
-                html += `<div class="ve-time-marker" style="left: ${pct}%;">${APP.Utils.formatMinutesToTime(time)}</div>`;
+                html += `
+                    <div class="ve-time-marker" style="left: ${pct}%;">
+                        ${APP.Utils.formatMinutesToTime(time)}
+                    </div>
+                `;
             }
         }
         ELS.visualEditorTimeRuler.innerHTML = html;
     };
     
+    // 4. Render Summary (Footer)
     const renderSummary = () => {
         let totalDuration = 0;
         let paidDuration = 0;
+
         BUILDER_STATE.segments.forEach(seg => {
             const component = APP.StateManager.getComponentById(seg.component_id);
             totalDuration += seg.duration_min;
-            if (component && component.is_paid) paidDuration += seg.duration_min;
+            if (component && component.is_paid) {
+                paidDuration += seg.duration_min;
+            }
         });
+
         ELS.modalTotalTime.textContent = APP.Utils.formatDuration(totalDuration);
         ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
     };
 
+    // 5. Handle Clicks on Toolbox (Pop-up)
     const handleToolboxClick = (e) => {
         const item = e.target.closest('.ve-toolbox-item');
         if (!item) return;
+
         const { componentId, componentName } = item.dataset;
-        BUILDER_STATE.addPopupState = { isOpen: true, componentId, componentName, isEditing: false, editIndex: -1 };
+        BUILDER_STATE.addPopupState = {
+            isOpen: true,
+            componentId,
+            componentName,
+            isEditing: false, // <-- Ensure this is reset
+            editIndex: -1   // <-- Ensure this is reset
+        };
+
+        // Open the pop-up
         ELS.veAddPopupTitle.textContent = `Add: ${componentName}`;
         ELS.veAddStartTime.value = '';
         ELS.veAddDuration.value = '30';
@@ -1161,11 +1718,20 @@ window.APP = window.APP || {};
         ELS.visualEditorAddPopup.style.display = 'none';
     };
 
+    // 6. Reusable "Carve-Out" function (used by pop-up AND drag-drop)
     const handleAddComponent = (componentId, startTime, durationToAdd) => {
-        const MIN_SEGMENT_DUR = 5; 
-        if (startTime === null) { APP.Utils.showToast("Invalid start time. Use HH:MM format.", "danger"); return false; }
-        if (isNaN(durationToAdd) || durationToAdd < MIN_SEGMENT_DUR) { APP.Utils.showToast(`Invalid duration. Must be at least ${MIN_SEGMENT_DUR} minutes.`, "danger"); return false; }
+        const MIN_SEGMENT_DUR = 5; // 5 minute minimum
 
+        if (startTime === null) {
+            APP.Utils.showToast("Invalid start time. Use HH:MM format.", "danger");
+            return false;
+        }
+        if (isNaN(durationToAdd) || durationToAdd < MIN_SEGMENT_DUR) {
+            APP.Utils.showToast(`Invalid duration. Must be at least ${MIN_SEGMENT_DUR} minutes.`, "danger");
+            return false;
+        }
+
+        // Convert "absolute" time to "relative" time in shift
         const relativeStartTime = startTime - BUILDER_STATE.startTimeMin;
         const totalShiftDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
 
@@ -1178,71 +1744,119 @@ window.APP = window.APP || {};
         let inserted = false;
         const newSegments = [];
 
+        // --- THIS IS THE "RIPPLE-PAY" LOGIC ---
+        
+        // 1. First, we build the new schedule by inserting and splitting
         for (const seg of BUILDER_STATE.segments) {
             const segStart = timeElapsed;
             const segEnd = timeElapsed + seg.duration_min;
 
             if (!inserted && relativeStartTime >= segStart && relativeStartTime < segEnd) {
+                // This is the segment to split
                 inserted = true;
                 const timeIntoSegment = relativeStartTime - segStart;
-                if (timeIntoSegment >= MIN_SEGMENT_DUR) newSegments.push({ component_id: seg.component_id, duration_min: timeIntoSegment });
+
+                // Part 1: First half of the split segment
+                if (timeIntoSegment >= MIN_SEGMENT_DUR) {
+                    newSegments.push({ component_id: seg.component_id, duration_min: timeIntoSegment });
+                }
+
+                // Part 2: The new segment we are adding
                 newSegments.push({ component_id: componentId, duration_min: durationToAdd });
+
+                // Part 3: The second half of the split segment
                 const remainingDurationInSegment = seg.duration_min - timeIntoSegment;
-                if (remainingDurationInSegment >= MIN_SEGMENT_DUR) newSegments.push({ component_id: seg.component_id, duration_min: remainingDurationInSegment });
+                if (remainingDurationInSegment >= MIN_SEGMENT_DUR) {
+                    newSegments.push({ component_id: seg.component_id, duration_min: remainingDurationInSegment });
+                }
             } else {
+                // This segment is unaffected by the split
                 newSegments.push(seg);
             }
             timeElapsed += seg.duration_min;
         }
 
+        // 2. Now, we "pay" for the `durationToAdd`
+        // We do this by shrinking other segments, starting from the end of the shift.
         let debt = durationToAdd;
         for (let i = newSegments.length - 1; i >= 0; i--) {
-            if (debt <= 0) break; 
-            if (newSegments[i].component_id === componentId && newSegments[i].duration_min === durationToAdd) continue; 
+            if (debt <= 0) break; // Debt is paid
+            
+            // Don't pay from the segment we just added
+            if (newSegments[i].component_id === componentId && newSegments[i].duration_min === durationToAdd) {
+                continue; 
+            }
+
+            // How much can this segment pay?
             const availableToPay = Math.max(0, newSegments[i].duration_min - MIN_SEGMENT_DUR);
             const payment = Math.min(debt, availableToPay);
+
             newSegments[i].duration_min -= payment;
             debt -= payment;
         }
 
+        // 3. Final step: filter out any segments that were "eaten"
         BUILDER_STATE.segments = newSegments.filter(s => s.duration_min >= MIN_SEGMENT_DUR);
+
+        // If we still have debt, the new item was too large and must be trimmed
         if (debt > 0) {
              APP.Utils.showToast("Warning: Activity was too long and was trimmed to fit.", "warning");
              const newSeg = BUILDER_STATE.segments.find(s => s.component_id === componentId && s.duration_min === durationToAdd);
              if (newSeg) {
                  newSeg.duration_min -= debt;
+                 // Refilter just in case it's now too small
                  BUILDER_STATE.segments = BUILDER_STATE.segments.filter(s => s.duration_min >= MIN_SEGMENT_DUR);
              }
         }
+        
         renderTimeline();
-        saveVisualHistory(); 
-        return true; 
+        saveVisualHistory(); // <-- Save Undo state
+        return true; // Success
     };
 
+    // 7. This is the "Save" button handler for the pop-up (FIXED IN STEP 5)
     const handleAddPopupSave = () => {
         const { componentId, isEditing, editIndex } = BUILDER_STATE.addPopupState;
         const startTime = parseTimeToMinutes(ELS.veAddStartTime.value);
         const durationToAdd = parseInt(ELS.veAddDuration.value, 10);
         
         if (isEditing) {
+            // --- THIS IS THE EDIT LOGIC ---
+            // 1. Delete the old segment (and pay back its time)
             const deletedDuration = BUILDER_STATE.segments[editIndex].duration_min;
             BUILDER_STATE.segments.splice(editIndex, 1);
+            
             const paybackIndex = (editIndex > 0) ? editIndex - 1 : 0;
-            if (BUILDER_STATE.segments[paybackIndex]) BUILDER_STATE.segments[paybackIndex].duration_min += deletedDuration;
+            if (BUILDER_STATE.segments[paybackIndex]) {
+                BUILDER_STATE.segments[paybackIndex].duration_min += deletedDuration;
+            }
+
+            // 2. Add the "new" (edited) segment
             const success = handleAddComponent(componentId, startTime, durationToAdd);
-            if (success) closeAddPopup();
-            else renderTimeline(); 
+            if (success) {
+                closeAddPopup();
+            } else {
+                // If add fails, re-render to restore the original state (since we deleted it)
+                renderTimeline(); 
+            }
+            
         } else {
+            // --- THIS IS THE "ADD NEW" LOGIC ---
             const success = handleAddComponent(componentId, startTime, durationToAdd);
-            if (success) closeAddPopup();
+            if (success) {
+                closeAddPopup();
+            }
         }
     };
 
+    // 8. Handle Drag-to-Adjust (The "Drag" Ripple)
     const handleDragStart = (e) => {
         const handle = e.target.closest('.ve-drag-handle');
         if (!handle) return;
-        e.preventDefault(); 
+
+        e.preventDefault(); // Prevent text selection
         const segmentIndex = parseInt(handle.dataset.handleIndex, 10);
+        
         BUILDER_STATE.dragState = {
             isDragging: true,
             segmentIndex: segmentIndex,
@@ -1257,13 +1871,18 @@ window.APP = window.APP || {};
 
     const handleDragMove = (e) => {
         if (!BUILDER_STATE.dragState.isDragging) return;
+
         const { segmentIndex, startX, originalDurations, minDuration } = BUILDER_STATE.dragState;
         const totalDuration = originalDurations[0] + originalDurations[1];
+        
         const deltaX = e.clientX - startX;
-        const deltaMinutes = Math.round(deltaX / 2); 
+        const deltaMinutes = Math.round(deltaX / 2); // Slow down the drag speed
+
+        // Calculate new durations
         let newDurationA = originalDurations[0] + deltaMinutes;
         let newDurationB = originalDurations[1] - deltaMinutes;
 
+        // Enforce minimums (the "ripple" stop)
         if (newDurationA < minDuration) {
             newDurationA = minDuration;
             newDurationB = totalDuration - minDuration;
@@ -1271,174 +1890,283 @@ window.APP = window.APP || {};
             newDurationB = minDuration;
             newDurationA = totalDuration - minDuration;
         }
+
+        // Update the state
         BUILDER_STATE.segments[segmentIndex].duration_min = newDurationA;
         BUILDER_STATE.segments[segmentIndex + 1].duration_min = newDurationB;
+
+        // Re-render the timeline
         renderTimeline();
     };
 
     const handleDragEnd = () => {
         if (BUILDER_STATE.dragState.isDragging) {
             BUILDER_STATE.dragState.isDragging = false;
-            saveVisualHistory(); 
+            saveVisualHistory(); // <-- Save Undo state
         }
     };
 
+    // --- NEW: Drag-and-Drop Handlers (Step 4) ---
+
+    // 9. Handle Drag from Toolbox
     const handleToolboxDragStart = (e) => {
         const item = e.target.closest('.ve-toolbox-item');
-        if (!item) { e.preventDefault(); return; }
+        if (!item) {
+            e.preventDefault();
+            return;
+        }
+        
         e.dataTransfer.effectAllowed = 'copy';
         e.dataTransfer.setData('text/plain', item.dataset.componentId);
-        setTimeout(() => { item.classList.add('is-dragging'); }, 0);
+        
+        setTimeout(() => {
+            item.classList.add('is-dragging');
+        }, 0);
     };
 
+    // 10. Clean up after drag
     const handleToolboxDragEnd = (e) => {
-        const item = e.target.closest('.ve-toolbox-item.is-dragging'); 
-        if (item) item.classList.remove('is-dragging');
+        const item = e.target.closest('.ve-toolbox-item.is-dragging'); // Find the one that was dragging
+        if (item) {
+            item.classList.remove('is-dragging');
+        }
     };
 
+    // 11. Handle moving over the timeline
     const handleTimelineDragEnter = (e) => {
         e.preventDefault();
-        if (ELS.visualEditorDropCursor) ELS.visualEditorDropCursor.style.display = 'block';
+        if (ELS.visualEditorDropCursor) {
+            ELS.visualEditorDropCursor.style.display = 'block';
+        }
     };
 
+    // 12. Handle leaving the timeline
     const handleTimelineDragLeave = (e) => {
-        if (ELS.visualEditorDropCursor) ELS.visualEditorDropCursor.style.display = 'none';
+        if (ELS.visualEditorDropCursor) {
+            ELS.visualEditorDropCursor.style.display = 'none';
+        }
     };
 
+    // 13. Calculate cursor position
     const handleTimelineDragOver = (e) => {
         e.preventDefault(); 
         if (!ELS.visualEditorTimeline) return;
+
         const rect = ELS.visualEditorTimeline.getBoundingClientRect();
         const x = e.clientX - rect.left; 
         const width = ELS.visualEditorTimeline.clientWidth;
         const pct = Math.max(0, Math.min(1, x / width)); 
+
         const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
         const relativeTime = Math.round(pct * totalDuration);
         const absoluteTime = BUILDER_STATE.startTimeMin + relativeTime;
+
         if (ELS.visualEditorDropCursor) {
             ELS.visualEditorDropCursor.style.left = `${pct * 100}%`;
             ELS.visualEditorDropCursor.title = `Drop at: ${APP.Utils.formatMinutesToTime(absoluteTime)}`;
         }
     };
 
+    // 14. Handle the drop
     const handleTimelineDrop = (e) => {
         e.preventDefault();
-        if (ELS.visualEditorDropCursor) ELS.visualEditorDropCursor.style.display = 'none'; 
+        if (ELS.visualEditorDropCursor) {
+            ELS.visualEditorDropCursor.style.display = 'none'; // Hide cursor
+        }
+
         const componentId = e.dataTransfer.getData('text/plain');
         const component = APP.StateManager.getComponentById(componentId);
         if (!component) return;
+
         const rect = ELS.visualEditorTimeline.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const width = ELS.visualEditorTimeline.clientWidth;
         const pct = Math.max(0, Math.min(1, x / width));
+        
         const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
         const relativeTime = Math.round(pct * totalDuration);
         const absoluteTime = BUILDER_STATE.startTimeMin + relativeTime;
-        handleAddComponent(componentId, absoluteTime, component.default_duration_min);
+        
+        handleAddComponent(
+            componentId, 
+            absoluteTime, 
+            component.default_duration_min 
+        );
     };
     
+    // --- End Drag-and-Drop Handlers ---
+
+    // --- NEW: Right-Click Context Menu Handlers (Step 5) ---
+    
     const handleTimelineContextMenu = (e) => {
-        e.preventDefault(); 
-        closeContextMenu(); 
+        e.preventDefault(); // Stop the browser's default right-click menu
+        closeContextMenu(); // Close any existing one
+
         const segment = e.target.closest('.ve-segment');
-        if (!segment) return; 
+        if (!segment) return; // Didn't click on a segment
+
         const index = parseInt(segment.dataset.index, 10);
         if (isNaN(index)) return;
+
+        // Store the index of the segment we clicked
         BUILDER_STATE.contextMenuIndex = index; 
+
+        // Show the menu at the mouse position
         ELS.visualEditorContextMenu.style.display = 'block';
         ELS.visualEditorContextMenu.style.left = `${e.clientX}px`;
         ELS.visualEditorContextMenu.style.top = `${e.clientY}px`;
     };
 
+    // Closes the context menu
     const closeContextMenu = () => {
-        if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.style.display = 'none';
+        if (ELS.visualEditorContextMenu) {
+            ELS.visualEditorContextMenu.style.display = 'none';
+        }
     };
 
+    // Handles clicks on the menu's buttons
     const handleContextMenuClick = (e) => {
         const item = e.target.closest('.ve-context-menu-item');
         if (!item) return;
+
         const action = item.dataset.action;
-        const index = BUILDER_STATE.contextMenuIndex; 
+        const index = BUILDER_STATE.contextMenuIndex; // Get the stored index
+        
+        // **TYPO FIX:** Was BUILDT_STATE
         if (isNaN(index) || !BUILDER_STATE.segments[index]) return;
+
         const segment = BUILDER_STATE.segments[index];
         const MIN_SEGMENT_DUR = 5;
 
         if (action === 'delete') {
+            // --- Delete Logic (with "anti-ripple") ---
             const deletedDuration = segment.duration_min;
+            
+            // Remove the segment
             BUILDER_STATE.segments.splice(index, 1);
+
+            // "Pay back" the duration to the previous segment (or next, if it was the first)
             const paybackIndex = (index > 0) ? index - 1 : 0;
-            if (BUILDER_STATE.segments[paybackIndex]) BUILDER_STATE.segments[paybackIndex].duration_min += deletedDuration;
+            
+            if (BUILDER_STATE.segments[paybackIndex]) {
+                BUILDER_STATE.segments[paybackIndex].duration_min += deletedDuration;
+            }
         }
         else if (action === 'split') {
-            if (segment.duration_min < (MIN_SEGMENT_DUR * 2)) { APP.Utils.showToast("Segment is too short to split.", "warning"); return; }
+            // --- Split Logic ---
+            if (segment.duration_min < (MIN_SEGMENT_DUR * 2)) {
+                APP.Utils.showToast("Segment is too short to split.", "warning");
+                return;
+            }
+            
             const dur1 = Math.floor(segment.duration_min / 2);
             const dur2 = segment.duration_min - dur1;
+            
+            // Update original segment
             segment.duration_min = dur1;
-            BUILDER_STATE.segments.splice(index + 1, 0, { component_id: segment.component_id, duration_min: dur2 });
+            
+            // Insert the new segment
+            BUILDER_STATE.segments.splice(index + 1, 0, {
+                component_id: segment.component_id,
+                duration_min: dur2
+            });
         }
         else if (action === 'edit') {
+            // --- Edit Logic (Re-uses the pop-up) ---
             const component = APP.StateManager.getComponentById(segment.component_id);
-            BUILDER_STATE.addPopupState = { isOpen: true, componentId: segment.component_id, componentName: component.name, isEditing: true, editIndex: index };
+            BUILDER_STATE.addPopupState = {
+                isOpen: true,
+                componentId: segment.component_id,
+                componentName: component.name,
+                isEditing: true, // Set edit mode
+                editIndex: index // Store the index we are editing
+            };
+
+            // Calculate the segment's absolute start time
             let startTime = BUILDER_STATE.startTimeMin;
-            for(let i = 0; i < index; i++) startTime += BUILDER_STATE.segments[i].duration_min;
+            for(let i = 0; i < index; i++) {
+                startTime += BUILDER_STATE.segments[i].duration_min;
+            }
+
+            // Open and pre-fill the pop-up
             ELS.veAddPopupTitle.textContent = `Edit: ${component.name}`;
             ELS.veAddStartTime.value = APP.Utils.formatMinutesToTime(startTime);
             ELS.veAddDuration.value = segment.duration_min;
             ELS.visualEditorAddPopup.style.display = 'block';
             ELS.veAddStartTime.focus();
         }
+        
+        // Re-render the timeline to show all changes
         renderTimeline();
-        saveVisualHistory(); 
+        saveVisualHistory(); // <-- Save Undo state
         closeContextMenu();
     };
 
+    // --- NEW: Internal History Functions (Step 6) ---
+
+    // Saves a snapshot of the current segments
     const saveVisualHistory = () => {
+        // Clear any "redo" history
         if (BUILDER_STATE.visualHistoryIndex < BUILDER_STATE.visualHistory.length - 1) {
             BUILDER_STATE.visualHistory = BUILDER_STATE.visualHistory.slice(0, BUILDER_STATE.visualHistoryIndex + 1);
         }
+        
+        // Add new state
+        // **TYPO FIX:** Was BUILDES_STATE
         BUILDER_STATE.visualHistory.push(JSON.parse(JSON.stringify(BUILDER_STATE.segments)));
         BUILDER_STATE.visualHistoryIndex++;
+        
         updateUndoRedoButtons();
     };
 
+    // Handles the Undo button click
     const handleUndo = () => {
         if (BUILDER_STATE.visualHistoryIndex > 0) {
             BUILDER_STATE.visualHistoryIndex--;
             const segments = JSON.parse(JSON.stringify(BUILDER_STATE.visualHistory[BUILDER_STATE.visualHistoryIndex]));
             BUILDER_STATE.segments = segments;
-            renderTimeline(); 
+            renderTimeline(); // Re-render with the old state
             updateUndoRedoButtons();
         }
     };
 
+    // Handles the Redo button click
     const handleRedo = () => {
         if (BUILDER_STATE.visualHistoryIndex < BUILDER_STATE.visualHistory.length - 1) {
             BUILDER_STATE.visualHistoryIndex++;
             const segments = JSON.parse(JSON.stringify(BUILDER_STATE.visualHistory[BUILDER_STATE.visualHistoryIndex]));
             BUILDER_STATE.segments = segments;
-            renderTimeline(); 
+            renderTimeline(); // Re-render with the new state
             updateUndoRedoButtons();
         }
     };
     
+    // Updates the enabled/disabled state of the buttons
     const updateUndoRedoButtons = () => {
         if (ELS.veUndo) ELS.veUndo.disabled = BUILDER_STATE.visualHistoryIndex <= 0;
         if (ELS.veRedo) ELS.veRedo.disabled = BUILDER_STATE.visualHistoryIndex >= BUILDER_STATE.visualHistory.length - 1;
     };
 
+    // --- UNIVERSAL SAVE FUNCTION ---
     const handleSave = async () => {
         const { mode, contextId, segments, startTimeMin, exceptionDate, reason } = BUILDER_STATE;
+        
         const absoluteTimeSegments = [];
         let currentTime = startTimeMin;
 
         if (segments.length === 0) {
              if (mode === 'exception') {
-                if (!confirm("This will clear the schedule for the selected day (RDO/Absence). Proceed?")) return;
+                if (!confirm("This will clear the schedule for the selected day (RDO/Absence). Proceed?")) {
+                    return;
+                }
              }
         }
 
         for (const seg of segments) {
-            if (!seg.component_id) { APP.Utils.showToast("Error: All activities must have a component selected.", "danger"); return; }
+            if (!seg.component_id) {
+                APP.Utils.showToast("Error: All activities must have a component selected.", "danger");
+                return;
+            }
             const start = currentTime;
             const end = currentTime + seg.duration_min;
             absoluteTimeSegments.push({ component_id: seg.component_id, start_min: start, end_min: end });
@@ -1446,28 +2174,43 @@ window.APP = window.APP || {};
         }
 
         let result;
-        if (mode === 'definition') result = await saveShiftDefinition(contextId, absoluteTimeSegments);
-        else if (mode === 'exception') result = await saveScheduleException(contextId, exceptionDate, absoluteTimeSegments, reason);
+        if (mode === 'definition') {
+            result = await saveShiftDefinition(contextId, absoluteTimeSegments);
+        } else if (mode === 'exception') {
+            result = await saveScheduleException(contextId, exceptionDate, absoluteTimeSegments, reason);
+        }
 
         if (result && !result.error) {
             SequentialBuilder.close();
-            if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
+            if (APP.Components.ScheduleViewer) {
+                APP.Components.ScheduleViewer.render();
+            }
         }
     };
 
+    // Specific save handler for Shift Definitions
     const saveShiftDefinition = async (definitionId, structure) => {
         const { data, error } = await APP.DataService.updateRecord('shift_definitions', { structure: structure }, { id: definitionId });
         if (!error) {
             APP.StateManager.syncRecord('shift_definitions', data);
             APP.StateManager.saveHistory("Update Shift Structure");
             APP.Utils.showToast("Shift definition saved successfully.", "success");
-            if (APP.Components.ShiftDefinitionEditor) APP.Components.ShiftDefinitionEditor.render();
+            if (APP.Components.ShiftDefinitionEditor) {
+                APP.Components.ShiftDefinitionEditor.render();
+            }
         }
         return { data, error };
     };
 
+    // Specific save handler for Schedule Exceptions
     const saveScheduleException = async (advisorId, dateISO, structure, reason) => {
-        const record = { advisor_id: advisorId, exception_date: dateISO, structure: structure, reason: reason || null };
+        const record = {
+            advisor_id: advisorId,
+            exception_date: dateISO,
+            structure: structure,
+            reason: reason || null
+        };
+
         const { data, error } = await APP.DataService.saveRecord('schedule_exceptions', record, 'advisor_id, exception_date');
         if (!error) {
             APP.StateManager.syncRecord('schedule_exceptions', data);
@@ -1477,38 +2220,75 @@ window.APP = window.APP || {};
         return { data, error };
     };
 
+
+    // --- LEGACY FUNCTIONS (For Shift Definition Editor) ---
     const renderLegacyTable = () => {
-        if (!ELS.modalSequenceBody) return;
-        const STATE = APP.StateManager.getState();
-        if (!STATE || !STATE.scheduleComponents) return;
-        const components = STATE.scheduleComponents.sort((a,b) => a.name.localeCompare(b.name));
-        const componentOpts = components.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
         let html = '';
         let currentTime = BUILDER_STATE.startTimeMin;
+        let totalDuration = 0;
+        let paidDuration = 0;
+        const STATE = APP.StateManager.getState();
+        const componentOptions = STATE.scheduleComponents
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map(c => `<option value="${c.id}">${c.name} (${c.type})</option>`)
+            .join('');
 
         BUILDER_STATE.segments.forEach((seg, index) => {
-            const duration = seg.duration_min;
-            const endTime = currentTime + duration;
-            html += `<tr data-index="${index}">
-                <td>${APP.Utils.formatMinutesToTime(currentTime)}</td>
-                <td>${APP.Utils.formatMinutesToTime(endTime)}</td>
-                <td><select class="form-select legacy-component-select" data-index="${index}">${componentOpts}</select></td>
-                <td><input type="number" class="form-input legacy-duration-input" value="${duration}" data-index="${index}" min="5" step="5" style="width: 70px;"></td>
-                <td class="actions"><button class="btn btn-sm btn-secondary legacy-insert" data-index="${index}">Ins</button>
-                <button class="btn btn-sm btn-warning legacy-split" data-index="${index}">Split</button>
-                <button class="btn btn-sm btn-danger legacy-delete" data-index="${index}">Del</button></td>
-            </tr>`;
+            const component = APP.StateManager.getComponentById(seg.component_id);
+            const startTime = currentTime;
+            const endTime = currentTime + seg.duration_min;
+            html += `
+             <tr data-index="${index}">
+                    <td>${index + 1}</td>
+                    <td>
+                        <select class="form-select sequence-component" data-index="${index}">
+                           <option value="">-- Select Activity --</option>
+                            ${componentOptions}
+                        </select>
+                    </td>
+                    <td>
+                        <input type="number" class="form-input duration-input sequence-duration" data-index="${index}" value="${seg.duration_min}" min="5" step="5">
+                    </td>
+                    <td>
+                         <input type="text" class="form-input duration-input sequence-start-time" 
+                                data-index="${index}" value="${APP.Utils.formatMinutesToTime(startTime)}" data-minutes="${startTime}">
+                    </td>
+                    <td>
+                        <input type="text" class="form-input duration-input sequence-end-time" 
+                               data-index="${index}" value="${APP.Utils.formatMinutesToTime(endTime)}" data-minutes="${endTime}">
+                    </td>
+                    <td class="actions-cell">
+                      <div class="btn-group">
+                         <button class="btn btn-sm" data-action="insert-before" data-index="${index}">+ Above</button>
+                        <button class="btn btn-sm" data-action="insert-after" data-index="${index}">+ Below</button>
+                        <button class="btn btn-sm" data-action="split-row" data-index="${index}">Split</button>
+                         <button class="btn btn-sm btn-danger delete-sequence-item" data-index="${index}">Remove</button>
+                      </div>
+                    </td>
+                </tr>`;
             currentTime = endTime;
+            totalDuration += seg.duration_min;
+            if (component && component.is_paid) {
+                paidDuration += seg.duration_min;
+            }
         });
+
         ELS.modalSequenceBody.innerHTML = html;
         BUILDER_STATE.segments.forEach((seg, index) => {
-            const select = ELS.modalSequenceBody.querySelector(`.legacy-component-select[data-index="${index}"]`);
-            if (select) select.value = seg.component_id;
+            const selectEl = ELS.modalSequenceBody.querySelector(`.sequence-component[data-index="${index}"]`);
+            if (selectEl) {
+                selectEl.value = seg.component_id || '';
+            }
         });
-        renderSummary();
+        ELS.modalTotalTime.textContent = APP.Utils.formatDuration(totalDuration);
+        ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
     };
 
-    const handleLegacyAddActivity = () => { BUILDER_STATE.segments.push({ component_id: null, duration_min: 60 }); renderLegacyTable(); };
+    const handleLegacyAddActivity = () => {
+        BUILDER_STATE.segments.push({ component_id: null, duration_min: 60 });
+        renderLegacyTable();
+    };
+
     const handleLegacySequenceChange = (e) => {
         const target = e.target;
         const index = parseInt(target.dataset.index, 10);
@@ -1517,31 +2297,125 @@ window.APP = window.APP || {};
             const componentId = target.value;
             BUILDER_STATE.segments[index].component_id = componentId || null;
             const component = APP.StateManager.getComponentById(componentId);
-            if (component) BUILDER_STATE.segments[index].duration_min = component.default_duration_min;
+            if (component) {
+                BUILDER_STATE.segments[index].duration_min = component.default_duration_min;
+            }
         } else if (target.classList.contains('sequence-duration')) {
             const duration = parseInt(target.value, 10);
-            if (isNaN(duration) || duration < 5) { target.value = BUILDER_STATE.segments[index].duration_min; return; }
+            if (isNaN(duration) || duration < 5) {
+                target.value = BUILDER_STATE.segments[index].duration_min;
+                return;
+            }
             BUILDER_STATE.segments[index].duration_min = duration;
-        } 
+        } else if (target.classList.contains('sequence-start-time')) {
+            const newStartTimeMin = parseTimeToMinutes(target.value);
+            const originalStartTimeMin = parseInt(target.dataset.minutes, 10);
+            if (newStartTimeMin === null || newStartTimeMin === originalStartTimeMin) {
+                target.value = APP.Utils.formatMinutesToTime(originalStartTimeMin);
+                return;
+            }
+            if (index === 0) {
+                BUILDER_STATE.startTimeMin = newStartTimeMin;
+            } else {
+                const durationDiff = newStartTimeMin - originalStartTimeMin;
+                const prevDuration = BUILDER_STATE.segments[index - 1].duration_min;
+                const currDuration = BUILDER_STATE.segments[index].duration_min;
+                const newPrevDuration = prevDuration + durationDiff;
+                const newCurrDuration = currDuration - durationDiff;
+                if (newPrevDuration < 5 || newCurrDuration < 5) {
+                    APP.Utils.showToast("Cannot adjust: an activity would become too short.", "warning");
+                    target.value = APP.Utils.formatMinutesToTime(originalStartTimeMin); // Revert
+                    return;
+                }
+                BUILDER_STATE.segments[index - 1].duration_min = newPrevDuration;
+                BUILDER_STATE.segments[index].duration_min = newCurrDuration;
+            }
+        } else if (target.classList.contains('sequence-end-time')) {
+            const newEndTimeMin = parseTimeToMinutes(target.value);
+            const originalEndTimeMin = parseInt(target.dataset.minutes, 10);
+            if (newEndTimeMin === null || newEndTimeMin === originalEndTimeMin) {
+                target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin);
+                return;
+            }
+            const isLastRow = index === BUILDER_STATE.segments.length - 1;
+            if (isLastRow) {
+                const durationDiff = newEndTimeMin - originalEndTimeMin;
+                const newLastDuration = BUILDER_STATE.segments[index].duration_min + durationDiff;
+                if (newLastDuration < 5) {
+                     APP.Utils.showToast("Cannot adjust: the last activity would be too short.", "warning");
+                     target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin); // Revert
+                     return;
+                }
+                BUILDER_STATE.segments[index].duration_min = newLastDuration;
+            } else {
+                const durationDiff = newEndTimeMin - originalEndTimeMin;
+                const currDuration = BUILDER_STATE.segments[index].duration_min;
+                const nextDuration = BUILDER_STATE.segments[index + 1].duration_min;
+                const newCurrDuration = currDuration + durationDiff;
+                const newNextDuration = nextDuration - durationDiff;
+                if (newCurrDuration < 5 || newNextDuration < 5) {
+                    APP.Utils.showToast("Cannot adjust: an activity would become too short.", "warning");
+                    target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin); // Revert
+                    return;
+                }
+                BUILDER_STATE.segments[index].duration_min = newCurrDuration;
+                BUILDER_STATE.segments[index + 1].duration_min = newNextDuration;
+            }
+        }
         renderLegacyTable();
     };
+
     const handleLegacySequenceClick = (e) => {
         const target = e.target.closest('button');
         if (!target) return;
         const index = parseInt(target.dataset.index, 10);
         if (isNaN(index)) return;
-        if (target.classList.contains('legacy-delete')) {
+        const clamp = (v) => Math.max(5, Math.round(v / 5) * 5);
+        if (target.classList.contains('delete-sequence-item')) {
             BUILDER_STATE.segments.splice(index, 1);
             renderLegacyTable();
+            return;
+        }
+        const action = target.dataset.action;
+        if (action === 'insert-before' || action === 'insert-after') {
+            const NEW_DURATION = 30;
+            const insertAt = action === 'insert-before' ? index : index + 1;
+            BUILDER_STATE.segments.splice(insertAt, 0, { component_id: null, duration_min: NEW_DURATION });
+            const adjustIndex = action === 'insert-before' ? index + 1 : index;
+            if (BUILDER_STATE.segments[adjustIndex]) {
+                const cur = BUILDER_STATE.segments[adjustIndex];
+                if (cur.duration_min > NEW_DURATION + 5) {
+                    cur.duration_min = cur.duration_min - NEW_DURATION;
+                }
+            }
+            renderLegacyTable();
+            return;
+        }
+        if (action === 'split-row') {
+            const seg = BUILDER_STATE.segments[index];
+            if (!seg || seg.duration_min < 10) {
+                APP.Utils.showToast("Cannot split activity shorter than 10 minutes.", "warning");
+                return;
+            }
+            let first = clamp(Math.floor(seg.duration_min / 2));
+            let second = seg.duration_min - first;
+            seg.duration_min = first;
+            BUILDER_STATE.segments.splice(index + 1, 0, { component_id: seg.component_id, duration_min: second });
+            renderLegacyTable();
+            return;
         }
     };
     
+    // --- End Legacy Functions ---
+
     APP.Components = APP.Components || {};
     APP.Components.SequentialBuilder = SequentialBuilder;
 }(window.APP));
 
+
 /**
  * MODULE: APP.Components.ShiftDefinitionEditor
+ * Manages the list of Shift Definitions and triggers the SequentialBuilder.
  */
 (function(APP) {
     const ShiftDefinitionEditor = {};
@@ -1550,6 +2424,7 @@ window.APP = window.APP || {};
     ShiftDefinitionEditor.initialize = () => {
         ELS.grid = document.getElementById('shiftDefinitionsGrid');
         ELS.btnNew = document.getElementById('btnNewShiftDefinition');
+
         if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNewDefinition);
         if (ELS.grid) ELS.grid.addEventListener('click', handleGridClick);
     };
@@ -1558,44 +2433,81 @@ window.APP = window.APP || {};
         if (!ELS.grid) return;
         const STATE = APP.StateManager.getState();
         const definitions = STATE.shiftDefinitions.sort((a,b) => a.name.localeCompare(b.name));
+
         let html = '<table><thead><tr><th>Code</th><th>Name</th><th>Total Duration</th><th>Paid Duration</th><th>Actions</th></tr></thead><tbody>';
+
         definitions.forEach(def => {
             let totalDuration = 0;
             let paidDuration = 0;
+
+            // Calculate durations based on the structure
             if (def.structure && Array.isArray(def.structure)) {
-               def.structure.forEach(seg => {
+                def.structure.forEach(seg => {
                     const duration = seg.end_min - seg.start_min;
                     totalDuration += duration;
                     const component = APP.StateManager.getComponentById(seg.component_id);
-                    if (component && component.is_paid) paidDuration += duration;
+                    if (component && component.is_paid) {
+                        paidDuration += duration;
+                    }
                 });
             }
-            html += `<tr data-definition-id="${def.id}"><td><strong>${def.code}</strong></td><td>${def.name}</td><td>${APP.Utils.formatDuration(totalDuration)}</td><td>${APP.Utils.formatDuration(paidDuration)}</td><td class="actions"><button class="btn btn-sm btn-primary edit-structure" data-definition-id="${def.id}">Edit Structure</button><button class="btn btn-sm btn-danger delete-definition" data-definition-id="${def.id}">Delete</button></td></tr>`;
+
+            html += `
+            <tr data-definition-id="${def.id}">
+                <td><strong>${def.code}</strong></td>
+                <td>${def.name}</td>
+                <td>${APP.Utils.formatDuration(totalDuration)}</td>
+                <td>${APP.Utils.formatDuration(paidDuration)}</td>
+                <td class="actions">
+                    <button class="btn btn-sm btn-primary edit-structure" data-definition-id="${def.id}">Edit Structure</button>
+                    <button class="btn btn-sm btn-danger delete-definition" data-definition-id="${def.id}">Delete</button>
+                </td>
+            </tr>`;
         });
         html += '</tbody></table>';
         ELS.grid.innerHTML = html;
+
+
     };
+
+    // --- CRUD Handlers ---
 
     const handleNewDefinition = async () => {
         const nameInput = prompt("Enter the full name (e.g., 'Early 7am-4pm Flex'):");
         if (!nameInput) return;
         const name = nameInput.trim();
+
         const codeInput = prompt("Enter a unique shortcode (e.g., 'E74F' or '2'):");
         if (!codeInput) return;
         const code = codeInput.trim();
-        if (APP.StateManager.getShiftDefinitionByCode(code)) { APP.Utils.showToast("Error: Code already exists.", "danger"); return; }
+
+        if (!name || !code) return;
+
+        // Check for duplicate code
+        if (APP.StateManager.getShiftDefinitionByCode(code)) {
+            APP.Utils.showToast("Error: Code already exists.", "danger");
+            return;
+        }
+
+        // Ensure code is explicitly stored as a string
         const newDefinition = { name, code: String(code), structure: [] };
+
         const { data, error } = await APP.DataService.saveRecord('shift_definitions', newDefinition);
         if (!error) {
             APP.StateManager.syncRecord('shift_definitions', data);
-            APP.Utils.showToast(`Shift '${name}' created.`, "success");
+            APP.StateManager.saveHistory("Create Shift Definition");
+            APP.Utils.showToast(`Shift '${name}' created. Now click 'Edit Structure'.`, "success");
             ShiftDefinitionEditor.render();
-            if (APP.Components.RotationEditor) APP.Components.RotationEditor.renderGrid();
+            // Update rotation editor dropdowns
+            if (APP.Components.RotationEditor) {
+                 APP.Components.RotationEditor.renderGrid();
+            }
         }
     };
-
+    
     const handleGridClick = (e) => {
         if (e.target.classList.contains('edit-structure')) {
+            // Open the shared Sequential Builder in 'definition' mode
             const definitionId = e.target.dataset.definitionId;
             const definition = APP.StateManager.getShiftDefinitionById(definitionId);
             if (definition && APP.Components.SequentialBuilder) {
@@ -1613,13 +2525,18 @@ window.APP = window.APP || {};
 
     const handleDeleteDefinition = async (id) => {
         const definition = APP.StateManager.getShiftDefinitionById(id);
-        if (!definition || !confirm(`Delete '${definition.name}'?`)) return;
+        if (!definition || !confirm(`Delete '${definition.name}' (${definition.code})?`)) return;
+
+        // NOTE: Should ideally check if definition is used in rotations before deleting
         const { error } = await APP.DataService.deleteRecord('shift_definitions', { id });
         if (!error) {
             APP.StateManager.syncRecord('shift_definitions', { id: id }, true);
+            APP.StateManager.saveHistory("Delete Shift Definition");
             APP.Utils.showToast(`Shift deleted.`, "success");
             ShiftDefinitionEditor.render();
-            if (APP.Components.RotationEditor) APP.Components.RotationEditor.renderGrid();
+            if (APP.Components.RotationEditor) {
+                APP.Components.RotationEditor.renderGrid();
+            }
         }
     };
 
@@ -1627,8 +2544,10 @@ window.APP = window.APP || {};
     APP.Components.ShiftDefinitionEditor = ShiftDefinitionEditor;
 }(window.APP));
 
+
 /**
  * MODULE: APP.Components.RotationEditor
+ * Manages the creation and modification of rotation patterns (Auto-Save Architecture).
  */
 (function(APP) {
     const RotationEditor = {};
@@ -1638,7 +2557,7 @@ window.APP = window.APP || {};
         ELS.familySelect = document.getElementById('rotationFamily');
         ELS.btnNew = document.getElementById('btnNewRotation');
         ELS.btnDelete = document.getElementById('btnDeleteRotation');
-        ELS.btnAddWeek = document.getElementById('btnAddWeek'); 
+        ELS.btnAddWeek = document.getElementById('btnAddWeek'); // (Top Button)
         ELS.grid = document.getElementById('rotationGrid');
         ELS.autoSaveStatus = document.getElementById('autoSaveStatus');
 
@@ -1658,8 +2577,11 @@ window.APP = window.APP || {};
         if (!ELS.familySelect) return;
         const STATE = APP.StateManager.getState();
         const patterns = STATE.rotationPatterns.sort((a,b) => a.name.localeCompare(b.name));
+        
         let opts = '<option value="">-- Select Rotation --</option>';
-        patterns.forEach(p => { opts += `<option value="${p.name}" ${p.name === STATE.currentRotation ? 'selected' : ''}>${p.name}</option>`; });
+        patterns.forEach(p => {
+            opts += `<option value="${p.name}" ${p.name === STATE.currentRotation ? 'selected' : ''}>${p.name}</option>`;
+        });
         ELS.familySelect.innerHTML = opts;
     };
 
@@ -1668,53 +2590,107 @@ window.APP = window.APP || {};
         const STATE = APP.StateManager.getState();
         const pattern = APP.StateManager.getPatternByName(STATE.currentRotation);
         const patternData = pattern ? (pattern.pattern || {}) : {};
+        
+        // Use the utility function to determine the number of weeks
         let numWeeks = 0;
         if (pattern) {
             numWeeks = APP.Utils.calculateRotationLength(pattern);
+            // Ensure a minimum of 6 weeks is displayed if the pattern exists but has fewer than 6 defined.
             if (numWeeks < 6) numWeeks = 6; 
         }
        
         const weeks = Array.from({length: numWeeks}, (_, i) => i + 1);
         const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
-        const definitionOpts = STATE.shiftDefinitions.sort((a,b) => (String(a.code) || '').localeCompare(String(b.code) || '')).map(d => `<option value="${d.code}">${d.code} (${d.name})</option>`).join('');
+        
+        // Generate shift definition options
+        const definitionOpts = STATE.shiftDefinitions
+            .sort((a,b) => (String(a.code) || '').localeCompare(String(b.code) || ''))
+            .map(d => `<option value="${d.code}">${d.code} (${d.name})</option>`)
+            .join('');
+            
         let html = '<table><thead><tr><th>WEEK</th>';
         days.forEach(d => html += `<th>${d}</th>`);
         html += '</tr></thead><tbody>';
+
         weeks.forEach(w => {
             html += `<tr><td>Week ${w}</td>`;
             days.forEach((d, i) => {
-                const dow = i + 1; 
-                html += `<td><select class="form-select rotation-grid-select" data-week="${w}" data-dow="${dow}" ${!pattern ? 'disabled' : ''}><option value="">-- RDO --</option>${definitionOpts}</select></td>`;
+                const dow = i + 1; // Day of week index (1-7)
+                html += `
+                <td>
+                    <select class="form-select rotation-grid-select" data-week="${w}" data-dow="${dow}" ${!pattern ? 'disabled' : ''}>
+                    <option value="">-- RDO --</option>
+                    ${definitionOpts}
+                    </select>
+                </td>`;
             });
             html += '</tr>';
         });
         html += '</tbody></table>';
 
+        // V15.8.1: Added "Delete Last Week" button
+        // Inline "Add Week" and "Delete Week" (only when a rotation is selected)
         if (pattern) {
-          html += `<div class="table-footer-inline"><button id="btnAddWeekInline" class="btn btn-secondary">[+] Add Week (Bottom)</button><button id="btnDeleteWeekInline" class="btn btn-danger" ${numWeeks === 0 ? 'disabled' : ''}>[-] Delete Last Week</button></div>`;
+          html += `
+            <div class="table-footer-inline">
+              <button id="btnAddWeekInline" class="btn btn-secondary">[+] Add Week (Bottom)</button>
+              <button id="btnDeleteWeekInline" class="btn btn-danger" ${numWeeks === 0 ? 'disabled' : ''}>[-] Delete Last Week</button>
+            </div>
+          `;
         }
-        if (numWeeks === 0 && !pattern) html = '<div class="visualization-empty">Select or create a rotation to begin editing.</div>';
+
+        
+        if (numWeeks === 0 && !pattern) {
+             html = '<div class="visualization-empty">Select or create a rotation to begin editing.</div>';
+        }
 
         ELS.grid.innerHTML = html;
+
+
+        // Wire inline buttons (appears under the table)
         const inlineAdd = document.getElementById('btnAddWeekInline');
         if (inlineAdd) inlineAdd.addEventListener('click', handleAddWeek);
+
+        // V15.8.1: Wire the new Delete Last Week button
         const inlineDelete = document.getElementById('btnDeleteWeekInline');
         if (inlineDelete) inlineDelete.addEventListener('click', handleDeleteLastWeek);
 
+
+        // Set selected values (must be done after HTML insertion)
         if (pattern) {
             weeks.forEach(w => {
-                const weekKey = Object.keys(patternData).find(k => { const match = k.match(/^Week ?(\d+)$/i); return match && parseInt(match[1], 10) === w; });
+                // Need a robust way to find the week data regardless of key format
+                const weekKey = findWeekKey(patternData, w);
                 const weekData = weekKey ? patternData[weekKey] : {};
+                
                 days.forEach((d, i) => {
                     const dow = i + 1;
+                    // Handle legacy DOW keys (e.g., 'mon') if numerical key is missing
                     const legacyDayKey = d.toLowerCase();
                     const code = weekData[dow] || weekData[legacyDayKey] || ''; 
+
                     const sel = ELS.grid.querySelector(`select[data-week="${w}"][data-dow="${dow}"]`);
-                    if (sel) sel.value = code;
+                    if (sel) {
+                        sel.value = code;
+                    }
                 });
             });
         }
-        if (ELS.btnAddWeek) ELS.btnAddWeek.disabled = !pattern;
+
+        // Enable/Disable Add Week button based on selection
+        if (ELS.btnAddWeek) {
+            ELS.btnAddWeek.disabled = !pattern;
+        }
+    };
+
+    // Helper: Finds the correct key in the pattern data (handles "Week 1", "Week1", "week1" etc.)
+    const findWeekKey = (patternData, weekNumber) => {
+        const keys = Object.keys(patternData);
+        // Find the key that matches the week number using the robust regex
+        return keys.find(k => {
+            const match = k.match(/^Week ?(\d+)$/i);
+            return match && parseInt(match[1], 10) === weekNumber;
+        });
     };
 
     const handleFamilyChange = () => {
@@ -1725,103 +2701,207 @@ window.APP = window.APP || {};
     const handleNewRotation = async () => {
         const name = prompt("Enter a name for the new rotation family:");
         if (!name) return;
-        if (APP.StateManager.getPatternByName(name)) { APP.Utils.showToast("Error: Rotation name already exists.", "danger"); return; }
+        
+        if (APP.StateManager.getPatternByName(name)) {
+            APP.Utils.showToast("Error: Rotation name already exists.", "danger");
+            return;
+        }
+        
+        // Initialize with a standard 6-week structure (Using standard "Week N" format)
         const initialPattern = {};
-        for (let i = 1; i <= 6; i++) initialPattern[`Week ${i}`] = {};
+        for (let i = 1; i <= 6; i++) {
+            initialPattern[`Week ${i}`] = {};
+        }
+
         const newPatternRecord = { name: name, pattern: initialPattern };
         const { data, error } = await APP.DataService.saveRecord('rotation_patterns', newPatternRecord);
+        
         if (!error) {
             APP.StateManager.syncRecord('rotation_patterns', data);
             APP.StateManager.getState().currentRotation = name;
-            APP.Utils.showToast(`Rotation '${name}' created.`, "success");
+            APP.StateManager.saveHistory(`Create rotation`);
+            APP.Utils.showToast(`Rotation '${name}' created (6 weeks).`, "success");
             RotationEditor.render();
-            if (APP.Components.AssignmentManager) APP.Components.AssignmentManager.render();
+            
+            // Update related components
+            if (APP.Components.AssignmentManager) {
+                APP.Components.AssignmentManager.render(); // Update assignment dropdowns
+            }
         }
     };
 
+    // Handle adding a new week to the existing rotation
     const handleAddWeek = async () => {
         const STATE = APP.StateManager.getState();
         const rotationName = STATE.currentRotation;
         const pattern = APP.StateManager.getPatternByName(rotationName);
+
         if (!pattern) return;
+
+        // Determine the next week number
+        // Use the utility function
         const maxWeek = APP.Utils.calculateRotationLength(pattern);
+        // If the length was 0 (empty pattern), we ensure it starts at 1.
         const nextWeek = (maxWeek === 0) ? 1 : maxWeek + 1;
+
+
+        // Update the pattern structure locally (Using standard "Week N" format)
         if (!pattern.pattern) pattern.pattern = {};
         const nextWeekKey = `Week ${nextWeek}`;
         pattern.pattern[nextWeekKey] = {};
+
+        // Save the updated structure (Auto-Save Architecture)
         const { error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: pattern.pattern }, { name: rotationName });
+
         if (!error) {
             APP.StateManager.saveHistory(`Add Week ${nextWeek}`);
-            APP.Utils.showToast(`Week ${nextWeek} added.`, "success");
-            RotationEditor.renderGrid(); 
+            APP.Utils.showToast(`Week ${nextWeek} added to rotation.`, "success");
+            RotationEditor.renderGrid(); // Re-render the grid to show the new week
         } else {
+            // Rollback local change if save failed
             delete pattern.pattern[nextWeekKey];
         }
     };
 
+    // V15.8.1: Handle deleting the last week from the existing rotation
     const handleDeleteLastWeek = async () => {
         const STATE = APP.StateManager.getState();
         const rotationName = STATE.currentRotation;
         const pattern = APP.StateManager.getPatternByName(rotationName);
-        if (!pattern || !pattern.pattern) return;
-        const maxWeek = APP.Utils.calculateRotationLength(pattern);
-        if (maxWeek === 0) return;
-        if (!confirm(`Delete Week ${maxWeek}?`)) return;
 
-        const lastWeekKey = Object.keys(pattern.pattern).find(k => { const match = k.match(/^Week ?(\d+)$/i); return match && parseInt(match[1], 10) === maxWeek; });
-        if (!lastWeekKey) return;
+        if (!pattern || !pattern.pattern) return;
+
+        // Determine the current maximum week number
+        const maxWeek = APP.Utils.calculateRotationLength(pattern);
+
+        if (maxWeek === 0) {
+            APP.Utils.showToast("Rotation is already empty.", "warning");
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete Week ${maxWeek} from ${rotationName}? This cannot be undone easily.`)) {
+            return;
+        }
+
+        // Find the key for the last week
+        const lastWeekKey = findWeekKey(pattern.pattern, maxWeek);
+
+        if (!lastWeekKey) {
+            console.error("Error: Could not find the key for the last week, even though length > 0.");
+            return;
+        }
+
+        // Store the week data for potential rollback if the save fails
         const deletedWeekData = JSON.parse(JSON.stringify(pattern.pattern[lastWeekKey]));
+
+        // 1. Delete the week locally
         delete pattern.pattern[lastWeekKey];
+
+        // 2. Save the updated structure (Auto-Save Architecture)
         const { error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: pattern.pattern }, { name: rotationName });
+
         if (!error) {
             APP.StateManager.saveHistory(`Delete Week ${maxWeek}`);
-            APP.Utils.showToast(`Week ${maxWeek} deleted.`, "success");
-            RotationEditor.renderGrid(); 
+            APP.Utils.showToast(`Week ${maxWeek} deleted from rotation.`, "success");
+            RotationEditor.renderGrid(); // Re-render the grid to show the change
         } else {
+            // Rollback local change if save failed
             pattern.pattern[lastWeekKey] = deletedWeekData;
+            // Error toast is shown by DataService
         }
     };
+
 
     const handleDeleteRotation = async () => {
         const STATE = APP.StateManager.getState();
         const rotationName = STATE.currentRotation;
         if (!rotationName || !confirm(`Delete '${rotationName}'?`)) return;
+        
+        // NOTE: Should ideally check if rotation is assigned before deleting
         const { error } = await APP.DataService.deleteRecord('rotation_patterns', { name: rotationName });
+        
         if (!error) {
             APP.StateManager.syncRecord('rotation_patterns', { name: rotationName }, true);
             STATE.currentRotation = null;
+            APP.StateManager.saveHistory(`Delete rotation`);
             APP.Utils.showToast(`Rotation deleted.`, "success");
             RotationEditor.render();
-            if (APP.Components.AssignmentManager) APP.Components.AssignmentManager.render();
+            if (APP.Components.AssignmentManager) {
+                APP.Components.AssignmentManager.render(); // Update assignment dropdowns
+            }
         }
     };
 
+    // Auto-save functionality for grid cell changes
     const handleGridChange = async (e) => {
         if (!e.target.classList.contains('rotation-grid-select')) return;
-        if (ELS.autoSaveStatus) { ELS.autoSaveStatus.textContent = "Saving..."; ELS.autoSaveStatus.style.opacity = 1; }
+        
+        // Show saving indicator
+        if (ELS.autoSaveStatus) {
+            ELS.autoSaveStatus.textContent = "Saving...";
+            ELS.autoSaveStatus.style.opacity = 1;
+        }
 
         const { week, dow } = e.target.dataset;
         const shiftCode = e.target.value;
         const STATE = APP.StateManager.getState();
         const rotationName = STATE.currentRotation;
+        
         const pattern = APP.StateManager.getPatternByName(rotationName);
         if (!pattern) return;
-
+        
+        // 1. Update the local state object
         if (!pattern.pattern) pattern.pattern = {};
-        let weekKey = Object.keys(pattern.pattern).find(k => { const match = k.match(/^Week ?(\d+)$/i); return match && parseInt(match[1], 10) === parseInt(week, 10); });
-        if (!weekKey) weekKey = `Week ${week}`;
+
+        // Find the correct week key format or create it if missing (using standard format)
+        let weekKey = findWeekKey(pattern.pattern, parseInt(week, 10));
+        if (!weekKey) {
+            weekKey = `Week ${week}`; // Use standard format for new entries
+        }
+
         if (!pattern.pattern[weekKey]) pattern.pattern[weekKey] = {};
         
-        if (shiftCode) pattern.pattern[weekKey][dow] = String(shiftCode);
-        else delete pattern.pattern[weekKey][dow];
+        // Normalize the update by removing legacy keys and using the standard numerical DOW key
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        const legacyDayKey = days[parseInt(dow, 10) - 1];
 
-        const { error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: pattern.pattern }, { name: rotationName });
-        if (!error) {
-            APP.StateManager.syncRecord('rotation_patterns', pattern);
-            if (ELS.autoSaveStatus) { ELS.autoSaveStatus.textContent = "✓ Saved"; setTimeout(() => { ELS.autoSaveStatus.style.opacity = 0; }, 2000); }
-            if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
+        if (shiftCode) {
+            // Ensure the shift code is stored consistently as a string
+            pattern.pattern[weekKey][dow] = String(shiftCode);
+            // Remove the legacy key if it exists (Normalization)
+            if (pattern.pattern[weekKey].hasOwnProperty(legacyDayKey)) {
+                delete pattern.pattern[weekKey][legacyDayKey];
+            }
         } else {
-             if (ELS.autoSaveStatus) ELS.autoSaveStatus.textContent = "Error Saving";
+            // RDO (Remove the keys)
+            delete pattern.pattern[weekKey][dow]; 
+            if (pattern.pattern[weekKey].hasOwnProperty(legacyDayKey)) {
+                delete pattern.pattern[weekKey][legacyDayKey];
+            }
+        }
+
+        // 2. Auto-save the entire pattern object
+        const { error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: pattern.pattern }, { name: rotationName });
+            
+        if (!error) {
+            // Syncing the pattern also clears the historical cache in StateManager
+            APP.StateManager.syncRecord('rotation_patterns', pattern); 
+            APP.StateManager.saveHistory(`Update rotation cell`);
+            if (ELS.autoSaveStatus) {
+                ELS.autoSaveStatus.textContent = "✓ Saved";
+                setTimeout(() => {
+                    ELS.autoSaveStatus.style.opacity = 0;
+                }, 2000);
+            }
+            // Re-render visualization as rotations affect schedules
+            if (APP.Components.ScheduleViewer) {
+                APP.Components.ScheduleViewer.render();
+            }
+        } else {
+             if (ELS.autoSaveStatus) {
+                ELS.autoSaveStatus.textContent = "Error Saving";
+            }
+            // Error toast handled in DataService
         }
     };
 
@@ -1831,6 +2911,7 @@ window.APP = window.APP || {};
 
 /**
  * MODULE: APP.Components.ScheduleViewer
+ * Manages the visualization (Daily Gantt and Weekly Grid), including Hybrid Adherence and Live Editing triggers.
  */
 (function(APP) {
     const ScheduleViewer = {};
@@ -1839,6 +2920,7 @@ window.APP = window.APP || {};
     let timeIndicatorInterval = null;
 
     ScheduleViewer.initialize = () => {
+        // Cache Elements
         ELS.tree = document.getElementById('schedulesTree');
         ELS.treeSearch = document.getElementById('treeSearch');
         ELS.btnClearSelection = document.getElementById('btnClearSelection');
@@ -1848,53 +2930,78 @@ window.APP = window.APP || {};
         ELS.dayToggleContainer = document.getElementById('dayToggleContainer');
         ELS.plannerDay = document.getElementById('plannerDay');
 
+        // Event Listeners
         if (ELS.treeSearch) ELS.treeSearch.addEventListener('input', renderTree);
         if (ELS.btnClearSelection) ELS.btnClearSelection.addEventListener('click', clearSelection);
         if (ELS.tree) ELS.tree.addEventListener('change', handleTreeChange);
-        if (ELS.plannerDay) ELS.plannerDay.addEventListener('change', () => { APP.StateManager.getState().selectedDay = ELS.plannerDay.value; renderPlannerContent(); });
+        
+        if (ELS.plannerDay) ELS.plannerDay.addEventListener('change', () => {
+            APP.StateManager.getState().selectedDay = ELS.plannerDay.value;
+            renderPlannerContent();
+        });
+
         if (ELS.viewToggleGroup) ELS.viewToggleGroup.addEventListener('click', handleViewToggle);
+
+        // Add listener for Live Editing clicks
         if (ELS.visualizationContainer) ELS.visualizationContainer.addEventListener('click', handleVisualizationClick);
     };
 
+    // Main render function (coordinates tree and planner rendering)
     ScheduleViewer.render = async () => {
+        // Ensure historical data is loaded before rendering the planner visualization.
         const STATE = APP.StateManager.getState();
-        if (STATE.weekStart) await APP.StateManager.loadEffectiveAssignments(STATE.weekStart);
+        if (STATE.weekStart) {
+            // Pre-load the effective assignments for the selected week start date.
+            await APP.StateManager.loadEffectiveAssignments(STATE.weekStart);
+        }
+        
         renderTree();
         renderPlannerContent();
+
+        // Also ensure Assignments tab is up-to-date if visible (as it relies on the same historical data)
         const assignmentsTab = document.getElementById('tab-advisor-assignments');
         if (assignmentsTab && assignmentsTab.classList.contains('active') && APP.Components.AssignmentManager) {
              APP.Components.AssignmentManager.render();
         }
     };
 
+
     const handleViewToggle = (e) => {
         const target = e.target.closest('.btn-toggle');
         if (target) {
             const viewMode = target.dataset.view;
             APP.StateManager.getState().scheduleViewMode = viewMode;
+            
             ELS.viewToggleGroup.querySelectorAll('.btn-toggle').forEach(btn => btn.classList.remove('active'));
             target.classList.add('active');
+
             ELS.dayToggleContainer.style.display = (viewMode === 'daily') ? 'flex' : 'none';
+            
             renderPlannerContent();
         }
     };
 
+    // Handle clicks on the visualization (for Live Editing)
     const handleVisualizationClick = (e) => {
         const STATE = APP.StateManager.getState();
         let advisorId, dateISO, dayName;
 
+        // Determine context based on view mode
         if (STATE.scheduleViewMode === 'daily') {
             const row = e.target.closest('.timeline-row');
             if (row && row.dataset.advisorId) {
                 advisorId = row.dataset.advisorId;
                 dayName = STATE.selectedDay;
+                // Calculate the specific ISO date for the selected day
                 dateISO = APP.Utils.getISODateForDayName(STATE.weekStart, dayName);
             }
         } else if (STATE.scheduleViewMode === 'weekly') {
              const cell = e.target.closest('.weekly-cell');
+             // The cell already has the required data attributes
              if (cell && cell.dataset.advisorId && cell.dataset.date) {
                  advisorId = cell.dataset.advisorId;
                  dateISO = cell.dataset.date;
+                 // Use utility function for consistency
                  dayName = APP.Utils.getDayNameFromISO(dateISO);
              }
         }
@@ -1902,9 +3009,15 @@ window.APP = window.APP || {};
         if (advisorId && dateISO && dayName) {
             const advisor = APP.StateManager.getAdvisorById(advisorId);
             if (!advisor) return;
-            const weekStartISO = APP.Utils.getMondayForDate(dateISO);
+            
+            // Calculate the Monday for that specific date
+            const weekStartISO = APP.Utils.getMondayForDate(dateISO); 
+            
+            // Use the centralized ScheduleCalculator
+            // NOTE: This relies on the historical data for weekStartISO being loaded. 
             const { segments, reason } = APP.ScheduleCalculator.calculateSegments(advisorId, dayName, weekStartISO);
 
+            // Open the Sequential Builder in 'exception' mode
             if (APP.Components.SequentialBuilder) {
                 APP.Components.SequentialBuilder.open({
                     mode: 'exception',
@@ -1914,41 +3027,69 @@ window.APP = window.APP || {};
                     structure: segments,
                     reason: reason
                 });
+            } else {
+                 APP.Utils.showToast("Error: Live Editor module not initialized.", "danger");
             }
         }
     };
 
+    // Render the hierarchical team selection tree
     const renderTree = () => {
         if (!ELS.tree) return;
         const STATE = APP.StateManager.getState();
         const filter = ELS.treeSearch ? ELS.treeSearch.value.toLowerCase() : '';
         let html = '';
+
         const leaders = STATE.leaders.sort((a, b) => a.name.localeCompare(b.name));
         const advisors = STATE.advisors.sort((a, b) => a.name.localeCompare(b.name));
+
         leaders.forEach(leader => {
             const teamAdvisors = advisors.filter(a => a.leader_id === leader.id);
+            
+            // Determine if the leader or any team member matches the filter
             const matchesFilter = !filter || leader.name.toLowerCase().includes(filter) || teamAdvisors.some(a => a.name.toLowerCase().includes(filter));
 
             if (matchesFilter && teamAdvisors.length > 0) {
+                // Check if all advisors in the team are currently selected
                 const allSelected = teamAdvisors.every(a => STATE.selectedAdvisors.has(a.id));
+
+                // Get the site name (if it exists) from the data we fetched in Fix 1
                 const site = leader.sites ? leader.sites.name : '';
                 const siteHTML = site ? `<span class="team-brand">${site}</span>` : '';
 
-                html += `<div class="tree-node-leader"><label><input type="checkbox" class="select-leader" data-leader-id="${leader.id}" ${allSelected ? 'checked' : ''} /> ${leader.name} (Team Leader) ${siteHTML}</label></div>`;
+                html += `<div class="tree-node-leader">
+                    <label>
+                   
+                     <input type="checkbox" class="select-leader" data-leader-id="${leader.id}" ${allSelected ? 'checked' : ''} />
+                        ${leader.name} (Team Leader)
+                        ${siteHTML}
+                    </label>
+                </div>`;
+
                 teamAdvisors.forEach(adv => {
+                    // Show advisor if filter matches or if the leader matches (to show the whole team)
                     if (!filter || adv.name.toLowerCase().includes(filter) || leader.name.toLowerCase().includes(filter)) {
                          const isChecked = STATE.selectedAdvisors.has(adv.id);
-                         html += `<div class="tree-node-advisor"><label><input type="checkbox" class="select-advisor" data-advisor-id="${adv.id}" data-leader-id="${leader.id}" ${isChecked ? 'checked' : ''} /> ${adv.name}</label></div>`;
+                        html += `<div class="tree-node-advisor">
+                            <label>
+                                <input type="checkbox" class="select-advisor" data-advisor-id="${adv.id}" data-leader-id="${leader.id}" ${isChecked ? 'checked' : ''} />
+                                ${adv.name}
+                            </label>
+                        </div>`;
                     }
                 });
             }
         });
+        
         ELS.tree.innerHTML = html || '<div class="visualization-empty">No teams or advisors found.</div>';
+
+        // Auto-select the first advisor on initial load if none are selected (Bootstrapping UI)
         if (STATE.selectedAdvisors.size === 0 && STATE.advisors.length > 0 && !STATE.treeInitialized) {
             const firstAdvisor = advisors.find(a => a.leader_id);
-            if (firstAdvisor) {
+             if (firstAdvisor) {
                 STATE.selectedAdvisors.add(firstAdvisor.id);
                 STATE.treeInitialized = true;
+                // Trigger the main render function to ensure coordination
                 ScheduleViewer.render();
             }
         }
@@ -1957,36 +3098,71 @@ window.APP = window.APP || {};
     const handleTreeChange = (e) => {
         const target = e.target;
         const STATE = APP.StateManager.getState();
+
         if (target.classList.contains('select-leader')) {
             const leaderId = target.dataset.leaderId;
             const isChecked = target.checked;
             const teamAdvisors = APP.StateManager.getAdvisorsByLeader(leaderId);
-            teamAdvisors.forEach(adv => { isChecked ? STATE.selectedAdvisors.add(adv.id) : STATE.selectedAdvisors.delete(adv.id); });
-            renderTree(); 
+
+            // Select/Deselect the entire team
+            teamAdvisors.forEach(adv => {
+                if (isChecked) {
+                    STATE.selectedAdvisors.add(adv.id);
+                } else {
+                    STATE.selectedAdvisors.delete(adv.id);
+                }
+            });
+            renderTree(); // Re-render to update individual checkboxes
+
         } else if (target.classList.contains('select-advisor')) {
             const id = target.dataset.advisorId;
             target.checked ? STATE.selectedAdvisors.add(id) : STATE.selectedAdvisors.delete(id);
+            // Re-render tree to update the leader checkbox state (if all are now selected/deselected)
             renderTree();
         }
+        
+        // Render the content based on the selection change
         renderPlannerContent();
     };
 
     const clearSelection = () => {
         APP.StateManager.getState().selectedAdvisors.clear();
         renderTree();
+        // Render the content based on the selection change
         renderPlannerContent();
     };
 
+    // Renamed from renderPlanner. This assumes data is already loaded/cached.
     const renderPlannerContent = () => {
         const STATE = APP.StateManager.getState();
-        if (STATE.scheduleViewMode === 'daily') renderDailyPlanner();
-        else renderWeeklyPlanner();
+        if (STATE.scheduleViewMode === 'daily') {
+            renderDailyPlanner();
+        } else {
+            renderWeeklyPlanner();
+        }
     };
 
+    // --- DAILY VIEW (GANTT) ---
+
     const renderDailyPlanner = () => {
+        // Updated time range in title
         ELS.scheduleViewTitle.textContent = "Schedule Visualization (Daily 05:00 - 23:00)";
-        ELS.visualizationContainer.innerHTML = `<div class="timeline-container" id="timelineContainer"><div class="timeline-header"><div class="header-name">Name</div><div class="header-timeline" id="timeHeader"></div></div><div class="timeline-body" id="plannerBody"></div><div id="currentTimeIndicator" class="current-time-indicator"></div><div id="mouseTimeIndicator" class="mouse-time-indicator"></div><div id="mouseTimeTooltip" class="mouse-time-tooltip">00:00</div></div>`;
+
+        // Setup the structure for the Gantt chart
+        ELS.visualizationContainer.innerHTML = `
+            <div class="timeline-container" id="timelineContainer">
+                <div class="timeline-header">
+                    <div class="header-name">Name</div>
+                    <div class="header-timeline" id="timeHeader"></div>
+                </div>
+                <div class="timeline-body" id="plannerBody"></div>
+                <div id="currentTimeIndicator" class="current-time-indicator"></div>
+                <div id="mouseTimeIndicator" class="mouse-time-indicator"></div>
+                <div id="mouseTimeTooltip" class="mouse-time-tooltip">00:00</div>
+            </div>
+        `;
         
+        // Cache dynamic elements
         const ELS_DAILY = {
             timeHeader: document.getElementById('timeHeader'),
             plannerBody: document.getElementById('plannerBody'),
@@ -1997,20 +3173,38 @@ window.APP = window.APP || {};
         };
 
         renderTimeHeader(ELS_DAILY.timeHeader);
+        
         const STATE = APP.StateManager.getState();
         const selected = Array.from(STATE.selectedAdvisors);
+        
         if (selected.length > 0) {
-            const advisorsToRender = STATE.advisors.filter(a => selected.includes(a.id)).sort((a,b) => a.name.localeCompare(b.name));
+            const advisorsToRender = STATE.advisors
+                .filter(a => selected.includes(a.id))
+                .sort((a,b) => a.name.localeCompare(b.name));
+                
             let html = '';
             advisorsToRender.forEach(adv => {
+                // Use the centralized ScheduleCalculator
                 const { segments, source } = APP.ScheduleCalculator.calculateSegments(adv.id, STATE.selectedDay);
+                
+                // Add exception styling class if source is 'exception'
                 const rowClass = (source === 'exception') ? 'is-exception' : '';
-                html += `<div class="timeline-row ${rowClass}" data-advisor-id="${adv.id}"><div class="timeline-name">${adv.name}</div><div class="timeline-track">${renderSegments(segments)}</div></div>`;
+
+                // Add data-advisor-id for click handling
+                html += `
+                <div class="timeline-row ${rowClass}" data-advisor-id="${adv.id}">
+                    <div class="timeline-name">${adv.name}</div>
+                    <div class="timeline-track">
+                        ${renderSegments(segments)}
+                    </div>
+                </div>
+                `;
             });
             ELS_DAILY.plannerBody.innerHTML = html;
         } else {
              ELS_DAILY.plannerBody.innerHTML = '<div class="visualization-empty">Select advisors to view schedules.</div>';
         }
+
         setupIntradayIndicators(ELS_DAILY);
     };
 
@@ -2018,49 +3212,112 @@ window.APP = window.APP || {};
         const startHour = Math.floor(Config.TIMELINE_START_MIN / 60);
         const endHour = Math.floor(Config.TIMELINE_END_MIN / 60);
         const totalHours = Config.TIMELINE_DURATION_MIN / 60;
+        
         let html = '';
+        // Loop through each hour in the range
         for (let h = startHour; h <= endHour; h++) {
             const pct = (h - startHour) / totalHours * 100;
-            html += `<div class="time-tick" style="left: ${pct}%;">${h.toString().padStart(2, '0')}:00</div>`;
+            const label = h.toString().padStart(2, '0') + ':00';
+            html += `<div class="time-tick" style="left: ${pct}%;">${label}</div>`;
         }
+        // Note: The final tick (e.g., 20:00) is often omitted as the lines represent the start of the hour block.
+
         headerElement.innerHTML = html;
     };
 
+    // Made public as it's used by TradeCenter preview as well
     ScheduleViewer.renderSegments = (segments) => {
-        if (!segments || segments.length === 0) return '';
+        if (!segments || segments.length === 0) {
+            return ''; // RDO
+        }
+        
         return segments.map(seg => {
             const component = APP.StateManager.getComponentById(seg.component_id);
             if (!component) return '';
+
+            // Calculate position and width percentage
             const startPct = ((seg.start_min - Config.TIMELINE_START_MIN) / Config.TIMELINE_DURATION_MIN) * 100;
             const widthPct = ((seg.end_min - seg.start_min) / Config.TIMELINE_DURATION_MIN) * 100;
+            
+            // Determine styling class based on component type
             let barClass = '';
-            if (component.type === 'Break' || component.type === 'Lunch') barClass = 'is-gap';
-            else if (component.type === 'Activity') barClass = 'is-activity';
+            if (component.type === 'Break' || component.type === 'Lunch') {
+                barClass = 'is-gap';
+            } else if (component.type === 'Activity') {
+                barClass = 'is-activity';
+            }
+            
+            // Apply specific color if no predefined class matches
             const style = (barClass === '') ? `background-color: ${component.color}; color: ${APP.Utils.getContrastingTextColor(component.color)};` : '';
-            return `<div class="timeline-bar ${barClass}" style="left: ${startPct}%; width: ${widthPct}%; ${style}" title="${component.name} (${APP.Utils.formatMinutesToTime(seg.start_min)} - ${APP.Utils.formatMinutesToTime(seg.end_min)})"></div>`;
+
+            // The 'title' attribute provides the native browser tooltip on hover.
+            return `
+            <div class="timeline-bar ${barClass}" style="left: ${startPct}%; width: ${widthPct}%; ${style}" title="${component.name} (${APP.Utils.formatMinutesToTime(seg.start_min)} - ${APP.Utils.formatMinutesToTime(seg.end_min)})">
+            </div>
+            `;
         }).join('');
     };
+    // Alias for internal use
     const renderSegments = ScheduleViewer.renderSegments;
+
+    // --- WEEKLY VIEW ---
 
     const renderWeeklyPlanner = () => {
         ELS.scheduleViewTitle.textContent = "Schedule Visualization (Weekly Overview)";
-        ELS.visualizationContainer.innerHTML = `<div class="table-container"><table class="weekly-grid" id="weeklyGrid"><thead><tr><th>Name</th><th>MON</th><th>TUE</th><th>WED</th><th>THU</th><th>FRI</th><th>SAT</th><th>SUN</th></tr></thead><tbody id="weeklyBody"></tbody></table></div>`;
-        const ELS_WEEKLY = { weeklyBody: document.getElementById('weeklyBody') };
+
+        // Initialize the structure of the weekly planner
+        ELS.visualizationContainer.innerHTML = `
+            <div class="table-container">
+                <table class="weekly-grid" id="weeklyGrid">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>MON</th>
+                            <th>TUE</th>
+                            <th>WED</th>
+                            <th>THU</th>
+                            <th>FRI</th>
+                            <th>SAT</th>
+                            <th>SUN</th>
+                        </tr>
+                    </thead>
+                    <tbody id="weeklyBody">
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        const ELS_WEEKLY = {
+            weeklyBody: document.getElementById('weeklyBody')
+        };
+
         const STATE = APP.StateManager.getState();
         const selected = Array.from(STATE.selectedAdvisors);
         const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         
         if (selected.length > 0) {
-            const advisorsToRender = STATE.advisors.filter(a => selected.includes(a.id)).sort((a,b) => a.name.localeCompare(b.name));
+            const advisorsToRender = STATE.advisors
+                .filter(a => selected.includes(a.id))
+                .sort((a,b) => a.name.localeCompare(b.name));
+
             let html = '';
             advisorsToRender.forEach(adv => {
                 html += `<tr><td>${adv.name}</td>`;
+                
                 daysOfWeek.forEach(day => {
+                    // Use the centralized ScheduleCalculator
                     const { segments, source } = APP.ScheduleCalculator.calculateSegments(adv.id, day);
+                    
+                    // Determine class and get the specific date for this cell
                     const cellClass = (source === 'exception') ? 'is-exception' : '';
                     const dateISO = APP.Utils.getISODateForDayName(STATE.weekStart, day);
-                    html += `<td class="weekly-cell ${cellClass}" data-advisor-id="${adv.id}" data-date="${dateISO}">${renderWeeklyCell(segments, source)}</td>`;
+
+                    // Add 'weekly-cell' class and data attributes for click handling
+                    html += `<td class="weekly-cell ${cellClass}" data-advisor-id="${adv.id}" data-date="${dateISO}">
+                                ${renderWeeklyCell(segments, source)}
+                             </td>`;
                 });
+                
                 html += `</tr>`;
             });
             ELS_WEEKLY.weeklyBody.innerHTML = html;
@@ -2069,69 +3326,137 @@ window.APP = window.APP || {};
         }
     };
 
+    // Updated to handle source for exception visualization
     const renderWeeklyCell = (segments, source) => {
-        if (!segments || segments.length === 0) return `<div class="weekly-cell-content"><span class="weekly-rdo">RDO</span></div>`;
+        if (!segments || segments.length === 0) {
+            return `<div class="weekly-cell-content"><span class="weekly-rdo">RDO</span></div>`;
+        }
+        
         let shiftCode = 'N/A';
+
+        // If the source is 'rotation', try to find the matching definition code.
         if (source === 'rotation') {
             const STATE = APP.StateManager.getState();
+            // Match by structure comparison (requires segments to be sorted consistently)
             const definition = STATE.shiftDefinitions.find(def => {
                 if (!def.structure) return false;
+                // Ensure comparison is robust by sorting the definition structure as well
                 const sortedDefStructure = JSON.parse(JSON.stringify(def.structure)).sort((a, b) => a.start_min - b.start_min);
                 return JSON.stringify(sortedDefStructure) === JSON.stringify(segments);
             });
-            if (definition) shiftCode = definition.code;
-        } else if (source === 'exception') { shiftCode = 'Custom'; }
+            if (definition) {
+                shiftCode = definition.code;
+            }
+        } else if (source === 'exception') {
+            // If it's an exception, label it as 'Custom'.
+            shiftCode = 'Custom';
+        }
+        
         const startMin = segments[0].start_min;
         const endMin = segments[segments.length - 1].end_min;
         const timeString = `${APP.Utils.formatMinutesToTime(startMin)} - ${APP.Utils.formatMinutesToTime(endMin)}`;
-        return `<div class="weekly-cell-content"><span class="weekly-shift-code">${shiftCode}</span><span class="weekly-shift-time">${timeString}</span></div>`;
+
+        return `
+            <div class="weekly-cell-content">
+                <span class="weekly-shift-code">${shiftCode}</span>
+                <span class="weekly-shift-time">${timeString}</span>
+            </div>
+        `;
     };
 
+
+    // --- INTRADAY INDICATORS (Daily View Only) ---
+    
     const setupIntradayIndicators = (ELS_DAILY) => {
+       // Clear previous interval to prevent stacking
        if (timeIndicatorInterval) clearInterval(timeIndicatorInterval);
+       // Update current time indicator every minute
        timeIndicatorInterval = setInterval(() => updateCurrentTimeIndicator(ELS_DAILY), 60000);
        updateCurrentTimeIndicator(ELS_DAILY);
+
+       // Setup mouse tracking for precision cursor
        if (ELS_DAILY.timelineContainer) {
            ELS_DAILY.timelineContainer.addEventListener('mousemove', (e) => updateMouseTimeIndicator(e, ELS_DAILY));
            ELS_DAILY.timelineContainer.addEventListener('mouseenter', () => showMouseIndicator(ELS_DAILY));
            ELS_DAILY.timelineContainer.addEventListener('mouseleave', () => hideMouseIndicator(ELS_DAILY));
        }
    };
-
+   
    const updateCurrentTimeIndicator = (ELS_DAILY) => {
        if (!ELS_DAILY || !ELS_DAILY.currentTimeIndicator || !ELS_DAILY.timelineContainer) return;
+
+        // NOTE: This relies on the client's local time.
        const now = new Date();
+       
        const STATE = APP.StateManager.getState();
+       // Get the specific date ISO for the selected day in the view
        const viewDateISO = APP.Utils.getISODateForDayName(STATE.weekStart, STATE.selectedDay);
        const todayISO = APP.Utils.formatDateToISO(now);
-       if (STATE.scheduleViewMode !== 'daily' || viewDateISO !== todayISO) { ELS_DAILY.currentTimeIndicator.style.display = 'none'; return; }
+
+       // Only show if the view is 'daily' AND the date being viewed is today's date
+       if (STATE.scheduleViewMode !== 'daily' || viewDateISO !== todayISO) {
+           ELS_DAILY.currentTimeIndicator.style.display = 'none';
+           return;
+       }
+
        const currentMinutes = now.getHours() * 60 + now.getMinutes();
-       if (currentMinutes < Config.TIMELINE_START_MIN || currentMinutes > Config.TIMELINE_END_MIN) { ELS_DAILY.currentTimeIndicator.style.display = 'none'; return; }
+       
+       if (currentMinutes < Config.TIMELINE_START_MIN || currentMinutes > Config.TIMELINE_END_MIN) {
+           ELS_DAILY.currentTimeIndicator.style.display = 'none';
+           return;
+       }
+
        const pct = ((currentMinutes - Config.TIMELINE_START_MIN) / Config.TIMELINE_DURATION_MIN) * 100;
+       
        const nameColElement = ELS_DAILY.timelineContainer.querySelector('.header-name');
+       // Use offsetWidth for accurate measurement of the sticky name column
        const nameColWidth = nameColElement ? nameColElement.offsetWidth : 220;
+
        ELS_DAILY.currentTimeIndicator.style.display = 'block';
+       // Position correctly relative to the start of the container, accounting for the name column width
        ELS_DAILY.currentTimeIndicator.style.left = `calc(${nameColWidth}px + ${pct}%)`;
    };
 
+   // Updated mouse tracking to correctly account for horizontal scrolling
    const updateMouseTimeIndicator = (e, ELS_DAILY) => {
        if (!ELS_DAILY || !ELS_DAILY.mouseTimeIndicator || !ELS_DAILY.timelineContainer) return;
+
+       // We need the container element of the visualization area for scroll position
        const vizContainer = document.getElementById('visualizationContainer');
        if (!vizContainer) return;
+
        const containerRect = ELS_DAILY.timelineContainer.getBoundingClientRect();
+       // Calculate mouse position relative to the container, accounting for the visualization container's scrollLeft
        const mouseX = e.clientX - containerRect.left + vizContainer.scrollLeft;
+       
        const nameColElement = ELS_DAILY.timelineContainer.querySelector('.header-name');
        const nameColWidth = nameColElement ? nameColElement.offsetWidth : 220;
        const headerHeight = ELS_DAILY.timeHeader ? ELS_DAILY.timeHeader.offsetHeight : 48;
-       if (mouseX < nameColWidth) { hideMouseIndicator(ELS_DAILY); return; }
+
+       // Hide if the mouse is over the name column
+       if (mouseX < nameColWidth) {
+           hideMouseIndicator(ELS_DAILY);
+           return;
+       }
+
+       // Calculate the width of the actual timeline track area
        const trackWidth = ELS_DAILY.timeHeader.offsetWidth;
        const relativeX = mouseX - nameColWidth;
+       
+       // Calculate time based on percentage position within the track
        const pct = relativeX / trackWidth;
+       
+       // Constrain percentage between 0 and 1
        const constrainedPct = Math.max(0, Math.min(1, pct));
+       
        const timeInMinutes = Config.TIMELINE_START_MIN + (constrainedPct * Config.TIMELINE_DURATION_MIN);
+
+       // Position the vertical line at the mouse X position
        ELS_DAILY.mouseTimeIndicator.style.left = `${mouseX}px`;
+       
+       // Update and position the tooltip
        ELS_DAILY.mouseTimeTooltip.textContent = APP.Utils.formatMinutesToTime(timeInMinutes);
-       ELS_DAILY.mouseTimeTooltip.style.top = `${headerHeight - 30}px`;
+       ELS_DAILY.mouseTimeTooltip.style.top = `${headerHeight - 30}px`; 
        ELS_DAILY.mouseTimeTooltip.style.left = `${mouseX}px`;
    };
 
@@ -2149,13 +3474,25 @@ window.APP = window.APP || {};
     APP.Components.ScheduleViewer = ScheduleViewer;
 }(window.APP));
 
+
 /**
  * MODULE: APP.Components.ShiftTradeCenter
+ * Manages the interface and logic for swapping shifts between two advisors.
  */
 (function(APP) {
     const ShiftTradeCenter = {};
     const ELS = {};
-    const TRADE_STATE = { advisor1: null, date1: null, schedule1: null, advisor2: null, date2: null, schedule2: null, reason: null };
+
+    // Local state for the trade center
+    const TRADE_STATE = {
+        advisor1: null,
+        date1: null,
+        schedule1: null,
+        advisor2: null,
+        date2: null,
+        schedule2: null,
+        reason: null,
+    };
 
     ShiftTradeCenter.initialize = () => {
         ELS.advisor1 = document.getElementById('tradeAdvisor1');
@@ -2167,94 +3504,202 @@ window.APP = window.APP || {};
         ELS.btnExecuteTrade = document.getElementById('btnExecuteTrade');
         ELS.reasonInput = document.getElementById('tradeReason');
 
+        // Event Listeners
         if (ELS.advisor1) ELS.advisor1.addEventListener('change', (e) => handleSelectionChange('1', 'advisor', e.target.value));
         if (ELS.advisor2) ELS.advisor2.addEventListener('change', (e) => handleSelectionChange('2', 'advisor', e.target.value));
         if (ELS.btnExecuteTrade) ELS.btnExecuteTrade.addEventListener('click', executeTrade);
-        if (ELS.reasonInput) ELS.reasonInput.addEventListener('input', (e) => { TRADE_STATE.reason = e.target.value; validateTrade(); });
+        if (ELS.reasonInput) ELS.reasonInput.addEventListener('input', (e) => {
+            TRADE_STATE.reason = e.target.value;
+            validateTrade();
+        });
 
+
+        // Initialize Date Pickers (Flatpickr)
         if (typeof flatpickr !== 'undefined') {
-            if (ELS.date1) flatpickr(ELS.date1, { dateFormat: 'Y-m-d', altInput: true, altFormat: 'D, d M Y', onChange: (selectedDates, dateStr) => handleSelectionChange('1', 'date', dateStr) });
-            if (ELS.date2) flatpickr(ELS.date2, { dateFormat: 'Y-m-d', altInput: true, altFormat: 'D, d M Y', onChange: (selectedDates, dateStr) => handleSelectionChange('2', 'date', dateStr) });
+            if (ELS.date1) {
+                flatpickr(ELS.date1, {
+                    dateFormat: 'Y-m-d',
+                    altInput: true,
+                    altFormat: 'D, d M Y', // Friendly display format
+                    onChange: (selectedDates, dateStr) => handleSelectionChange('1', 'date', dateStr)
+                });
+            }
+            if (ELS.date2) {
+                 flatpickr(ELS.date2, {
+                    dateFormat: 'Y-m-d',
+                    altInput: true,
+                    altFormat: 'D, d M Y',
+                    onChange: (selectedDates, dateStr) => handleSelectionChange('2', 'date', dateStr)
+                });
+            }
         }
     };
 
-    ShiftTradeCenter.render = () => { renderAdvisorDropdowns(); };
+    ShiftTradeCenter.render = () => {
+        renderAdvisorDropdowns();
+        // Previews are rendered dynamically on selection change
+    };
 
     const renderAdvisorDropdowns = () => {
+        // Check if elements exist (they might not if the tab content was manipulated)
         if (!ELS.advisor1 || !ELS.advisor2) return;
+
+        // Check if already populated to prevent redundant rendering
         if (ELS.advisor1.options.length > 1) return;
+
         const STATE = APP.StateManager.getState();
         const advisors = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name));
+        
         let opts = '<option value="">-- Select Advisor --</option>';
-        advisors.forEach(adv => { opts += `<option value="${adv.id}">${adv.name}</option>`; });
+        advisors.forEach(adv => {
+            opts += `<option value="${adv.id}">${adv.name}</option>`;
+        });
+
         ELS.advisor1.innerHTML = opts;
         ELS.advisor2.innerHTML = opts;
     };
 
     const handleSelectionChange = async (slot, type, value) => {
         TRADE_STATE[`${type}${slot}`] = value || null;
+        
         const advisorId = TRADE_STATE[`advisor${slot}`];
         const dateISO = TRADE_STATE[`date${slot}`];
+
         if (advisorId && dateISO) {
+            // Fetch and render the schedule preview
             TRADE_STATE[`schedule${slot}`] = await fetchScheduleForDate(advisorId, dateISO);
             renderPreview(slot);
         } else {
+            // Clear the preview
             TRADE_STATE[`schedule${slot}`] = null;
             renderPreview(slot);
         }
         validateTrade();
     };
 
+    // Helper to fetch the schedule for a specific advisor and date.
     const fetchScheduleForDate = async (advisorId, dateISO) => {
         try {
+            // 1. Determine Day Name and Week Start
             const weekStartISO = APP.Utils.getMondayForDate(dateISO);
-            if (!weekStartISO) return null;
+
+            // Check if date calculation was successful
+            if (!weekStartISO) {
+                console.error("Could not determine week start for date:", dateISO);
+                return null;
+            }
+
             const dayName = APP.Utils.getDayNameFromISO(dateISO);
+            
+
+            // 2. Ensure historical data is loaded for that specific week start
+            // This leverages the StateManager's caching mechanism.
             await APP.StateManager.loadEffectiveAssignments(weekStartISO);
+
+            // 3. Use the centralized calculation logic.
              const result = APP.ScheduleCalculator.calculateSegments(advisorId, dayName, weekStartISO);
              return result;
-        } catch (e) { return null; }
+
+        } catch (e) {
+            console.error("Error fetching schedule for trade preview:", e);
+            return null;
+        }
     };
 
+    // Renders the preview panel for the specified slot
     const renderPreview = (slot) => {
         const previewEl = ELS[`preview${slot}`];
         const schedule = TRADE_STATE[`schedule${slot}`];
+
         if (!previewEl) return;
-        if (!schedule) { previewEl.innerHTML = 'Select advisor and date to preview schedule.'; return; }
-        if (schedule.segments.length === 0) { previewEl.innerHTML = `<div class="trade-preview-details"><h4>Rest Day Off (RDO)</h4></div>`; return; }
+
+        if (!schedule) {
+            previewEl.innerHTML = 'Select advisor and date to preview schedule.';
+            return;
+        }
+
+        if (schedule.segments.length === 0) {
+            previewEl.innerHTML = `<div class="trade-preview-details"><h4>Rest Day Off (RDO)</h4></div>`;
+            return;
+        }
+
         const startMin = schedule.segments[0].start_min;
         const endMin = schedule.segments[schedule.segments.length - 1].end_min;
         const timeString = `${APP.Utils.formatMinutesToTime(startMin)} - ${APP.Utils.formatMinutesToTime(endMin)}`;
-        let html = `<div class="trade-preview-details"><h4>${timeString} (${schedule.source === 'exception' ? 'Exception' : 'Rotation'})</h4><ul>`;
+
+        let html = `<div class="trade-preview-details">
+            <h4>${timeString} (${schedule.source === 'exception' ? 'Exception' : 'Rotation'})</h4>
+            <ul>`;
+        
         schedule.segments.forEach(seg => {
             const component = APP.StateManager.getComponentById(seg.component_id);
             const duration = seg.end_min - seg.start_min;
             html += `<li>${APP.Utils.formatMinutesToTime(seg.start_min)}: ${component ? component.name : 'Unknown'} (${duration}m)</li>`;
         });
+
         html += `</ul></div>`;
         previewEl.innerHTML = html;
     };
 
+    // Validates if the trade is possible and enables/disables the button
     const validateTrade = () => {
         const { advisor1, date1, schedule1, advisor2, date2, schedule2, reason } = TRADE_STATE;
+        
         let isValid = true;
-        if (!advisor1 || !date1 || !advisor2 || !date2 || !reason || reason.trim() === '') isValid = false;
-        else if (!schedule1 || !schedule2) isValid = false;
-        else if (advisor1 === advisor2 && date1 === date2) isValid = false;
-        if (ELS.btnExecuteTrade) ELS.btnExecuteTrade.disabled = !isValid;
+
+        // 1. All inputs must be selected and reason provided
+        if (!advisor1 || !date1 || !advisor2 || !date2 || !reason || reason.trim() === '') {
+            isValid = false;
+        }
+
+        // 2. Schedules must be successfully loaded
+        else if (!schedule1 || !schedule2) {
+             isValid = false;
+        }
+
+        // 3. Cannot trade with oneself on the same day
+        else if (advisor1 === advisor2 && date1 === date2) {
+             isValid = false;
+        }
+        
+        if (ELS.btnExecuteTrade) {
+            ELS.btnExecuteTrade.disabled = !isValid;
+        }
         return isValid;
     };
 
     const executeTrade = async () => {
         if (!validateTrade()) return;
+
         const { advisor1, date1, schedule1, advisor2, date2, schedule2, reason } = TRADE_STATE;
+
         const adv1Name = APP.StateManager.getAdvisorById(advisor1)?.name || advisor1;
         const adv2Name = APP.StateManager.getAdvisorById(advisor2)?.name || advisor2;
-        if (!confirm(`Confirm Trade:\n\n${adv1Name} on ${APP.Utils.convertISOToUKDate(date1)} <-> ${adv2Name} on ${APP.Utils.convertISOToUKDate(date2)}.\n\nReason: ${reason}\n\nProceed?`)) return;
 
-        const exception1 = { advisor_id: advisor1, exception_date: date1, structure: schedule2.segments.length > 0 ? JSON.parse(JSON.stringify(schedule2.segments)) : [], reason: `${reason} (Trade with ${adv2Name})` };
-        const exception2 = { advisor_id: advisor2, exception_date: date2, structure: schedule1.segments.length > 0 ? JSON.parse(JSON.stringify(schedule1.segments)) : [], reason: `${reason} (Trade with ${adv1Name})` };
+        if (!confirm(`Confirm Trade:\n\n${adv1Name} on ${APP.Utils.convertISOToUKDate(date1)} will receive ${adv2Name}'s schedule from ${APP.Utils.convertISOToUKDate(date2)}.\n\n${adv2Name} on ${APP.Utils.convertISOToUKDate(date2)} will receive ${adv1Name}'s schedule from ${APP.Utils.convertISOToUKDate(date1)}.\n\nReason: ${reason}\n\nProceed?`)) {
+            return;
+        }
 
+        // Create the two exceptions
+        // Exception 1: Advisor 1 gets Schedule 2 on Date 1
+        const exception1 = {
+            advisor_id: advisor1,
+            exception_date: date1,
+            // Must use a deep copy of the segments (handle RDO by setting structure to empty array)
+            structure: schedule2.segments.length > 0 ? JSON.parse(JSON.stringify(schedule2.segments)) : [], 
+            reason: `${reason} (Trade with ${adv2Name} on ${APP.Utils.convertISOToUKDate(date2)})`
+        };
+
+        // Exception 2: Advisor 2 gets Schedule 1 on Date 2
+        const exception2 = {
+            advisor_id: advisor2,
+            exception_date: date2,
+            // Must use a deep copy of the segments
+            structure: schedule1.segments.length > 0 ? JSON.parse(JSON.stringify(schedule1.segments)) : [],
+            reason: `${reason} (Trade with ${adv1Name} on ${APP.Utils.convertISOToUKDate(date1)})`
+        };
+
+        // Save both exceptions (ideally in a transaction, but sequentially here)
         const res1 = await APP.DataService.saveRecord('schedule_exceptions', exception1, 'advisor_id, exception_date');
         const res2 = await APP.DataService.saveRecord('schedule_exceptions', exception2, 'advisor_id, exception_date');
 
@@ -2263,60 +3708,108 @@ window.APP = window.APP || {};
             APP.StateManager.syncRecord('schedule_exceptions', res2.data);
             APP.StateManager.saveHistory("Execute Shift Trade");
             APP.Utils.showToast("Shift trade executed successfully.", "success");
+            
+            // Clear the form and re-render previews
             clearTradeForm();
-            if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
+            
+            // Re-render the main schedule view if it's currently active
+            if (APP.Components.ScheduleViewer) {
+                 APP.Components.ScheduleViewer.render();
+            }
+            
+        } else {
+            // Error toasts handled by DataService
+            if (res1.error) console.error("Trade Error (Part 1):", res1.error);
+            if (res2.error) console.error("Trade Error (Part 2):", res2.error);
         }
     };
 
     const clearTradeForm = () => {
+        // Reset state
         Object.keys(TRADE_STATE).forEach(key => TRADE_STATE[key] = null);
+        
+        // Reset UI elements
         if (ELS.advisor1) ELS.advisor1.value = "";
         if (ELS.advisor2) ELS.advisor2.value = "";
         if (ELS.date1 && ELS.date1._flatpickr) ELS.date1._flatpickr.clear();
         if (ELS.date2 && ELS.date2._flatpickr) ELS.date2._flatpickr.clear();
         if (ELS.reasonInput) ELS.reasonInput.value = '';
+        
         renderPreview('1');
         renderPreview('2');
         validateTrade();
     };
 
+
     APP.Components = APP.Components || {};
     APP.Components.ShiftTradeCenter = ShiftTradeCenter;
 }(window.APP));
 
+
 /**
  * MODULE: APP.Core
+ * The main application controller responsible for initialization, global event wiring, and rendering coordination.
  */
 (function(APP) {
     const Core = {};
     const ELS = {};
 
+    // This function is exposed so init.js can call it.
     Core.initialize = async () => {
-        console.log("WFM Intelligence Platform (v16.3 FINAL) Initializing...");
+        console.log("WFM Intelligence Platform (v15.8.1) Initializing...");
+        
+        // Initialize foundational services
         APP.Utils.cacheDOMElements();
-        if (!APP.DataService.initialize()) { console.error("DataService initialization failed."); return; }
-        cacheCoreDOMElements();
-        setDefaultWeek();
-        const initialData = await APP.DataService.loadCoreData();
-        if (!initialData) {
-            console.error("Failed to load core data.");
-             if (ELS.mainContentArea) ELS.mainContentArea.innerHTML = `<div class="card" style="text-align: center; padding: 50px;"><h1>Data Load Failed</h1></div>`;
+        if (!APP.DataService.initialize()) {
+            console.error("Fatal Error: DataService failed to initialize.");
             return;
         }
-        APP.StateManager.initialize(initialData);
-        initializeTabs();
-        initializeDateControls();
-        
-        if (APP.Components.ComponentManager) APP.Components.ComponentManager.initialize();
-        if (APP.Components.SequentialBuilder) APP.Components.SequentialBuilder.initialize();
-        if (APP.Components.ShiftDefinitionEditor) APP.Components.ShiftDefinitionEditor.initialize();
-        if (APP.Components.RotationEditor) APP.Components.RotationEditor.initialize();
-        if (APP.Components.AssignmentManager) APP.Components.AssignmentManager.initialize();
-        if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.initialize();
-        if (APP.Components.ShiftTradeCenter) APP.Components.ShiftTradeCenter.initialize();
 
+        // Cache Core DOM elements
+        cacheCoreDOMElements();
+        
+        // Set the default week to the current week
+        setDefaultWeek();
+
+        // Load data
+        const initialData = await APP.DataService.loadCoreData();
+        if (!initialData) {
+            console.error("Fatal Error: Failed to load core data.");
+             if (document.body) {
+                document.body.innerHTML = "<h1>Fatal Error: Failed to load core data from database. Check connection and schema.</h1>";
+            }
+            return;
+        }
+
+        // Initialize State Manager
+        APP.StateManager.initialize(initialData);
+
+        // Initialize UI Components
+        try {
+            APP.Components.ComponentManager.initialize();
+            APP.Components.AssignmentManager.initialize();
+            // Initialize the shared builder first
+            APP.Components.SequentialBuilder.initialize(); 
+            APP.Components.ShiftDefinitionEditor.initialize();
+            APP.Components.RotationEditor.initialize();
+            APP.Components.ScheduleViewer.initialize();
+            // Initialize the Trade Center
+            if (APP.Components.ShiftTradeCenter) {
+                APP.Components.ShiftTradeCenter.initialize();
+            }
+        } catch (error) {
+            console.error("CRITICAL ERROR during UI Component Initialization:", error);
+            APP.Utils.showToast("Fatal Error during UI initialization. Check console logs.", "danger", 10000);
+            return; 
+        }
+
+        // Render all components
+        // This triggers the initial render chain, including the first historical data fetch.
         Core.renderAll();
+
+        // Wire global event handlers
         wireGlobalEvents();
+        
         console.log("Initialization complete.");
     };
 
@@ -2328,73 +3821,226 @@ window.APP = window.APP || {};
         ELS.btnRedo = document.getElementById('btnRedo');
         ELS.tabNav = document.getElementById('main-navigation');
         ELS.tabs = document.querySelectorAll('.tab-content');
-        ELS.mainContentArea = document.getElementById('main-content-area');
     };
 
+    // Set the default week view to the Monday of the current week.
     const setDefaultWeek = () => {
         let d = new Date();
         let day = d.getDay();
+        // Calculate the date of the current week's Monday
         let diff = d.getDate() - day + (day === 0 ? -6 : 1);
         const localMonday = new Date(d.getFullYear(), d.getMonth(), diff);
+        
+        // Format as YYYY-MM-DD and set in state
         APP.StateManager.getState().weekStart = APP.Utils.formatDateToISO(localMonday);
     };
 
-    const wireGlobalEvents = () => {
-        if (ELS.weekStart && typeof flatpickr !== 'undefined') {
+    // This is the NEW code to paste
+const wireGlobalEvents = () => {
+    // Week Navigation
+    if (ELS.weekStart) {
+        if (typeof flatpickr !== 'function') {
+            console.error("CRITICAL ERROR: flatpickr library not loaded (Global Events)."); //
+        } else {
+            // Configure Week Picker (Flatpickr)
             flatpickr(ELS.weekStart, {
-                dateFormat: "Y-m-d", 
+                dateFormat: "Y-m-d", // ISO format for consistency
                 defaultDate: APP.StateManager.getState().weekStart,
-                "locale": { "firstDayOfWeek": 1 },
+          
+                "locale": { "firstDayOfWeek": 1 }, // Monday start
                 onChange: (selectedDates, dateStr) => {
+                    // Update state and re-render visualization on date change
                     APP.StateManager.getState().weekStart = dateStr;
-                    APP.Components.ScheduleViewer.render();
+ 
+                    // ScheduleViewer.render() coordinates the historical data fetch and subsequent renders.
+                    APP.Components.ScheduleViewer.render(); //
                 }
             });
         }
-        if (ELS.prevWeek) ELS.prevWeek.addEventListener('click', () => updateWeek(-7));
-        if (ELS.nextWeek) ELS.nextWeek.addEventListener('click', () => updateWeek(7));
-        if (ELS.btnUndo) ELS.btnUndo.addEventListener('click', () => APP.StateManager.applyHistory('undo'));
-        if (ELS.btnRedo) ELS.btnRedo.addEventListener('click', () => APP.StateManager.applyHistory('redo'));
-        if (ELS.tabNav) ELS.tabNav.addEventListener('click', handleTabNavigation);
-    };
+    }
+    if (ELS.prevWeek) ELS.prevWeek.addEventListener('click', () => updateWeek(-7)); //
+    if (ELS.nextWeek) ELS.nextWeek.addEventListener('click', () => updateWeek(7)); //
+
+    // Undo/Redo
+    if (ELS.btnUndo) ELS.btnUndo.addEventListener('click', () => APP.StateManager.applyHistory('undo')); //
+    if (ELS.btnRedo) ELS.btnRedo.addEventListener('click', () => APP.StateManager.applyHistory('redo')); //
+
+    // Tab Navigation
+    if (ELS.tabNav) ELS.tabNav.addEventListener('click', handleTabNavigation); //
+
+    // --- BEGIN CACHE-BYPASS FIX (v2) ---
+    // Forcefully injects the 'Shift Swop' button AND panel if 
+    // a stale, cached index.html file is loaded without them.
+    try {
+        // 1. INJECT THE BUTTON (if missing)
+        if (ELS.tabNav) {
+            const tradeButtonExists = ELS.tabNav.querySelector('[data-tab="tab-trade-center"]');
+            if (!tradeButtonExists) {
+                console.warn("WFM: 'Shift Swop' button not found. Injecting manually...");
+                
+                const buttonHTML = `
+                <button class="tab-link" data-tab="tab-trade-center" title="Shift Swop">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
+                    <span>Shift Swop</span>
+                </button>
+                `;
+
+                let planningSeparator = null;
+                ELS.tabNav.querySelectorAll('.nav-separator').forEach(sep => {
+                    if (sep.textContent.trim().toUpperCase() === 'PLANNING') {
+                        planningSeparator = sep;
+                    }
+                });
+
+                if (planningSeparator) {
+                    planningSeparator.insertAdjacentHTML('afterend', buttonHTML);
+                    console.log("WFM: Successfully injected 'Shift Swop' button.");
+                }
+            }
+        }
+
+        // 2. INJECT THE PANEL (if missing)
+        const tradePanelExists = document.getElementById('tab-trade-center');
+        if (!tradePanelExists) {
+            console.warn("WFM: 'Shift Swop' panel not found. Injecting manually...");
+            
+            // This is the full HTML for the panel, copied from your correct index.html file
+            const panelHTML = `
+            <section id="tab-trade-center" class="tab-content">
+              <div class="card">
+                <h2>Shift Swop</h2>
+                <p class="helper-text">Select two advisors and the corresponding dates to trade their schedules. This creates exceptions for the selected dates only.</p>
+                <div class="trade-layout">
+                  <div class="trade-panel">
+                    <h3>Trade Slot 1</h3>
+                    <div class="form-group">
+                      <label for="tradeAdvisor1">Advisor 1</label>
+                      <select id="tradeAdvisor1" class="form-select trade-advisor"></select>
+                    </div>
+                    <div class="form-group">
+                      <label for="tradeDate1">Date 1</label>
+                      <input type="text" id="tradeDate1" class="form-input trade-date-picker" placeholder="Select date...">
+                    </div>
+                    <div class="trade-preview" id="tradePreview1">Select advisor and date to preview schedule.</div>
+                  </div>
+                  <div class="trade-swap-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 17l5-5-5-5M19.8 12H9M8 7l-5 5 5 5"/></svg>
+                  </div>
+                  <div class="trade-panel">
+                    <h3>Trade Slot 2</h3>
+                    <div class="form-group">
+                      <label for="tradeAdvisor2">Advisor 2</label>
+                      <select id="tradeAdvisor2" class="form-select trade-advisor"></select>
+                    </div>
+                    <div class="form-group">
+                      <label for="tradeDate2">Date 2</label>
+                      <input type="text" id="tradeDate2" class="form-input trade-date-picker" placeholder="Select date...">
+                    </div>
+                    <div class="trade-preview" id="tradePreview2">Select advisor and date to preview schedule.</div>
+                  </div>
+                </div>
+                <div class="trade-actions">
+                  <div class="form-group" style="max-width: 500px; margin: 0 auto 16px auto;">
+                    <label for="tradeReason">Reason for Trade (Required)</label>
+                    <input type="text" id="tradeReason" class="form-input" placeholder="e.g., Mutual agreement, Operational need...">
+                  </div>
+                  <button id="btnExecuteTrade" class="btn btn-primary btn-lg" disabled>Execute Trade</button>
+                </div>
+              </div>
+            </section>
+            `;
+
+            const mainContentArea = document.getElementById('main-content-area'); //
+            
+            if (mainContentArea) {
+                mainContentArea.insertAdjacentHTML('beforeend', panelHTML);
+                console.log("WFM: Successfully injected 'Shift Swop' panel.");
+                
+                // 3. CRITICAL: Re-run the initialize for that specific component
+                // This wires up all the new buttons and dropdowns inside the panel.
+                if (APP.Components.ShiftTradeCenter) {
+                    APP.Components.ShiftTradeCenter.initialize(); //
+                    console.log("WFM: Re-initialized ShiftTradeCenter component.");
+                }
+                
+                // 4. CRITICAL: Re-cache the ELS.tabs NodeList so the tab switcher works
+                ELS.tabs = document.querySelectorAll('.tab-content'); //
+            } else {
+                console.error("WFM: Could not find 'main-content-area' to inject panel.");
+            }
+        }
+    } catch (e) {
+        console.error("WFM: Error during cache-bypass fix:", e);
+    }
+    // --- END CACHE-BYPASS FIX ---
+
+    // V15.8 FIX: Removed the unnecessary JS injection of the Shift Swop button here.
+    // It is now correctly defined in index.html.
+};
     
     const handleTabNavigation = (e) => {
         const target = e.target.closest('.tab-link');
         if (target && !target.classList.contains('disabled')) {
             const tabId = target.dataset.tab;
+            
+            // Deactivate all tabs and links
             ELS.tabNav.querySelectorAll('.tab-link').forEach(t => t.classList.remove('active'));
             ELS.tabs.forEach(t => t.classList.remove('active'));
+            
+            // Activate the selected one
             target.classList.add('active');
             const activeTab = document.getElementById(tabId);
             if (activeTab) activeTab.classList.add('active');
-            Core.renderAll();
+            
+            // Force re-render on tab switch to ensure visualization is updated correctly
+            // This also handles fetching historical data if switching to ScheduleView or Assignments
+            if (tabId === 'tab-schedule-view') {
+                APP.Components.ScheduleViewer.render();
+            } else if (tabId === 'tab-advisor-assignments') {
+                // When switching to the Assignments tab, we must ensure the data is loaded and rendered.
+                // ScheduleViewer.render() handles the coordination of fetching data and rendering the AssignmentManager if the tab is active.
+                APP.Components.ScheduleViewer.render();
+            } else if (tabId === 'tab-trade-center') {
+                // Ensure Trade Center is rendered when activated
+                if (APP.Components.ShiftTradeCenter) {
+                    APP.Components.ShiftTradeCenter.render();
+                }
+            }
         }
     };
 
     const updateWeek = (days) => {
         if (!ELS.weekStart || !ELS.weekStart._flatpickr) return;
+
         const flatpickrInstance = ELS.weekStart._flatpickr;
+        
         const currentDate = flatpickrInstance.selectedDates[0] || new Date();
         currentDate.setDate(currentDate.getDate() + days);
+        // Set the new date and trigger the onChange event
         flatpickrInstance.setDate(currentDate, true);
     };
 
+    // Expose function to update Undo/Redo button states
     Core.updateUndoRedoButtons = (index, length) => {
         if (ELS.btnUndo) ELS.btnUndo.disabled = index <= 0;
         if (ELS.btnRedo) ELS.btnRedo.disabled = index >= length - 1;
     };
 
-    Core.renderAll = async () => {
+    // Expose function to trigger a full application re-render
+    Core.renderAll = () => {
         if (!APP.StateManager.getState().isBooted) return;
-        const activeTab = document.querySelector('.tab-link.active');
-        const activeTabId = activeTab ? activeTab.dataset.tab : 'tab-schedule-view';
+        APP.Components.ComponentManager.render();
+        // AssignmentManager.render() is implicitly called by ScheduleViewer.render() coordination
+        APP.Components.ShiftDefinitionEditor.render();
+        APP.Components.RotationEditor.render();
+        
+        // Render the Trade Center
+        if (APP.Components.ShiftTradeCenter) {
+             APP.Components.ShiftTradeCenter.render();
+        }
 
-        if (activeTabId === 'tab-schedule-view') APP.Components.ScheduleViewer.render();
-        else if (activeTabId === 'tab-rotation-editor') APP.Components.RotationEditor.render();
-        else if (activeTabId === 'tab-shift-definitions') APP.Components.ShiftDefinitionEditor.render();
-        else if (activeTabId === 'tab-advisor-assignments') APP.Components.AssignmentManager.render();
-        else if (activeTabId === 'tab-component-manager') APP.Components.ComponentManager.render();
-        else if (activeTabId === 'tab-trade-center') APP.Components.TradeCenter.render();
+        // ScheduleViewer.render() coordinates historical data fetch and rendering of both Viewer and Assignments tabs.
+        APP.Components.ScheduleViewer.render();
     };
 
     APP.Core = Core;
