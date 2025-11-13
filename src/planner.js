@@ -374,53 +374,103 @@ Utils.addDaysISO = (iso, days) => {
         return { data: null, error: null };
     };
 
-    // V15.8 FIX: Reads effective rotation rows for a given date (YYYY-MM-DD).
-    // Includes prioritization logic and fallback if history table is missing.
-    DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
+    // V15.8 FIX: Handles "Assign" and "Swap" button clicks
+    const handleRowAction = async (action, advisorId) => {
       try {
-        // FIX: Calculate the end of the week to capture any starts within this week (including Monday)
-        const weekEndISO = APP.Utils.addDaysISO(isoDate, 6);
+        const row = document.querySelector(`tr[data-advisor-id="${advisorId}"]`);
+        if (!row) return APP.Utils.showToast('Row not found', 'danger');
 
-        // 1) Pull rows that start anytime on or before the end of this week
-        const { data, error } = await supabase
-          .from(HISTORY_TABLE)
-          .select('advisor_id, rotation_name, start_date, end_date, reason')
-          .lte('start_date', weekEndISO) /* <--- CHANGED to weekEndISO */
-          .or(`end_date.is.null,end_date.gte.${isoDate}`);
+        let rotationName = undefined;
+        let inputStartDateISO = undefined;
 
-        // Handle specific error if the history table is missing (PostgREST error code PGRST116 or 42P01)
-        if (error && (error.code === '42P01' || error.code === 'PGRST116')) {
-            console.warn(`${HISTORY_TABLE} not found. Falling back to ${SNAPSHOT_TABLE} snapshot.`);
-            return await fetchSnapshotAssignments();
+        // 1. Check if user typed/selected something manually (Pending Changes)
+        if (PENDING_CHANGES.has(advisorId)) {
+            const pending = PENDING_CHANGES.get(advisorId);
+            if (pending.rotation_name !== undefined) rotationName = pending.rotation_name;
+            if (pending.start_date !== undefined) inputStartDateISO = pending.start_date;
+        } 
+        
+        // 2. Fallback: Read directly from the inputs on the screen
+        if (rotationName === undefined || inputStartDateISO === undefined) {
+             const rotationSel = row.querySelector('.assign-rotation');
+             const dateInput   = row.querySelector('.assign-start-date');
+             
+             if (rotationName === undefined) rotationName = rotationSel ? rotationSel.value : '';
+             // If date is empty, use the value from the input field
+             if (inputStartDateISO === undefined) inputStartDateISO = (dateInput) ? dateInput.value.trim() : '';
         }
 
-        if (error) return handleError(error, 'Fetch effective assignments for date');
+        // 3. Default to the global week date if the box is empty
+        const globalWeekStartISO = APP.StateManager.getState().weekStart;
+        let actionStartISO = inputStartDateISO || globalWeekStartISO;
+        
+        // Handle UK Date format (just in case)
+        if (actionStartISO && actionStartISO.includes('/')) {
+            const iso = APP.Utils.convertUKToISODate(actionStartISO);
+            if (iso) actionStartISO = iso;
+        }
 
-        // 2) For each advisor, pick the row with the *latest* start_date (closest to isoDate).
-        //    If there are ties, prefer a bounded swap (has end_date) over an open-ended row.
-        const byAdvisor = new Map();
-        (data || []).forEach(row => {
-          const existing = byAdvisor.get(row.advisor_id);
-          if (!existing) {
-            byAdvisor.set(row.advisor_id, row);
-            return;
-          }
-          // choose the row with the later start_date
-          if (row.start_date > existing.start_date) {
-            byAdvisor.set(row.advisor_id, row);
-          } else if (row.start_date === existing.start_date) {
-            // tie-breaker: prefer bounded swap (end_date not null)
-            const existingIsBounded = !!existing.end_date;
-            const rowIsBounded = !!row.end_date;
-            if (rowIsBounded && !existingIsBounded) {
-              byAdvisor.set(row.advisor_id, row);
-            }
-          }
-        });
+        // --- WARNING MESSAGE (Restored) ---
+        const advisorName = row.cells[0].innerText; 
+        let confirmMsg = "";
+        
+        if (action === 'assign_from_week') {
+            confirmMsg = `Are you sure you want to set ${advisorName} to '${rotationName || 'No Rotation'}'?\n\nStart Date: ${actionStartISO}\n\nThis will change all future weeks.`;
+        } else if (action === 'change_one_week') {
+            confirmMsg = `Are you sure you want to SWAP ${advisorName} to '${rotationName}'?\n\nThis affects ONLY the week of: ${actionStartISO}`;
+        }
 
-        return { data: byAdvisor, error: null };
-      } catch (err) {
-        return handleError(err, 'Fetch effective assignments for date (Catch)');
+        if (!confirm(confirmMsg)) return; // STOP if user clicks Cancel
+        // ----------------------------------
+
+        // 4. Save to Database
+        let res;
+        if (action === 'assign_from_week') {
+          res = await APP.DataService.assignFromWeek({
+            advisor_id: advisorId,
+            rotation_name: rotationName,
+            start_date: actionStartISO
+          });
+        } else if (action === 'change_one_week') {
+          // Calculate the exact Monday of that week for the swap record
+          const weekStart = APP.Utils.getMondayForDate(actionStartISO);
+          if (!weekStart) return APP.Utils.showToast('Invalid date for swap.', 'danger');
+          
+          res = await APP.DataService.changeOnlyWeek({
+            advisor_id: advisorId,
+            rotation_name: rotationName,
+            week_start: weekStart,
+            week_end: APP.Utils.addDaysISO(weekStart, 6)
+          });
+        }
+
+        if (res?.error) return; // Database error (toast handled elsewhere)
+
+        // 5. Success! Update the UI immediately
+        PENDING_CHANGES.delete(advisorId); // Clear the manual input memory
+        APP.StateManager.clearEffectiveAssignmentsCache(); // FORCE the app to re-fetch data
+        
+        // Update history tracking
+        const { data: updatedSnapshot } = await APP.DataService.fetchSnapshotForAdvisor(advisorId);
+        if (updatedSnapshot) APP.StateManager.syncRecord('rotation_assignments', updatedSnapshot);
+
+        APP.StateManager.saveHistory(`Assignment Action: ${action}`);
+
+        // REFRESH LIVE VIEW
+        if (APP.Components.ScheduleViewer) {
+             // This command forces the "Live View" (Gantt chart) to grab the new data
+             await APP.StateManager.loadEffectiveAssignments(APP.StateManager.getState().weekStart);
+             APP.Components.ScheduleViewer.render();
+        }
+        
+        // Refresh the Assignments Grid
+        AssignmentManager.render(); 
+
+        APP.Utils.showToast('Assignment updated successfully.', 'success');
+
+      } catch (e) {
+        console.error("Error in handleRowAction:", e);
+        APP.Utils.showToast('Unexpected error. See console.', 'danger');
       }
     };
 
