@@ -1,7 +1,10 @@
 /**
- * WFM Intelligence Platform - Styles (v15.8)
- * Includes Base Layout, Components, Editors, Visualization (Daily/Weekly), and Trade Center.
- * MODIFIED: Added Authentication Overlay Styles.
+ * WFM Intelligence Platform - Styles (v16.11 - Fixed Colors & Water Pipe)
+ * Includes Base Layout, Components, Editors, Visualization, Authentication, and Trade Center.
+ * FIXES:
+ * 1. Component colors now display correctly in all views (removed hardcoded overrides).
+ * 2. "Water Pipe" visuals: Blocks fuse neatly with no gaps or rounded edges between them.
+ * 3. Drag-and-Drop: Smooth transitions for the "stream" effect.
 */
 
 /* === VARIABLES & CONFIGURATION === */
@@ -32,15 +35,13 @@
   --color-success-bg: #ECFDF5;
   --color-danger: #EF4444;
   --color-danger-bg: #FEE2E2;
-  
-  /* V15.0: Exception State (Purple) */
-  --color-exception: #9333EA; 
+  --color-exception: #9333EA; /* Purple */
 
   /* Layout */
   --sidebar-width: 220px;
   --top-bar-height: 55px;
   --border-radius: 8px;
-  
+
   /* Timeline Visualization */
   --timeline-name-col: 180px;
   --timeline-row-height: 30px;
@@ -48,17 +49,17 @@
   --timeline-grid-color: #E5E7EB;
   --timeline-header-bg: #F3F4F6;
 
-  /* Debenhams Branding (Approximated from image) */
+  /* Branding */
   --debenhams-teal: #70E6D6;
   --debenhams-dark: #000000;
 
-  /* NEW: Login Screen Styling (Dark Theme based on photo) */
+  /* Login Screen Styling (Dark Theme) */
   --login-bg: #000000;
   --login-text: #FFFFFF;
-  --login-text-muted: #9CA3AF; /* Light grey for labels/footer */
-  --login-input-bg: #1F2937; /* Dark grey for inputs */
+  --login-text-muted: #9CA3AF;
+  --login-input-bg: #1F2937;
   --login-input-border: #374151;
-  --login-button-green: #22C55E; /* A bright green approximation from photo */
+  --login-button-green: #22C55E;
 }
 
 /* === BASE STYLES & LAYOUT === */
@@ -69,7 +70,7 @@ html, body {
   font-size: 13px;
   background-color: var(--color-bg);
   color: var(--color-text);
-  overflow: hidden; /* Prevent body scroll, rely on internal component scrolling */
+  overflow: hidden;
 }
 
 *, *::before, *::after {
@@ -90,15 +91,13 @@ h2 {
     font-size: 17px;
 }
 
-/* === AUTHENTICATION OVERLAY (Heavily Modified) === */
+/* === AUTHENTICATION OVERLAY === */
 
 /* Hide main application components initially */
 .app-sidebar, .app-main-content {
   display: none;
 }
-/* --- Authentication Enhancements (v15.8.3) --- */
 
-/* Styling for the "Forgot Password?" and "Back to Sign In" links */
 .auth-link {
     color: var(--login-text-muted);
     cursor: pointer;
@@ -110,54 +109,37 @@ h2 {
 }
 
 .auth-link:hover {
-    color: var(--login-text); /* Brighten on hover */
+    color: var(--login-text);
 }
 
-/* Generalized container for authentication feedback (replaces auth-error-message) */
 .auth-notice {
     margin-top: 24px;
     padding: 12px;
     border-radius: var(--border-radius);
-    /* display: none; (Handled by JS) */
     font-size: 14px;
     text-align: left;
 }
 
-/* Specific style for Success (e.g., Password reset link sent) */
 .auth-notice.success {
-     /* Using standard success colors defined in :root */
-    background-color: var(--color-success-bg); /* ECFDF5 */
-    color: #065F46; /* Darker green for text contrast */
-    border: 1px solid #A7F3D0; /* Light green border */
+    background-color: var(--color-success-bg);
+    color: #065F46;
+    border: 1px solid #A7F3D0;
 }
 
-/* Specific style for Errors */
 .auth-notice.error {
-    /* Using standard danger colors defined in :root */
-    background-color: var(--color-danger-bg); /* FEE2E2 */
-    color: #991B1B; /* Darker red for text contrast */
-    border: 1px solid #FCA5A5; /* Light red border */
+    background-color: var(--color-danger-bg);
+    color: #991B1B;
+    border: 1px solid #FCA5A5;
 }
 
-/* Reveal them when the 'authenticated' class is added to the body by init.js */
-body.authenticated .app-sidebar {
-  display: flex;
-}
-body.authenticated .app-main-content {
-  display: flex;
-}
+/* Reveal app when authenticated */
+body.authenticated .app-sidebar { display: flex; }
+body.authenticated .app-main-content { display: flex; }
 
 .auth-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  /* background-color: #F3F4F6; REMOVED */
-  /* Display is managed by init.js (flex when shown, none when hidden) */
-  display: none; 
-  /* align-items: center; REMOVED */
-  /* justify-content: center; REMOVED */
+  top: 0; left: 0; width: 100%; height: 100%;
+  display: none; /* Managed by JS */
   z-index: 9999;
   opacity: 1;
   transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
@@ -170,16 +152,13 @@ body.authenticated .app-main-content {
 
 .auth-container {
   display: flex;
-  /* Changed to full screen */
   width: 100%;
   height: 100%;
-  /* Removed max-width, height, background-color, border-radius, box-shadow */
-  overflow: hidden; /* Keeps the split design contained */
+  overflow: hidden;
 }
 
-/* --- Banner Side (Left) --- */
+/* Banner Side */
 .auth-banner {
-  /* width: 50%; CHANGED to 65% */
   width: 75%;
   background-color: var(--debenhams-teal); 
   display: flex;
@@ -189,58 +168,35 @@ body.authenticated .app-main-content {
   overflow: hidden;
 }
 
-/* Recreating the subtle pattern background using an embedded SVG */
 .auth-banner::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    /* SVG pattern mimicking the geometric style of the banner image */
-     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cdefs%3E%3Cstyle%3E.bee%7Bfill:none;stroke:rgba(255,255,255,0.35);stroke-width:2;%7D%3C/style%3E%3C/defs%3E%3Cg transform='translate(50 50) rotate(5)'%3E%3C!-- Body --%3E%3Cpolygon class='bee' points='0,-12 12,-6 12,6 0,12 -12,6 -12,-6'/%3E%3C!-- Stripes (approximated) --%3E%3Cline class='bee' x1='-6' y1='-9' x2='-6' y2='9'/%3E%3Cline class='bee' x1='0' y1='-12' x2='0' y2='12'/%3E%3Cline class='bee' x1='6' y1='-9' x2='6' y2='9'/%3E%3C!-- Wings (approximated shape) --%3E%3Cpolygon class='bee' points='0,-12 18,-30 30,-18 12,-6'/%3E%3Cpolygon class='bee' points='0,-12 -18,-30 -30,-18 -12,-6'/%3E%3C/g%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cdefs%3E%3Cstyle%3E.bee%7Bfill:none;stroke:rgba(255,255,255,0.35);stroke-width:2;%7D%3C/style%3E%3C/defs%3E%3Cg transform='translate(50 50) rotate(5)'%3E%3C!-- Body --%3E%3Cpolygon class='bee' points='0,-12 12,-6 12,6 0,12 -12,6 -12,-6'/%3E%3C!-- Stripes --%3E%3Cline class='bee' x1='-6' y1='-9' x2='-6' y2='9'/%3E%3Cline class='bee' x1='0' y1='-12' x2='0' y2='12'/%3E%3Cline class='bee' x1='6' y1='-9' x2='6' y2='9'/%3E%3C!-- Wings --%3E%3Cpolygon class='bee' points='0,-12 18,-30 30,-18 12,-6'/%3E%3Cpolygon class='bee' points='0,-12 -18,-30 -30,-18 -12,-6'/%3E%3C/g%3E%3C/svg%3E");
     background-size: 90px 90px;
-    /* Optional: subtle animation for a fancy effect */
-    /* animation: subtle-pan 250s linear infinite; */ /* <-- Animation is disabled */
     opacity: 0.7;
-}
-
-@keyframes subtle-pan {
-  0% { background-position: 0 0; }
-  100% { background-position: 100% 100%; }
 }
 
 .banner-content {
     position: relative;
     z-index: 1;
     padding: 40px;
-    /* ADDED: Center the content */
     text-align: center;
 }
 
-/* Debenhams Group Logo Recreation (CSS approximation) */
 .dg-logo {
-  /* display: flex; REMOVED */
-  /* align-items: center; REMOVED */
-  /* gap: 20px; REMOVED */
   color: var(--debenhams-dark);
-  /* ADDED: Space before tagline */
   margin-bottom: 50px;
 }
 
-/* Removed .dg-monogram styles as they were not in the user's HTML */
-
-
 .dg-text {
-  /* display: flex; REMOVED */
-  /* flex-direction: column; REMOVED */
-  /* text-align: left; CHANGED to center */
   text-align: center;
   display: block;
 }
 
 .dg-main-text {
-  /* font-size: 42px; CHANGED to 96px */
   font-size: 72px;
   font-weight: 700;
-  /* font-family: 'Playfair Display', serif; CHANGED to Sans-Serif to match photo style */
   font-family: var(--font-family);
   letter-spacing: -2px;
   line-height: 1;
@@ -248,42 +204,35 @@ body.authenticated .app-main-content {
 }
 
 .dg-sub-text {
-  /* font-size: 18px; CHANGED to 36px */
   font-size: 28px;
   font-weight: 600;
-  font-family: var(--font-family); /* Back to Inter */
+  font-family: var(--font-family);
   text-transform: uppercase;
   margin-top: 5px;
   display: block;
 }
 
-/* NEW: Tagline Styling */
 .dg-tagline {
     font-size: 24px;
-    font-weight: 400; /* 'FOR EVERYONE' is bolded in HTML, the rest is regular */
+    font-weight: 400;
     font-family: var(--font-family);
     text-transform: uppercase;
     line-height: 1.3;
     color: var(--debenhams-dark);
 }
 
-
-/* --- Form Side (Right) --- */
+/* Form Side */
 .auth-form-panel {
-  /* width: 50%; CHANGED to 35% */
   width: 25%;
   padding: 60px;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  /* ADDED: Black background and white text */
   background-color: var(--login-bg);
   color: var(--login-text);
 }
 
-
 .auth-title {
-  /* Styling to match "Access People" (White, Inter font, no symbol) */
   font-size: 24px;
   font-weight: 600;
   color: var(--login-text); 
@@ -291,37 +240,30 @@ body.authenticated .app-main-content {
   font-family: var(--font-family);
 }
 
-
-/* This styles the text inside the panel */
 .auth-form-panel p {
   color: var(--login-text-muted);
   font-size: 14px;
-  margin: 0; /* Reset margins first */
+  margin: 0;
 }
 
-/* This styles your Motto and adds the BIG GAP */
 .auth-motto {
   font-size: 14px;
-  margin-top: 8px; /* Small space after the title */
-  margin-bottom: 60px; /* This is your "4 spaces" gap */
+  margin-top: 8px;
+  margin-bottom: 60px;
 }
 
-/* This styles the "Welcome" text inside the form */
 .auth-welcome {
   font-size: 14px;
-  margin-bottom: 24px; /* Sits 1 line above the form */
+  margin-bottom: 24px;
 }
 
 .auth-form label {
     display: block;
-    font-weight: 500; /* Slightly less bold than 600 */
+    font-weight: 500;
     margin-bottom: 8px;
-    /* ADDED: Color for dark mode */
     color: var(--login-text-muted);
 }
 
-/* Generalized input styles for dark mode within the auth form */
-/* This replaces the specific #passwordInput styles */
 .auth-form .form-input {
   padding: 12px 16px;
   font-size: 16px;
@@ -330,13 +272,8 @@ body.authenticated .app-main-content {
   color: var(--login-text);
 }
 
-
-/* Override default focus style to use the brand color */
-/* This replaces the specific #passwordInput:focus styles */
 .auth-form .form-input:focus {
-  /* border-color: var(--debenhams-dark); CHANGED */
   border-color: #FFFFFF; 
-  /* box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.2); CHANGED */
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
 }
 
@@ -344,11 +281,9 @@ body.authenticated .app-main-content {
   padding: 12px 18px;
   font-size: 16px;
   font-weight: 600;
-  /* background-color: var(--debenhams-dark); CHANGED to green */
   background-color: var(--login-button-green); 
   color: white;
   border: none;
-  /* border-radius: var(--border-radius); CHANGED to pill shape */
   border-radius: 30px;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -356,7 +291,6 @@ body.authenticated .app-main-content {
 }
 
 .btn-login:hover {
-  /* background-color: #333; CHANGED to darker green */
   background-color: #16A34A;
 }
 
@@ -364,104 +298,62 @@ body.authenticated .app-main-content {
     margin-top: 24px;
     font-weight: 500;
     color: var(--color-danger);
-    display: none; /* Hidden by default, shown by JS */
-
+    display: none;
 }
-/* NEW: Inspirational Quote Blockquote (No Bar) */
+
 .auth-form-panel blockquote {
-  margin: 40px 0; /* Space above and below */
+  margin: 40px 0;
   padding-left: 0;
-  border-left: none; /* No bar */
+  border-left: none;
   font-style: italic;
-  font-size: 18px; /* Slightly larger as requested */
+  font-size: 18px;
   color: var(--login-text-muted);
   line-height: 1.6;
 }
 
-.auth-form-panel blockquote p {
-  margin: 0;
-}
+.auth-form-panel blockquote p { margin: 0; }
+
 .auth-footer {
     margin-top: auto;
     padding-top: 24px;
     font-size: 12px;
-    /* color: var(--color-text-muted); CHANGED */
     color: var(--login-text-muted);
-    /* border-top: 1px solid var(--color-border); CHANGED */
     border-top: 1px solid var(--login-input-border);
 }
 
-/* Responsive adjustments for the password screen */
+/* Responsive Auth */
 @media (max-width: 1200px) {
-  /* Adjust font sizes slightly on smaller desktop screens */
-  .dg-main-text {
-      font-size: 72px;
-  }
-  .dg-sub-text {
-      font-size: 28px;
-  }
-  .dg-tagline {
-      font-size: 24px;
-  }
+  .dg-main-text { font-size: 72px; }
+  .dg-sub-text { font-size: 28px; }
+  .dg-tagline { font-size: 24px; }
 }
 
 @media (max-width: 992px) {
-  /* Change split ratio on tablets */
-  .auth-banner {
-      width: 50%;
-  }
-  .auth-form-panel {
-      width: 50%;
-      padding: 40px;
-  }
+  .auth-banner { width: 50%; }
+  .auth-form-panel { width: 50%; padding: 40px; }
 }
-
 
 @media (max-width: 768px) {
-  .auth-container {
-    flex-direction: column;
-    /* width: 90%; REMOVED */
-    /* max-width: 450px; REMOVED */
-    /* height: auto; CHANGED to ensure full height */
-    height: 100%;
-  }
-  .auth-banner, .auth-form-panel {
-    width: 100%;
-  }
-  .auth-banner {
-    padding: 40px 0;
-    min-height: 40vh; /* Take up less vertical space */
-    height: auto;
-  }
-  .auth-form-panel {
-      padding: 40px 30px;
-      flex-grow: 1; /* Fill remaining space */
-  }
-  .dg-main-text {
-      font-size: 64px;
-  }
-  .dg-sub-text {
-      font-size: 24px;
-  }
-  .dg-tagline {
-      font-size: 20px;
-  }
+  .auth-container { flex-direction: column; height: 100%; }
+  .auth-banner, .auth-form-panel { width: 100%; }
+  .auth-banner { padding: 40px 0; min-height: 40vh; height: auto; }
+  .auth-form-panel { padding: 40px 30px; flex-grow: 1; }
+  .dg-main-text { font-size: 64px; }
+  .dg-sub-text { font-size: 24px; }
+  .dg-tagline { font-size: 20px; }
 }
-
 
 /* === SIDEBAR NAVIGATION === */
 .app-sidebar {
   width: var(--sidebar-width);
   background-color: var(--sidebar-bg);
   color: var(--sidebar-text);
-  /* display: flex; (Handled by authentication visibility logic) */
   flex-direction: column;
   flex-shrink: 0;
   border-right: 1px solid var(--sidebar-border);
   height: 100vh;
   overflow-y: auto;
 }
-
 
 .sidebar-header {
     padding: 20px 24px;
@@ -520,15 +412,14 @@ body.authenticated .app-main-content {
 /* === MAIN CONTENT & TOP BAR === */
 .app-main-content {
   flex-grow: 1;
-  /* display: flex; (Handled by authentication visibility logic) */
   flex-direction: column;
-  overflow: hidden; /* Important for internal scrolling */
+  overflow: hidden;
 }
 
 .top-bar {
   height: var(--top-bar-height);
   background-color: var(--color-panel-bg);
-  margin-bottom: 4px; /* This creates the 4px gap you want */
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -542,9 +433,7 @@ body.authenticated .app-main-content {
     gap: 12px;
 }
 
-.top-bar-controls label {
-    font-weight: 500;
-}
+.top-bar-controls label { font-weight: 500; }
 
 .separator {
     height: 24px;
@@ -553,15 +442,12 @@ body.authenticated .app-main-content {
     margin: 0 8px;
 }
 
-.ai-assistant-placeholder input {
-    width: 300px;
-}
+.ai-assistant-placeholder input { width: 300px; }
 
 /* === CONTENT AREA & TABS === */
-/* V15.6.1: Improved Layout Handling */
 .content-area {
   flex-grow: 1;
-  overflow: hidden; /* Manage scrolling within tabs */
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -570,12 +456,10 @@ body.authenticated .app-main-content {
   display: none;
   padding: 24px;
   flex-grow: 1;
-  overflow-y: auto; /* Default scrolling behavior for tabs */
+  overflow-y: auto;
 }
 
-.tab-content.active {
-  display: block;
-}
+.tab-content.active { display: block; }
 
 /* === CARDS & PANELS === */
 .card {
@@ -619,49 +503,18 @@ body.authenticated .app-main-content {
   transition: background-color 0.15s;
 }
 
-.btn-sm {
-    padding: 6px 12px;
-    font-size: 13px;
-}
+.btn-sm { padding: 6px 12px; font-size: 13px; }
+.btn-lg { padding: 12px 24px; font-size: 16px; }
 
-/* V15.7: Added large button style */
-.btn-lg {
-    padding: 12px 24px;
-    font-size: 16px;
-}
+.btn-primary { background-color: var(--brand-primary); color: white; }
+.btn-primary:hover { background-color: var(--brand-primary-dark); }
+.btn-primary:disabled { background-color: #A5B4FC; cursor: not-allowed; }
 
-.btn-primary {
-  background-color: var(--brand-primary);
-  color: white;
-}
+.btn-secondary { background-color: var(--color-hover-bg); color: var(--color-text); border: 1px solid var(--color-border); }
+.btn-secondary:hover { background-color: #E5E7EB; }
 
-.btn-primary:hover {
-  background-color: var(--brand-primary-dark);
-}
-
-.btn-primary:disabled {
-    background-color: #A5B4FC; /* Lighter indigo */
-    cursor: not-allowed;
-}
-
-.btn-secondary {
-    background-color: var(--color-hover-bg);
-    color: var(--color-text);
-    border: 1px solid var(--color-border);
-}
-
-.btn-secondary:hover {
-    background-color: #E5E7EB;
-}
-
-.btn-danger {
-    background-color: var(--color-danger);
-    color: white;
-}
-
-.btn-danger:hover {
-    background-color: #B91C1C;
-}
+.btn-danger { background-color: var(--color-danger); color: white; }
+.btn-danger:hover { background-color: #B91C1C; }
 
 .btn-icon {
     display: flex;
@@ -675,17 +528,8 @@ body.authenticated .app-main-content {
     color: var(--color-text-muted);
 }
 
-.btn-icon:hover {
-    background-color: var(--color-hover-bg);
-    color: var(--color-text);
-}
-
-.btn-icon:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    background-color: transparent;
-}
-
+.btn-icon:hover { background-color: var(--color-hover-bg); color: var(--color-text); }
+.btn-icon:disabled { opacity: 0.4; cursor: not-allowed; background-color: transparent; }
 
 /* === TABLES === */
 .table-container {
@@ -716,14 +560,8 @@ th {
   letter-spacing: 0.5px;
 }
 
-tr:last-child td {
-    border-bottom: none;
-}
-
-/* General table row hover effect (Specific views may override this) */
-tbody tr:hover {
-    background-color: var(--color-hover-bg);
-}
+tr:last-child td { border-bottom: none; }
+tbody tr:hover { background-color: var(--color-hover-bg); }
 
 /* === EDITOR LAYOUTS === */
 .editor-controls {
@@ -733,116 +571,51 @@ tbody tr:hover {
     margin-bottom: 20px;
 }
 
-.editor-buttons {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
+.editor-buttons { display: flex; align-items: center; gap: 12px; }
+.helper-text { color: var(--color-text-muted); margin-top: -8px; margin-bottom: 16px; }
+.auto-save-status { font-size: 13px; color: var(--brand-accent); opacity: 0; transition: opacity 0.3s; }
 
-.helper-text {
-    color: var(--color-text-muted);
-    margin-top: -8px;
-    margin-bottom: 16px;
-}
-
-/* Auto Save Status Indicator */
-.auto-save-status {
-    font-size: 13px;
-    color: var(--brand-accent);
-    opacity: 0;
-    transition: opacity 0.3s;
-}
-
-/* === SCHEDULE VIEW (Layout) === */
-
-/* V15.6.1: Ensures the schedule view takes the full available height */
-.planner-section {
-  height: 100%;
-  /* Override parent tab scrolling behavior */
-  overflow: hidden; 
-}
-
+/* === SCHEDULE VIEW === */
+.planner-section { height: 100%; overflow: hidden; }
 .planner-layout {
   display: grid;
-  grid-template-columns: 280px 1fr; /* Fixed width for controls, flexible for viewer */
+  grid-template-columns: 280px 1fr;
   gap: 24px;
   height: 100%;
 }
 
-.planner-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  overflow-y: auto; /* Allows tree view to scroll if it gets long */
-  height: 100%;
-}
+.planner-controls { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; height: 100%; }
+.schedules-tree { flex-grow: 1; margin-top: 16px; }
+.schedules-tree label { cursor: pointer; display: block; padding: 8px 12px; border-radius: 6px; }
+.schedules-tree input[type="checkbox"] { margin-right: 8px; }
+.schedules-tree label:hover { background-color: var(--color-hover-bg); }
 
-/* Hierarchical Tree View */
-.schedules-tree {
-  flex-grow: 1;
-  margin-top: 16px;
-}
-
-.schedules-tree label {
-    cursor: pointer;
-    display: block;
-    padding: 8px 12px;
-    border-radius: 6px;
-}
-
-.schedules-tree input[type="checkbox"] {
-    margin-right: 8px;
-}
-
-.schedules-tree label:hover {
-    background-color: var(--color-hover-bg);
-}
-
-/* Styling for the Leader nodes */
 .tree-node-leader label {
     font-weight: 600;
     color: var(--brand-primary);
-    background-color: #EEF2FF; /* Light indigo background */
-
-    /* --- ADD THESE 3 LINES --- */
+    background-color: #EEF2FF;
     display: flex;
     align-items: center;
-    flex-wrap: wrap; /* Ensures it can wrap if needed on small screens */
+    flex-wrap: wrap;
 }
-/* --- PASTE THIS ENTIRE NEW BLOCK --- */
 
 .tree-node-leader label .team-brand {
     font-size: 11px;
     font-weight: 600;
-    color: var(--color-text); /* Use the standard dark text color */
-    background-color: var(--color-border); /* Light grey tag background */
-    padding: 2px 6px;
-    border-radius: 4px;
-    margin-left: auto; /* <-- This is the magic line */
-}
-
-/* --- END OF NEW BLOCK --- */
-
-/* Styling for the Advisor nodes (indented) */
-.tree-node-advisor label {
-    padding-left: 32px;
-}
-
-.tree-node-leader label .team-brand {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--color-text-muted);
+    color: var(--color-text);
     background-color: var(--color-border);
     padding: 2px 6px;
     border-radius: 4px;
-    margin-left: 8px; /* Adds space next to the leader's name */
+    margin-left: auto;
 }
+
+.tree-node-advisor label { padding-left: 32px; }
 
 .planner-viewer {
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Critical for the visualization container */
-  padding: 0; /* Remove padding from the card container itself */
+  overflow: hidden;
+  padding: 0;
   height: 100%;
 }
 
@@ -854,24 +627,9 @@ tbody tr:hover {
   border-bottom: 1px solid var(--color-border);
 }
 
-/* View Controls (Daily/Weekly Toggle) */
-.planner-view-controls {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
-
-.planner-day-toggle {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.view-toggle-group {
-    display: flex;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
-}
+.planner-view-controls { display: flex; align-items: center; gap: 20px; }
+.planner-day-toggle { display: flex; align-items: center; gap: 12px; }
+.view-toggle-group { display: flex; border: 1px solid var(--color-border); border-radius: var(--border-radius); }
 
 .btn-toggle {
     padding: 8px 16px;
@@ -883,44 +641,15 @@ tbody tr:hover {
     cursor: pointer;
 }
 
-/* Handle rounded corners for the group */
-.btn-toggle:first-child {
-    border-top-left-radius: var(--border-radius);
-    border-bottom-left-radius: var(--border-radius);
-}
-.btn-toggle:last-child {
-    border-top-right-radius: var(--border-radius);
-    border-bottom-right-radius: var(--border-radius);
-}
+.btn-toggle:first-child { border-top-left-radius: var(--border-radius); border-bottom-left-radius: var(--border-radius); }
+.btn-toggle:last-child { border-top-right-radius: var(--border-radius); border-bottom-right-radius: var(--border-radius); }
+.btn-toggle.active { background-color: var(--brand-primary); color: white; }
 
-.btn-toggle.active {
-    background-color: var(--brand-primary);
-    color: white;
-}
-
-
-/* === VISUALIZATION CONTAINER === */
-.visualization-container {
-  flex-grow: 1;
-  overflow: auto; /* Allows the Gantt/Grid to scroll horizontally and vertically */
-  position: relative;
-}
-
-.visualization-empty {
-    padding: 40px;
-    text-align: center;
-    color: var(--color-text-muted);
-}
+.visualization-container { flex-grow: 1; overflow: auto; position: relative; }
+.visualization-empty { padding: 40px; text-align: center; color: var(--color-text-muted); }
 
 /* === DAILY TIMELINE (GANTT) VIEW === */
-
-/* The container for the timeline rows and header */
-.timeline-container {
-    position: relative;
-    /* min-width ensures the timeline doesn't compress too much */
-    min-width: 1200px; 
-}
-
+.timeline-container { position: relative; min-width: 1200px; }
 .timeline-header {
   display: grid;
   grid-template-columns: var(--timeline-name-col) 1fr;
@@ -928,136 +657,83 @@ tbody tr:hover {
   border-bottom: 1px solid var(--color-border);
   position: sticky;
   top: 0;
-  z-index: 5; /* Ensures header stays above content */
+  z-index: 5;
 }
 
 .header-name { 
     padding: 12px 20px; 
-    border-right: 1px solid var(--color-border); 
+    border-right: 1px solid var(--color-border);
     font-weight: 600;
-    /* Sticky positioning for the name column header */
     position: sticky;
     left: 0;
     background-color: var(--timeline-header-bg);
     z-index: 10;
 }
 
-/* V15.1: Refined Header Timeline Styling (Matching Example) */
-.header-timeline { 
-    position: relative; 
-    height: 48px; 
-    background-color: var(--timeline-header-bg); 
-}
+.header-timeline { position: relative; height: 48px; background-color: var(--timeline-header-bg); }
 
 .time-tick {
   position: absolute;
   font-size: 12px;
-  font-weight: 600; /* Bolder like the example */
-  color: #4B5563; /* Darker gray */
+  font-weight: 600;
+  color: #4B5563;
   user-select: none;
   height: 100%;
   padding-left: 6px;
   display: flex;
   align-items: center;
   top: 0;
-  /* Background behind text to prevent grid lines cutting through it */
   background-color: var(--timeline-header-bg);
-  padding-right: 6px; 
+  padding-right: 6px;
 }
 
-/* V15.1: Grid Lines using pseudo-elements for better control */
 .time-tick::after {
     content: '';
     position: absolute;
-    left: 0;
-    top: 0;
-    height: 5000px; /* Extend line far down the page (will be clipped by overflow) */
-    width: 1px;
+    left: 0; top: 0; height: 5000px; width: 1px;
     background-color: var(--timeline-grid-color);
-    z-index: -1; /* Behind the time label text */
+    z-index: -1;
 }
 
-
-/* Time Indicators (Current and Mouse) */
 .current-time-indicator {
-    position: absolute;
-    top: 0;
-    height: 100%;
-    width: 2px;
+    position: absolute; top: 0; height: 100%; width: 2px;
     background-color: var(--color-danger);
-    z-index: 50;
-    display: none; /* Controlled by JS */
-    pointer-events: none; /* Allow clicks through the line */
+    z-index: 50; display: none; pointer-events: none;
 }
 
 .mouse-time-indicator {
-    position: absolute;
-    top: 0;
-    height: 100%;
-    width: 1px;
+    position: absolute; top: 0; height: 100%; width: 1px;
     background-color: var(--color-text);
-    z-index: 51;
-    display: none; /* Controlled by JS */
-    pointer-events: none;
+    z-index: 51; display: none; pointer-events: none;
 }
 
 .mouse-time-tooltip {
-    position: absolute;
-    background-color: var(--color-text);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    z-index: 52;
-    display: none; /* Controlled by JS */
-    transform: translateX(-50%);
-    pointer-events: none;
+    position: absolute; background-color: var(--color-text); color: white;
+    padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;
+    z-index: 52; display: none; transform: translateX(-50%); pointer-events: none;
 }
-
 
 .timeline-row {
   display: grid;
   grid-template-columns: var(--timeline-name-col) 1fr;
   height: var(--timeline-row-height);
-  margin-bottom: 4px; /*
-  border-bottom: 1px solid var(--color-border);
-  /* V15.1: Make rows clickable for Live Editing */
-  cursor: pointer; 
+  margin-bottom: 4px;
+  cursor: pointer;
 }
 
-/* V15.1: Hover effect for timeline rows */
-.timeline-row:hover {
-    background-color: #F3F4F6 !important;
-}
-
-/* Alternating row colors */
-.timeline-row:nth-child(odd) {
-    background-color: #FFFFFF;
-}
-.timeline-row:nth-child(even) {
-    background-color: #F9FAFB;
-}
-
+.timeline-row:hover { background-color: #F3F4F6 !important; }
+.timeline-row:nth-child(odd) { background-color: #FFFFFF; }
+.timeline-row:nth-child(even) { background-color: #F9FAFB; }
 
 .timeline-name { 
-    padding: 0 20px; 
-    border-right: 1px solid var(--color-border); 
-    display: flex; 
-    align-items: center; 
-    font-size: 14px;
-    /* Sticky positioning for the name column body */
-    position: sticky;
-    left: 0;
-    z-index: 15;
-    background-color: inherit; /* Inherits the alternating row color */
+    padding: 0 20px; border-right: 1px solid var(--color-border); 
+    display: flex; align-items: center; font-size: 14px;
+    position: sticky; left: 0; z-index: 15; background-color: inherit;
 }
 
-.timeline-track {
-    position: relative;
-    height: 100%;
-}
+.timeline-track { position: relative; height: 100%; }
 
+/* --- Visualization Styles (Fixed for Custom Colors & Neatness) --- */
 .timeline-bar {
   position: absolute;
   top: 0;
@@ -1065,26 +741,20 @@ tbody tr:hover {
   display: flex;
   align-items: center;
   overflow: hidden;
-  border-radius: 0; /* Square edges */
-  z-index: 10; 
+  /* NEATNESS FIX: Square edges allow neighbors to look like one solid block */
+  border-radius: 0; 
+  z-index: 10;
+  /* Ensure text is visible on dark colors */
+  color: #fff; 
+  font-size: 11px;
+  font-weight: 600;
+  padding-left: 4px;
+  /* ANIMATION: Smooth sliding for "Water Pipe" effect */
+  transition: width 0.1s ease-out, left 0.1s ease-out; 
 }
 
-/* Visualization Styles (Matching Screenshot Request) */
-.timeline-bar.is-gap {
-    background-color: #D1D5DB !important; /* Gray for breaks/lunch */
-    color: #4B5563 !important;
-}
-
-.timeline-bar.is-activity {
-    /* Using the Olive Green color from the screenshots provided previously */
-    background-color: #808000 !important; 
-    color: white !important;
-}
-
-/* V15.1: Exception Visualization (Hatched Overlay) */
-/* When the parent row has 'is-exception', apply the overlay to the bars inside it */
+/* Exception Overlay (Hatched Pattern) */
 .is-exception .timeline-bar {
-    /* Apply a repeating linear gradient overlay to indicate an exception */
     background-image: repeating-linear-gradient(
         135deg,
         rgba(255, 255, 255, 0.2),
@@ -1094,599 +764,123 @@ tbody tr:hover {
     );
 }
 
-
 /* === WEEKLY VIEW === */
-.weekly-grid {
-    width: 100%;
-}
+.weekly-grid { width: 100%; }
+.weekly-grid thead th { position: sticky; top: 0; z-index: 10; }
+.weekly-cell { cursor: pointer; }
+.weekly-cell.is-exception { border: 2px solid var(--color-exception); }
+.weekly-cell-content { display: flex; flex-direction: column; align-items: flex-start; }
+.weekly-shift-code { font-weight: 700; font-size: 14px; color: var(--brand-primary); }
+.is-exception .weekly-shift-code { color: var(--color-exception); }
+.weekly-shift-time { font-size: 12px; color: var(--color-text-muted); }
+.weekly-rdo { font-size: 13px; color: #9CA3AF; font-weight: 500; }
 
-/* Sticky headers for the weekly grid */
-.weekly-grid thead th {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-}
+/* === SHIFT TRADE CENTER === */
+.trade-layout { display: flex; align-items: stretch; gap: 24px; margin-top: 24px; }
+.trade-panel { flex: 1; border: 1px solid var(--color-border); border-radius: var(--border-radius); padding: 20px; display: flex; flex-direction: column; gap: 16px; background-color: var(--color-hover-bg); }
+.trade-swap-icon { color: var(--brand-primary); padding: 12px; align-self: center; }
+.trade-preview { margin-top: 16px; padding: 16px; background-color: white; border: 1px solid var(--color-border); border-radius: var(--border-radius); min-height: 100px; color: var(--color-text-muted); flex-grow: 1; }
+.trade-preview-details { color: var(--color-text); }
+.trade-preview-details h4 { margin-top: 0; margin-bottom: 12px; font-size: 16px; font-weight: 600; }
+.trade-preview-details ul { list-style-type: none; padding: 0; margin: 0; }
+.trade-preview-details li { font-size: 13px; margin-bottom: 4px; font-family: monospace; }
+.trade-actions { margin-top: 32px; text-align: center; }
 
-/* V15.1: Make weekly cells clickable */
-/* We apply this to the TD element itself (using class .weekly-cell applied by JS) */
-.weekly-cell {
-    cursor: pointer;
-}
-
-/* V15.1: Exception visualization for weekly view */
-.weekly-cell.is-exception {
-    /* Add a distinct border to indicate an exception */
-    border: 2px solid var(--color-exception);
-}
-
-
-.weekly-cell-content {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    /* Padding is applied to the TD in the base table styles */
-}
-
-.weekly-shift-code {
-    font-weight: 700;
-    font-size: 14px;
-    color: var(--brand-primary);
-}
-
-/* V15.1: Change code color if it's an exception */
-.is-exception .weekly-shift-code {
-    color: var(--color-exception);
-}
-
-.weekly-shift-time {
-    font-size: 12px;
-    color: var(--color-text-muted);
-}
-
-.weekly-rdo {
-    font-size: 13px;
-    color: #9CA3AF;
-    font-weight: 500;
-}
-
-/* === V15.7: SHIFT TRADE CENTER === */
-.trade-layout {
-    display: flex;
-    align-items: stretch; /* Ensure panels are equal height */
-    gap: 24px;
-    margin-top: 24px;
-}
-
-.trade-panel {
-    flex: 1;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    /* Use a slightly off-white background for the input panels */
-    background-color: var(--color-hover-bg); 
-}
-
-.trade-swap-icon {
-    color: var(--brand-primary);
-    padding: 12px;
-    /* Ensure the icon stays centered even if panels have different heights */
-    align-self: center; 
-}
-
-.trade-preview {
-    margin-top: 16px;
-    padding: 16px;
-    background-color: white;
-    border: 1px solid var(--color-border);
-    border-radius: var(--border-radius);
-    min-height: 100px;
-    color: var(--color-text-muted);
-    flex-grow: 1; /* Allow preview to fill space */
-}
-
-.trade-preview-details {
-    color: var(--color-text);
-}
-
-.trade-preview-details h4 {
-    margin-top: 0;
-    margin-bottom: 12px;
-    font-size: 16px;
-    font-weight: 600;
-}
-
-.trade-preview-details ul {
-    list-style-type: none;
-    padding: 0;
-    margin: 0;
-}
-
-.trade-preview-details li {
-    font-size: 13px;
-    margin-bottom: 4px;
-    font-family: monospace; /* Use monospace for time alignment */
-}
-
-
-.trade-actions {
-    margin-top: 32px;
-    text-align: center;
-}
-
-
-/* === SEQUENTIAL BUILDER MODAL (Shared) === */
+/* === MODAL & BUILDER STYLES (Updated Layout) === */
 .modal-backdrop { display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(17, 24, 39, 0.5); align-items: center; justify-content: center; }
 .modal-content { background-color: var(--color-panel-bg); margin: auto; border-radius: var(--border-radius); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; max-height: 85vh; }
 .modal-lg { width: 90%; max-width: 1000px; }
-.modal-header, .modal-footer { padding: 20px 24px; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-border); }
-.modal-footer { border-top: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; }
+.modal-header { padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-border); }
 .modal-close { color: var(--color-text); }
 .modal-body { flex-grow: 1; overflow: hidden; padding: 24px; }
 
-/* Layout inside the modal */
-.sequential-layout { display: flex; flex-direction: column; height: 100%; }
+/* Fix Modal Layout for Water Pipe */
+.modal-body.sequential-layout { flex-direction: column !important; display: flex; }
+.visual-editor-layout { display: flex; width: 100%; height: 350px; border: 1px solid var(--color-border); border-radius: var(--border-radius); background-color: #fff; overflow: hidden; }
+
 .builder-controls { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
 .time-picker-input { width: 120px; }
-
-/* Scrollable grid container */
 .builder-grid-container { flex-grow: 1; overflow-y: auto; border-radius: var(--border-radius); }
-
-/* Specific table styles for the builder */
 .builder-grid th { font-size: 12px; padding: 10px 16px; position: sticky; top: 0; z-index: 1; }
-
-/* Compact row action buttons (Shared style) */
-.btn-group {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-/* Inline footer under rotation grid */
-.table-footer-inline {
-  display: flex;
-  justify-content: center;
-  padding: 12px 0 4px;
-}
-
-/* Compact, flexible action buttons in the last cell (Builder) */
-.actions-cell .btn-group {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
+.btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.table-footer-inline { display: flex; justify-content: center; padding: 12px 0 4px; }
+.actions-cell .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
 .builder-grid .form-select, .builder-grid .form-input { width: 100%; padding: 6px 10px; font-size: 13px; }
 .duration-input { max-width: 100px; }
-.time-display { font-weight: 500; color: var(--color-text-muted); }
-.editor-summary { font-size: 14px; font-weight: 500; }
+.exception-reason-group { margin-bottom: 24px; }
+#modalExceptionReason { width: 100%; }
 
-/* V15.1: Exception Reason Input */
-.exception-reason-group {
-    margin-bottom: 24px;
-}
+/* Modal Footer */
+.modal-footer { border-top: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 20px 24px; }
+.modal-footer-left { flex-grow: 1; }
+.modal-footer-left .form-group { width: 100%; max-width: 500px; }
+.modal-footer-left .form-group label { font-size: 11px; font-weight: 600; color: var(--color-text-muted); }
+.modal-footer-right { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+.ve-undo-redo { display: flex; gap: 4px; border-right: 1px solid var(--color-border); padding-right: 16px; }
+.editor-summary { font-size: 13px; color: var(--color-text-muted); white-space: nowrap; }
+.editor-summary strong { color: var(--color-text); font-weight: 600; }
 
-#modalExceptionReason {
-    width: 100%;
-}
+/* === VISUAL EDITOR COMPONENTS (Water Pipe) === */
 
-/* === NOTIFICATION TOAST === */
-#notification-container {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  z-index: 2000;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
+/* Toolbox */
+.ve-toolbox { width: 25%; height: 100%; display: flex; flex-direction: column; border-right: 1px solid var(--color-border); background-color: var(--color-panel-bg); }
+.ve-toolbox-header { padding: 12px 16px; border-bottom: 1px solid var(--color-border); background-color: var(--color-hover-bg); }
+.ve-toolbox-header p { font-size: 11px; color: var(--color-text-muted); margin: 4px 0 0 0; }
+.ve-toolbox-list { flex-grow: 1; overflow-y: auto; padding: 8px; }
+.ve-toolbox-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px; cursor: grab; font-weight: 500; font-size: 12px; margin-bottom: 4px; border: 1px solid transparent; transition: background-color 0.1s; }
+.ve-toolbox-item:hover { background-color: var(--color-hover-bg); }
+.ve-toolbox-color { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; }
 
-.toast {
-  padding: 16px 20px;
-  border-radius: var(--border-radius);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  min-width: 300px;
-  color: var(--color-text);
-  font-weight: 500;
-}
+/* Timeline Area */
+.ve-timeline-container { width: 75%; height: 100%; padding: 10px 16px 20px 16px; overflow-y: auto; display: flex; flex-direction: column; }
+.ve-timeline-track { display: flex; width: 100%; height: 50px; border-radius: 6px; overflow: hidden; border: 1px solid var(--color-border); background-color: #fff; position: relative; flex-shrink: 0; }
 
-.toast.is-success {
-    background-color: #D1FAE5;
-    border-left: 4px solid var(--brand-accent);
-}
+/* Segments (The Water/Stone) */
+.ve-segment { display: flex; align-items: center; justify-content: center; height: 100%; border-right: none; border-radius: 0; overflow: hidden; white-space: nowrap; font-size: 11px; font-weight: 600; position: relative; cursor: grab; user-select: none; transition: width 0.1s ease-out; }
+.ve-drag-handle { position: absolute; right: -3px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 20; }
 
-.toast.is-danger {
-    background-color: var(--color-danger-bg);
-    border-left: 4px solid var(--color-danger);
-}
-/* Compact actions cell in Assignments grid */
-/* FIX: Ensure buttons do not wrap in the assignments table */
+/* Dragging Visuals */
+.ve-segment.is-dragging { opacity: 0.6; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: grabbing; background-image: repeating-linear-gradient(-45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.1) 5px, transparent 5px, transparent 10px); }
+.ve-toolbox-item.is-dragging { opacity: 0.5; background-color: var(--color-success-bg); border: 1px dashed var(--color-success); }
+
+/* Time Ruler */
+.ve-time-ruler { display: flex; position: relative; width: 100%; height: 25px; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: var(--color-text-muted); flex-shrink: 0; }
+.ve-time-marker { position: absolute; height: 100%; border-left: 1px solid var(--color-border); padding-left: 4px; user-select: none; }
+.ve-time-marker:first-child { border-left: none; }
+
+/* Drop Cursor */
+.ve-drop-cursor { position: absolute; top: 35px; height: 50px; width: 2px; background-color: var(--color-danger); z-index: 100; pointer-events: none; box-shadow: 0 0 4px rgba(239, 68, 68, 0.6); }
+
+/* Pop-up */
+.ve-add-popup { position: absolute; width: 280px; background: var(--color-panel-bg); border: 1px solid var(--color-border); box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: var(--border-radius); padding: 16px; z-index: 20; display: none; }
+.ve-add-popup h4 { margin-top: 0; margin-bottom: 16px; }
+.ve-add-popup .form-group { margin-bottom: 12px; }
+.ve-add-popup .ve-add-popup-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+/* Context Menu */
+.ve-context-menu { position: fixed; z-index: 9999; display: flex; flex-direction: column; width: 180px; background-color: #fff; border: 1px solid var(--color-border); border-radius: 6px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); padding: 4px; }
+.ve-context-menu-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; padding: 8px 12px; border: none; background-color: transparent; border-radius: 4px; cursor: pointer; text-align: left; color: var(--color-text); }
+.ve-context-menu-item:hover { background-color: var(--color-hover-bg); }
+.ve-context-menu-separator { height: 1px; background-color: var(--color-border); margin: 6px 0; }
+.ve-context-menu-item.is-danger { color: var(--color-danger); }
+.ve-context-menu-item.is-danger svg { color: var(--color-danger); }
+.ve-context-menu-item.is-danger:hover { background-color: var(--color-danger-bg); }
+
+/* === TOAST NOTIFICATIONS === */
+#notification-container { position: fixed; bottom: 24px; right: 24px; z-index: 2000; display: flex; flex-direction: column; gap: 12px; }
+.toast { padding: 16px 20px; border-radius: var(--border-radius); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); min-width: 300px; color: var(--color-text); font-weight: 500; }
+.toast.is-success { background-color: #D1FAE5; border-left: 4px solid var(--brand-accent); }
+.toast.is-danger { background-color: var(--color-danger-bg); border-left: 4px solid var(--color-danger); }
+
+/* Button Specifics */
+#btnRemoveWeek.btn-danger { background-color: #dc3545; border-color: #dc3545; color: white; cursor: pointer; }
+#btnRemoveWeek.btn-danger:hover { background-color: #c82333; border-color: #bd2130; }
 .table .actions { white-space: nowrap; }
 .table .actions .btn { margin-right: 8px; }
 .table .actions .btn:last-child { margin-right: 0; }
 
-/* FIX: Removed stray closing brace '}' that was previously here */
-
-/* Styling for the new Remove Week button */
-#btnRemoveWeek.btn-danger {
-    background-color: #dc3545; /* Red */
-    border-color: #dc3545;
-    color: white;
-    cursor: pointer; /* Show hand cursor */
-}
-
-#btnRemoveWeek.btn-danger:hover {
-    background-color: #c82333; /* Darker red */
-    border-color: #bd2130;
-}
-/* Styling for the new Remove Week button */
-#btnRemoveWeek.btn-danger {
-    background-color: #dc3545; /* Red */
-    border-color: #dc3545;
-    color: white;
-    cursor: pointer; /* Show hand cursor */
-}
-
-#btnRemoveWeek.btn-danger:hover {
-    background-color: #c82333; /* Darker red */
-    border-color: #bd2130;     /* <--- THIS IS THE FIXED LINE */
-}
-/* === INLINE EDIT STYLES === */
-.form-input-color {
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 36px;
-  padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  background-color: white;
-  cursor: pointer;
-}
-.form-input-color::-webkit-color-swatch {
-  border-radius: var(--border-radius);
-  border: none;
-  padding: 0;
-}
-.form-input-color::-webkit-color-swatch-wrapper {
-  border-radius: var(--border-radius);
-  border: none;
-  padding: 0;
-}
-/* Fix for inline color picker */
-td .form-input-color.edit-value {
-    width: 60px;
-    height: 30px;
-}
-/* === NEW STYLES: Smart-Visual Editor (v16+) === */
-
-/* Main layout: 25% Toolbox, 75% Timeline */
-.visual-editor-layout {
-  display: flex;
-  gap: 20px;
-  height: 350px; /* Give the visual editor a fixed height */
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  background-color: var(--color-hover-bg);
-}
-
-/* 1. Toolbox (Left side) */
-.ve-toolbox {
-  width: 25%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--color-border);
-  background-color: var(--color-panel-bg);
-  border-top-left-radius: var(--border-radius);
-  border-bottom-left-radius: var(--border-radius);
-}
-
-.ve-toolbox-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--color-border);
-}
-.ve-toolbox-header p {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  margin: 4px 0 0 0;
-}
-
-.ve-toolbox-list {
-  flex-grow: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-/* Individual component item in the toolbox */
-.ve-toolbox-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  cursor: grab;
-  font-weight: 500;
-  font-size: 12px;
-  margin-bottom: 4px;
-  border: 1px solid transparent;
-}
-.ve-toolbox-item:hover {
-  background-color: var(--color-hover-bg);
-}
-/* This is the little colored square */
-.ve-toolbox-color {
-  width: 14px;
-  height: 14px;
-  border-radius: 4px;
-  border: 1px solid rgba(0,0,0,0.1);
-  flex-shrink: 0;
-}
-
-/* 2. Timeline (Right side) */
-.ve-timeline-container {
-  width: 75%;
-  height: 100%;
-  padding: 20px 16px; /* Give it some space */
-  overflow-y: auto; /* In case many segments are added */
-}
-
-/* This is the main track that holds all the colored bars */
-.ve-timeline-track {
-  display: flex;
-  width: 100%;
-  height: 50px; /* Height of the timeline bar */
-  border-radius: 6px;
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  background-color: #fff;
-  position: relative; /* For pop-ups and handles */
-}
-
-/* Individual colored segment in the timeline */
-.ve-segment {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  border-right: 1px solid rgba(0,0,0,0.1);
-  overflow: hidden;
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 600;
-  position: relative; /* For the drag handles */
-}
-.ve-segment:last-child {
-  border-right: none;
-}
-
-/* Drag handle on the edge of a segment */
-.ve-drag-handle {
-  position: absolute;
-  right: -3px;
-  top: 0;
-  bottom: 0;
-  width: 6px; /* Wider click target */
-  cursor: col-resize;
-  z-index: 10;
-}
-.ve-segment:last-child .ve-drag-handle {
-  display: none; /* No handle on the last segment */
-}
-
-/* 3. "Add Component" Pop-up */
-.ve-add-popup {
-  position: absolute;
-  width: 280px;
-  background: var(--color-panel-bg);
-  border: 1px solid var(--color-border);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  border-radius: var(--border-radius);
-  padding: 16px;
-  z-index: 20;
-  display: none; /* Hidden by default */
-}
-.ve-add-popup h4 {
-  margin-top: 0;
-  margin-bottom: 16px;
-}
-.ve-add-popup .form-group {
-  margin-bottom: 12px;
-}
-.ve-add-popup .ve-add-popup-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-top: 16px;
-}
-/* === NEW STYLES: Time Ruler for Visual Editor === */
-
-.ve-timeline-container {
-  /* Change padding to make room for the ruler */
-  padding: 10px 16px 20px 16px; 
-}
-
-/* This is the new Time Ruler */
-.ve-time-ruler {
-  display: flex;
-  position: relative;
-  width: 100%;
-  height: 25px; /* Height of the ruler */
-  margin-bottom: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
-
-/* This is a single hour marker, e.g., "09:00" */
-.ve-time-marker {
-  position: absolute;
-  height: 100%;
-  border-left: 1px solid var(--color-border);
-  padding-left: 4px;
-  user-select: none; /* Make text unselectable */
-}
-/* Don't show a border for the very first marker */
-.ve-time-marker:first-child {
-  border-left: none;
-}
-/* === NEW STYLES: Drag-and-Drop Cursor === */
-
-/* This is the vertical red line */
-.ve-drop-cursor {
-  position: absolute;
-  top: 35px; /* Aligns with the top of the timeline track */
-  bottom: 20px; /* Aligns with the bottom of the timeline track */
-  width: 2px;
-  background-color: var(--color-danger);
-  z-index: 30; /* Above timeline, below pop-ups */
-  pointer-events: none; /* Mouse clicks go through it */
-  box-shadow: 0 0 5px var(--color-danger);
-}
-
-/* This class gets added by JS when dragging */
-.ve-toolbox-item.is-dragging {
-  opacity: 0.5;
-  background-color: var(--color-success-bg);
-  border: 1px dashed var(--color-success);
-}
-/* === NEW STYLES: Right-Click Context Menu === */
-
-.ve-context-menu {
-  position: absolute;
-  z-index: 1060; /* Above modal backdrop */
-  display: flex;
-  flex-direction: column;
-  width: 200px;
-  background-color: var(--color-panel-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  padding: 6px;
-}
-
-.ve-context-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 8px 10px;
-  border: none;
-  background-color: transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  text-align: left;
-  color: var(--color-text);
-}
-
-.ve-context-menu-item:hover {
-  background-color: var(--color-hover-bg);
-}
-
-.ve-context-menu-item svg {
-  flex-shrink: 0;
-  color: var(--color-text-muted);
-}
-
-.ve-context-menu-separator {
-  height: 1px;
-  background-color: var(--color-border);
-  margin: 6px 0;
-}
-
-/* Red text for destructive actions */
-.ve-context-menu-item.is-danger {
-  color: var(--color-danger);
-}
-.ve-context-menu-item.is-danger svg {
-  color: var(--color-danger);
-}
-.ve-context-menu-item.is-danger:hover {
-  background-color: var(--color-danger-bg);
-}
-/* === NEW STYLES: Professional Modal Layout Fix === */
-
-/* Force the modal body to behave (fixes the side-by-side bug) */
-.modal-body.sequential-layout {
-  flex-direction: column !important;
-  display: flex;
-}
-
-/* Force the main visual layout to take all available width */
-.visual-editor-layout {
-  width: 100%;
-}
-
-/* New Footer Layout */
-.modal-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 20px;
-}
-
-/* Make the "Reason" field take up flexible space on the left */
-.modal-footer-left {
-  flex-grow: 1;
-}
-.modal-footer-left .form-group {
-  width: 100%;
-  max-width: 500px; /* Stop it from being *too* long */
-}
-.modal-footer-left .form-group label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-}
-
-/* Group all buttons and summaries on the right */
-.modal-footer-right {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  flex-shrink: 0; /* Don't let this group shrink */
-}
-
-/* Tweak Undo/Redo button alignment */
-.ve-undo-redo {
-  display: flex;
-  gap: 4px;
-  border-right: 1px solid var(--color-border);
-  padding-right: 16px;
-}
-
-/* Tweak summary text */
-.editor-summary {
-  font-size: 13px;
-  color: var(--color-text-muted);
-  white-space: nowrap; /* Stop it from wrapping */
-}
-.editor-summary strong {
-  color: var(--color-text);
-  font-weight: 600;
-}
-/* === NEW STYLES: "Zero-Sum Shuffle" Visuals === */
-
-/* * This styles the segment while it is being dragged.
- * It creates the "Ghost" effect (hatched lines) to show the slot is empty.
- */
-.ve-segment.is-dragging {
-  opacity: 0.5;
-  background-color: var(--color-hover-bg) !important; /* Use important to override the component color */
-  border: 1px dashed var(--brand-primary);
-  cursor: grabbing;
-  
-  /* Professional hatched pattern */
-  background-image: repeating-linear-gradient(
-    -45deg,
-    transparent,
-    transparent 5px,
-    rgba(0,0,0,0.05) 5px,
-    rgba(0,0,0,0.05) 10px
-  ) !important;
-}
+/* Color Picker Fix */
+.form-input-color { -webkit-appearance: none; -moz-appearance: none; appearance: none; width: 100%; height: 36px; padding: 0; border: 1px solid var(--color-border); border-radius: var(--border-radius); background-color: white; cursor: pointer; }
+.form-input-color::-webkit-color-swatch { border-radius: var(--border-radius); border: none; padding: 0; }
+.form-input-color::-webkit-color-swatch-wrapper { border-radius: var(--border-radius); border: none; padding: 0; }
+td .form-input-color.edit-value { width: 60px; height: 30px; }
