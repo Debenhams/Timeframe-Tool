@@ -363,7 +363,7 @@ Utils.addDaysISO = (iso, days) => {
           .select('id, advisor_id, rotation_name, start_date, end_date, reason')
           .lte('start_date', weekEndISO)
           .or(`end_date.is.null,end_date.gte.${isoDate}`)
-          .order('id', { ascending: true }); // Ensure deterministic order (newer edits last)
+          .order('id', { ascending: true }); 
 
         if (error && (error.code === '42P01' || error.code === 'PGRST116')) {
             return await fetchSnapshotAssignments();
@@ -388,11 +388,9 @@ Utils.addDaysISO = (iso, days) => {
             const existingIsBounded = !!existing.end_date;
             const rowIsBounded = !!row.end_date;
             
-            // Prefer bounded swap over unbounded main rotation
             if (rowIsBounded && !existingIsBounded) {
                  byAdvisor.set(row.advisor_id, row);
             } 
-            // If both are the same type (both swaps or both main), prefer the NEWER one (higher ID)
             else if (rowIsBounded === existingIsBounded) {
                  byAdvisor.set(row.advisor_id, row); 
             }
@@ -404,7 +402,6 @@ Utils.addDaysISO = (iso, days) => {
       }
     };
 
-    // Fallback
     const fetchSnapshotAssignments = async () => {
         const { data, error } = await fetchTable(SNAPSHOT_TABLE);
         if (error) return { data: new Map(), error: error.error };
@@ -479,8 +476,6 @@ Utils.addDaysISO = (iso, days) => {
     DataService.assignFromWeek = async ({ advisor_id, rotation_name, start_date, reason = 'New Assignment' }) => {
         try {
             const dateMinusOne = APP.Utils.addDaysISO(start_date, -1);
-            
-            // 1. Clip previous open-ended assignments
             const { error: updateError } = await supabase
                 .from(HISTORY_TABLE)
                 .update({ end_date: dateMinusOne })
@@ -490,7 +485,6 @@ Utils.addDaysISO = (iso, days) => {
 
             if (updateError && !updateError.code.startsWith('PGRST')) throw new Error("Failed to clip previous.");
 
-            // 2. Insert new open-ended assignment
             const newRecord = {
                 advisor_id: advisor_id,
                 rotation_name: rotation_name || null,
@@ -498,7 +492,6 @@ Utils.addDaysISO = (iso, days) => {
                 end_date: null,
                 reason: reason
             };
-            // Upsert handles overwriting a record if we do this multiple times for the same day
             const { data, error } = await DataService.saveRecord(HISTORY_TABLE, newRecord, 'advisor_id, start_date');
             if (error && !error.includes('PGRST')) throw new Error("Failed to insert assignment.");
 
@@ -543,6 +536,354 @@ Utils.addDaysISO = (iso, days) => {
 }(window.APP));
 
 /**
+ * MODULE: APP.StateManager
+ * Manages the application's state, selectors, synchronization, and history (Undo/Redo).
+ * RESTORED after accidental deletion.
+ */
+(function(APP) {
+    const StateManager = {};
+
+    const STATE = {
+        advisors: [],
+        leaders: [],
+        scheduleComponents: [], 
+        shiftDefinitions: [], 
+        rotationPatterns: [], 
+        rotationAssignments: [], 
+        scheduleExceptions: [],
+        selectedAdvisors: new Set(),
+        weekStart: null, 
+        currentRotation: null,
+        selectedDay: 'Monday',
+        scheduleViewMode: 'daily',
+        isBooted: false,
+        history: [],
+        historyIndex: -1,
+        effectiveAssignmentsCache: new Map(), 
+    };
+
+    StateManager.getState = () => STATE;
+
+    StateManager.initialize = (initialData) => {
+        Object.assign(STATE, initialData);
+        STATE.isBooted = true;
+        StateManager.saveHistory("Initial Load");
+    };
+
+    // Selectors
+    StateManager.getAssignmentForAdvisor = (id) => STATE.rotationAssignments.find(a => a.advisor_id === id) || null;
+    StateManager.getPatternByName = (name) => STATE.rotationPatterns.find(p => p.name === name) || null;
+    StateManager.getComponentById = (id) => STATE.scheduleComponents.find(c => c.id === id) || null;
+    StateManager.getShiftDefinitionById = (id) => STATE.shiftDefinitions.find(d => d.id === id) || null;
+    StateManager.getAdvisorById = (id) => STATE.advisors.find(a => a.id === id) || null;
+    StateManager.getShiftDefinitionByCode = (code) => {
+        if (!code) return null;
+        const trimmedCode = String(code).trim();
+        return STATE.shiftDefinitions.find(d => (d.code && String(d.code).trim()) === trimmedCode) || null;
+    };
+    StateManager.getAdvisorsByLeader = (leaderId) => STATE.advisors.filter(a => a.leader_id === leaderId);
+
+    StateManager.getExceptionForAdvisorDate = (advisorId, dateISO) => {
+        return STATE.scheduleExceptions.find(e => e.advisor_id === advisorId && e.exception_date === dateISO) || null;
+    };
+
+    StateManager.loadEffectiveAssignments = async (dateISO) => {
+        if (STATE.effectiveAssignmentsCache.has(dateISO)) return;
+        const { data, error } = await APP.DataService.fetchEffectiveAssignmentsForDate(dateISO);
+        if (!error && data) {
+            STATE.effectiveAssignmentsCache.set(dateISO, data);
+        } else {
+            STATE.effectiveAssignmentsCache.set(dateISO, new Map());
+        }
+    };
+
+    StateManager.clearEffectiveAssignmentsCache = () => {
+        STATE.effectiveAssignmentsCache.clear();
+    };
+
+    // History & Sync
+    StateManager.saveHistory = (reason = "Change") => {
+        if (STATE.historyIndex < STATE.history.length - 1) {
+            STATE.history = STATE.history.slice(0, STATE.historyIndex + 1);
+        }
+        const snapshot = {
+            shiftDefinitions: JSON.parse(JSON.stringify(STATE.shiftDefinitions)),
+            rotationPatterns: JSON.parse(JSON.stringify(STATE.rotationPatterns)),
+            rotationAssignments: JSON.parse(JSON.stringify(STATE.rotationAssignments)),
+            scheduleExceptions: JSON.parse(JSON.stringify(STATE.scheduleExceptions)),
+            reason: reason
+        };
+        STATE.history.push(snapshot);
+        if (STATE.history.length > 30) STATE.history.shift();
+        STATE.historyIndex = STATE.history.length - 1;
+        
+        if (APP.Core && APP.Core.updateUndoRedoButtons) {
+             APP.Core.updateUndoRedoButtons(STATE.historyIndex, STATE.history.length);
+        }
+        StateManager.clearEffectiveAssignmentsCache();
+    };
+
+    StateManager.applyHistory = (direction) => {
+        let newIndex = STATE.historyIndex;
+        if (direction === 'undo' && newIndex > 0) newIndex--;
+        else if (direction === 'redo' && newIndex < STATE.history.length - 1) newIndex++;
+        else return;
+
+        const snapshot = STATE.history[newIndex];
+        STATE.shiftDefinitions = JSON.parse(JSON.stringify(snapshot.shiftDefinitions));
+        STATE.rotationPatterns = JSON.parse(JSON.stringify(snapshot.rotationPatterns));
+        STATE.rotationAssignments = JSON.parse(JSON.stringify(snapshot.rotationAssignments));
+        STATE.scheduleExceptions = JSON.parse(JSON.stringify(snapshot.scheduleExceptions));
+        STATE.historyIndex = newIndex;
+        StateManager.clearEffectiveAssignmentsCache();
+        
+        if (APP.Core && APP.Core.renderAll && APP.Core.updateUndoRedoButtons) {
+            APP.Core.renderAll();
+            APP.Core.updateUndoRedoButtons(STATE.historyIndex, STATE.history.length);
+        }
+    };
+    
+    StateManager.syncRecord = (tableName, record, isDeleted = false) => {
+        let stateKey = null;
+        switch (tableName) {
+            case 'schedule_exceptions': stateKey = 'scheduleExceptions'; break;
+            case 'shift_definitions': stateKey = 'shiftDefinitions'; break;
+            case 'rotation_patterns': stateKey = 'rotationPatterns'; break;
+            case 'rotation_assignments': stateKey = 'rotationAssignments'; break;
+            case 'schedule_components': stateKey = 'scheduleComponents'; break;
+            default: stateKey = tableName;
+        }
+
+        const collection = STATE[stateKey];
+        if (tableName === 'rotation_assignments_history' || tableName === 'rotation_patterns') {
+            StateManager.clearEffectiveAssignmentsCache();
+        }
+
+        if (!collection) return;
+
+        let primaryKey = 'id';
+        if (tableName === 'rotation_patterns') primaryKey = 'name';
+        if (tableName === 'rotation_assignments') primaryKey = 'advisor_id';
+        if (tableName === 'schedule_exceptions') primaryKey = 'id';
+
+        if (!record || !record.hasOwnProperty(primaryKey)) return;
+        
+        const recordKey = record[primaryKey];
+        const index = collection.findIndex(item => item[primaryKey] === recordKey);
+
+        if (isDeleted) {
+            if (index > -1) collection.splice(index, 1);
+        } else {
+            if (index > -1) collection[index] = record;
+            else collection.push(record);
+        }
+        
+        if (tableName === 'rotation_assignments') StateManager.clearEffectiveAssignmentsCache();
+    };
+
+    APP.StateManager = StateManager;
+}(window.APP));
+
+
+/**
+ * MODULE: APP.ScheduleCalculator
+ * Centralized service for calculating effective schedules.
+ * RESTORED after accidental deletion.
+ */
+(function(APP) {
+    const ScheduleCalculator = {};
+
+    const findWeekKey = (patternData, weekNumber) => {
+        const keys = Object.keys(patternData);
+        return keys.find(k => {
+            const match = k.match(/^Week ?(\d+)$/i);
+            return match && parseInt(match[1], 10) === weekNumber;
+        });
+    };
+
+    ScheduleCalculator.calculateSegments = (advisorId, dayName, weekStartISO = null) => {
+        const STATE = APP.StateManager.getState();
+        const effectiveWeekStart = weekStartISO || STATE.weekStart;
+        
+        if (!effectiveWeekStart) return { segments: [], source: null, reason: null };
+        const dateISO = APP.Utils.getISODateForDayName(effectiveWeekStart, dayName);
+        if (!dateISO) return { segments: [], source: null, reason: null };
+
+        // 1. Exception
+        const exception = APP.StateManager.getExceptionForAdvisorDate(advisorId, dateISO);
+        if (exception && exception.structure) {
+            if (exception.structure.length === 0) return { segments: [], source: 'exception', reason: exception.reason };
+            const sortedSegments = JSON.parse(JSON.stringify(exception.structure)).sort((a, b) => a.start_min - b.start_min);
+            return { segments: sortedSegments, source: 'exception', reason: exception.reason };
+        }
+
+        // 2. Rotation
+        const effectiveMap = STATE.effectiveAssignmentsCache.get(effectiveWeekStart);
+        let assignment = null;
+        if (effectiveMap && effectiveMap.has(advisorId)) assignment = effectiveMap.get(advisorId);
+        if (!assignment || !assignment.rotation_name || !assignment.start_date) {
+            return { segments: [], source: 'rotation', reason: null };
+        }
+
+        const effectiveWeek = APP.Utils.getEffectiveWeek(assignment.start_date, effectiveWeekStart, assignment, APP.StateManager.getPatternByName);
+        if (effectiveWeek === null) return { segments: [], source: 'rotation', reason: null };
+
+        const dayIndex = (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(dayName) + 1);
+        const dayIndexStr = dayIndex.toString();
+
+        const pattern = APP.StateManager.getPatternByName(assignment.rotation_name);
+        if (!pattern || !pattern.pattern) return { segments: [], source: 'rotation', reason: null };
+
+        const weekKey = findWeekKey(pattern.pattern, effectiveWeek);
+        const weekPattern = weekKey ? pattern.pattern[weekKey] : {};
+        const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+        const legacyDayKey = days[dayIndex - 1];
+        
+        const shiftCode = weekPattern[dayIndexStr] || weekPattern[legacyDayKey];
+        if (!shiftCode) return { segments: [], source: 'rotation', reason: null };
+
+        const definition = APP.StateManager.getShiftDefinitionByCode(shiftCode);
+        if (!definition || !definition.structure) return { segments: [], source: 'rotation', reason: null };
+
+        const sortedRotation = JSON.parse(JSON.stringify(definition.structure)).sort((a, b) => a.start_min - b.start_min);
+        return { segments: sortedRotation, source: 'rotation', reason: null };
+    };
+
+    APP.ScheduleCalculator = ScheduleCalculator;
+}(window.APP));
+
+/**
+ * MODULE: APP.Components.ComponentManager
+ * Manages the CRUD operations for Schedule Components.
+ * RESTORED after accidental deletion.
+ */
+(function(APP) {
+    const ComponentManager = {};
+    const ELS = {};
+
+    ComponentManager.initialize = () => {
+        ELS.grid = document.getElementById('componentManagerGrid');
+        ELS.btnNew = document.getElementById('btnNewComponent');
+        if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNew);
+        if (ELS.grid) ELS.grid.addEventListener('click', handleClick);
+    };
+
+    ComponentManager.render = () => {
+        if (!ELS.grid) return;
+        const STATE = APP.StateManager.getState();
+        const components = STATE.scheduleComponents.sort((a,b) => a.name.localeCompare(b.name));
+        let html = '<table><thead><tr><th>Name</th><th>Type</th><th>Color</th><th>Default Duration</th><th>Paid</th><th>Actions</th></tr></thead><tbody>';
+        components.forEach(comp => {
+            html += `<tr data-component-id="${comp.id}">
+                <td><span class="display-value">${comp.name}</span><input type="text" class="form-input edit-value" name="comp-name" value="${comp.name}" style="display:none;"></td>
+                <td><span class="display-value">${comp.type}</span>
+                   <select class="form-select edit-value" name="comp-type" style="display:none;">
+                        <option value="Activity" ${comp.type === 'Activity' ? 'selected' : ''}>Activity</option>
+                        <option value="Break" ${comp.type === 'Break' ? 'selected' : ''}>Break</option>
+                        <option value="Lunch" ${comp.type === 'Lunch' ? 'selected' : ''}>Lunch</option>
+                        <option value="Shrinkage" ${comp.type === 'Shrinkage' ? 'selected' : ''}>Shrinkage</option>
+                        <option value="Absence" ${comp.type === 'Absence' ? 'selected' : ''}>Absence</option>
+                    </select>
+                </td>
+                <td><span class="display-value" style="display: inline-block; width: 20px; height: 20px; background-color: ${comp.color}; border-radius: 4px;"></span><input type="color" class="form-input-color edit-value" name="comp-color" value="${comp.color}" style="display:none;"></td>
+                <td><span class="display-value">${comp.default_duration_min}m</span><input type="number" class="form-input edit-value" name="comp-duration" value="${comp.default_duration_min}" style="display:none; width: 70px;"></td>
+                <td><span class="display-value">${comp.is_paid ? 'Yes' : 'No'}</span>
+                    <select class="form-select edit-value" name="comp-paid" style="display:none; width: 70px;">
+                        <option value="true" ${comp.is_paid ? 'selected' : ''}>Yes</option>
+                        <option value="false" ${!comp.is_paid ? 'selected' : ''}>No</option>
+                    </select>
+                </td>
+                <td class="actions">
+                    <button class="btn btn-sm btn-primary edit-component" data-component-id="${comp.id}">Edit</button>
+                    <button class="btn btn-sm btn-danger delete-component" data-component-id="${comp.id}">Delete</button>
+                    <button class="btn btn-sm btn-success save-component" data-component-id="${comp.id}" style="display:none;">Save</button>
+                    <button class="btn btn-sm btn-secondary cancel-edit-component" data-component-id="${comp.id}" style="display:none;">Cancel</button>
+                </td>
+             </tr>`;
+        });
+        html += '</tbody></table>';
+        ELS.grid.innerHTML = html;
+    };
+
+    const handleNew = async () => {
+        const name = prompt("Enter component name:");
+        if (!name) return;
+        const type = prompt("Enter type (Activity, Break, Lunch, Shrinkage, Absence):", "Activity");
+        const color = prompt("Enter hex color code:", "#3498db");
+        const duration = parseInt(prompt("Enter default duration in minutes:", "60"), 10);
+        const isPaid = confirm("Is this a paid activity?");
+        if (!name || !type || !color || isNaN(duration)) {
+            APP.Utils.showToast("Invalid input.", "danger");
+            return;
+        }
+        const newComponent = { name, type, color, default_duration_min: duration, is_paid: isPaid };
+        const { data, error } = await APP.DataService.saveRecord('schedule_components', newComponent);
+        if (!error) {
+            APP.StateManager.syncRecord('schedule_components', data);
+            APP.Utils.showToast(`Component '${name}' created.`, "success");
+            ComponentManager.render();
+        }
+    };
+
+    const handleClick = (e) => {
+        const target = e.target;
+        const id = target.dataset.componentId;
+        if (!id) return;
+        if (target.classList.contains('delete-component')) handleDelete(id);
+        else if (target.classList.contains('edit-component')) toggleRowEditMode(id, true);
+        else if (target.classList.contains('cancel-edit-component')) toggleRowEditMode(id, false);
+        else if (target.classList.contains('save-component')) handleInlineSave(id);
+    };
+
+    const toggleRowEditMode = (id, isEditing) => {
+        const row = ELS.grid.querySelector(`tr[data-component-id="${id}"]`);
+        if (!row) return;
+        row.querySelectorAll('.display-value').forEach(el => el.style.display = isEditing ? 'none' : '');
+        row.querySelectorAll('.edit-value').forEach(el => el.style.display = isEditing ? 'block' : 'none');
+        row.querySelector('.edit-component').style.display = isEditing ? 'none' : '';
+        row.querySelector('.delete-component').style.display = isEditing ? 'none' : '';
+        row.querySelector('.save-component').style.display = isEditing ? 'block' : 'none';
+        row.querySelector('.cancel-edit-component').style.display = isEditing ? 'block' : 'none';
+        if (!isEditing) ComponentManager.render();
+    };
+
+    const handleInlineSave = async (id) => {
+        const row = ELS.grid.querySelector(`tr[data-component-id="${id}"]`);
+        if (!row) return;
+        const name = row.querySelector('[name="comp-name"]').value;
+        const type = row.querySelector('[name="comp-type"]').value;
+        const color = row.querySelector('[name="comp-color"]').value;
+        const duration = parseInt(row.querySelector('[name="comp-duration"]').value, 10);
+        const isPaid = row.querySelector('[name="comp-paid"]').value === 'true';
+        if (!name || !type || !color || isNaN(duration) || duration < 0) {
+            APP.Utils.showToast("Invalid data.", "danger");
+            return;
+        }
+        const updatedComponent = { id: id, name, type, color, default_duration_min: duration, is_paid: isPaid };
+        const { data, error } = await APP.DataService.updateRecord('schedule_components', updatedComponent, { id: id });
+        if (!error) {
+            APP.StateManager.syncRecord('schedule_components', data);
+            APP.Utils.showToast(`Component '${name}' updated.`, "success");
+            ComponentManager.render();
+        }
+    };
+
+    const handleDelete = async (id) => {
+        const component = APP.StateManager.getComponentById(id);
+        if (!component || !confirm(`Delete '${component.name}'?`)) return;
+        const { error } = await APP.DataService.deleteRecord('schedule_components', { id });
+        if (!error) {
+            APP.StateManager.syncRecord('schedule_components', { id: id }, true);
+            APP.Utils.showToast(`Component deleted.`, "success");
+            ComponentManager.render();
+        }
+    };
+
+    APP.Components = APP.Components || {};
+    APP.Components.ComponentManager = ComponentManager;
+}(window.APP));
+
+/**
  * MODULE: APP.Components.AssignmentManager
  * Manages the assignment of Rotations to Advisors.
  * V15.9 FIX: Auto-updates Start Date when Rotation changes to prevent overwriting history.
@@ -577,7 +918,6 @@ Utils.addDaysISO = (iso, days) => {
             let displayRotation = effective ? effective.rotation_name : '';
             let displayStartDate = effective ? effective.start_date : '';
 
-            // Check pending changes
             if (PENDING_CHANGES.has(adv.id)) {
                 const pending = PENDING_CHANGES.get(adv.id);
                 if (pending.rotation_name !== undefined) displayRotation = pending.rotation_name;
@@ -598,7 +938,6 @@ Utils.addDaysISO = (iso, days) => {
         html += '</tbody></table>';
         ELS.grid.innerHTML = html;
 
-        // Wire Buttons
         ELS.grid.querySelectorAll('.act-assign-week, .act-change-forward').forEach(btn => {
           btn.addEventListener('click', () => handleRowAction('assign_from_week', btn.dataset.advisorId));
         });
@@ -606,7 +945,6 @@ Utils.addDaysISO = (iso, days) => {
           btn.addEventListener('click', () => handleRowAction('change_one_week', btn.dataset.advisorId));
         });
 
-        // Initialize Inputs
         advisors.forEach(adv => {
             const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
             let displayRotation = effective ? effective.rotation_name : '';
@@ -628,13 +966,11 @@ Utils.addDaysISO = (iso, days) => {
                     const pending = PENDING_CHANGES.get(adv.id) || {};
                     pending.rotation_name = e.target.value;
                     
-                    // V15.9 FIX: Auto-set date to THIS WEEK when rotation changes
-                    // This solves the "doesn't overwrite" issue by defaulting to "Now" instead of "History".
                     const globalWeekStart = APP.StateManager.getState().weekStart;
                     if (globalWeekStart) {
                         pending.start_date = globalWeekStart;
                         if (dateInput && dateInput._flatpickr) {
-                            dateInput._flatpickr.setDate(globalWeekStart, true); // Update UI
+                            dateInput._flatpickr.setDate(globalWeekStart, true); 
                         }
                     }
                     PENDING_CHANGES.set(adv.id, pending);
@@ -666,14 +1002,12 @@ Utils.addDaysISO = (iso, days) => {
         let rotationName = undefined;
         let inputStartDateISO = undefined;
 
-        // 1. Check pending changes
         if (PENDING_CHANGES.has(advisorId)) {
             const pending = PENDING_CHANGES.get(advisorId);
             if (pending.rotation_name !== undefined) rotationName = pending.rotation_name;
             if (pending.start_date !== undefined) inputStartDateISO = pending.start_date;
         } 
         
-        // 2. Fallback to DOM
         if (rotationName === undefined || inputStartDateISO === undefined) {
              const rotationSel = row.querySelector('.assign-rotation');
              const dateInput = row.querySelector('.assign-start-date');
