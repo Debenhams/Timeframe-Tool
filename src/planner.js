@@ -1054,32 +1054,51 @@ Utils.addDaysISO = (iso, days) => {
         }
 
         let res;
+        const STATE = APP.StateManager.getState(); // Access state for local updates
+
         if (action === 'assign_from_week') {
           res = await APP.DataService.assignFromWeek({
             advisor_id: advisorId,
             rotation_name: rotationName,
             start_date: actionStartISO
           });
+          
+          // V16.1 FIX: Locally remove conflicting future exceptions so UI updates instantly
+          if (!res.error) {
+              STATE.scheduleExceptions = STATE.scheduleExceptions.filter(ex => {
+                  return ex.advisor_id !== advisorId || ex.exception_date < actionStartISO;
+              });
+          }
+
         } else if (action === 'change_one_week') {
           const weekStart = APP.Utils.getMondayForDate(actionStartISO);
           if (!weekStart) return APP.Utils.showToast('Invalid week start.', 'danger');
+          const weekEnd = APP.Utils.addDaysISO(weekStart, 6);
+
           res = await APP.DataService.changeOnlyWeek({
             advisor_id: advisorId,
             rotation_name: rotationName,
             week_start: weekStart,
-            week_end: APP.Utils.addDaysISO(weekStart, 6)
+            week_end: weekEnd
           });
+
+          // V16.1 FIX: Locally remove conflicting week exceptions so UI updates instantly
+          if (!res.error) {
+              STATE.scheduleExceptions = STATE.scheduleExceptions.filter(ex => {
+                  return ex.advisor_id !== advisorId || (ex.exception_date < weekStart || ex.exception_date > weekEnd);
+              });
+          }
         }
 
         if (res?.error) return;
 
-        // --- INSTANT UPDATE FIX START ---
+        // Cleanup and Refresh
         PENDING_CHANGES.delete(advisorId);
         
-        // 1. Clear the cache so the viewer is forced to re-fetch fresh data
+        // 1. Clear cache to force re-calculation of rotation
         APP.StateManager.clearEffectiveAssignmentsCache();
         
-        // 2. Update local state snapshot for immediate UI feedback
+        // 2. Update local rotation snapshot
         const { data: updatedSnapshot } = await APP.DataService.fetchSnapshotForAdvisor(advisorId);
         if (updatedSnapshot) {
             APP.StateManager.syncRecord('rotation_assignments', updatedSnapshot);
@@ -1089,12 +1108,10 @@ Utils.addDaysISO = (iso, days) => {
 
         APP.StateManager.saveHistory(`Assignment Action: ${action}`);
         
-        // 3. Force Re-render of the Schedule View immediately
+        // 3. Force Re-render immediately
         if (APP.Components.ScheduleViewer) {
-             // This triggers the re-fetch because cache was cleared in step 1
              await APP.Components.ScheduleViewer.render(); 
         }
-        // --- INSTANT UPDATE FIX END ---
 
         APP.Utils.showToast('Assignment updated successfully.', 'success');
       } catch (e) {
