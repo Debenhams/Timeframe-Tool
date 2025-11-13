@@ -378,12 +378,14 @@ Utils.addDaysISO = (iso, days) => {
     // Includes prioritization logic and fallback if history table is missing.
     DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
       try {
-        // 1) Pull only rows that *cover* this date from history:
-        //    start_date <= isoDate AND (end_date IS NULL OR end_date >= isoDate)
+        // FIX: Calculate the end of the week to capture any starts within this week (including Monday)
+        const weekEndISO = APP.Utils.addDaysISO(isoDate, 6);
+
+        // 1) Pull rows that start anytime on or before the end of this week
         const { data, error } = await supabase
           .from(HISTORY_TABLE)
           .select('advisor_id, rotation_name, start_date, end_date, reason')
-          .lte('start_date', isoDate)
+          .lte('start_date', weekEndISO) /* <--- CHANGED to weekEndISO */
           .or(`end_date.is.null,end_date.gte.${isoDate}`);
 
         // Handle specific error if the history table is missing (PostgREST error code PGRST116 or 42P01)
