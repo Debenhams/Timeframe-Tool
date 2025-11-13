@@ -2015,7 +2015,7 @@ const toggleRowEditMode = (id, isEditing) => {
 
     /**
      * Handles the start of a drag on an existing timeline segment.
-     * This initiates the "Zero-Sum Shuffle" (Extraction).
+     * CORRECTED: Does NOT delete the segment immediately.
      */
     const handleSegmentDragStart = (e) => {
         const segment = e.target.closest('.ve-segment');
@@ -2027,75 +2027,55 @@ const toggleRowEditMode = (id, isEditing) => {
         const index = parseInt(segment.dataset.index, 10);
         if (isNaN(index)) return;
 
-        // Store the segment's data for the drop handler
-        // We use 'application/json' to differentiate from a toolbox drag
         try {
             const segmentData = JSON.parse(JSON.stringify(BUILDER_STATE.segments[index]));
+            segmentData._originalIndex = index; // Save index for the drop handler
             e.dataTransfer.setData('application/json', JSON.stringify(segmentData));
         } catch (err) {
             console.error("Failed to serialize segment data for drag:", err);
             return;
         }
 
-        // --- ADVANCED: Key-Modified Clone Logic ---
-        // If user holds ALT, we COPY instead of MOVE
         const isCloning = e.altKey; 
-        
         e.dataTransfer.effectAllowed = isCloning ? 'copy' : 'move';
 
-        // Add visual class to the segment being dragged (Ghost effect)
         setTimeout(() => {
             segment.classList.add('is-dragging');
         }, 0);
-
-        // --- THE MAGIC: Conditional Extraction ---
-        if (isCloning) {
-            // If cloning, we leave the original there.
-        } else {
-            // If moving, we extract it immediately to close the gap (Zero-Sum)
-            executeSegmentExtraction(index);
-        }
     };
 
     /**
      * Helper function to perform the "Extraction" part of the shuffle.
-     * It removes the segment and "pays back" the time to the previous activity.
      */
     const executeSegmentExtraction = (index) => {
         if (!BUILDER_STATE.segments[index]) return;
 
-        // 1. Get the duration of the segment being extracted
+        // 1. Get duration
         const deletedDuration = BUILDER_STATE.segments[index].duration_min;
 
-        // 2. Remove the segment from the state array
+        // 2. Remove segment
         BUILDER_STATE.segments.splice(index, 1);
 
-        // 3. "Pay back" its duration to a neighbor to maintain zero-sum
-        //    (We prefer paying back to the *previous* segment to close the gap naturally)
+        // 3. Pay back duration to neighbor
         const paybackIndex = (index > 0) ? index - 1 : 0; 
         
         if (BUILDER_STATE.segments[paybackIndex]) {
             BUILDER_STATE.segments[paybackIndex].duration_min += deletedDuration;
         } else if (BUILDER_STATE.segments.length > 0) {
-            // Fallback: If we deleted the first item, pay forward to the new first item
             BUILDER_STATE.segments[0].duration_min += deletedDuration;
         }
 
-        // 4. Re-render the timeline to show the "closed gap" immediately
         renderTimeline();
     };
 
     /**
-     * Cleans up dragging UI if the drag is cancelled or finished.
+     * Cleans up dragging UI.
      */
     const handleSegmentDragEnd = (e) => {
-        // Clean up any 'is-dragging' ghost classes
         const segment = document.querySelector('.ve-segment.is-dragging');
         if (segment) {
             segment.classList.remove('is-dragging');
         }
-        
-        // Also clean up any toolbox items just in case
         const toolboxItem = document.querySelector('.ve-toolbox-item.is-dragging');
         if (toolboxItem) {
             toolboxItem.classList.remove('is-dragging');
@@ -2186,29 +2166,33 @@ const toggleRowEditMode = (id, isEditing) => {
         const pct = Math.max(0, Math.min(1, x / width));
         const totalDuration = BUILDER_STATE.segments.reduce((total, seg) => total + seg.duration_min, 0);
         
-        // --- NEW: Add Snap-to-Grid Logic (5 minutes) ---
+        // Snap-to-Grid (5 minutes)
         const timeInMinutes = (pct * totalDuration);
-        const snappedRelativeTime = Math.round(timeInMinutes / 5) * 5; // Snap!
-        
+        const snappedRelativeTime = Math.round(timeInMinutes / 5) * 5;
         const absoluteTime = BUILDER_STATE.startTimeMin + snappedRelativeTime;
 
-        // --- NEW: Differentiate between a RE-ORDER and a NEW-COMPONENT ---
-        
+        // --- RE-ORDER vs NEW COMPONENT ---
         const reorderData = e.dataTransfer.getData('application/json');
-        const componentId = e.dataTransfer.getData('text/plain'); // Legacy/Toolbox
+        const componentId = e.dataTransfer.getData('text/plain'); 
 
         if (reorderData) {
-            // --- This is a RE-ORDER (Zero-Sum Shuffle) ---
+            // --- RE-ORDER LOGIC ---
             try {
                 const segment = JSON.parse(reorderData);
+                
+                // 1. EXECUTE EXTRACTION (Delete the old one first)
+                // We check for _originalIndex (which we saved in the drag start)
+                if (segment._originalIndex !== undefined && !e.altKey) {
+                     executeSegmentExtraction(segment._originalIndex);
+                }
+
+                // 2. EXECUTE INSERTION (Add it to the new spot)
                 if (segment && segment.component_id && segment.duration_min) {
                     // Re-use the existing "Ripple-Pay" function for insertion
-                    // This keeps everything zero-sum!
                     handleAddComponent(segment.component_id, absoluteTime, segment.duration_min);
                 }
             } catch (err) {
                 console.error("Failed to parse re-order data:", err);
-                APP.Utils.showToast("Re-order failed. Please Undo.", "danger");
             }
         } else if (componentId) {
             // --- EXISTING: This is a NEW component from the toolbox ---
@@ -2222,8 +2206,7 @@ const toggleRowEditMode = (id, isEditing) => {
             );
         }
 
-        // --- Universal Cleanup ---
-        // Find *any* element that was being dragged and remove its class.
+        // Cleanup
         const draggingEl = document.querySelector('.is-dragging');
         if (draggingEl) {
             draggingEl.classList.remove('is-dragging');
