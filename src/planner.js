@@ -1217,6 +1217,9 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
  * 1. TOOLBOX DRAG: Drag items from toolbox to insert into timeline.
  * 2. RESIZE: Drag right edge of segments to expand/reduce (pushes/pulls neighbors).
  * 3. WATER PIPE: Fixed shift length maintained automatically.
+ * * CUSTOM MODIFICATION: 'Break' and 'Lunch' components are now "anchored".
+ * Normalization (trim/expand) logic now targets the last non-anchored segment
+ * to preserve the start times of breaks/lunches.
  */
 (function(APP) {
     const SequentialBuilder = {};
@@ -1230,6 +1233,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         startTimeMin: 480, 
         fixedShiftLength: 0, 
         segments: [], 
+ 
         reason: null,
         
         // Interaction State
@@ -1238,7 +1242,8 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             segmentIndex: -1,
             startX: 0,
             startDuration: 0,
-            draggedSegment: null,
+         
+           draggedSegment: null,
             baseSegments: [] // Snapshot before manipulation
         },
         
@@ -1249,12 +1254,25 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
     };
 
     const parseTimeToMinutes = (timeStr) => {
-        const parts = (timeStr || "").split(':');
+   
+         const parts = (timeStr || "").split(':');
         if (parts.length !== 2) return null;
         const h = parseInt(parts[0], 10);
         const m = parseInt(parts[1], 10);
         if (isNaN(h) || isNaN(m)) return null;
         return h * 60 + m;
+    };
+
+    /**
+     * NEW HELPER: Checks if a component type should be anchored.
+     * Anchored segments (Breaks, Lunch) will not be automatically
+     * trimmed or expanded by the normalization logic.
+     */
+    const isAnchored = (componentId) => {
+        const component = APP.StateManager.getComponentById(componentId);
+        if (!component) return false;
+        // Anchored types
+        return component.type === 'Break' || component.type === 'Lunch';
     };
 
     SequentialBuilder.initialize = () => {
@@ -1286,7 +1304,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         ELS.veAddDuration = document.getElementById('ve-add-duration');
         ELS.veAddPopupCancel = document.getElementById('ve-add-popup-cancel');
         ELS.veAddPopupSave = document.getElementById('ve-add-popup-save');
-
         // Legacy Elements
         ELS.legacyEditorContainer = document.getElementById('legacyEditorContainer');
         ELS.modalStartTime = document.getElementById('modalStartTime');
@@ -1296,7 +1313,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         // Listeners
         if (ELS.modalClose) ELS.modalClose.addEventListener('click', SequentialBuilder.close);
         if (ELS.modalSave) ELS.modalSave.addEventListener('click', handleSave);
-
         if (ELS.modalExceptionReason) {
             ELS.modalExceptionReason.addEventListener('input', (e) => {
                 BUILDER_STATE.reason = e.target.value;
@@ -1345,10 +1361,12 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
                 enableTime: true, noCalendar: true, dateFormat: "H:i", time_24hr: true, minuteIncrement: 5,
                 onChange: (selectedDates, dateStr) => {
                     const newTimeMin = parseTimeToMinutes(dateStr);
-                    if (newTimeMin !== null && newTimeMin !== BUILDER_STATE.startTimeMin) {
+   
+                     if (newTimeMin !== null && newTimeMin !== BUILDER_STATE.startTimeMin) {
                         BUILDER_STATE.startTimeMin = newTimeMin;
                         if (BUILDER_STATE.isOpen && BUILDER_STATE.mode === 'definition') renderLegacyTable();
-                    }
+                   
+     }
                 }
             });
         }
@@ -1375,7 +1393,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         BUILDER_STATE.exceptionDate = config.date || null;
         BUILDER_STATE.startTimeMin = startTimeMin;
         BUILDER_STATE.segments = JSON.parse(JSON.stringify(sequentialSegments));
-        
         // FIXED PIPE CAPACITY: Locked to initial length
         BUILDER_STATE.fixedShiftLength = BUILDER_STATE.segments.reduce((sum, s) => sum + s.duration_min, 0);
         if (BUILDER_STATE.fixedShiftLength === 0) BUILDER_STATE.fixedShiftLength = 60;
@@ -1383,19 +1400,16 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         BUILDER_STATE.reason = config.reason || null;
         BUILDER_STATE.visualHistory = [];
         BUILDER_STATE.visualHistoryIndex = -1;
-
         ELS.modalTitle.textContent = config.title;
         if (ELS.visualEditorContainer) ELS.visualEditorContainer.style.display = 'none';
         if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'none';
         if (ELS.visualEditorControlsGroup) ELS.visualEditorControlsGroup.style.display = 'none';
-
         if (config.mode === 'exception') {
             if (ELS.visualEditorContainer) ELS.visualEditorContainer.style.display = 'block';
             if (ELS.visualEditorControlsGroup) ELS.visualEditorControlsGroup.style.display = 'flex';
             ELS.exceptionReasonGroup.style.display = 'block';
             ELS.modalExceptionReason.value = BUILDER_STATE.reason || '';
             ELS.modalSave.textContent = "Save Exception";
-            
             // Auto-fuse on load
             BUILDER_STATE.segments = fuseNeighbors(BUILDER_STATE.segments);
             
@@ -1414,7 +1428,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         updateUndoRedoButtons(); 
         ELS.modal.style.display = 'flex';
     };
-
     SequentialBuilder.close = () => {
         BUILDER_STATE.isOpen = false;
         if (ELS.modal) ELS.modal.style.display = 'none';
@@ -1438,9 +1451,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
     const renderTimeline = () => {
         if (!ELS.visualEditorTimeline) return;
         renderTimeRuler();
-        
         const totalDuration = BUILDER_STATE.fixedShiftLength > 0 ? BUILDER_STATE.fixedShiftLength : 60;
-        
         if (BUILDER_STATE.segments.length === 0) {
             ELS.visualEditorTimeline.innerHTML = '<div style="padding: 16px; color: #6B7280;">Empty Schedule (RDO).</div>';
             renderSummary();
@@ -1449,7 +1460,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 
         let html = '';
         let currentTime = BUILDER_STATE.startTimeMin;
-
         BUILDER_STATE.segments.forEach((seg, index) => {
             const component = APP.StateManager.getComponentById(seg.component_id);
             if (!component) return;
@@ -1494,7 +1504,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         }
         ELS.visualEditorTimeRuler.innerHTML = html;
     };
-
     const renderSummary = () => {
         let totalDuration = 0;
         let paidDuration = 0;
@@ -1506,7 +1515,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         if (ELS.modalTotalTime) ELS.modalTotalTime.textContent = APP.Utils.formatDuration(totalDuration);
         if (ELS.modalPaidTime) ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
     };
-
     // --- LOGIC: NEIGHBOR FUSION & NORMALIZATION ---
     const fuseNeighbors = (segments) => {
         if (segments.length < 2) return segments;
@@ -1525,38 +1533,83 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         return fused;
     };
 
-    // Ensures total duration equals fixed shift length by trimming or extending the LAST segment
+    /**
+     * MODIFIED: Ensures total duration equals fixed shift length
+     * by trimming or extending the LAST NON-ANCHORED segment.
+     */
     const normalizeShiftLength = (segments) => {
         let currentTotal = segments.reduce((sum, s) => sum + s.duration_min, 0);
         const target = BUILDER_STATE.fixedShiftLength;
 
         if (currentTotal === target) return segments;
-
+        
         // Create a copy to avoid mutation issues
         let adjusted = JSON.parse(JSON.stringify(segments));
 
         // 1. Trim Excess (Drain)
         while (currentTotal > target && adjusted.length > 0) {
             const excess = currentTotal - target;
-            const last = adjusted[adjusted.length - 1];
-            if (last.duration_min > excess) {
-                last.duration_min -= excess;
-                currentTotal -= excess;
+            
+            // Find the last non-anchored segment
+            let lastNonAnchoredIndex = -1;
+            for (let i = adjusted.length - 1; i >= 0; i--) {
+                if (!isAnchored(adjusted[i].component_id)) {
+                    lastNonAnchoredIndex = i;
+                    break;
+                }
+            }
+
+            // If no non-anchored segment is found (e.g., shift is ALL breaks),
+            // we must break to avoid an infinite loop.
+            if (lastNonAnchoredIndex === -1) {
+                 console.warn("Normalize: Shift is too long but no non-anchored segments found to trim.");
+                 break; // Exit loop, return oversized segments
+            }
+
+            const segmentToTrim = adjusted[lastNonAnchoredIndex];
+
+            // Re-implementation of original logic [cite: 930-932] but targeted
+            if (segmentToTrim.duration_min > excess) {
+                // Segment is long enough to absorb the entire excess. Trim it.
+                segmentToTrim.duration_min -= excess;
+                currentTotal -= excess; // This will make currentTotal === target, exiting the loop.
             } else {
-                currentTotal -= last.duration_min;
-                adjusted.pop();
+                // Segment is shorter than or equal to the excess.
+                // We must remove it entirely to make space.
+                const durationToRemove = segmentToTrim.duration_min;
+                adjusted.splice(lastNonAnchoredIndex, 1);
+                currentTotal -= durationToRemove;
+                // Loop continues to find the *new* last non-anchored segment to trim.
             }
         }
 
         // 2. Fill Gap (Refill)
-        if (currentTotal < target && adjusted.length > 0) {
+        if (currentTotal < target) {
             const deficit = target - currentTotal;
-            adjusted[adjusted.length - 1].duration_min += deficit;
+            
+            // Find the last non-anchored segment
+            let lastNonAnchoredIndex = -1;
+            for (let i = adjusted.length - 1; i >= 0; i--) {
+                if (!isAnchored(adjusted[i].component_id)) {
+                    lastNonAnchoredIndex = i;
+                    break;
+                }
+            }
+
+            if (lastNonAnchoredIndex !== -1) {
+                // Add the deficit to this segment
+                adjusted[lastNonAnchoredIndex].duration_min += deficit;
+                currentTotal += deficit;
+            } else {
+                // Edge case: No non-anchored segments to add to.
+                console.warn("Normalize: Shift is too short but no non-anchored segments found to expand.");
+                // We just return the undersized segments.
+            }
         }
 
         return adjusted;
     };
-
+    
     // --- LOGIC: CORE MANIPULATIONS ---
 
     const liftStone = (segments, indexToRemove) => {
@@ -1572,12 +1625,10 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         let runningTime = BUILDER_STATE.startTimeMin;
         let inserted = false;
         const result = [];
-
         for (let i = 0; i < segments.length; i++) {
             const seg = segments[i];
             const segStart = runningTime;
             const segEnd = runningTime + seg.duration_min;
-
             if (!inserted && insertTimeAbs >= segStart && insertTimeAbs < segEnd) {
                 // WEDGE IN
                 const timeBefore = insertTimeAbs - segStart;
@@ -1619,14 +1670,21 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
                 startX: e.clientX,
                 startDuration: BUILDER_STATE.segments[index].duration_min,
                 baseSegments: JSON.parse(JSON.stringify(BUILDER_STATE.segments))
+        
             };
         } else if (segmentEl) {
             // === START MOVE (LIFT STONE) ===
             e.preventDefault();
             const index = parseInt(segmentEl.dataset.index, 10);
+            
+            // Don't allow moving anchored items
+            if (isAnchored(BUILDER_STATE.segments[index].component_id)) {
+                 console.log("This segment is anchored and cannot be moved this way.");
+                 return;
+            }
+
             const stone = BUILDER_STATE.segments[index];
             const baseWater = liftStone(BUILDER_STATE.segments, index);
-
             BUILDER_STATE.interaction = {
                 type: 'move',
                 draggedSegment: stone,
@@ -1641,17 +1699,16 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 
         const rect = ELS.visualEditorTimeline.getBoundingClientRect();
         const pipeCapacity = BUILDER_STATE.fixedShiftLength;
-
         if (type === 'resize') {
             // === HANDLE RESIZE ===
             const { startX, startDuration, segmentIndex, baseSegments } = BUILDER_STATE.interaction;
             const pixelDiff = e.clientX - startX;
             // Calculate minutes delta based on pixels
             const pxPerMin = rect.width / pipeCapacity;
-            const minDiff = Math.round(pixelDiff / pxPerMin / 5) * 5; // Snap to 5m
+            const minDiff = Math.round(pixelDiff / pxPerMin / 5) * 5;
+            // Snap to 5m
 
             let newDuration = Math.max(5, startDuration + minDiff);
-            
             // Clone base segments to manipulate
             let workingSegments = JSON.parse(JSON.stringify(baseSegments));
             workingSegments[segmentIndex].duration_min = newDuration;
@@ -1668,6 +1725,24 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             const relativeMinutes = Math.round(pct * pipeCapacity);
             const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
             const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
+
+            // Check if insertion point is inside an anchored segment
+            let runningTime = BUILDER_STATE.startTimeMin;
+            let isInsideAnchored = false;
+            for (const seg of BUILDER_STATE.interaction.baseSegments) {
+                const segStart = runningTime;
+                const segEnd = runningTime + seg.duration_min;
+                if (isAnchored(seg.component_id) && insertTimeAbs > segStart && insertTimeAbs < segEnd) {
+                    isInsideAnchored = true;
+                    break;
+                }
+                runningTime += seg.duration_min;
+            }
+
+            if (isInsideAnchored) {
+                // Don't render the change, just return
+                return;
+            }
 
             const previewSegments = insertStone(
                 BUILDER_STATE.interaction.baseSegments, 
@@ -1701,29 +1776,60 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
     };
 
     const handleTimelineDragOver = (e) => {
-        e.preventDefault(); // Allow drop
+        e.preventDefault();
+        // Allow drop
         const rect = ELS.visualEditorTimeline.getBoundingClientRect();
-        const x = e.clientX - rect.left; 
+        const x = e.clientX - rect.left;
         const width = ELS.visualEditorTimeline.clientWidth;
-        const pct = Math.max(0, Math.min(1, x / width)); 
+        const pct = Math.max(0, Math.min(1, x / width));
         
-        if (ELS.visualEditorDropCursor) {
-            ELS.visualEditorDropCursor.style.display = 'block';
-            ELS.visualEditorDropCursor.style.left = `${pct * 100}%`;
+        // Calculate insert time to check if it's in an anchored segment
+        const pipeCapacity = BUILDER_STATE.fixedShiftLength;
+        const relativeMinutes = Math.round(pct * pipeCapacity);
+        const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
+        const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
+
+        // Check if insertion point is inside an anchored segment
+        let runningTime = BUILDER_STATE.startTimeMin;
+        let isInsideAnchored = false;
+        for (const seg of BUILDER_STATE.segments) {
+            const segStart = runningTime;
+            const segEnd = runningTime + seg.duration_min;
+            if (isAnchored(seg.component_id) && insertTimeAbs > segStart && insertTimeAbs < segEnd) {
+                isInsideAnchored = true;
+                break;
+            }
+            runningTime += seg.duration_min;
+        }
+
+        if (isInsideAnchored) {
+            // Disallow drop
+            if (ELS.visualEditorDropCursor) ELS.visualEditorDropCursor.style.display = 'none';
+            e.dataTransfer.dropEffect = 'none';
+        } else {
+            // Allow drop
+            if (ELS.visualEditorDropCursor) {
+                ELS.visualEditorDropCursor.style.display = 'block';
+                ELS.visualEditorDropCursor.style.left = `${pct * 100}%`;
+            }
+            e.dataTransfer.dropEffect = 'copy';
         }
     };
-
     const handleTimelineDragLeave = (e) => {
         if (ELS.visualEditorDropCursor) ELS.visualEditorDropCursor.style.display = 'none';
     };
-
     const handleTimelineDrop = (e) => {
         e.preventDefault();
         if (ELS.visualEditorDropCursor) ELS.visualEditorDropCursor.style.display = 'none';
-
         const componentId = e.dataTransfer.getData('text/plain');
         const component = APP.StateManager.getComponentById(componentId);
         if (!component) return;
+
+        // Don't allow dropping anchored components
+        if (isAnchored(componentId)) {
+            APP.Utils.showToast("Breaks and Lunches cannot be added this way. Please edit them manually.", "warning");
+            return;
+        }
 
         const rect = ELS.visualEditorTimeline.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -1733,7 +1839,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         const relativeMinutes = Math.round(pct * pipeCapacity);
         const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
         const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
-
+        
         // Insert new stone
         const newSegments = insertStone(
             BUILDER_STATE.segments,
@@ -1741,7 +1847,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             component.default_duration_min,
             insertTimeAbs
         );
-
         BUILDER_STATE.segments = newSegments;
         renderTimeline();
         saveVisualHistory();
@@ -1755,6 +1860,12 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         if (!item) return;
         const { componentId, componentName } = item.dataset;
         
+        // Don't allow adding anchored components this way
+        if (isAnchored(componentId)) {
+            APP.Utils.showToast("Breaks and Lunches are anchored. Please edit them directly on the timeline.", "warning");
+            return;
+        }
+
         BUILDER_STATE.addPopupState = { isOpen: true, componentId, componentName, isEditing: false, editIndex: -1 };
         ELS.veAddPopupTitle.textContent = `Add: ${componentName}`;
         ELS.veAddStartTime.value = '';
@@ -1773,16 +1884,29 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         const startTime = parseTimeToMinutes(ELS.veAddStartTime.value);
         const durationToAdd = parseInt(ELS.veAddDuration.value, 10);
         
-        let base = BUILDER_STATE.segments;
-        if (isEditing) base = liftStone(base, editIndex);
+        if (isNaN(durationToAdd) || durationToAdd <= 0) {
+            APP.Utils.showToast("Invalid duration.", "danger");
+            return;
+        }
+        if (startTime === null) {
+             APP.Utils.showToast("Invalid start time. Use HH:MM format.", "danger");
+            return;
+        }
 
-        const newSegments = insertStone(base, componentId, durationToAdd, startTime);
-        BUILDER_STATE.segments = newSegments;
+        let base = BUILDER_STATE.segments;
+        if (isEditing) {
+             // If editing, we just update the duration and let normalization handle it
+             base[editIndex].duration_min = durationToAdd;
+        } else {
+             // If adding, insert the stone
+             base = insertStone(base, componentId, durationToAdd, startTime);
+        }
+
+        BUILDER_STATE.segments = normalizeShiftLength(base);
         renderTimeline();
         saveVisualHistory();
         closeAddPopup();
     };
-
     // --- CONTEXT MENU ---
     const handleTimelineContextMenu = (e) => {
         e.preventDefault();
@@ -1791,6 +1915,16 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         if (!segment) return;
         const index = parseInt(segment.dataset.index, 10);
         BUILDER_STATE.contextMenuIndex = index;
+
+        // Customize context menu
+        const segmentId = BUILDER_STATE.segments[index].component_id;
+        const allowDelete = !isAnchored(segmentId);
+
+        const deleteButton = ELS.visualEditorContextMenu.querySelector('[data-action="delete"]');
+        if (deleteButton) {
+            deleteButton.style.display = allowDelete ? 'flex' : 'none';
+        }
+
         ELS.visualEditorContextMenu.style.display = 'block';
         ELS.visualEditorContextMenu.style.left = `${e.clientX}px`;
         ELS.visualEditorContextMenu.style.top = `${e.clientY}px`;
@@ -1805,7 +1939,11 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         if (!item) return;
         const action = item.dataset.action;
         const index = BUILDER_STATE.contextMenuIndex;
-        
+        if (index === -1 || index >= BUILDER_STATE.segments.length) {
+            closeContextMenu();
+            return;
+        }
+
         if (action === 'delete') {
             BUILDER_STATE.segments = liftStone(BUILDER_STATE.segments, index);
         } else if (action === 'edit') {
@@ -1822,14 +1960,17 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             ELS.veAddPopupTitle.textContent = `Edit: ${component.name}`;
             ELS.veAddStartTime.value = APP.Utils.formatMinutesToTime(time);
             ELS.veAddDuration.value = seg.duration_min;
+            
+            // Don't allow changing start time for anchored items
+            ELS.veAddStartTime.disabled = isAnchored(seg.component_id);
+
             ELS.visualEditorAddPopup.style.display = 'block';
-            ELS.veAddStartTime.focus();
+            ELS.veAddDuration.focus();
         }
         renderTimeline();
         saveVisualHistory();
         closeContextMenu();
     };
-
     // --- HISTORY & SAVE ---
     const saveVisualHistory = () => {
         if (BUILDER_STATE.visualHistoryIndex < BUILDER_STATE.visualHistory.length - 1) {
@@ -1839,7 +1980,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         BUILDER_STATE.visualHistoryIndex++;
         updateUndoRedoButtons();
     };
-
     const handleUndo = () => {
         if (BUILDER_STATE.visualHistoryIndex > 0) {
             BUILDER_STATE.visualHistoryIndex--;
@@ -1848,7 +1988,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             updateUndoRedoButtons();
         }
     };
-
     const handleRedo = () => {
         if (BUILDER_STATE.visualHistoryIndex < BUILDER_STATE.visualHistory.length - 1) {
             BUILDER_STATE.visualHistoryIndex++;
@@ -1857,12 +1996,10 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             updateUndoRedoButtons();
         }
     };
-    
     const updateUndoRedoButtons = () => {
         if (ELS.veUndo) ELS.veUndo.disabled = BUILDER_STATE.visualHistoryIndex <= 0;
         if (ELS.veRedo) ELS.veRedo.disabled = BUILDER_STATE.visualHistoryIndex >= BUILDER_STATE.visualHistory.length - 1;
     };
-
     const handleSave = async () => {
         const { mode, contextId, segments, startTimeMin, exceptionDate, reason } = BUILDER_STATE;
         const absoluteTimeSegments = [];
@@ -1870,8 +2007,11 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 
         // Final normalization
         const normalized = normalizeShiftLength(segments);
+        
+        // Final check for zero-duration segments (from aggressive trimming)
+        const finalSegments = normalized.filter(seg => seg.duration_min > 0);
 
-        for (const seg of normalized) {
+        for (const seg of finalSegments) {
             if (!seg.component_id) {
                 APP.Utils.showToast("Error: Invalid activity.", "danger");
                 return;
@@ -1881,6 +2021,13 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             absoluteTimeSegments.push({ component_id: seg.component_id, start_min: start, end_min: end });
             currentTime = end;
         }
+
+        // Final check on total duration
+        const finalDuration = currentTime - startTimeMin;
+        if (finalDuration !== BUILDER_STATE.fixedShiftLength) {
+             APP.Utils.showToast(`Warning: Final duration (${finalDuration}m) does not match target (${BUILDER_STATE.fixedShiftLength}m). Saving anyway.`, "warning");
+        }
+
 
         let result;
         if (mode === 'definition') {
