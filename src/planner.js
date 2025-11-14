@@ -1270,16 +1270,15 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
      */
     const isAnchored = (componentId) => {
         const component = APP.StateManager.getComponentById(componentId);
-        // Check for component and component.type
-        if (!component || !component.type) return false;
+        // Check for component and component.name
+        if (!component || !component.name) return false;
         
-        // Convert to uppercase for a case-insensitive comparison
-        const componentType = component.type.toUpperCase();
+        // Convert NAME to uppercase for a case-insensitive comparison
+        const componentName = component.name.toUpperCase();
         
-        // Anchored types
-        return componentType === 'BREAK' || componentType === 'LUNCH';
+        // Anchored types (checking by NAME now, not TYPE)
+        return componentName === 'BREAK' || componentName === 'LUNCH';
     };
-
     SequentialBuilder.initialize = () => {
         // Modal Elements
         ELS.modal = document.getElementById('shiftBuilderModal');
