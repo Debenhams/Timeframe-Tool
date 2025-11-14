@@ -247,7 +247,21 @@
         <div class="card">
             <h2>Advisor Assignments</h2>
             <p class="helper-text">Manage rotation assignments and swaps. Use the action buttons to apply changes for specific periods.</p>
-            <div class="table-container" id="assignmentGrid"></div>
+            <div class="table-container" id="assignmentGrid">
+          <table>
+            <thead>
+              <tr>
+                <th>Advisor</th>
+                <th>Assigned Rotation (This Week)</th>
+                <th>Start Date (Week 1)</th>
+                <th>Start Wk #</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              </tbody>
+          </table>
+        </div>
         </div>
       </section>
 
@@ -381,7 +395,34 @@
       </div>
     </div>
   </div>
-  
+  <div class="modal-backdrop" id="planModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="planModalTitle">Advisor Plan</h2>
+        <button class="btn-icon modal-close" id="planModalClose">
+           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p class="helper-text">Showing all assignments ordered by start date (newest first).</p>
+        <div class="table-container" id="planModalBodyContainer">
+            <table class="plan-modal-table">
+                <thead>
+                    <tr>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                        <th>Rotation Name</th>
+                        <th>Start Wk #</th>
+                        <th>Reason</th>
+                    </tr>
+                </thead>
+                <tbody id="planModalBody">
+                    </tbody>
+            </table>
+        </div>
+      </div>
+    </div>
+  </div>
   <div id="notification-container"></div>
 
   <script src="./src/planner.js?v=16.11"></script>

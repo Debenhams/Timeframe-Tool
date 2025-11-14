@@ -37,6 +37,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 /**
  * MODULE: APP.Utils
  * Utility functions for date handling, formatting, and UI feedback.
+ * V16.13: Updated getEffectiveWeek to handle start_week_offset.
  */
 (function(APP) {
     const Utils = {};
@@ -52,7 +53,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         if (!ELS.notificationContainer) Utils.cacheDOMElements();
         if (!ELS.notificationContainer) return;
         
-        // Map various types to standard classes
         let toastClass = 'is-success';
         if (type === 'danger' || type === 'error' || type === 'warning') {
             toastClass = 'is-danger';
@@ -62,7 +62,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         toast.className = `toast ${toastClass}`;
         toast.textContent = message;
         ELS.notificationContainer.appendChild(toast);
-        // Auto-remove the toast
+        
         setTimeout(() => { 
             if (ELS.notificationContainer && toast.parentNode === ELS.notificationContainer) {
                 ELS.notificationContainer.removeChild(toast);
@@ -74,20 +74,10 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
     Utils.formatMinutesToTime = (minutes) => {
         if (minutes === null || isNaN(minutes)) return "";
         let roundedMinutes = Math.round(minutes);
-        
-        // Handle times past midnight gracefully for display
-        if (roundedMinutes >= 1440) {
-             roundedMinutes -= 1440;
-        }
-        
+        if (roundedMinutes >= 1440) roundedMinutes -= 1440;
         const h = Math.floor(roundedMinutes / 60);
         const m = roundedMinutes % 60;
-        
-        // Handle rounding resulting in 60 minutes
-        if (m === 60) {
-             return `${String(h + 1).padStart(2, '0')}:00`;
-        }
-        
+        if (m === 60) return `${String(h + 1).padStart(2, '0')}:00`;
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
     };
 
@@ -105,11 +95,9 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             const r = parseInt(hexColor.substr(1, 2), 16);
             const g = parseInt(hexColor.substr(3, 2), 16);
             const b = parseInt(hexColor.substr(5, 2), 16);
-            // Formula for luminance perception
             const brightness = ((r * 299) + (g * 587) + (b * 114)) / 1000;
             return (brightness > 128) ? '#000000' : '#FFFFFF';
         } catch (e) {
-            // Fallback if hex color is invalid
             return '#FFFFFF';
         }
     };
@@ -139,21 +127,18 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         const dayIndex = days.indexOf(dayName);
         if (dayIndex === -1) return null;
-
         const [y, m, d] = weekStartISO.split('-').map(Number);
-        // Use local time calculation for visualization consistency
         const date = new Date(y, m - 1, d);
         date.setDate(date.getDate() + dayIndex);
-
         return Utils.formatDateToISO(date);
     };
 
     // Helper to format Date object to YYYY-MM-DD
     Utils.formatDateToISO = (dateObj) => {
          const yyyy = dateObj.getFullYear();
-        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
-        const dd = String(dateObj.getDate()).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd}`;
+         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+         const dd = String(dateObj.getDate()).padStart(2, '0');
+         return `${yyyy}-${mm}-${dd}`;
     };
 
     // Helper to get the Monday ISO date for any given ISO date
@@ -169,8 +154,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             return null;
         }
         const day = date.getDay();
-        // Calculate difference to Monday (1 for Monday, 0 for Sunday)
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1); 
+        const diff = date.getDate() - day + (day === 0 ? -6 : 1);
         const monday = new Date(date.setDate(diff));
         return Utils.formatDateToISO(monday);
     };
@@ -180,7 +164,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         if (!isoDateStr) return null;
         try {
             const [y, m, d] = isoDateStr.split('-').map(Number);
-            // Use UTC to ensure consistent day name regardless of client timezone
             const dateObj = new Date(Date.UTC(y, m - 1, d));
             return dateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
          } catch (err) {
@@ -194,88 +177,65 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         let numWeeks = 0;
         if (pattern && pattern.pattern && Object.keys(pattern.pattern).length > 0) {
             const keys = Object.keys(pattern.pattern);
-            // Robust method to find the max week number defined in the pattern (supports "Week1" and "Week 1")
             const weekNumbers = keys.map(k => {
                 const match = k.match(/^Week ?(\d+)$/i);
                 return match ? parseInt(match[1], 10) : 0;
             });
             const maxWeek = Math.max(0, ...weekNumbers);
-
-            if (maxWeek > 0) {
-                numWeeks = maxWeek;
-            }
+            if (maxWeek > 0) numWeeks = maxWeek;
         }
         return numWeeks;
     };
 
-
-    // Updated for FINITE (Non-Repeating) Rotations
-    // Calculates the effective week number based on the assignment start date.
-    Utils.getEffectiveWeek = (startDateISO, weekStartISO, assignment, getPatternByName) => {
+    // V16.13 FIX: Calculates effective week using the start_week_offset
+    Utils.getEffectiveWeek = (weekStartISO, assignment, getPatternByName) => {
         try {
-            if (!startDateISO || !weekStartISO || !assignment) return null;
-            
-            // Robust parsing of "YYYY-MM-DD"
-            const [y1, m1, d1] = startDateISO.split('-').map(Number);
+            if (!assignment || !assignment.start_date || !weekStartISO) return null;
+
+            const [y1, m1, d1] = assignment.start_date.split('-').map(Number);
             const [y2, m2, d2] = weekStartISO.split('-').map(Number);
 
-            if (isNaN(y1) || isNaN(y2)) {
-                 console.error("Failed to parse dates:", startDateISO, weekStartISO);
-                 return null; 
-            }
+            if (isNaN(y1) || isNaN(y2)) return null; 
             
-            // Use UTC to avoid timezone shifts affecting week boundaries
             const startUTC = Date.UTC(y1, m1 - 1, d1);
             const checkUTC = Date.UTC(y2, m2 - 1, d2);
             
             const diffTime = checkUTC - startUTC;
-            
-            // If the checked week is before the rotation's "Week 1 Day 1", it's invalid.
-            if (diffTime < 0) return null;
+            if (diffTime < 0) return null; // Check week is before assignment started
 
-            // Calculate the number of weeks elapsed since the start date (0-based index)
+            // Calculate 0-based week difference
             const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
             
-            // Determine rotation length
             const pattern = getPatternByName(assignment.rotation_name);
-            
-            // Use the helper function for consistency
             let numWeeksInRotation = Utils.calculateRotationLength(pattern);
+            if (numWeeksInRotation === 0) return null;
             
-            if (numWeeksInRotation === 0) {
-                // Fallback if pattern is empty or invalid
-                return null;
-            }
+            // Get the offset, defaulting to 1
+            const offset = assignment.start_week_offset || 1;
+
+            // Calculate the effective week number
+            const effectiveWeek = diffWeeks + offset;
                 
-            // Check if the elapsed weeks exceed the rotation length.
-            // If it does, the rotation is finished (Finite Rotation).
-            if (diffWeeks >= numWeeksInRotation) {
-                return null;
+            // Check if this effective week is beyond the pattern's length
+            if (effectiveWeek > numWeeksInRotation) {
+                return null; // Rotation finished
             }
 
-            // Calculate the effective week number (1-based index)
-            const effectiveWeek = diffWeeks + 1;
             return effectiveWeek;
         } catch (e) {
             console.error("Error calculating effective week:", e);
             return null;
         }
-   
-};
+    };
 
-// Robust ISO date arithmetic using UTC
-Utils.addDaysISO = (iso, days) => {
-  if (!iso) return null;
-  // Use UTC midnight to prevent timezone issues when calculating date differences
-  const d = new Date(iso + 'T00:00:00Z');
-  if (isNaN(d.getTime())) {
-      console.error("Invalid ISO date provided to addDaysISO:", iso);
-      return null;
-  }
-  d.setUTCDate(d.getUTCDate() + days);
-  // Return the YYYY-MM-DD part of the ISO string (toISOString slice works correctly because we are in UTC)
-  return d.toISOString().slice(0,10);
-};
+    // Robust ISO date arithmetic using UTC
+    Utils.addDaysISO = (iso, days) => {
+      if (!iso) return null;
+      const d = new Date(iso + 'T00:00:00Z');
+      if (isNaN(d.getTime())) return null;
+      d.setUTCDate(d.getUTCDate() + days);
+      return d.toISOString().slice(0,10);
+    };
 
     APP.Utils = Utils;
 }(window.APP));
@@ -283,8 +243,7 @@ Utils.addDaysISO = (iso, days) => {
 
 /**
  * MODULE: APP.DataService
- * Handles all interactions with the Supabase backend.
- * V16.0 FIX: Force Overwrite - Clears conflicting Exceptions when changing Rotations.
+ * V16.13: Added fetchAssignmentHistoryForAdvisor and support for start_week_offset.
  */
 (function(APP) {
     const DataService = {};
@@ -328,7 +287,8 @@ Utils.addDaysISO = (iso, days) => {
         } else {
             query = query.insert(record);
         }
-        const { data, error } = await query.select();
+        // V16.13: Added start_week_offset to selection
+        const { data, error } = await query.select('*,start_week_offset');
         if (error) return handleError(error, `Save ${tableName}`);
         return { data: data ? data[0] : null, error: null };
     };
@@ -353,14 +313,14 @@ Utils.addDaysISO = (iso, days) => {
         return { data: null, error: null };
     };
 
-    // V15.9 Logic: Tie-breaker for overlapping assignments
     DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
       try {
         const weekEndISO = APP.Utils.addDaysISO(isoDate, 6);
         
         const { data, error } = await supabase
           .from(HISTORY_TABLE)
-          .select('id, advisor_id, rotation_name, start_date, end_date, reason')
+          // V16.13: Added start_week_offset to selection
+          .select('id, advisor_id, rotation_name, start_date, end_date, reason, start_week_offset')
           .lte('start_date', weekEndISO)
           .or(`end_date.is.null,end_date.gte.${isoDate}`)
           .order('id', { ascending: true });
@@ -406,7 +366,8 @@ Utils.addDaysISO = (iso, days) => {
                 rotation_name: row.rotation_name,
                 start_date: row.start_date,
                 end_date: null,
-                reason: 'Snapshot Fallback'
+                reason: 'Snapshot Fallback',
+                start_week_offset: 1 // Snapshot doesn't have this, default to 1
             });
         });
         return { data: byAdvisor, error: null };
@@ -467,11 +428,10 @@ Utils.addDaysISO = (iso, days) => {
         }
     };
 
-    DataService.assignFromWeek = async ({ advisor_id, rotation_name, start_date, reason = 'New Assignment' }) => {
+    DataService.assignFromWeek = async ({ advisor_id, rotation_name, start_date, start_week_offset = 1, reason = 'New Assignment' }) => {
         try {
             const dateMinusOne = APP.Utils.addDaysISO(start_date, -1);
             
-            // 1. Clip previous
             const { error: updateError } = await supabase
                 .from(HISTORY_TABLE)
                 .update({ end_date: dateMinusOne })
@@ -481,18 +441,17 @@ Utils.addDaysISO = (iso, days) => {
 
             if (updateError && !updateError.code.startsWith('PGRST')) throw new Error("Failed to clip previous.");
 
-            // 2. Insert new
             const newRecord = {
                 advisor_id: advisor_id,
                 rotation_name: rotation_name || null,
                 start_date: start_date,
                 end_date: null,
+                start_week_offset: start_week_offset, // Save the offset
                 reason: reason
             };
             const { data, error } = await DataService.saveRecord(HISTORY_TABLE, newRecord, 'advisor_id, start_date');
             if (error && !error.includes('PGRST')) throw new Error("Failed to insert assignment.");
 
-            // 3. V16.0 FIX: Wipe conflicting exceptions for the future to ensure rotation is visible
             await supabase.from(EXCEPTIONS_TABLE)
                 .delete()
                 .eq('advisor_id', advisor_id)
@@ -505,7 +464,7 @@ Utils.addDaysISO = (iso, days) => {
         }
     };
 
-    DataService.changeOnlyWeek = async ({ advisor_id, rotation_name, week_start, week_end }) => {
+    DataService.changeOnlyWeek = async ({ advisor_id, rotation_name, week_start, week_end, start_week_offset = 1 }) => {
         try {
             if (!rotation_name) throw new Error("Rotation name required for swap.");
 
@@ -514,13 +473,13 @@ Utils.addDaysISO = (iso, days) => {
                 rotation_name: rotation_name,
                 start_date: week_start,
                 end_date: week_end,
+                start_week_offset: start_week_offset, // Save the offset
                 reason: 'One Week Swap'
             };
             
             const { data, error } = await DataService.saveRecord(HISTORY_TABLE, swapRecord, 'advisor_id, start_date');
             if (error && !error.includes('PGRST')) throw new Error("Failed to insert swap.");
 
-            // 3. V16.0 FIX: Wipe conflicting exceptions for THIS week to ensure swap is visible
             await supabase.from(EXCEPTIONS_TABLE)
                 .delete()
                 .eq('advisor_id', advisor_id)
@@ -542,13 +501,26 @@ Utils.addDaysISO = (iso, days) => {
         return { data, error: null };
     };
 
+    // V16.13: New function to get full history for one advisor
+    DataService.fetchAssignmentHistoryForAdvisor = async (advisorId) => {
+        if (!supabase) return { data: null, error: "DB not initialized." };
+        
+        const { data, error } = await supabase
+            .from(HISTORY_TABLE)
+            .select('*')
+            .eq('advisor_id', advisorId)
+            .order('start_date', { ascending: false }); // Show newest first
+            
+        if (error) return handleError(error, `Fetch History for ${advisorId}`);
+        return { data, error: null };
+    };
+
     APP.DataService = DataService;
 }(window.APP));
 
 /**
  * MODULE: APP.StateManager
- * Manages the application's state, selectors, synchronization, and history (Undo/Redo).
- * RESTORED after accidental deletion.
+ * (No changes, but included for restore integrity)
  */
 (function(APP) {
     const StateManager = {};
@@ -697,8 +669,7 @@ Utils.addDaysISO = (iso, days) => {
 
 /**
  * MODULE: APP.ScheduleCalculator
- * Centralized service for calculating effective schedules.
- * RESTORED after accidental deletion.
+ * V16.13: Updated to use new getEffectiveWeek signature.
  */
 (function(APP) {
     const ScheduleCalculator = {};
@@ -735,7 +706,8 @@ Utils.addDaysISO = (iso, days) => {
             return { segments: [], source: 'rotation', reason: null };
         }
 
-        const effectiveWeek = APP.Utils.getEffectiveWeek(assignment.start_date, effectiveWeekStart, assignment, APP.StateManager.getPatternByName);
+        // V16.13 FIX: Pass assignment object to getEffectiveWeek
+        const effectiveWeek = APP.Utils.getEffectiveWeek(effectiveWeekStart, assignment, APP.StateManager.getPatternByName);
         if (effectiveWeek === null) return { segments: [], source: 'rotation', reason: null };
 
         const dayIndex = (['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(dayName) + 1);
@@ -764,8 +736,7 @@ Utils.addDaysISO = (iso, days) => {
 
 /**
  * MODULE: APP.Components.ComponentManager
- * Manages the CRUD operations for Schedule Components.
- * RESTORED after accidental deletion.
+ * (No changes, but included for restore integrity)
  */
 (function(APP) {
     const ComponentManager = {};
@@ -895,8 +866,7 @@ Utils.addDaysISO = (iso, days) => {
 
 /**
  * MODULE: APP.Components.AssignmentManager
- * Manages the assignment of Rotations to Advisors.
- * V15.9 FIX: Auto-updates Start Date when Rotation changes to prevent overwriting history.
+ * V16.13: Added "Start Wk #" input and "View Plan" button.
  */
 (function(APP) {
     const AssignmentManager = {};
@@ -905,6 +875,16 @@ Utils.addDaysISO = (iso, days) => {
 
     AssignmentManager.initialize = () => {
         ELS.grid = document.getElementById('assignmentGrid');
+        
+        // V16.13: Cache and wire up the new "View Plan" modal
+        ELS.planModal = document.getElementById('planModal');
+        ELS.planModalTitle = document.getElementById('planModalTitle');
+        ELS.planModalBody = document.getElementById('planModalBody');
+        ELS.planModalClose = document.getElementById('planModalClose');
+
+        if (ELS.planModalClose) ELS.planModalClose.addEventListener('click', () => {
+            if (ELS.planModal) ELS.planModal.style.display = 'none';
+        });
     };
 
     AssignmentManager.render = async () => {
@@ -921,40 +901,53 @@ Utils.addDaysISO = (iso, days) => {
         }
 
         const effectiveMap = STATE.effectiveAssignmentsCache.get(weekStartISO);
-        let html = '<table><thead><tr><th>Advisor</th><th>Assigned Rotation (This Week)</th><th>Start Date (Week 1)</th><th>Actions</th></tr></thead><tbody>';
+        
+        // V16.13: Update table header to match HTML
+        let html = '<table><thead><tr><th>Advisor</th><th>Assigned Rotation (This Week)</th><th>Start Date (Week 1)</th><th>Start Wk #</th><th>View Plan</th><th>Actions</th></tr></thead><tbody>';
         
         advisors.forEach(adv => {
             const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
             let displayRotation = effective ? effective.rotation_name : '';
             let displayStartDate = effective ? effective.start_date : '';
+            let displayOffset = effective ? (effective.start_week_offset || 1) : 1;
 
             if (PENDING_CHANGES.has(adv.id)) {
                 const pending = PENDING_CHANGES.get(adv.id);
                 if (pending.rotation_name !== undefined) displayRotation = pending.rotation_name;
                 if (pending.start_date !== undefined) displayStartDate = pending.start_date;
+                if (pending.start_week_offset !== undefined) displayOffset = pending.start_week_offset;
             }
 
             html += `<tr data-advisor-id="${adv.id}">
                   <td>${adv.name}</td>
                   <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
                   <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${displayStartDate}" /></td>
-                   <td class="actions">
-                      <button class="btn btn-sm btn-primary act-assign-week" data-advisor-id="${adv.id}">Assign from this week</button>
-                      <button class="btn btn-sm btn-primary act-change-forward" data-advisor-id="${adv.id}">Change from this week forward</button>
-                      <button class="btn btn-sm btn-secondary act-change-week" data-advisor-id="${adv.id}">Change only this week (Swap)</button>
+                  <td><input type="number" class="form-input assign-start-week" data-advisor-id="${adv.id}" value="${displayOffset}" min="1" /></td>
+                  <td class="actions">
+                      <button class="btn btn-sm btn-primary act-assign-week" data-advisor-id="${adv.id}">Assign</button>
+                      <button class="btn btn-sm btn-primary act-change-forward" data-advisor-id="${adv.id}">Change Forward</button>
+                      <button class="btn btn-sm btn-secondary act-change-week" data-advisor-id="${adv.id}">Swap Week</button>
+                      <button class="btn-icon act-view-plan" data-advisor-id="${adv.id}" title="View Advisor Plan">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                      </button>
                 </td>
              </tr>`;
         });
         html += '</tbody></table>';
         ELS.grid.innerHTML = html;
 
+        // Wire Buttons
         ELS.grid.querySelectorAll('.act-assign-week, .act-change-forward').forEach(btn => {
           btn.addEventListener('click', () => handleRowAction('assign_from_week', btn.dataset.advisorId));
         });
         ELS.grid.querySelectorAll('.act-change-week').forEach(btn => {
           btn.addEventListener('click', () => handleRowAction('change_one_week', btn.dataset.advisorId));
         });
+        ELS.grid.querySelectorAll('.act-view-plan').forEach(btn => {
+          btn.addEventListener('click', () => handleViewPlan(btn.dataset.advisorId));
+        });
 
+        // Initialize Inputs
         advisors.forEach(adv => {
             const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
             let displayRotation = effective ? effective.rotation_name : '';
@@ -969,6 +962,7 @@ Utils.addDaysISO = (iso, days) => {
 
             const rotSelect = row.querySelector('.assign-rotation');
             const dateInput = row.querySelector('.assign-start-date');
+            const startWeekInput = row.querySelector('.assign-start-week');
 
             if (rotSelect) {
                 rotSelect.value = displayRotation || '';
@@ -983,17 +977,17 @@ Utils.addDaysISO = (iso, days) => {
                             dateInput._flatpickr.setDate(globalWeekStart, true); 
                         }
                     }
+                    // Reset offset to 1 when rotation changes
+                    pending.start_week_offset = 1;
+                    if(startWeekInput) startWeekInput.value = 1;
+                    
                     PENDING_CHANGES.set(adv.id, pending);
                 });
             }
 
             if (dateInput && typeof flatpickr !== 'undefined') {
                 flatpickr(dateInput, {
-                  dateFormat: 'Y-m-d',           
-                  altInput: true,                 
-                  altFormat: 'd/m/Y',             
-                  allowInput: true,
-                  locale: { "firstDayOfWeek": 1 },
+                  dateFormat: 'Y-m-d', altInput: true, altFormat: 'd/m/Y', allowInput: true, locale: { "firstDayOfWeek": 1 },
                   onChange: function(selectedDates, dateStr) {
                     const pending = PENDING_CHANGES.get(adv.id) || {};
                     pending.start_date = dateStr;
@@ -1001,7 +995,56 @@ Utils.addDaysISO = (iso, days) => {
                   }
                 });
             }
+            
+            if (startWeekInput) {
+                startWeekInput.addEventListener('change', (e) => {
+                    const pending = PENDING_CHANGES.get(adv.id) || {};
+                    let val = parseInt(e.target.value, 10);
+                    if (isNaN(val) || val < 1) val = 1;
+                    e.target.value = val; // Correct the input field
+                    pending.start_week_offset = val;
+                    PENDING_CHANGES.set(adv.id, pending);
+                });
+            }
         });
+    };
+
+    // V16.13: New handler for "View Plan"
+    const handleViewPlan = async (advisorId) => {
+        if (!ELS.planModal) return;
+
+        const advisor = APP.StateManager.getAdvisorById(advisorId);
+        if (!advisor) return;
+
+        ELS.planModalTitle.textContent = `Assignment Plan for: ${advisor.name}`;
+        ELS.planModalBody.innerHTML = `<tr><td colspan="5">Loading...</td></tr>`;
+        ELS.planModal.style.display = 'flex';
+
+        const { data, error } = await APP.DataService.fetchAssignmentHistoryForAdvisor(advisorId);
+
+        if (error) {
+            ELS.planModalBody.innerHTML = `<tr><td colspan="5" style="color: red;">Error loading history.</td></tr>`;
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            ELS.planModalBody.innerHTML = `<tr><td colspan="5">No assignment history found for this advisor.</td></tr>`;
+            return;
+        }
+
+        let html = '';
+        data.forEach(row => {
+            html += `
+                <tr>
+                    <td>${APP.Utils.convertISOToUKDate(row.start_date)}</td>
+                    <td>${row.end_date ? APP.Utils.convertISOToUKDate(row.end_date) : '(Ongoing)'}</td>
+                    <td>${row.rotation_name || 'None'}</td>
+                    <td>${row.start_week_offset || 1}</td>
+                    <td>${row.reason || ''}</td>
+                </tr>
+            `;
+        });
+        ELS.planModalBody.innerHTML = html;
     };
 
     const handleRowAction = async (action, advisorId) => {
@@ -1009,23 +1052,21 @@ Utils.addDaysISO = (iso, days) => {
         const row = document.querySelector(`tr[data-advisor-id="${advisorId}"]`);
         if (!row) return APP.Utils.showToast('Row not found', 'danger');
 
-        let rotationName = undefined;
-        let inputStartDateISO = undefined;
+        let rotationName, inputStartDateISO, startWeekOffset;
 
-        // 1. Check pending changes
+        // 1. Get from pending
         if (PENDING_CHANGES.has(advisorId)) {
             const pending = PENDING_CHANGES.get(advisorId);
-            if (pending.rotation_name !== undefined) rotationName = pending.rotation_name;
-            if (pending.start_date !== undefined) inputStartDateISO = pending.start_date;
-        } 
+            rotationName = pending.rotation_name;
+            inputStartDateISO = pending.start_date;
+            startWeekOffset = pending.start_week_offset;
+        }
         
         // 2. Fallback to DOM
-        if (rotationName === undefined || inputStartDateISO === undefined) {
-             const rotationSel = row.querySelector('.assign-rotation');
-             const dateInput = row.querySelector('.assign-start-date');
-             if (rotationName === undefined) rotationName = rotationSel ? rotationSel.value : '';
-             if (inputStartDateISO === undefined) inputStartDateISO = (dateInput) ? dateInput.value.trim() : '';
-        }
+        if (rotationName === undefined) rotationName = row.querySelector('.assign-rotation')?.value;
+        if (inputStartDateISO === undefined) inputStartDateISO = row.querySelector('.assign-start-date')?.value.trim();
+        if (startWeekOffset === undefined) startWeekOffset = parseInt(row.querySelector('.assign-start-week')?.value, 10) || 1;
+
 
         const globalWeekStartISO = APP.StateManager.getState().weekStart;
 
@@ -1037,30 +1078,24 @@ Utils.addDaysISO = (iso, days) => {
 
         if (action === 'assign_from_week') {
             if (!inputStartDateISO) return APP.Utils.showToast('Start date required.', 'danger');
-            if (inputStartDateISO.includes('/')) {
-                const iso = APP.Utils.convertUKToISODate(inputStartDateISO);
-                if (!iso) return APP.Utils.showToast('Invalid date format.', 'danger');
-                actionStartISO = iso;
-            } else {
-                actionStartISO = inputStartDateISO;
-            }
+            actionStartISO = inputStartDateISO.includes('/') ? APP.Utils.convertUKToISODate(inputStartDateISO) : inputStartDateISO;
+            if (!actionStartISO) return APP.Utils.showToast('Invalid date format.', 'danger');
         }
 
         if (!/^\d{4}-\d{2}-\d{2}$/.test(actionStartISO)) {
-          if (!globalWeekStartISO && action === 'change_one_week') {
-              return APP.Utils.showToast('Select a week first.', 'danger');
-          }
+          if (!globalWeekStartISO && action === 'change_one_week') return APP.Utils.showToast('Select a week first.', 'danger');
           return APP.Utils.showToast('Invalid date.', 'danger');
         }
 
         let res;
-        const STATE = APP.StateManager.getState(); // Access state for local updates
+        const STATE = APP.StateManager.getState();
 
         if (action === 'assign_from_week') {
           res = await APP.DataService.assignFromWeek({
             advisor_id: advisorId,
             rotation_name: rotationName,
-            start_date: actionStartISO
+            start_date: actionStartISO,
+            start_week_offset: startWeekOffset
           });
           
           // V16.1 FIX: Locally remove conflicting future exceptions so UI updates instantly
@@ -1079,7 +1114,8 @@ Utils.addDaysISO = (iso, days) => {
             advisor_id: advisorId,
             rotation_name: rotationName,
             week_start: weekStart,
-            week_end: weekEnd
+            week_end: weekEnd,
+            start_week_offset: startWeekOffset
           });
 
           // V16.1 FIX: Locally remove conflicting week exceptions so UI updates instantly
