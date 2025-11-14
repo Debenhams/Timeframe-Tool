@@ -927,35 +927,54 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         
         // V16.13: Update table header to match HTML
         let html = '<table><thead><tr><th>Advisor</th><th>Assigned Rotation (This Week)</th><th>Start Date (Week 1)</th><th>Start Wk #</th><th>View Plan</th><th>Actions</th></tr></thead><tbody>';
-        
-        sortedAdvisors.forEach(adv => {
-            const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
-            let displayRotation = effective ? effective.rotation_name : '';
-            let displayStartDate = effective ? effective.start_date : '';
-            let displayOffset = effective ? (effective.start_week_offset || 1) : 1;
 
-            if (PENDING_CHANGES.has(adv.id)) {
-                const pending = PENDING_CHANGES.get(adv.id);
-                if (pending.rotation_name !== undefined) displayRotation = pending.rotation_name;
-                if (pending.start_date !== undefined) displayStartDate = pending.start_date;
-                if (pending.start_week_offset !== undefined) displayOffset = pending.start_week_offset;
-            }
+        // Loop through each leader to create team groups
+        leaders.forEach(leader => {
+            // Add a header row for the team
+            html += `
+                <tr class="team-header-row">
+                    <td colspan="6">${leader.name}'s Team</td>
+                </tr>
+            `;
 
-            html += `<tr data-advisor-id="${adv.id}">
-                  <td>${adv.name}</td>
-                  <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
-                  <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${displayStartDate}" /></td>
-                  <td><input type="number" class="form-input assign-start-week" data-advisor-id="${adv.id}" value="${displayOffset}" min="1" /></td>
-                  <td class="actions">
-                      <button class="btn btn-sm btn-primary act-assign-week" data-advisor-id="${adv.id}">Assign</button>
-                      <button class="btn btn-sm btn-primary act-change-forward" data-advisor-id="${adv.id}">Change Forward</button>
-                      <button class="btn btn-sm btn-secondary act-change-week" data-advisor-id="${adv.id}">Swap Week</button>
-                      <button class="btn-icon act-view-plan" data-advisor-id="${adv.id}" title="View Advisor Plan">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-                      </button>
-                </td>
-             </tr>`;
+            // Get and sort this leader's team
+            const teamAdvisors = APP.StateManager.getAdvisorsByLeader(leader.id);
+            teamAdvisors.sort((a, b) => a.name.localeCompare(b.name));
+
+            // Now loop through just this team's advisors
+            teamAdvisors.forEach(adv => {
+                const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
+                let displayRotation = effective ? effective.rotation_name : '';
+                let displayStartDate = effective ? effective.start_date : '';
+                let displayOffset = effective ? (effective.start_week_offset || 1) : 1;
+
+                if (PENDING_CHANGES.has(adv.id)) {
+                    const pending = PENDING_CHANGES.get(adv.id);
+                    if (pending.rotation_name !== undefined) displayRotation = pending.rotation_name;
+                    if (pending.start_date !== undefined) displayStartDate = pending.start_date;
+                    if (pending.start_week_offset !== undefined) displayOffset = pending.start_week_offset;
+                }
+
+                 html += `<tr data-advisor-id="${adv.id}">
+                      <td>${adv.name}</td>
+                      <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
+                      <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${displayStartDate}" /></td>
+                      <td><input type="number" class="form-input assign-start-week" data-advisor-id="${adv.id}" value="${displayOffset}" min="1" /></td>
+                      <td class="actions">
+                          <button class="btn btn-sm btn-primary act-assign-week" data-advisor-id="${adv.id}">Assign</button>
+                          <button class="btn btn-sm btn-primary act-change-forward" data-advisor-id="${adv.id}">Change Forward</button>
+                          <button class="btn btn-sm btn-secondary act-change-week" data-advisor-id="${adv.id}">Swap Week</button>
+                          <button class="btn-icon act-view-plan" data-advisor-id="${adv.id}" title="View Advisor Plan">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                       </button>
+                    </td>
+                 </tr>`;
+            });
         });
+
+        // NOTE: We are intentionally skipping unassigned advisors for now to keep this clean.
+        // We can add them later if needed.
+
         html += '</tbody></table>';
         ELS.grid.innerHTML = html;
 
@@ -971,7 +990,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         });
 
         // Initialize Inputs
-        sortedAdvisors.forEach(adv => {
+        STATE.advisors.forEach(adv => {
             const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
             let displayRotation = effective ? effective.rotation_name : '';
             

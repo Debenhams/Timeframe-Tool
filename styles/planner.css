@@ -929,3 +929,12 @@ td .form-input-color.edit-value { width: 60px; height: 30px; }
 .plan-modal-table tr:last-child td {
   border-bottom: none;
 }
+/* Styling for the new Team Header Row in Assignments */
+.team-header-row td {
+    background-color: #f3f4f6; /* A light grey background */
+    font-weight: 600;
+    font-size: 13px;
+    color: #4b5563; /* A muted dark grey text */
+    padding: 10px 16px;
+    border-top: 2px solid #e5e7eb; /* A slighly thicker top border */
+}
