@@ -891,7 +891,30 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         if (!ELS.grid) return;
 
         const STATE = APP.StateManager.getState();
-        const advisors = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name));
+        // Get leaders sorted by name
+        const leaders = STATE.leaders.sort((a, b) => a.name.localeCompare(b.name));
+
+        // Create a new array for our team-grouped advisors
+        const sortedAdvisors = [];
+
+        // Loop through each leader to get their team
+        leaders.forEach(leader => {
+            // Get all advisors for this leader
+            const teamAdvisors = APP.StateManager.getAdvisorsByLeader(leader.id);
+
+            // Sort that small team alphabetically
+            const sortedTeam = teamAdvisors.sort((a, b) => a.name.localeCompare(b.name));
+
+            // Add this sorted team to our main list
+            sortedAdvisors.push(...sortedTeam);
+        });
+
+        // Also get any advisors without a leader and add them at the end
+        const unassignedAdvisors = STATE.advisors
+            .filter(a => !a.leader_id)
+            .sort((a, b) => a.name.localeCompare(b.name));
+
+        sortedAdvisors.push(...unassignedAdvisors);
         const patterns = STATE.rotationPatterns.sort((a,b) => a.name.localeCompare(b.name));
         const patternOpts = patterns.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
         const weekStartISO = STATE.weekStart;
@@ -905,7 +928,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         // V16.13: Update table header to match HTML
         let html = '<table><thead><tr><th>Advisor</th><th>Assigned Rotation (This Week)</th><th>Start Date (Week 1)</th><th>Start Wk #</th><th>View Plan</th><th>Actions</th></tr></thead><tbody>';
         
-        advisors.forEach(adv => {
+        sortedAdvisors.forEach(adv => {
             const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
             let displayRotation = effective ? effective.rotation_name : '';
             let displayStartDate = effective ? effective.start_date : '';
@@ -948,7 +971,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         });
 
         // Initialize Inputs
-        advisors.forEach(adv => {
+        sortedAdvisors.forEach(adv => {
             const effective = (effectiveMap && effectiveMap.get(adv.id)) ? effectiveMap.get(adv.id) : null;
             let displayRotation = effective ? effective.rotation_name : '';
             
