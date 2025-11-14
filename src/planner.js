@@ -2505,7 +2505,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         if (ELS.familySelect) ELS.familySelect.addEventListener('change', handleFamilyChange);
         if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNewRotation);
         if (ELS.btnDelete) ELS.btnDelete.addEventListener('click', handleDeleteRotation);
-        if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeek);
+        if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeekTop);
         if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
     };
 
@@ -2727,7 +2727,48 @@ const toggleRowEdit = (row, isEditing) => {
             }
         }
     };
+// Handle adding a new week to the *top* of the rotation (shifts all other weeks down)
+    const handleAddWeekTop = async () => {
+        const STATE = APP.StateManager.getState();
+        const rotationName = STATE.currentRotation;
+        const pattern = APP.StateManager.getPatternByName(rotationName);
 
+        if (!pattern) return;
+
+        // 1. Create a new, empty pattern object
+        const newPatternData = {};
+        
+        // 2. Add the new "Week 1"
+        newPatternData["Week 1"] = {};
+
+        // 3. Get the current max week number
+        const maxWeek = APP.Utils.calculateRotationLength(pattern);
+
+        // 4. Re-index and copy all existing weeks
+        if (pattern.pattern) {
+            for (let w = 1; w <= maxWeek; w++) {
+                // Find the key for the old week (e.g., "Week 1")
+                const oldWeekKey = findWeekKey(pattern.pattern, w);
+                if (oldWeekKey) {
+                    // Create the new key (e.g., "Week 2")
+                    const newWeekKey = `Week ${w + 1}`;
+                    // Copy the data
+                    newPatternData[newWeekKey] = pattern.pattern[oldWeekKey];
+                }
+            }
+        }
+
+        // 5. Save the new, re-indexed pattern (Auto-Save Architecture)
+        const { error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: newPatternData }, { name: rotationName });
+        
+        if (!error) {
+            // Manually update the local state to match
+            pattern.pattern = newPatternData;
+            APP.StateManager.saveHistory(`Add Week 1 (Top)`);
+            APP.Utils.showToast(`Week 1 added to top of rotation.`, "success");
+            RotationEditor.renderGrid(); // Re-render the grid
+        }
+    };
     // Handle adding a new week to the existing rotation
     const handleAddWeek = async () => {
         const STATE = APP.StateManager.getState();
