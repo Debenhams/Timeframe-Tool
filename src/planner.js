@@ -1733,71 +1733,86 @@ const normalizeShiftLength = (segments) => {
                 baseSegments: JSON.parse(JSON.stringify(BUILDER_STATE.segments))
             };
         } else if (segmentEl) {
-            // === START MOVE (LIFT STONE) ===
-            e.preventDefault();
-            const index = parseInt(segmentEl.dataset.index, 10);
-            const stone = BUILDER_STATE.segments[index];
-            const baseWater = liftStone(BUILDER_STATE.segments, index);
-
-            BUILDER_STATE.interaction = {
-                type: 'move',
-                draggedSegment: stone,
-                baseSegments: baseWater
-            };
-        }
+    // === START MOVE (PRIME) ===
+    // On mousedown, we just "prime" the interaction
+    // We don't "lift the stone" until the mouse actually moves.
+    e.preventDefault();
+    const index = parseInt(segmentEl.dataset.index, 10);
+    BUILDER_STATE.interaction = {
+        type: 'move',
+        segmentIndex: index, // Store the index of the item we clicked
+        draggedSegment: null, // Not yet "lifted"
+        baseSegments: null  // Not yet created
     };
+}
 
     const handleGlobalMouseMove = (e) => {
-        const { type } = BUILDER_STATE.interaction;
-        if (!type || !ELS.visualEditorTimeline) return;
+    const { type } = BUILDER_STATE.interaction;
+    if (!type || !ELS.visualEditorTimeline) return;
 
-        const rect = ELS.visualEditorTimeline.getBoundingClientRect();
-        const pipeCapacity = BUILDER_STATE.fixedShiftLength;
+    // --- NEW DRAG-START LOGIC ---
+    // If this is the *first* mouse move of a "move" action,
+    // we now "lift the stone" and create the baseSegments.
+    if (type === 'move' && !BUILDER_STATE.interaction.baseSegments) {
+        const index = BUILDER_STATE.interaction.segmentIndex;
+        const stone = BUILDER_STATE.segments[index];
+        const baseWater = liftStone(BUILDER_STATE.segments, index);
 
-        if (type === 'resize') {
-            // === HANDLE RESIZE ===
-            const { startX, startDuration, segmentIndex, baseSegments } = BUILDER_STATE.interaction;
-            const pixelDiff = e.clientX - startX;
-            // Calculate minutes delta based on pixels
-            const pxPerMin = rect.width / pipeCapacity;
-            const minDiff = Math.round(pixelDiff / pxPerMin / 5) * 5; // Snap to 5m
+        BUILDER_STATE.interaction.draggedSegment = stone;
+        BUILDER_STATE.interaction.baseSegments = baseWater;
+    }
+    // --- END NEW LOGIC ---
 
-            let newDuration = Math.max(5, startDuration + minDiff);
-            
-            // Clone base segments to manipulate
-            let workingSegments = JSON.parse(JSON.stringify(baseSegments));
-            workingSegments[segmentIndex].duration_min = newDuration;
-            
-            // Apply fixed shift logic (Trim or Extend end)
-            BUILDER_STATE.segments = normalizeShiftLength(workingSegments);
-            renderTimeline();
+    const rect = ELS.visualEditorTimeline.getBoundingClientRect();
+    const pipeCapacity = BUILDER_STATE.fixedShiftLength;
 
-        } else if (type === 'move') {
-            // === HANDLE MOVE (STONE) ===
-            let relativeX = e.clientX - rect.left;
-            relativeX = Math.max(0, Math.min(relativeX, rect.width));
-            const pct = relativeX / rect.width;
-            const relativeMinutes = Math.round(pct * pipeCapacity);
-            const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
-            const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
+    if (type === 'resize') {
+        // === HANDLE RESIZE ===
+        const { startX, startDuration, segmentIndex, baseSegments } = BUILDER_STATE.interaction;
+        const pixelDiff = e.clientX - startX;
+        // Calculate minutes delta based on pixels
+        const pxPerMin = rect.width / pipeCapacity;
+        const minDiff = Math.round(pixelDiff / pxPerMin / 5) * 5; // Snap to 5m
 
-            const previewSegments = insertStone(
-                BUILDER_STATE.interaction.baseSegments, 
-                BUILDER_STATE.interaction.draggedSegment.component_id, 
-                BUILDER_STATE.interaction.draggedSegment.duration_min, 
-                insertTimeAbs
-            );
-            BUILDER_STATE.segments = previewSegments;
-            renderTimeline();
-        }
-    };
+        let newDuration = Math.max(5, startDuration + minDiff);
+        // Clone base segments to manipulate
+        let workingSegments = JSON.parse(JSON.stringify(baseSegments));
+        workingSegments[segmentIndex].duration_min = newDuration;
+
+        // Apply fixed shift logic (Trim or Extend end)
+        BUILDER_STATE.segments = normalizeShiftLength(workingSegments);
+        renderTimeline();
+
+    } else if (type === 'move' && BUILDER_STATE.interaction.draggedSegment) {
+        // === HANDLE MOVE (STONE) ===
+        // (We check for draggedSegment to make sure it's "lifted")
+        let relativeX = e.clientX - rect.left;
+        relativeX = Math.max(0, Math.min(relativeX, rect.width));
+        const pct = relativeX / rect.width;
+        const relativeMinutes = Math.round(pct * pipeCapacity);
+        const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
+        const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
+
+        const previewSegments = insertStone(
+            BUILDER_STATE.interaction.baseSegments, 
+            BUILDER_STATE.interaction.draggedSegment.component_id, 
+            BUILDER_STATE.interaction.draggedSegment.duration_min, 
+            insertTimeAbs
+        );
+        BUILDER_STATE.segments = previewSegments;
+        renderTimeline();
+    }
+};
 
     const handleGlobalMouseUp = (e) => {
-        if (BUILDER_STATE.interaction.type) {
-            BUILDER_STATE.interaction = { type: null };
+    if (BUILDER_STATE.interaction.type) {
+        // Only save history if a drag *actually happened*
+        if (BUILDER_STATE.interaction.baseSegments) {
             saveVisualHistory();
         }
-    };
+        BUILDER_STATE.interaction = { type: null };
+    }
+};
 
     // --- TOOLBOX DRAG & DROP HANDLERS ---
 
@@ -2132,6 +2147,7 @@ const normalizeShiftLength = (segments) => {
     
     APP.Components = APP.Components || {};
     APP.Components.SequentialBuilder = SequentialBuilder;
+    }
 }(window.APP));
 
 
