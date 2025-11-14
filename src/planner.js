@@ -1550,36 +1550,35 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         while (currentTotal > target && adjusted.length > 0) {
             const excess = currentTotal - target;
             
-            // Find the last non-anchored segment
-            let lastNonAnchoredIndex = -1;
-            for (let i = adjusted.length - 1; i >= 0; i--) {
+            // --- MODIFIED LOGIC ---
+            // Find the *largest* non-anchored segment
+            let largestFlexibleIndex = -1;
+            let maxDuration = 0;
+            
+            for (let i = 0; i < adjusted.length; i++) {
                 if (!isAnchored(adjusted[i].component_id)) {
-                    lastNonAnchoredIndex = i;
-                    break;
+                    if (adjusted[i].duration_min > maxDuration) {
+                        maxDuration = adjusted[i].duration_min;
+                        largestFlexibleIndex = i;
+                    }
                 }
             }
 
-            // If no non-anchored segment is found (e.g., shift is ALL breaks),
-            // we must break to avoid an infinite loop.
-            if (lastNonAnchoredIndex === -1) {
+            if (largestFlexibleIndex === -1) {
                  console.warn("Normalize: Shift is too long but no non-anchored segments found to trim.");
-                 break; // Exit loop, return oversized segments
+                 break; 
             }
 
-            const segmentToTrim = adjusted[lastNonAnchoredIndex];
+            const segmentToTrim = adjusted[largestFlexibleIndex];
 
-            // Re-implementation of original logic [cite: 930-932] but targeted
             if (segmentToTrim.duration_min > excess) {
-                // Segment is long enough to absorb the entire excess. Trim it.
+                // Segment is long enough to absorb the excess. Trim it.
                 segmentToTrim.duration_min -= excess;
-                currentTotal -= excess; // This will make currentTotal === target, exiting the loop.
+                currentTotal -= excess; 
             } else {
-                // Segment is shorter than or equal to the excess.
-                // We must remove it entirely to make space.
-                const durationToRemove = segmentToTrim.duration_min;
-                adjusted.splice(lastNonAnchoredIndex, 1);
-                currentTotal -= durationToRemove;
-                // Loop continues to find the *new* last non-anchored segment to trim.
+                // Segment is shorter than the excess. Remove it entirely.
+                currentTotal -= segmentToTrim.duration_min;
+                adjusted.splice(largestFlexibleIndex, 1);
             }
         }
 
@@ -1587,7 +1586,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         if (currentTotal < target) {
             const deficit = target - currentTotal;
             
-            // Find the last non-anchored segment
+            // Find the *last* non-anchored segment (filling at the end is fine)
             let lastNonAnchoredIndex = -1;
             for (let i = adjusted.length - 1; i >= 0; i--) {
                 if (!isAnchored(adjusted[i].component_id)) {
@@ -1601,13 +1600,15 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
                 adjusted[lastNonAnchoredIndex].duration_min += deficit;
                 currentTotal += deficit;
             } else {
-                // Edge case: No non-anchored segments to add to.
                 console.warn("Normalize: Shift is too short but no non-anchored segments found to expand.");
-                // We just return the undersized segments.
             }
         }
+        
+        // Filter out any zero-duration segments that might have been created
+        const finalSegments = adjusted.filter(seg => seg.duration_min > 0);
 
-        return adjusted;
+        // We must fuse *after* normalizing to clean up
+        return fuseNeighbors(finalSegments);
     };
     
     // --- LOGIC: CORE MANIPULATIONS ---
@@ -1651,7 +1652,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 
         // Clean up
         let merged = fuseNeighbors(result);
-        return normalizeShiftLength(merged);
+        return normalizeShiftLength(merged); // <-- Calls the new normalizeShiftLength
     };
 
     // --- INTERACTION HANDLERS ---
@@ -1746,6 +1747,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             // Check if insertion point is inside an anchored segment
             let runningTime = BUILDER_STATE.startTimeMin;
             let isInsideAnchored = false;
+            // We check against the 'baseSegments' (the timeline *without* the stone)
             for (const seg of BUILDER_STATE.interaction.baseSegments) {
                 const segStart = runningTime;
                 const segEnd = runningTime + seg.duration_min;
@@ -1861,6 +1863,20 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
         const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
         
+        // --- NEW CHECK ---
+        // Check if insertion point is inside an anchored segment
+        let runningTime = BUILDER_STATE.startTimeMin;
+        for (const seg of BUILDER_STATE.segments) {
+            const segStart = runningTime;
+            const segEnd = runningTime + seg.duration_min;
+            if (isAnchored(seg.component_id) && insertTimeAbs > segStart && insertTimeAbs < segEnd) {
+                APP.Utils.showToast("Cannot drop into an anchored segment (Break/Lunch).", "warning");
+                return;
+            }
+            runningTime += seg.duration_min;
+        }
+        // --- END NEW CHECK ---
+
         // Insert new stone
         const newSegments = insertStone(
             BUILDER_STATE.segments,
