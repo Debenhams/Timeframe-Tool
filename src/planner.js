@@ -1247,16 +1247,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         visualHistoryIndex: -1,
         contextMenuIndex: -1
     };
-// Helper function to identify "solid" (un-shrinkable) components
-    const isSolidComponent = (componentId) => {
-        if (!componentId) return false;
-        // We use APP.StateManager here because we're inside the module
-        const component = APP.StateManager.getComponentById(componentId); 
-        if (!component) return false;
-        const type = component.type.toLowerCase();
-        // Breaks and Lunches are "solid"
-        return (type === 'break' || type === 'lunch');
-    };
+
     const parseTimeToMinutes = (timeStr) => {
         const parts = (timeStr || "").split(':');
         if (parts.length !== 2) return null;
@@ -1534,60 +1525,37 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         return fused;
     };
 
-    // Ensures total duration equals fixed shift length by trimming/extending LIQUID segments
-const normalizeShiftLength = (segments) => {
-    let currentTotal = segments.reduce((sum, s) => sum + s.duration_min, 0);
-    const target = BUILDER_STATE.fixedShiftLength;
+    // Ensures total duration equals fixed shift length by trimming or extending the LAST segment
+    const normalizeShiftLength = (segments) => {
+        let currentTotal = segments.reduce((sum, s) => sum + s.duration_min, 0);
+        const target = BUILDER_STATE.fixedShiftLength;
 
-    if (currentTotal === target) return segments;
+        if (currentTotal === target) return segments;
 
-    let adjusted = JSON.parse(JSON.stringify(segments));
+        // Create a copy to avoid mutation issues
+        let adjusted = JSON.parse(JSON.stringify(segments));
 
-    // 1. Trim Excess (Drain)
-    let excess = currentTotal - target;
-    if (excess > 0) {
-        // Trim from the LAST liquid segment first, then move backwards
-        for (let i = adjusted.length - 1; i >= 0; i--) {
-            if (excess <= 0) break; // We've trimmed enough
-            const seg = adjusted[i];
-
-            // Only trim from "liquid" (non-solid) segments
-            if (!isSolidComponent(seg.component_id)) {
-                if (seg.duration_min > excess) {
-                    // This segment can cover the whole excess
-                    seg.duration_min -= excess;
-                    excess = 0;
-                } else {
-                    // This segment is shorter than the excess, so remove it
-                    excess -= seg.duration_min;
-                    seg.duration_min = 0; // Mark for removal
-                }
+        // 1. Trim Excess (Drain)
+        while (currentTotal > target && adjusted.length > 0) {
+            const excess = currentTotal - target;
+            const last = adjusted[adjusted.length - 1];
+            if (last.duration_min > excess) {
+                last.duration_min -= excess;
+                currentTotal -= excess;
+            } else {
+                currentTotal -= last.duration_min;
+                adjusted.pop();
             }
         }
-        // Filter out any segments we zeroed out
-        adjusted = adjusted.filter(seg => seg.duration_min > 0);
-    }
 
-    // 2. Fill Gap (Refill)
-    let deficit = target - currentTotal;
-    if (deficit > 0) {
-        // Add to the LAST liquid segment
-        let added = false;
-        for (let i = adjusted.length - 1; i >= 0; i--) {
-            if (!isSolidComponent(adjusted[i].component_id)) {
-                adjusted[i].duration_min += deficit;
-                added = true;
-                break;
-            }
-        }
-        // If there are NO liquid segments (e.g., just a lunch), add to the last segment
-        if (!added && adjusted.length > 0) {
+        // 2. Fill Gap (Refill)
+        if (currentTotal < target && adjusted.length > 0) {
+            const deficit = target - currentTotal;
             adjusted[adjusted.length - 1].duration_min += deficit;
         }
-    }
 
-    return adjusted;
-};
+        return adjusted;
+    };
 
     // --- LOGIC: CORE MANIPULATIONS ---
 
@@ -1600,120 +1568,40 @@ const normalizeShiftLength = (segments) => {
     };
 
     const insertStone = (baseSegments, componentId, duration, insertTimeAbs) => {
-    const isNewSegmentSolid = isSolidComponent(componentId);
-    let segments = JSON.parse(JSON.stringify(baseSegments));
-    let runningTime = BUILDER_STATE.startTimeMin;
-
-    // ---
-    // CASE 1: The new segment is "SOLID" (Break/Lunch)
-    // We use the OLD logic: just wedge it in and push everything else.
-    // This allows manual adjustment of break structures.
-    // ---
-    if (isNewSegmentSolid) {
+        let segments = JSON.parse(JSON.stringify(baseSegments));
+        let runningTime = BUILDER_STATE.startTimeMin;
         let inserted = false;
         const result = [];
+
         for (let i = 0; i < segments.length; i++) {
             const seg = segments[i];
             const segStart = runningTime;
             const segEnd = runningTime + seg.duration_min;
 
             if (!inserted && insertTimeAbs >= segStart && insertTimeAbs < segEnd) {
+                // WEDGE IN
                 const timeBefore = insertTimeAbs - segStart;
                 const timeAfter = segEnd - insertTimeAbs;
 
                 if (timeBefore > 0) result.push({ component_id: seg.component_id, duration_min: timeBefore });
                 result.push({ component_id: componentId, duration_min: duration });
                 if (timeAfter > 0) result.push({ component_id: seg.component_id, duration_min: timeAfter });
-
+                
                 inserted = true;
             } else {
                 result.push(seg);
             }
             runningTime += seg.duration_min;
         }
+
         if (!inserted) {
             result.push({ component_id: componentId, duration_min: duration });
         }
-        return normalizeShiftLength(fuseNeighbors(result));
-    }
 
-    // ---
-    // CASE 2: The new segment is "LIQUID" (Activity/Meeting)
-    // We use the NEW "Smart Squeeze" logic. We will NOT push solid breaks.
-    // We "pay for" the new duration by shrinking other liquid segments.
-    // ---
-    let inserted = false;
-    const result = [];
-    let durationToPay = duration; // We need to "pay" for this new duration
-
-    for (let i = 0; i < segments.length; i++) {
-        const seg = segments[i];
-        const segStart = runningTime;
-        const segEnd = runningTime + seg.duration_min;
-
-        // --- A) Insertion Point ---
-        if (!inserted && insertTimeAbs >= segStart && insertTimeAbs < segEnd) {
-            const existingSegmentIsSolid = isSolidComponent(seg.component_id);
-
-            if (existingSegmentIsSolid) {
-                // Trying to insert *on top of* a solid break.
-                // We can't do this. We'll just insert *before* it and let it push.
-                result.push({ component_id: componentId, duration_min: duration });
-                result.push(seg); // Add the break
-                inserted = true;
-            } else {
-                // This is the "Smart Squeeze"
-                // We're inserting into a LIQUID segment.
-                const timeBefore = insertTimeAbs - segStart;
-
-                // Add the part of the segment *before* the insertion
-                if (timeBefore > 0) result.push({ component_id: seg.component_id, duration_min: timeBefore });
-
-                // Add the new Meeting/Activity
-                result.push({ component_id: componentId, duration_min: duration });
-                inserted = true;
-
-                // Now, we must "pay" for it by shrinking the rest of this segment
-                const remainingDuration = seg.duration_min - timeBefore; // Use original duration
-                const durationToKeep = Math.max(0, remainingDuration - durationToPay);
-
-                if (durationToKeep > 0) {
-                    result.push({ component_id: seg.component_id, duration_min: durationToKeep });
-                }
-
-                // Track how much time we still need to "pay" for
-                durationToPay = Math.max(0, durationToPay - remainingDuration);
-            }
-
-        // --- B) Segments *after* the insertion point ---
-        } else if (inserted && durationToPay > 0 && !isSolidComponent(seg.component_id)) {
-            // This is a LIQUID segment *after* our insertion. We can "pay" from it.
-            const remainingDuration = seg.duration_min;
-            const durationToKeep = Math.max(0, remainingDuration - durationToPay);
-
-            if (durationToKeep > 0) {
-                result.push({ component_id: seg.component_id, duration_min: durationToKeep });
-            }
-            durationToPay = Math.max(0, durationToPay - remainingDuration);
-
-        } else {
-            // This is a segment before insertion, OR a SOLID break we can't touch
-            result.push(seg);
-        }
-
-        runningTime += seg.duration_min;
-    }
-
-    // If we still have duration to pay (e.g., inserted at the end)
-    // We let the new, smarter normalizeShiftLength handle it.
-    if (!inserted) {
-        // Failsafe: if it was never inserted (e.g., click at very end), just add it.
-        // normalizeShiftLength will handle the trimming.
-        result.push({ component_id: componentId, duration_min: duration });
-    }
-
-    return normalizeShiftLength(fuseNeighbors(result));
-};
+        // Clean up
+        let merged = fuseNeighbors(result);
+        return normalizeShiftLength(merged);
+    };
 
     // --- INTERACTION HANDLERS ---
 
@@ -1733,86 +1621,71 @@ const normalizeShiftLength = (segments) => {
                 baseSegments: JSON.parse(JSON.stringify(BUILDER_STATE.segments))
             };
         } else if (segmentEl) {
-    // === START MOVE (PRIME) ===
-    // On mousedown, we just "prime" the interaction
-    // We don't "lift the stone" until the mouse actually moves.
-    e.preventDefault();
-    const index = parseInt(segmentEl.dataset.index, 10);
-    BUILDER_STATE.interaction = {
-        type: 'move',
-        segmentIndex: index, // Store the index of the item we clicked
-        draggedSegment: null, // Not yet "lifted"
-        baseSegments: null  // Not yet created
+            // === START MOVE (LIFT STONE) ===
+            e.preventDefault();
+            const index = parseInt(segmentEl.dataset.index, 10);
+            const stone = BUILDER_STATE.segments[index];
+            const baseWater = liftStone(BUILDER_STATE.segments, index);
+
+            BUILDER_STATE.interaction = {
+                type: 'move',
+                draggedSegment: stone,
+                baseSegments: baseWater
+            };
+        }
     };
-}
 
     const handleGlobalMouseMove = (e) => {
-    const { type } = BUILDER_STATE.interaction;
-    if (!type || !ELS.visualEditorTimeline) return;
+        const { type } = BUILDER_STATE.interaction;
+        if (!type || !ELS.visualEditorTimeline) return;
 
-    // --- NEW DRAG-START LOGIC ---
-    // If this is the *first* mouse move of a "move" action,
-    // we now "lift the stone" and create the baseSegments.
-    if (type === 'move' && !BUILDER_STATE.interaction.baseSegments) {
-        const index = BUILDER_STATE.interaction.segmentIndex;
-        const stone = BUILDER_STATE.segments[index];
-        const baseWater = liftStone(BUILDER_STATE.segments, index);
+        const rect = ELS.visualEditorTimeline.getBoundingClientRect();
+        const pipeCapacity = BUILDER_STATE.fixedShiftLength;
 
-        BUILDER_STATE.interaction.draggedSegment = stone;
-        BUILDER_STATE.interaction.baseSegments = baseWater;
-    }
-    // --- END NEW LOGIC ---
+        if (type === 'resize') {
+            // === HANDLE RESIZE ===
+            const { startX, startDuration, segmentIndex, baseSegments } = BUILDER_STATE.interaction;
+            const pixelDiff = e.clientX - startX;
+            // Calculate minutes delta based on pixels
+            const pxPerMin = rect.width / pipeCapacity;
+            const minDiff = Math.round(pixelDiff / pxPerMin / 5) * 5; // Snap to 5m
 
-    const rect = ELS.visualEditorTimeline.getBoundingClientRect();
-    const pipeCapacity = BUILDER_STATE.fixedShiftLength;
+            let newDuration = Math.max(5, startDuration + minDiff);
+            
+            // Clone base segments to manipulate
+            let workingSegments = JSON.parse(JSON.stringify(baseSegments));
+            workingSegments[segmentIndex].duration_min = newDuration;
+            
+            // Apply fixed shift logic (Trim or Extend end)
+            BUILDER_STATE.segments = normalizeShiftLength(workingSegments);
+            renderTimeline();
 
-    if (type === 'resize') {
-        // === HANDLE RESIZE ===
-        const { startX, startDuration, segmentIndex, baseSegments } = BUILDER_STATE.interaction;
-        const pixelDiff = e.clientX - startX;
-        // Calculate minutes delta based on pixels
-        const pxPerMin = rect.width / pipeCapacity;
-        const minDiff = Math.round(pixelDiff / pxPerMin / 5) * 5; // Snap to 5m
+        } else if (type === 'move') {
+            // === HANDLE MOVE (STONE) ===
+            let relativeX = e.clientX - rect.left;
+            relativeX = Math.max(0, Math.min(relativeX, rect.width));
+            const pct = relativeX / rect.width;
+            const relativeMinutes = Math.round(pct * pipeCapacity);
+            const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
+            const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
 
-        let newDuration = Math.max(5, startDuration + minDiff);
-        // Clone base segments to manipulate
-        let workingSegments = JSON.parse(JSON.stringify(baseSegments));
-        workingSegments[segmentIndex].duration_min = newDuration;
-
-        // Apply fixed shift logic (Trim or Extend end)
-        BUILDER_STATE.segments = normalizeShiftLength(workingSegments);
-        renderTimeline();
-
-    } else if (type === 'move' && BUILDER_STATE.interaction.draggedSegment) {
-        // === HANDLE MOVE (STONE) ===
-        // (We check for draggedSegment to make sure it's "lifted")
-        let relativeX = e.clientX - rect.left;
-        relativeX = Math.max(0, Math.min(relativeX, rect.width));
-        const pct = relativeX / rect.width;
-        const relativeMinutes = Math.round(pct * pipeCapacity);
-        const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
-        const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
-
-        const previewSegments = insertStone(
-            BUILDER_STATE.interaction.baseSegments, 
-            BUILDER_STATE.interaction.draggedSegment.component_id, 
-            BUILDER_STATE.interaction.draggedSegment.duration_min, 
-            insertTimeAbs
-        );
-        BUILDER_STATE.segments = previewSegments;
-        renderTimeline();
-    }
-};
+            const previewSegments = insertStone(
+                BUILDER_STATE.interaction.baseSegments, 
+                BUILDER_STATE.interaction.draggedSegment.component_id, 
+                BUILDER_STATE.interaction.draggedSegment.duration_min, 
+                insertTimeAbs
+            );
+            BUILDER_STATE.segments = previewSegments;
+            renderTimeline();
+        }
+    };
 
     const handleGlobalMouseUp = (e) => {
-    if (BUILDER_STATE.interaction.type) {
-        // Only save history if a drag *actually happened*
-        if (BUILDER_STATE.interaction.baseSegments) {
+        if (BUILDER_STATE.interaction.type) {
+            BUILDER_STATE.interaction = { type: null };
             saveVisualHistory();
         }
-        BUILDER_STATE.interaction = { type: null };
-    }
-};
+    };
 
     // --- TOOLBOX DRAG & DROP HANDLERS ---
 
@@ -2147,7 +2020,6 @@ const normalizeShiftLength = (segments) => {
     
     APP.Components = APP.Components || {};
     APP.Components.SequentialBuilder = SequentialBuilder;
-    }
 }(window.APP));
 
 
@@ -2192,25 +2064,13 @@ const normalizeShiftLength = (segments) => {
 
             html += `
             <tr data-definition-id="${def.id}">
-                <td>
-                    <strong class="display-value">${def.code}</strong>
-                    <input type="text" class="form-input edit-value" name="def-code" value="${def.code}" style="display:none;">
-                </td>
-                <td>
-                    <span class="display-value">${def.name}</span>
-                    <input type="text" class="form-input edit-value" name="def-name" value="${def.name}" style="display:none;">
-                </td>
-
+                <td><strong>${def.code}</strong></td>
+                <td>${def.name}</td>
                 <td>${APP.Utils.formatDuration(totalDuration)}</td>
                 <td>${APP.Utils.formatDuration(paidDuration)}</td>
-
                 <td class="actions">
-                    <button class="btn btn-sm btn-secondary btn-edit-shift" data-definition-id="${def.id}">Edit</button>
                     <button class="btn btn-sm btn-primary edit-structure" data-definition-id="${def.id}">Edit Structure</button>
                     <button class="btn btn-sm btn-danger delete-definition" data-definition-id="${def.id}">Delete</button>
-
-                    <button class="btn btn-sm btn-success btn-save-shift" data-definition-id="${def.id}" style="display:none;">Save</button>
-                    <button class="btn btn-sm btn-secondary btn-cancel-shift" data-definition-id="${def.id}" style="display:none;">Cancel</button>
                 </td>
             </tr>`;
         });
@@ -2221,64 +2081,7 @@ const normalizeShiftLength = (segments) => {
     };
 
     // --- CRUD Handlers ---
-const toggleRowEdit = (row, isEditing) => {
-        if (!row) return;
-        // Toggle display/edit fields
-        row.querySelectorAll('.display-value').forEach(el => el.style.display = isEditing ? 'none' : '');
-        row.querySelectorAll('.edit-value').forEach(el => el.style.display = isEditing ? 'block' : 'none');
 
-        // Toggle buttons
-        row.querySelector('.btn-edit-shift').style.display = isEditing ? 'none' : '';
-        row.querySelector('.edit-structure').style.display = isEditing ? 'none' : '';
-        row.querySelector('.delete-definition').style.display = isEditing ? 'none' : '';
-        row.querySelector('.btn-save-shift').style.display = isEditing ? 'inline-block' : 'none';
-        row.querySelector('.btn-cancel-shift').style.display = isEditing ? 'inline-block' : 'none';
-
-        if (!isEditing) {
-            // Reset values on cancel
-            const code = row.querySelector('.edit-value[name="def-code"]');
-            const name = row.querySelector('.edit-value[name="def-name"]');
-            // Find the original values from the display spans and reset the inputs
-            code.value = row.querySelector('td:nth-child(1) .display-value').textContent;
-            name.value = row.querySelector('td:nth-child(2) .display-value').textContent;
-        }
-    };
-
-    const handleSave = async (id, row) => {
-        const newCode = row.querySelector('input[name="def-code"]').value.trim();
-        const newName = row.querySelector('input[name="def-name"]').value.trim();
-
-        if (!newCode || !newName) {
-            APP.Utils.showToast("Code and Name are required.", "danger");
-            return;
-        }
-
-        const originalDefinition = APP.StateManager.getShiftDefinitionById(id);
-
-        // Check if code already exists (and it's not the original code)
-        if (newCode !== originalDefinition.code && APP.StateManager.getShiftDefinitionByCode(newCode)) {
-            APP.Utils.showToast("Error: That code already exists.", "danger");
-            return;
-        }
-
-        const updates = { code: String(newCode), name: newName };
-
-        const { data, error } = await APP.DataService.updateRecord('shift_definitions', updates, { id: id });
-
-        if (!error) {
-            APP.StateManager.syncRecord('shift_definitions', data);
-            APP.StateManager.saveHistory("Edit Shift Definition");
-            APP.Utils.showToast("Shift definition updated.", "success");
-            ShiftDefinitionEditor.render(); // Re-render this table
-
-            // Re-render rotation editor to update dropdowns
-            if (APP.Components.RotationEditor) {
-                 APP.Components.RotationEditor.renderGrid();
-            }
-        } else {
-            APP.Utils.showToast("Error updating shift. Check console.", "danger");
-        }
-    };
     const handleNewDefinition = async () => {
         const nameInput = prompt("Enter the full name (e.g., 'Early 7am-4pm Flex'):");
         if (!nameInput) return;
@@ -2313,13 +2116,9 @@ const toggleRowEdit = (row, isEditing) => {
     };
     
     const handleGridClick = (e) => {
-        const row = e.target.closest('tr');
-        if (!row) return;
-        const definitionId = row.dataset.definitionId;
-        if (!definitionId) return;
-
         if (e.target.classList.contains('edit-structure')) {
-            // Open the shared Sequential Builder
+            // Open the shared Sequential Builder in 'definition' mode
+            const definitionId = e.target.dataset.definitionId;
             const definition = APP.StateManager.getShiftDefinitionById(definitionId);
             if (definition && APP.Components.SequentialBuilder) {
                 APP.Components.SequentialBuilder.open({
@@ -2330,15 +2129,7 @@ const toggleRowEdit = (row, isEditing) => {
                 });
             }
         } else if (e.target.classList.contains('delete-definition')) {
-            handleDeleteDefinition(definitionId);
-
-        // --- NEW LOGIC FOR NEW BUTTONS ---
-        } else if (e.target.classList.contains('btn-edit-shift')) {
-            toggleRowEdit(row, true);
-        } else if (e.target.classList.contains('btn-cancel-shift')) {
-            toggleRowEdit(row, false);
-        } else if (e.target.classList.contains('btn-save-shift')) {
-            handleSave(definitionId, row);
+            handleDeleteDefinition(e.target.dataset.definitionId);
         }
     };
 
