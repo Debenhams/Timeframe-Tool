@@ -930,12 +930,17 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 
         // Loop through each leader to create team groups
         leaders.forEach(leader => {
+            // Get the site/brand name, or use an empty string if it doesn't exist
+            const brandName = (leader.sites && leader.sites.name) ? `(${leader.sites.name})` : '';
+
             // Add a header row for the team
             html += `
                 <tr class="team-header-row">
-                    <td colspan="6">${leader.name}'s Team</td>
+                    <td colspan="6">${leader.name}'s Team ${brandName}</td>
                 </tr>
             `;
+
+            // Get and sort this leader's team
 
             // Get and sort this leader's team
             const teamAdvisors = APP.StateManager.getAdvisorsByLeader(leader.id);
