@@ -437,7 +437,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
                 .update({ end_date: dateMinusOne })
                 .eq('advisor_id', advisor_id)
                 .is('end_date', null)
-                .lt('start_date', start_date);
+            
 
             if (updateError && !updateError.code.startsWith('PGRST')) throw new Error("Failed to clip previous.");
 
