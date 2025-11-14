@@ -288,7 +288,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             query = query.insert(record);
         }
         // V16.13: Added start_week_offset to selection
-        const { data, error } = await query.select('*,start_week_offset');
+        const { data, error } = await query.select('*');
         if (error) return handleError(error, `Save ${tableName}`);
         return { data: data ? data[0] : null, error: null };
     };
