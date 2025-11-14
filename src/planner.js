@@ -961,19 +961,21 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
                 }
 
                  html += `<tr data-advisor-id="${adv.id}">
-                      <td>${adv.name}</td>
-                      <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
-                      <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${displayStartDate}" /></td>
-                      <td><input type="number" class="form-input assign-start-week" data-advisor-id="${adv.id}" value="${displayOffset}" min="1" /></td>
-                      <td class="actions">
-                          <button class="btn btn-sm btn-primary act-assign-week" data-advisor-id="${adv.id}">Assign</button>
-                          <button class="btn btn-sm btn-primary act-change-forward" data-advisor-id="${adv.id}">Change Forward</button>
-                          <button class="btn btn-sm btn-secondary act-change-week" data-advisor-id="${adv.id}">Swap Week</button>
-                          <button class="btn-icon act-view-plan" data-advisor-id="${adv.id}" title="View Advisor Plan">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-                       </button>
-                    </td>
-                 </tr>`;
+                  <td>${adv.name}</td>
+                  <td><select class="form-select assign-rotation" data-advisor-id="${adv.id}"><option value="">-- None --</option>${patternOpts}</select></td>
+                  <td><input type="text" class="form-input assign-start-date" data-advisor-id="${adv.id}" value="${displayStartDate}" /></td>
+                  <td><input type="number" class="form-input assign-start-week" data-advisor-id="${adv.id}" value="${displayOffset}" min="1" /></td>
+
+                  <td>
+                      <button class="btn btn-sm btn-secondary act-view-plan" data-advisor-id="${adv.id}">View Plan</button>
+                  </td>
+
+                  <td class="actions">
+                      <button class="btn btn-sm btn-primary act-assign-week" data-advisor-id="${adv.id}">Assign</button>
+                      <button class="btn btn-sm btn-primary act-change-forward" data-advisor-id="${adv.id}">Change Forward</button>
+                      <button class="btn btn-sm btn-secondary act-change-week" data-advisor-id="${adv.id}">Swap Week</button>
+                  </td>
+             </tr>`;
             });
         });
 
