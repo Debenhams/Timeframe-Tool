@@ -940,10 +940,16 @@ td .form-input-color.edit-value { width: 60px; height: 30px; }
 }
 /* Shift Definition Inline Edit */
 #shiftDefinitionsGrid .edit-value {
+    /* These make it feel "normal" like other inputs */
+    font-size: 13px;
+    padding: 6px 10px;
+
+    /* This makes the NAME box fill the space */
     width: 100%;
     min-width: 150px;
 }
 #shiftDefinitionsGrid input[name="def-code"] {
+    /* This overrides the width for the CODE box only */
     width: 80px;
     min-width: 80px;
 }
