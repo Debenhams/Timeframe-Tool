@@ -938,3 +938,12 @@ td .form-input-color.edit-value { width: 60px; height: 30px; }
     padding: 10px 16px;
     border-top: 2px solid #e5e7eb; /* A slighly thicker top border */
 }
+/* Shift Definition Inline Edit */
+#shiftDefinitionsGrid .edit-value {
+    width: 100%;
+    min-width: 150px;
+}
+#shiftDefinitionsGrid input[name="def-code"] {
+    width: 80px;
+    min-width: 80px;
+}
