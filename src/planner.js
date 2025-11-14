@@ -1670,23 +1670,20 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
                 startX: e.clientX,
                 startDuration: BUILDER_STATE.segments[index].duration_min,
                 baseSegments: JSON.parse(JSON.stringify(BUILDER_STATE.segments))
-        
             };
         } else if (segmentEl) {
-            // === START MOVE (LIFT STONE) ===
+            // === START POTENTIAL-MOVE ===
+            // This is the fix for the click-vs-drag issue.
+            // We are no longer blocking anchored items here.
             e.preventDefault();
             const index = parseInt(segmentEl.dataset.index, 10);
-            
-            // Don't allow moving anchored items
-            if (isAnchored(BUILDER_STATE.segments[index].component_id)) {
-                 console.log("This segment is anchored and cannot be moved this way.");
-                 return;
-            }
 
             const stone = BUILDER_STATE.segments[index];
             const baseWater = liftStone(BUILDER_STATE.segments, index);
+            
             BUILDER_STATE.interaction = {
-                type: 'move',
+                type: 'potential-move', // <-- Set to 'potential-move'
+                startX: e.clientX,         // <-- Store startX
                 draggedSegment: stone,
                 baseSegments: baseWater
             };
@@ -1695,10 +1692,30 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 
     const handleGlobalMouseMove = (e) => {
         const { type } = BUILDER_STATE.interaction;
+
+        // --- NEW "POTENTIAL-MOVE" PROMOTION LOGIC ---
+        // This is the fix for the click-vs-drag issue.
+        if (type === 'potential-move') {
+            const { startX } = BUILDER_STATE.interaction;
+            const pixelDiff = Math.abs(e.clientX - startX);
+            
+            // Only promote to a "move" if mouse moves more than 5 pixels
+            if (pixelDiff > 5) {
+                BUILDER_STATE.interaction.type = 'move'; // <-- Promote to 'move'
+                // We re-call handleGlobalMouseMove to immediately start the move logic
+                handleGlobalMouseMove(e); 
+                return;
+            }
+            // If not over threshold, do nothing. Wait.
+            return; 
+        }
+        // --- END NEW LOGIC ---
+
         if (!type || !ELS.visualEditorTimeline) return;
 
         const rect = ELS.visualEditorTimeline.getBoundingClientRect();
         const pipeCapacity = BUILDER_STATE.fixedShiftLength;
+        
         if (type === 'resize') {
             // === HANDLE RESIZE ===
             const { startX, startDuration, segmentIndex, baseSegments } = BUILDER_STATE.interaction;
@@ -1757,8 +1774,12 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 
     const handleGlobalMouseUp = (e) => {
         if (BUILDER_STATE.interaction.type) {
+            // Only save history if it was a completed move or resize
+            if (BUILDER_STATE.interaction.type === 'move' || BUILDER_STATE.interaction.type === 'resize') {
+                saveVisualHistory();
+            }
+            // Reset the interaction state, cancelling any 'potential-move'
             BUILDER_STATE.interaction = { type: null };
-            saveVisualHistory();
         }
     };
 
