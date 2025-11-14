@@ -3351,6 +3351,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             // Initialize the Trade Center
             if (APP.Components.ShiftTradeCenter) {
                 APP.Components.ShiftTradeCenter.initialize();
+                APP.Components.AdvisorAdmin.initialize();
             }
         } catch (error) {
             console.error("CRITICAL ERROR during UI Component Initialization:", error);
@@ -3560,6 +3561,11 @@ const wireGlobalEvents = () => {
                 if (APP.Components.ShiftTradeCenter) {
                     APP.Components.ShiftTradeCenter.render();
                 }
+            } else if (tabId === 'tab-advisor-admin') {
+                // Ensure Advisor Admin is rendered when activated
+                if (APP.Components.AdvisorAdmin) {
+                    APP.Components.AdvisorAdmin.render();
+                }
             }
         }
     };
@@ -3591,12 +3597,250 @@ const wireGlobalEvents = () => {
         
         // Render the Trade Center
         if (APP.Components.ShiftTradeCenter) {
-             APP.Components.ShiftTradeCenter.render();
-        }
+         APP.Components.ShiftTradeCenter.render();
+    }
+    // Render the new Advisor Admin
+if (APP.Components.AdvisorAdmin) {
+     APP.Components.AdvisorAdmin.render();
+}
 
-        // ScheduleViewer.render() coordinates historical data fetch and rendering of both Viewer and Assignments tabs.
-        APP.Components.ScheduleViewer.render();
+// ScheduleViewer.render() coordinates historical data fetch and rendering of both Viewer and Assignments tabs.
+APP.Components.ScheduleViewer.render();
+}; // <-- This brace closes Core.renderAll
+
+APP.Core = Core;
+}(window.APP));
+/**
+ * MODULE: APP.Components.AdvisorAdmin
+ * Manages CRUD operations for Advisors.
+ */
+(function(APP) {
+    const AdvisorAdmin = {};
+    const ELS = {};
+
+    AdvisorAdmin.initialize = () => {
+        ELS.grid = document.getElementById('advisorAdminGrid');
+        ELS.btnNew = document.getElementById('btnNewAdvisor');
+
+        if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNew);
+        if (ELS.grid) ELS.grid.addEventListener('click', handleGridClick);
     };
 
-    APP.Core = Core;
+    AdvisorAdmin.render = () => {
+        if (!ELS.grid) return;
+
+        const STATE = APP.StateManager.getState();
+        // Get all advisors and leaders
+        const advisors = STATE.advisors.sort((a,b) => a.name.localeCompare(b.name));
+        const leaders = STATE.leaders.sort((a,b) => a.name.localeCompare(b.name));
+
+        // Create the HTML for the leader dropdown (for editing)
+        const leaderOptions = leaders.map(leader => 
+            `<option value="${leader.id}">${leader.name}</option>`
+        ).join('');
+
+        let html = `
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Team Leader</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+
+        advisors.forEach(adv => {
+            const leader = STATE.leaders.find(l => l.id === adv.leader_id);
+            const leaderName = leader ? leader.name : 'N/A';
+
+            html += `
+                <tr data-advisor-id="${adv.id}">
+                    <td><span class="display-value">${adv.name}</span></td>
+                    <td><span class="display-value">${adv.email || ''}</span></td>
+                    <td><span class="display-value">${leaderName}</span></td>
+
+                    <td style="display:none;" class="edit-mode-cell">
+                        <input type="text" class="form-input edit-name" value="${adv.name}">
+                    </td>
+                    <td style="display:none;" class="edit-mode-cell">
+                        <input type="email" class="form-input edit-email" value="${adv.email || ''}">
+                    </td>
+                    <td style="display:none;" class="edit-mode-cell">
+                        <select class="form-select edit-leader">
+                            <option value="">-- No Leader --</option>
+                            ${leaderOptions}
+                        </select>
+                    </td>
+
+                    <td class="actions">
+                        <button class="btn btn-sm btn-primary btn-edit-advisor">Edit</button>
+                        <button class="btn btn-sm btn-danger btn-delete-advisor">Delete</button>
+
+                        <button class="btn btn-sm btn-success btn-save-advisor" style="display:none;">Save</button>
+                        <button class="btn btn-sm btn-secondary btn-cancel-advisor" style="display:none;">Cancel</button>
+                    </td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table>`;
+        ELS.grid.innerHTML = html;
+
+        // Now, set the correct selected leader for each row's edit mode
+        advisors.forEach(adv => {
+            const row = ELS.grid.querySelector(`tr[data-advisor-id="${adv.id}"]`);
+            if (row) {
+                const select = row.querySelector('.edit-leader');
+                if (select) {
+                    select.value = adv.leader_id || "";
+                }
+            }
+        });
+    };
+
+    const handleGridClick = (e) => {
+        const target = e.target;
+        const row = target.closest('tr');
+        if (!row) return;
+
+        const advisorId = row.dataset.advisorId;
+        if (!advisorId) return;
+
+        if (target.classList.contains('btn-edit-advisor')) {
+            toggleRowEdit(row, true);
+        } else if (target.classList.contains('btn-cancel-advisor')) {
+            toggleRowEdit(row, false);
+        } else if (target.classList.contains('btn-delete-advisor')) {
+            handleDelete(advisorId, row);
+        } else if (target.classList.contains('btn-save-advisor')) {
+            handleSave(advisorId, row);
+        }
+    };
+
+    const toggleRowEdit = (row, isEditing) => {
+        // Hide all display-value cells
+        row.querySelectorAll('.display-value').forEach(el => el.parentElement.style.display = isEditing ? 'none' : '');
+        // Show all edit-mode-cell cells
+        row.querySelectorAll('.edit-mode-cell').forEach(el => el.style.display = isEditing ? 'table-cell' : 'none');
+
+        // Toggle buttons
+        row.querySelector('.btn-edit-advisor').style.display = isEditing ? 'none' : '';
+        row.querySelector('.btn-delete-advisor').style.display = isEditing ? 'none' : '';
+        row.querySelector('.btn-save-advisor').style.display = isEditing ? 'inline-block' : 'none';
+        row.querySelector('.btn-cancel-advisor').style.display = isEditing ? 'inline-block' : 'none';
+    };
+
+    const handleNew = async () => {
+        const name = prompt("Enter new advisor's full name:");
+        if (!name) return;
+
+        const email = prompt("Enter new advisor's email (optional):");
+
+        const newAdvisor = {
+            name: name,
+            email: email || null,
+            leader_id: null // They can assign this using the "Edit" button
+        };
+
+        const { data, error } = await APP.DataService.saveRecord('advisors', newAdvisor);
+
+        if (error) {
+            APP.Utils.showToast("Error creating advisor. Check console.", "danger");
+            return;
+        }
+
+        // Add to state and re-render
+        APP.StateManager.getState().advisors.push(data);
+        AdvisorAdmin.render();
+        APP.Utils.showToast("Advisor created successfully.", "success");
+
+        // Also need to re-render the main schedule tree
+        if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
+    };
+
+    const handleSave = async (advisorId, row) => {
+        const name = row.querySelector('.edit-name').value;
+        const email = row.querySelector('.edit-email').value;
+        const leaderId = row.querySelector('.edit-leader').value;
+
+        if (!name) {
+            APP.Utils.showToast("Name cannot be empty.", "danger");
+            return;
+        }
+
+        const updates = {
+            name: name,
+            email: email || null,
+            leader_id: leaderId || null
+        };
+
+        // We get the original advisor data from state
+        const originalAdvisor = APP.StateManager.getAdvisorById(advisorId);
+        const originalData = { ...originalAdvisor }; // Make a copy
+
+        // --- Optimistic UI Update ---
+        // 1. Update the state object immediately
+        const stateAdvisors = APP.StateManager.getState().advisors;
+        const index = stateAdvisors.findIndex(a => a.id == advisorId);
+        if (index > -1) {
+            Object.assign(stateAdvisors[index], updates);
+        }
+        // 2. Re-render this tab and the tree
+        AdvisorAdmin.render();
+        if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
+        // ---------------------------
+
+        const { data, error } = await APP.DataService.updateRecord('advisors', updates, { id: advisorId });
+
+        if (error) {
+            APP.Utils.showToast("Error saving advisor. Reverting change.", "danger");
+            // --- Rollback on Error ---
+            if (index > -1) {
+                Object.assign(stateAdvisors[index], originalData); // Restore original data
+            }
+            AdvisorAdmin.render();
+            if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
+            return;
+        }
+
+        // Success! No need to re-render, it's already done.
+        APP.Utils.showToast("Advisor updated.", "success");
+    };
+
+    const handleDelete = async (advisorId, row) => {
+        const advisor = APP.StateManager.getAdvisorById(advisorId);
+        if (!advisor) return;
+
+        if (!confirm(`Are you sure you want to delete ${advisor.name}?\n\nThis will also delete all their assignments and exceptions. This action cannot be undone.`)) {
+            return;
+        }
+
+        // Note: We assume cascade deletes are set up on the database
+        // for assignments, exceptions, etc.
+        const { error } = await APP.DataService.deleteRecord('advisors', { id: advisorId });
+
+        if (error) {
+            APP.Utils.showToast(`Error: ${error.message}. Advisor might be linked to other data.`, "danger");
+            return;
+        }
+
+        // Remove from state
+        const stateAdvisors = APP.StateManager.getState().advisors;
+        const index = stateAdvisors.findIndex(a => a.id == advisorId);
+        if (index > -1) {
+            stateAdvisors.splice(index, 1);
+        }
+
+        AdvisorAdmin.render();
+        APP.Utils.showToast("Advisor deleted.", "success");
+
+        // Also need to re-render the main schedule tree
+        if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
+    };
+
+    APP.Components = APP.Components || {};
+    APP.Components.AdvisorAdmin = AdvisorAdmin;
 }(window.APP));
