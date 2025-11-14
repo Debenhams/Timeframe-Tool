@@ -857,27 +857,39 @@ function calculateRotationLength(pattern) {
 };
 
 // Calculates the effective week number based on the assignment start date
-function getEffectiveWeek(startDateISO, weekStartISO, assignment, getPatternByName) {
+// V16.13: Calculates effective week using the start_week_offset
+function getEffectiveWeek(weekStartISO, assignment, getPatternByName) {
     try {
-        if (!startDateISO || !weekStartISO || !assignment) return null;
-        const [y1, m1, d1] = startDateISO.split('-').map(Number);
+        // Note: We no longer pass startDateISO, we get it from the assignment object
+        if (!assignment || !assignment.start_date || !weekStartISO) return null;
+
+        const [y1, m1, d1] = assignment.start_date.split('-').map(Number);
         const [y2, m2, d2] = weekStartISO.split('-').map(Number);
-        if (isNaN(y1) || isNaN(y2)) return null; 
-        
+        if (isNaN(y1) || isNaN(y2)) return null;
+
         const startUTC = Date.UTC(y1, m1 - 1, d1);
         const checkUTC = Date.UTC(y2, m2 - 1, d2);
-        
         const diffTime = checkUTC - startUTC;
-        if (diffTime < 0) return null;
+        if (diffTime < 0) return null; // Check week is before assignment started
 
+        // Calculate 0-based week difference
         const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
+
         const pattern = getPatternByName(assignment.rotation_name);
         let numWeeksInRotation = calculateRotationLength(pattern);
-        
         if (numWeeksInRotation === 0) return null;
-        if (diffWeeks >= numWeeksInRotation) return null; // Finite rotation ended
 
-        const effectiveWeek = diffWeeks + 1;
+        // Get the offset, defaulting to 1
+        const offset = assignment.start_week_offset || 1;
+
+        // Calculate the effective week number
+        const effectiveWeek = diffWeeks + offset;
+
+        // Check if this effective week is beyond the pattern's length
+        if (effectiveWeek > numWeeksInRotation) {
+            return null; // Rotation finished
+        }
+
         return effectiveWeek;
     } catch (e) {
         console.error("Error calculating effective week:", e);
@@ -894,20 +906,6 @@ function findWeekKey(patternData, weekNumber) {
     });
 };
 
-
-// Color mapping for the Time Grid (Photo 2 Style)
-function getBlockColor(code){
-  const k = (code||"").toLowerCase();
-  // Use the new CSS variables defined in :root
-  if (k.includes("break") || k.includes("lunch")) return "var(--color-break)";
-  // Use light yellow for meetings/coaching (as seen in Photo 2)
-  if (k.includes("meeting")||k.includes("coach")||k.includes("121")||k.includes("huddle")||k.includes("training")) return "var(--color-meeting)";
-  // Use orange for 'Projects' or similar secondary tasks
-  if (k.includes("projects")) return "var(--color-activity-secondary)";
-
-  // Defaulting others (Emails, Mirakl, Social, Admin, etc.) to the main activity color (Olive Green)
-  return "var(--color-activity-main)";
-}
 
 // Legacy Color mapping (Kept for Team Schedule View if needed, though it uses old variables)
 function colorForCode(code){
@@ -955,7 +953,7 @@ return sortedStructure.map(item => {
         }
         const end = m2t(endMin || 0);
 
-        return { code, start, end };
+        return { code, start, end, color: component ? component.color : '#475569' };
     });
 }
 
@@ -978,12 +976,11 @@ function calculateLiveSegments(advisorId, dayName, weekStartISO) {
     }
 
     // 3. Calculate effective week
-    const effectiveWeek = getEffectiveWeek(
-        assignment.start_date, 
-        weekStartISO, 
-        assignment,
-        (name) => STATE.rotationPatterns[name]
-    );
+const effectiveWeek = getEffectiveWeek(
+    weekStartISO, 
+    assignment,
+    (name) => STATE.rotationPatterns[name]
+);
 
     if (effectiveWeek === null) {
         return []; // Not in rotation this week = RDO
@@ -1087,7 +1084,7 @@ async function loadAllDefinitions() {
 
 // Load components to interpret planner-style structures
 async function loadComponents() {
-    const { data } = await supabase.from("schedule_components").select("id, name");
+    const { data } = await supabase.from("schedule_components").select("id, name, color");
     (data||[]).forEach(c => STATE.components[c.id] = c);
 }
 
@@ -1413,7 +1410,7 @@ async function loadAndRender(){
             
             // Get all relevant assignment history records
             supabase.from("rotation_assignments_history")
-                     .select("advisor_id, rotation_name, start_date, end_date")
+                     .select("advisor_id, rotation_name, start_date, end_date, start_week_offset")
                      .in("advisor_id", Array.from(STATE.teamMemberIds))
                      .lte('start_date', dateRange[6]) // start date is on or before end of week
                      .or(`end_date.is.null,end_date.gte.${mondayISO}`) // end date is null or after start of week
@@ -1597,7 +1594,7 @@ function drawMyRotaCalendar(){
                 const heightPx = durationMin * pixelsPerMinute;
 
                 // Use the specific color mapping for the time grid style
-                const color = getBlockColor(seg.code);
+                const color = seg.color || 'var(--color-activity-main)';
                 
                 // Format matching Photo 2: Activity \n Start - End
                 html += `<div class="activity-block" style="top: ${topPx}px; height: ${heightPx}px; background-color: ${color};">
