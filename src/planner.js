@@ -1276,8 +1276,10 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         // Convert NAME to uppercase for a case-insensitive comparison
         const componentName = component.name.toUpperCase();
         
-        // Anchored types (checking by NAME now, not TYPE)
-        return componentName === 'BREAK' || componentName === 'LUNCH';
+        // --- THIS IS THE FIX ---
+        // We now check if the name *includes* these words.
+        // This will anchor "Break", "AM Break", "Lunch", "Paid Lunch", etc.
+        return componentName.includes('BREAK') || componentName.includes('LUNCH');
     };
     SequentialBuilder.initialize = () => {
         // Modal Elements
