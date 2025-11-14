@@ -1688,7 +1688,7 @@ const normalizeShiftLength = (segments) => {
         // --- B) Segments *after* the insertion point ---
         } else if (inserted && durationToPay > 0 && !isSolidComponent(seg.component_id)) {
             // This is a LIQUID segment *after* our insertion. We can "pay" from it.
-            const remainingDuration = seg.duration_min - timeBefore;
+            const remainingDuration = seg.duration_min;
             const durationToKeep = Math.max(0, remainingDuration - durationToPay);
 
             if (durationToKeep > 0) {
