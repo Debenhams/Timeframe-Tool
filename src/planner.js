@@ -1207,7 +1207,16 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 
     APP.Components = APP.Components || {};
     APP.Components.AssignmentManager = AssignmentManager;
-
+// Helper function for SequentialBuilder to identify "solid" (un-shrinkable) components
+const isSolidComponent = (componentId) => {
+    if (!componentId) return false;
+    // We have to use APP.StateManager here because BUILDER_STATE isn't initialized yet
+    const component = APP.StateManager.getComponentById(componentId); 
+    if (!component) return false;
+    const type = component.type.toLowerCase();
+    // Breaks and Lunches are "solid"
+    return (type === 'break' || type === 'lunch');
+};
 }(window.APP));
 
 /**
@@ -1525,37 +1534,60 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         return fused;
     };
 
-    // Ensures total duration equals fixed shift length by trimming or extending the LAST segment
-    const normalizeShiftLength = (segments) => {
-        let currentTotal = segments.reduce((sum, s) => sum + s.duration_min, 0);
-        const target = BUILDER_STATE.fixedShiftLength;
+    // Ensures total duration equals fixed shift length by trimming/extending LIQUID segments
+const normalizeShiftLength = (segments) => {
+    let currentTotal = segments.reduce((sum, s) => sum + s.duration_min, 0);
+    const target = BUILDER_STATE.fixedShiftLength;
 
-        if (currentTotal === target) return segments;
+    if (currentTotal === target) return segments;
 
-        // Create a copy to avoid mutation issues
-        let adjusted = JSON.parse(JSON.stringify(segments));
+    let adjusted = JSON.parse(JSON.stringify(segments));
 
-        // 1. Trim Excess (Drain)
-        while (currentTotal > target && adjusted.length > 0) {
-            const excess = currentTotal - target;
-            const last = adjusted[adjusted.length - 1];
-            if (last.duration_min > excess) {
-                last.duration_min -= excess;
-                currentTotal -= excess;
-            } else {
-                currentTotal -= last.duration_min;
-                adjusted.pop();
+    // 1. Trim Excess (Drain)
+    let excess = currentTotal - target;
+    if (excess > 0) {
+        // Trim from the LAST liquid segment first, then move backwards
+        for (let i = adjusted.length - 1; i >= 0; i--) {
+            if (excess <= 0) break; // We've trimmed enough
+            const seg = adjusted[i];
+
+            // Only trim from "liquid" (non-solid) segments
+            if (!isSolidComponent(seg.component_id)) {
+                if (seg.duration_min > excess) {
+                    // This segment can cover the whole excess
+                    seg.duration_min -= excess;
+                    excess = 0;
+                } else {
+                    // This segment is shorter than the excess, so remove it
+                    excess -= seg.duration_min;
+                    seg.duration_min = 0; // Mark for removal
+                }
             }
         }
+        // Filter out any segments we zeroed out
+        adjusted = adjusted.filter(seg => seg.duration_min > 0);
+    }
 
-        // 2. Fill Gap (Refill)
-        if (currentTotal < target && adjusted.length > 0) {
-            const deficit = target - currentTotal;
+    // 2. Fill Gap (Refill)
+    let deficit = target - currentTotal;
+    if (deficit > 0) {
+        // Add to the LAST liquid segment
+        let added = false;
+        for (let i = adjusted.length - 1; i >= 0; i--) {
+            if (!isSolidComponent(adjusted[i].component_id)) {
+                adjusted[i].duration_min += deficit;
+                added = true;
+                break;
+            }
+        }
+        // If there are NO liquid segments (e.g., just a lunch), add to the last segment
+        if (!added && adjusted.length > 0) {
             adjusted[adjusted.length - 1].duration_min += deficit;
         }
+    }
 
-        return adjusted;
-    };
+    return adjusted;
+};
 
     // --- LOGIC: CORE MANIPULATIONS ---
 
@@ -1568,40 +1600,125 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
     };
 
     const insertStone = (baseSegments, componentId, duration, insertTimeAbs) => {
-        let segments = JSON.parse(JSON.stringify(baseSegments));
-        let runningTime = BUILDER_STATE.startTimeMin;
+    const isNewSegmentSolid = isSolidComponent(componentId);
+    let segments = JSON.parse(JSON.stringify(baseSegments));
+    let runningTime = BUILDER_STATE.startTimeMin;
+
+    // ---
+    // CASE 1: The new segment is "SOLID" (Break/Lunch)
+    // We use the OLD logic: just wedge it in and push everything else.
+    // This allows manual adjustment of break structures.
+    // ---
+    if (isNewSegmentSolid) {
         let inserted = false;
         const result = [];
-
         for (let i = 0; i < segments.length; i++) {
             const seg = segments[i];
             const segStart = runningTime;
             const segEnd = runningTime + seg.duration_min;
 
             if (!inserted && insertTimeAbs >= segStart && insertTimeAbs < segEnd) {
-                // WEDGE IN
                 const timeBefore = insertTimeAbs - segStart;
                 const timeAfter = segEnd - insertTimeAbs;
 
                 if (timeBefore > 0) result.push({ component_id: seg.component_id, duration_min: timeBefore });
                 result.push({ component_id: componentId, duration_min: duration });
                 if (timeAfter > 0) result.push({ component_id: seg.component_id, duration_min: timeAfter });
-                
+
                 inserted = true;
             } else {
                 result.push(seg);
             }
             runningTime += seg.duration_min;
         }
-
         if (!inserted) {
             result.push({ component_id: componentId, duration_min: duration });
         }
+        return normalizeShiftLength(fuseNeighbors(result));
+    }
 
-        // Clean up
-        let merged = fuseNeighbors(result);
-        return normalizeShiftLength(merged);
-    };
+    // ---
+    // CASE 2: The new segment is "LIQUID" (Activity/Meeting)
+    // We use the NEW "Smart Squeeze" logic. We will NOT push solid breaks.
+    // We "pay for" the new duration by shrinking other liquid segments.
+    // ---
+    let inserted = false;
+    const result = [];
+    let durationToPay = duration; // We need to "pay" for this new duration
+
+    for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const segStart = runningTime;
+        const segEnd = runningTime + seg.duration_min;
+
+        // --- A) Insertion Point ---
+        if (!inserted && insertTimeAbs >= segStart && insertTimeAbs < segEnd) {
+            const existingSegmentIsSolid = isSolidComponent(seg.component_id);
+
+            if (existingSegmentIsSolid) {
+                // Trying to insert *on top of* a solid break.
+                // We can't do this. We'll just insert *before* it and let it push.
+                result.push({ component_id: componentId, duration_min: duration });
+                result.push(seg); // Add the break
+                inserted = true;
+            } else {
+                // This is the "Smart Squeeze"
+                // We're inserting into a LIQUID segment.
+                const timeBefore = insertTimeAbs - segStart;
+
+                // Add the part of the segment *before* the insertion
+                if (timeBefore > 0) result.push({ component_id: seg.component_id, duration_min: timeBefore });
+
+                // Add the new Meeting/Activity
+                result.push({ component_id: componentId, duration_min: duration });
+                inserted = true;
+
+                // Now, we must "pay" for it by shrinking the rest of this segment
+                const remainingDuration = seg.duration_min - timeBefore; // Use original duration
+                const durationToKeep = Math.max(0, remainingDuration - durationToPay);
+
+                if (durationToKeep > 0) {
+                    result.push({ component_id: seg.component_id, duration_min: durationToKeep });
+                }
+
+                // Track how much time we still need to "pay" for
+                durationToPay = Math.max(0, durationToPay - remainingDuration);
+            }
+
+        // --- B) Segments *after* the insertion point ---
+        } else if (inserted && durationToPay > 0 && !isSolidComponent(seg.component_id)) {
+            // This is a LIQUID segment *after* our insertion. We can "pay" from it.
+            const remainingDuration = seg.duration_min;
+            const durationToKeep = Math.max(0, remainingDuration - durationToPay);
+
+            if (durationToKeep > 0) {
+                result.push({ component_id: seg.component_id, duration_min: durationToKeep });
+            }
+            durationToPay = Math.max(0, durationToPay - remainingDuration);
+
+        } else {
+            // This is a segment before insertion, OR a SOLID break we can't touch
+            result.push(seg);
+        }
+
+        runningTime += seg.duration_min;
+    }
+
+    // If we still have duration to pay (e.g., inserted at the end)
+    // We let the new, smarter normalizeShiftLength handle it.
+    if (durationToPay > 0) {
+         // This can happen if we didn't find enough liquid time
+         // We'll let normalizeShiftLength (which is now smarter) trim from the end
+         let total = result.reduce((sum, s) => sum + s.duration_min, 0);
+         BUILDER_STATE.fixedShiftLength = total - durationToPay;
+    } else if (!inserted) {
+        // Failsafe: if it was never inserted (e.g., click at very end), just add it.
+        // normalizeShiftLength will handle the trimming.
+        result.push({ component_id: componentId, duration_min: duration });
+    }
+
+    return normalizeShiftLength(fuseNeighbors(result));
+};
 
     // --- INTERACTION HANDLERS ---
 
