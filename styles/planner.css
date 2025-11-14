@@ -950,6 +950,6 @@ td .form-input-color.edit-value { width: 60px; height: 30px; }
 }
 #shiftDefinitionsGrid input[name="def-code"] {
     /* This overrides the width for the CODE box only */
-    width: 80px;
-    min-width: 80px;
+    width: 100px;
+    min-width: 150px;
 }
