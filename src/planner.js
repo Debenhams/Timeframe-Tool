@@ -2066,7 +2066,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             <tr data-definition-id="${def.id}">
                 <td>
                     <strong class="display-value">${def.code}</strong>
-                    <input type="text" class="form-input edit-value" name="def-code" value="${def.code}" style="display:none; width: 80px;">
+                    <input type="text" class="form-input edit-value" name="def-code" value="${def.code}" style="display:none;">
                 </td>
                 <td>
                     <span class="display-value">${def.name}</span>
