@@ -2026,6 +2026,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 /**
  * MODULE: APP.Components.ShiftDefinitionEditor
  * Manages the list of Shift Definitions and triggers the SequentialBuilder.
+ * V16.14: Added inline edit for Code and Name.
  */
 (function(APP) {
     const ShiftDefinitionEditor = {};
@@ -2050,7 +2051,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             let totalDuration = 0;
             let paidDuration = 0;
 
-            // Calculate durations based on the structure
             if (def.structure && Array.isArray(def.structure)) {
                 def.structure.forEach(seg => {
                     const duration = seg.end_min - seg.start_min;
@@ -2085,15 +2085,72 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
                     <button class="btn btn-sm btn-secondary btn-cancel-shift" data-definition-id="${def.id}" style="display:none;">Cancel</button>
                 </td>
             </tr>`;
-});
+        });
         html += '</tbody></table>';
         ELS.grid.innerHTML = html;
+    };
 
+    // --- NEW HELPER FUNCTIONS ---
+    const toggleRowEdit = (row, isEditing) => {
+        if (!row) return;
+        // Toggle display/edit fields
+        row.querySelectorAll('.display-value').forEach(el => el.style.display = isEditing ? 'none' : '');
+        row.querySelectorAll('.edit-value').forEach(el => el.style.display = isEditing ? 'block' : 'none');
 
+        // Toggle buttons
+        row.querySelector('.btn-edit-shift').style.display = isEditing ? 'none' : '';
+        row.querySelector('.edit-structure').style.display = isEditing ? 'none' : '';
+        row.querySelector('.delete-definition').style.display = isEditing ? 'none' : '';
+        row.querySelector('.btn-save-shift').style.display = isEditing ? 'inline-block' : 'none';
+        row.querySelector('.btn-cancel-shift').style.display = isEditing ? 'inline-block' : 'none';
+
+        if (!isEditing) {
+            // Reset values on cancel
+            const code = row.querySelector('.edit-value[name="def-code"]');
+            const name = row.querySelector('.edit-value[name="def-name"]');
+            // Find the original values from the display spans and reset the inputs
+            code.value = row.querySelector('td:nth-child(1) .display-value').textContent;
+            name.value = row.querySelector('td:nth-child(2) .display-value').textContent;
+        }
+    };
+
+    const handleSave = async (id, row) => {
+        const newCode = row.querySelector('input[name="def-code"]').value.trim();
+        const newName = row.querySelector('input[name="def-name"]').value.trim();
+
+        if (!newCode || !newName) {
+            APP.Utils.showToast("Code and Name are required.", "danger");
+            return;
+        }
+
+        const originalDefinition = APP.StateManager.getShiftDefinitionById(id);
+
+        // Check if code already exists (and it's not the original code)
+        if (newCode !== originalDefinition.code && APP.StateManager.getShiftDefinitionByCode(newCode)) {
+            APP.Utils.showToast("Error: That code already exists.", "danger");
+            return;
+        }
+
+        const updates = { code: String(newCode), name: newName };
+
+        const { data, error } = await APP.DataService.updateRecord('shift_definitions', updates, { id: id });
+
+        if (!error) {
+            APP.StateManager.syncRecord('shift_definitions', data);
+            APP.StateManager.saveHistory("Edit Shift Definition");
+            APP.Utils.showToast("Shift definition updated.", "success");
+            ShiftDefinitionEditor.render(); // Re-render this table
+
+            // Re-render rotation editor to update dropdowns
+            if (APP.Components.RotationEditor) {
+                 APP.Components.RotationEditor.renderGrid();
+            }
+        } else {
+            APP.Utils.showToast("Error updating shift. Check console.", "danger");
+        }
     };
 
     // --- CRUD Handlers ---
-
     const handleNewDefinition = async () => {
         const nameInput = prompt("Enter the full name (e.g., 'Early 7am-4pm Flex'):");
         if (!nameInput) return;
@@ -2104,29 +2161,25 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         const code = codeInput.trim();
 
         if (!name || !code) return;
-
-        // Check for duplicate code
         if (APP.StateManager.getShiftDefinitionByCode(code)) {
             APP.Utils.showToast("Error: Code already exists.", "danger");
             return;
         }
 
-        // Ensure code is explicitly stored as a string
         const newDefinition = { name, code: String(code), structure: [] };
-
         const { data, error } = await APP.DataService.saveRecord('shift_definitions', newDefinition);
         if (!error) {
             APP.StateManager.syncRecord('shift_definitions', data);
             APP.StateManager.saveHistory("Create Shift Definition");
             APP.Utils.showToast(`Shift '${name}' created. Now click 'Edit Structure'.`, "success");
             ShiftDefinitionEditor.render();
-            // Update rotation editor dropdowns
             if (APP.Components.RotationEditor) {
                  APP.Components.RotationEditor.renderGrid();
             }
         }
     };
-    
+
+    // --- UPDATED CLICK HANDLER ---
     const handleGridClick = (e) => {
         const row = e.target.closest('tr');
         if (!row) return;
@@ -2161,7 +2214,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         const definition = APP.StateManager.getShiftDefinitionById(id);
         if (!definition || !confirm(`Delete '${definition.name}' (${definition.code})?`)) return;
 
-        // NOTE: Should ideally check if definition is used in rotations before deleting
         const { error } = await APP.DataService.deleteRecord('shift_definitions', { id });
         if (!error) {
             APP.StateManager.syncRecord('shift_definitions', { id: id }, true);
