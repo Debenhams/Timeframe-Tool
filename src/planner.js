@@ -1662,7 +1662,63 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
     };
 
     // --- INTERACTION HANDLERS ---
+// NEW FUNCTION: Replaces time instead of inserting
+    const carveOutTime = (baseSegments, componentId, newDuration, insertTimeAbs) => {
+        let segments = JSON.parse(JSON.stringify(baseSegments));
+        let runningTime = BUILDER_STATE.startTimeMin;
+        const result = [];
+        let inserted = false;
 
+        for (let i = 0; i < segments.length; i++) {
+            const seg = segments[i];
+            const segStart = runningTime;
+            const segEnd = runningTime + seg.duration_min;
+
+            // Is this the segment we're dropping onto?
+            if (!inserted && insertTimeAbs >= segStart && insertTimeAbs < segEnd) {
+                
+                // This is the target segment.
+                // It MUST be flexible.
+                if (isAnchored(seg.component_id)) {
+                    APP.Utils.showToast("Cannot modify an anchored segment (Break/Lunch).", "warning");
+                    return null; // Return null to indicate failure
+                }
+                
+                // Calculate the remaining duration *after* the new block is placed
+                const part1Duration = insertTimeAbs - segStart;
+                const part2Duration = segEnd - (insertTimeAbs + newDuration);
+
+                // Check if there's enough space
+                if (part2Duration < 0) {
+                     APP.Utils.showToast(`Not enough space. Needs ${newDuration}m.`, "warning");
+                     return null; // Return null to indicate failure
+                }
+
+                // Rebuild the segment
+                if (part1Duration > 0) {
+                    result.push({ component_id: seg.component_id, duration_min: part1Duration });
+                }
+                result.push({ component_id: componentId, duration_min: newDuration });
+                if (part2Duration > 0) {
+                    result.push({ component_id: seg.component_id, duration_min: part2Duration });
+                }
+                
+                inserted = true;
+            } else {
+                // This is not the target segment, just add it.
+                result.push(seg);
+            }
+            runningTime += seg.duration_min;
+        }
+        
+        if (!inserted) {
+             console.error("carveOutTime failed to find an insertion point.");
+             return null;
+        }
+
+        // Clean up by fusing any new neighbors
+        return fuseNeighbors(result);
+    };
     const handleTimelineMouseDown = (e) => {
         const handle = e.target.closest('.ve-drag-handle');
         const segmentEl = e.target.closest('.ve-segment');
@@ -1854,7 +1910,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         const component = APP.StateManager.getComponentById(componentId);
         if (!component) return;
 
-        // Don't allow dropping anchored components
         if (isAnchored(componentId)) {
             APP.Utils.showToast("Breaks and Lunches cannot be added this way. Please edit them manually.", "warning");
             return;
@@ -1869,30 +1924,22 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
         const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
         
-        // --- NEW CHECK ---
-        // Check if insertion point is inside an anchored segment
-        let runningTime = BUILDER_STATE.startTimeMin;
-        for (const seg of BUILDER_STATE.segments) {
-            const segStart = runningTime;
-            const segEnd = runningTime + seg.duration_min;
-            if (isAnchored(seg.component_id) && insertTimeAbs > segStart && insertTimeAbs < segEnd) {
-                APP.Utils.showToast("Cannot drop into an anchored segment (Break/Lunch).", "warning");
-                return;
-            }
-            runningTime += seg.duration_min;
-        }
-        // --- END NEW CHECK ---
-
-        // Insert new stone
-        const newSegments = insertStone(
+        // --- THIS IS THE LOGIC CHANGE ---
+        // We now call carveOutTime, which REPLACES time, instead of insertStone, which PUSHES time.
+        const newSegments = carveOutTime(
             BUILDER_STATE.segments,
             componentId,
             component.default_duration_min,
             insertTimeAbs
         );
-        BUILDER_STATE.segments = newSegments;
-        renderTimeline();
-        saveVisualHistory();
+        
+        // newSegments will be null if the carve-out failed (e.g., dropped on a break)
+        if (newSegments) {
+            BUILDER_STATE.segments = newSegments;
+            renderTimeline();
+            saveVisualHistory();
+        }
+        // --- END LOGIC CHANGE ---
     };
 
     // --- POPUP & MENU ---
@@ -1931,21 +1978,39 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             APP.Utils.showToast("Invalid duration.", "danger");
             return;
         }
-        if (startTime === null) {
-             APP.Utils.showToast("Invalid start time. Use HH:MM format.", "danger");
-            return;
-        }
 
-        let base = BUILDER_STATE.segments;
         if (isEditing) {
+             // --- EDIT LOGIC (Unchanged) ---
              // If editing, we just update the duration and let normalization handle it
+             let base = BUILDER_STATE.segments;
              base[editIndex].duration_min = durationToAdd;
+             BUILDER_STATE.segments = normalizeShiftLength(base);
+             // --- END EDIT LOGIC ---
+
         } else {
-             // If adding, insert the stone
-             base = insertStone(base, componentId, durationToAdd, startTime);
+            // --- ADD LOGIC (CHANGED) ---
+            if (startTime === null) {
+                 APP.Utils.showToast("Invalid start time. Use HH:MM format.", "danger");
+                return;
+            }
+            
+            // We now call carveOutTime, which REPLACES time.
+            const newSegments = carveOutTime(
+                BUILDER_STATE.segments,
+                componentId,
+                durationToAdd,
+                startTime
+            );
+            
+            // newSegments will be null if the carve-out failed
+            if (!newSegments) {
+                // Error toast was already shown by carveOutTime
+                return;
+            }
+            BUILDER_STATE.segments = newSegments;
+            // --- END ADD LOGIC ---
         }
 
-        BUILDER_STATE.segments = normalizeShiftLength(base);
         renderTimeline();
         saveVisualHistory();
         closeAddPopup();
