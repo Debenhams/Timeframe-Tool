@@ -2064,16 +2064,28 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 
             html += `
             <tr data-definition-id="${def.id}">
-                <td><strong>${def.code}</strong></td>
-                <td>${def.name}</td>
+                <td>
+                    <strong class="display-value">${def.code}</strong>
+                    <input type="text" class="form-input edit-value" name="def-code" value="${def.code}" style="display:none;">
+                </td>
+                <td>
+                    <span class="display-value">${def.name}</span>
+                    <input type="text" class="form-input edit-value" name="def-name" value="${def.name}" style="display:none;">
+                </td>
+
                 <td>${APP.Utils.formatDuration(totalDuration)}</td>
                 <td>${APP.Utils.formatDuration(paidDuration)}</td>
+
                 <td class="actions">
+                    <button class="btn btn-sm btn-secondary btn-edit-shift" data-definition-id="${def.id}">Edit</button>
                     <button class="btn btn-sm btn-primary edit-structure" data-definition-id="${def.id}">Edit Structure</button>
                     <button class="btn btn-sm btn-danger delete-definition" data-definition-id="${def.id}">Delete</button>
+
+                    <button class="btn btn-sm btn-success btn-save-shift" data-definition-id="${def.id}" style="display:none;">Save</button>
+                    <button class="btn btn-sm btn-secondary btn-cancel-shift" data-definition-id="${def.id}" style="display:none;">Cancel</button>
                 </td>
             </tr>`;
-        });
+});
         html += '</tbody></table>';
         ELS.grid.innerHTML = html;
 
@@ -2116,9 +2128,13 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
     };
     
     const handleGridClick = (e) => {
+        const row = e.target.closest('tr');
+        if (!row) return;
+        const definitionId = row.dataset.definitionId;
+        if (!definitionId) return;
+
         if (e.target.classList.contains('edit-structure')) {
-            // Open the shared Sequential Builder in 'definition' mode
-            const definitionId = e.target.dataset.definitionId;
+            // Open the shared Sequential Builder
             const definition = APP.StateManager.getShiftDefinitionById(definitionId);
             if (definition && APP.Components.SequentialBuilder) {
                 APP.Components.SequentialBuilder.open({
@@ -2129,7 +2145,15 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
                 });
             }
         } else if (e.target.classList.contains('delete-definition')) {
-            handleDeleteDefinition(e.target.dataset.definitionId);
+            handleDeleteDefinition(definitionId);
+
+        // --- NEW LOGIC FOR NEW BUTTONS ---
+        } else if (e.target.classList.contains('btn-edit-shift')) {
+            toggleRowEdit(row, true);
+        } else if (e.target.classList.contains('btn-cancel-shift')) {
+            toggleRowEdit(row, false);
+        } else if (e.target.classList.contains('btn-save-shift')) {
+            handleSave(definitionId, row);
         }
     };
 
@@ -2237,7 +2261,64 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             html += '</tr>';
         });
         html += '</tbody></table>';
+const toggleRowEdit = (row, isEditing) => {
+        if (!row) return;
+        // Toggle display/edit fields
+        row.querySelectorAll('.display-value').forEach(el => el.style.display = isEditing ? 'none' : '');
+        row.querySelectorAll('.edit-value').forEach(el => el.style.display = isEditing ? 'block' : 'none');
 
+        // Toggle buttons
+        row.querySelector('.btn-edit-shift').style.display = isEditing ? 'none' : '';
+        row.querySelector('.edit-structure').style.display = isEditing ? 'none' : '';
+        row.querySelector('.delete-definition').style.display = isEditing ? 'none' : '';
+        row.querySelector('.btn-save-shift').style.display = isEditing ? 'inline-block' : 'none';
+        row.querySelector('.btn-cancel-shift').style.display = isEditing ? 'inline-block' : 'none';
+
+        if (!isEditing) {
+            // Reset values on cancel
+            const code = row.querySelector('.edit-value[name="def-code"]');
+            const name = row.querySelector('.edit-value[name="def-name"]');
+            // Find the original values from the display spans and reset the inputs
+            code.value = row.querySelector('td:nth-child(1) .display-value').textContent;
+            name.value = row.querySelector('td:nth-child(2) .display-value').textContent;
+        }
+    };
+
+    const handleSave = async (id, row) => {
+        const newCode = row.querySelector('input[name="def-code"]').value.trim();
+        const newName = row.querySelector('input[name="def-name"]').value.trim();
+
+        if (!newCode || !newName) {
+            APP.Utils.showToast("Code and Name are required.", "danger");
+            return;
+        }
+
+        const originalDefinition = APP.StateManager.getShiftDefinitionById(id);
+
+        // Check if code already exists (and it's not the original code)
+        if (newCode !== originalDefinition.code && APP.StateManager.getShiftDefinitionByCode(newCode)) {
+            APP.Utils.showToast("Error: That code already exists.", "danger");
+            return;
+        }
+
+        const updates = { code: String(newCode), name: newName };
+
+        const { data, error } = await APP.DataService.updateRecord('shift_definitions', updates, { id: id });
+
+        if (!error) {
+            APP.StateManager.syncRecord('shift_definitions', data);
+            APP.StateManager.saveHistory("Edit Shift Definition");
+            APP.Utils.showToast("Shift definition updated.", "success");
+            ShiftDefinitionEditor.render(); // Re-render this table
+
+            // Re-render rotation editor to update dropdowns
+            if (APP.Components.RotationEditor) {
+                 APP.Components.RotationEditor.renderGrid();
+            }
+        } else {
+            APP.Utils.showToast("Error updating shift. Check console.", "danger");
+        }
+    };
         // V15.8.1: Added "Delete Last Week" button
         // Inline "Add Week" and "Delete Week" (only when a rotation is selected)
         if (pattern) {
