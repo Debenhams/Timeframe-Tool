@@ -2499,13 +2499,16 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         ELS.btnNew = document.getElementById('btnNewRotation');
         ELS.btnDelete = document.getElementById('btnDeleteRotation');
         ELS.btnAddWeek = document.getElementById('btnAddWeek'); // (Top Button)
+        ELS.btnDeleteFirstWeek = document.getElementById('btnDeleteFirstWeek'); // <-- ADD THIS LINE
         ELS.grid = document.getElementById('rotationGrid');
         ELS.autoSaveStatus = document.getElementById('autoSaveStatus');
 
         if (ELS.familySelect) ELS.familySelect.addEventListener('change', handleFamilyChange);
-        if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNewRotation);
+   
+     if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNewRotation);
         if (ELS.btnDelete) ELS.btnDelete.addEventListener('click', handleDeleteRotation);
         if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeekTop);
+        if (ELS.btnDeleteFirstWeek) ELS.btnDeleteFirstWeek.addEventListener('click', handleDeleteFirstWeek); // <-- ADD THIS LINE
         if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
     };
 
@@ -2673,12 +2676,15 @@ const toggleRowEdit = (row, isEditing) => {
                     }
                 });
             });
-        }
+}
 
         // Enable/Disable Add Week button based on selection
         if (ELS.btnAddWeek) {
             ELS.btnAddWeek.disabled = !pattern;
-        }
+}
+        if (ELS.btnDeleteFirstWeek) { // <-- ADD THIS
+            ELS.btnDeleteFirstWeek.disabled = !pattern || numWeeks === 0; // <-- ADD THIS
+        } // <-- ADD THIS
     };
 
     // Helper: Finds the correct key in the pattern data (handles "Week 1", "Week1", "week1" etc.)
@@ -2846,12 +2852,62 @@ const toggleRowEdit = (row, isEditing) => {
         } else {
             // Rollback local change if save failed
             pattern.pattern[lastWeekKey] = deletedWeekData;
+          // Error toast is shown by DataService
+        }
+    };
+
+    // V16.15: Handle deleting the *first* week from the existing rotation
+    const handleDeleteFirstWeek = async () => {
+        const STATE = APP.StateManager.getState();
+        const rotationName = STATE.currentRotation;
+        const pattern = APP.StateManager.getPatternByName(rotationName);
+
+        if (!pattern || !pattern.pattern) return;
+        
+        // Determine the current maximum week number
+        const maxWeek = APP.Utils.calculateRotationLength(pattern);
+        if (maxWeek === 0) {
+            APP.Utils.showToast("Rotation is already empty.", "warning");
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to delete Week 1 from ${rotationName}?\n\nThis will shift all other weeks up. This action cannot be undone easily.`)) {
+            return;
+        }
+
+        // 1. Create a new, empty pattern object
+        const newPatternData = {};
+        const originalPatternData = JSON.parse(JSON.stringify(pattern.pattern)); // For rollback
+
+        // 2. Re-index and copy all existing weeks, skipping Week 1
+        for (let w = 2; w <= maxWeek; w++) {
+            // Find the key for the old week (e.g., "Week 2")
+            const oldWeekKey = findWeekKey(pattern.pattern, w);
+            if (oldWeekKey) {
+                // Create the new key (e.g., "Week 1")
+                const newWeekKey = `Week ${w - 1}`;
+                // Copy the data
+                newPatternData[newWeekKey] = pattern.pattern[oldWeekKey];
+            }
+        }
+        
+        // 3. Save the new, re-indexed pattern (Auto-Save Architecture)
+        const { error } = await APP.DataService.updateRecord('rotation_patterns', { pattern: newPatternData }, { name: rotationName });
+        
+        if (!error) {
+            // Manually update the local state to match
+            pattern.pattern = newPatternData;
+            APP.StateManager.saveHistory(`Delete Week 1 (Top)`);
+            APP.Utils.showToast(`Week 1 deleted and rotation re-indexed.`, "success");
+            RotationEditor.renderGrid(); // Re-render the grid
+        } else {
+            // Rollback local change if save failed
+            pattern.pattern = originalPatternData;
             // Error toast is shown by DataService
         }
     };
 
-
-    const handleDeleteRotation = async () => {
+const handleDeleteRotation = async () => {
         const STATE = APP.StateManager.getState();
         const rotationName = STATE.currentRotation;
         if (!rotationName || !confirm(`Delete '${rotationName}'?`)) return;
