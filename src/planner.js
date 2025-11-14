@@ -1207,16 +1207,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 
     APP.Components = APP.Components || {};
     APP.Components.AssignmentManager = AssignmentManager;
-// Helper function for SequentialBuilder to identify "solid" (un-shrinkable) components
-const isSolidComponent = (componentId) => {
-    if (!componentId) return false;
-    // We have to use APP.StateManager here because BUILDER_STATE isn't initialized yet
-    const component = APP.StateManager.getComponentById(componentId); 
-    if (!component) return false;
-    const type = component.type.toLowerCase();
-    // Breaks and Lunches are "solid"
-    return (type === 'break' || type === 'lunch');
-};
+
 }(window.APP));
 
 /**
@@ -1256,7 +1247,16 @@ const isSolidComponent = (componentId) => {
         visualHistoryIndex: -1,
         contextMenuIndex: -1
     };
-
+// Helper function to identify "solid" (un-shrinkable) components
+    const isSolidComponent = (componentId) => {
+        if (!componentId) return false;
+        // We use APP.StateManager here because we're inside the module
+        const component = APP.StateManager.getComponentById(componentId); 
+        if (!component) return false;
+        const type = component.type.toLowerCase();
+        // Breaks and Lunches are "solid"
+        return (type === 'break' || type === 'lunch');
+    };
     const parseTimeToMinutes = (timeStr) => {
         const parts = (timeStr || "").split(':');
         if (parts.length !== 2) return null;
@@ -1688,7 +1688,7 @@ const normalizeShiftLength = (segments) => {
         // --- B) Segments *after* the insertion point ---
         } else if (inserted && durationToPay > 0 && !isSolidComponent(seg.component_id)) {
             // This is a LIQUID segment *after* our insertion. We can "pay" from it.
-            const remainingDuration = seg.duration_min;
+            const remainingDuration = seg.duration_min - timeBefore;
             const durationToKeep = Math.max(0, remainingDuration - durationToPay);
 
             if (durationToKeep > 0) {
@@ -1706,12 +1706,7 @@ const normalizeShiftLength = (segments) => {
 
     // If we still have duration to pay (e.g., inserted at the end)
     // We let the new, smarter normalizeShiftLength handle it.
-    if (durationToPay > 0) {
-         // This can happen if we didn't find enough liquid time
-         // We'll let normalizeShiftLength (which is now smarter) trim from the end
-         let total = result.reduce((sum, s) => sum + s.duration_min, 0);
-         BUILDER_STATE.fixedShiftLength = total - durationToPay;
-    } else if (!inserted) {
+    if (!inserted) {
         // Failsafe: if it was never inserted (e.g., click at very end), just add it.
         // normalizeShiftLength will handle the trimming.
         result.push({ component_id: componentId, duration_min: duration });
