@@ -513,31 +513,45 @@ overflow-y: scroll; /* Allow vertical scrolling for time */
     /* Activity Blocks (Positioned Events) */
     .activity-block {
         position: absolute;
-        /* Inset slightly from the edges for a cleaner look */
         left: 2px;
         right: 2px; 
-        padding: 2px 4px; /* Minimal padding */
-        font-size: 10px; /* Smaller base font */
-        overflow: hidden; /* CRITICAL: Must be hidden */
+        padding: 3px 6px; /* Good default padding */
+        font-size: 11px;
+        overflow: hidden; /* This is correct */
         border-radius: var(--border-radius);
-        /* Add subtle shadow */
         box-shadow: var(--shadow-sm);
-        pointer-events: auto;
-        line-height: 1.15; /* Very tight line height */
         border: 1px solid rgba(0,0,0,0.1);
-        /* REMOVED min-height and display:flex to restore top-alignment */
+        line-height: 1.2; /* Good default line height */
     }
 
     .activity-title {
         font-weight: 600;
         display: block;
-        font-size: 11px; /* Title slightly larger */
     }
 
     .activity-time {
-        display: block;
-        font-size: 9px; /* Time even smaller */
-        opacity: 0.9;
+        display: block; /* Times are VISIBLE by default */
+        font-size: 10px;
+        opacity: 0.85;
+    }
+    
+    /* --- NEW RULES FOR BREAK/LUNCH ONLY --- */
+    
+    /* This targets ONLY the blocks we tagged in JS */
+    .is-simple-block {
+        display: flex;
+        align-items: center; /* Vertical center */
+        justify-content: center; /* Horizontal center */
+    }
+    
+    /* This HIDES the time ONLY inside those blocks */
+    .is-simple-block .activity-time {
+        display: none;
+    }
+    
+    /* This centers the title ONLY inside those blocks */
+    .is-simple-block .activity-title {
+        text-align: center;
     }
 
 
@@ -1901,11 +1915,21 @@ function drawMyRotaCalendar(){
                 const textColor = getContrastingTextColor(color);
                 
                 // Format: Activity \n Start - End
-                html += `<div class="activity-block" style="top: ${topPx}px; height: ${heightPx}px; background-color: ${color}; color: ${textColor};">
+                const tooltip = `${seg.code}: ${seg.start} - ${seg.end}`;
+                
+                // --- NEW LOGIC ---
+                let blockClass = 'activity-block';
+                const lowerCode = seg.code.toLowerCase();
+                if (lowerCode.includes('break') || lowerCode.includes('lunch')) {
+                    blockClass += ' is-simple-block';
+                }
+                // --- END NEW LOGIC ---
+
+                html += `<div class="${blockClass}" title="${tooltip}" style="top: ${topPx}px; height: ${heightPx}px; background-color: ${color}; color: ${textColor};">
                             <span class="activity-title">${seg.code}</span>
                             <span class="activity-time">${seg.start} - ${seg.end}</span>
-                         </div>`;
-            }
+                  </div>`;
+}
         });
 
         html += `</div>`; // Close day-column-events
