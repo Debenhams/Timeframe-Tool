@@ -330,7 +330,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         }
 if (error) return handleError(error, 'Fetch effective assignments');
 
-        // --- BEGIN FIX ---
+// --- BEGIN FIX ---
         // If the history table exists but is EMPTY, fall back to the snapshot
         if (!data || data.length === 0) {
             console.warn("History table is empty. Falling back to snapshot assignments.");
@@ -338,7 +338,7 @@ if (error) return handleError(error, 'Fetch effective assignments');
         }
         // --- END FIX ---
 
-        const byAdvisor = new Map();
+const byAdvisor = new Map();
 (data || []).forEach(row => {
           const existing = byAdvisor.get(row.advisor_id);
           if (!existing) {
