@@ -351,10 +351,15 @@
                 <input type="text" id="ve-add-start-time" class="form-input" placeholder="e.g., 14:00">
               </div>
               <div class="form-group">
-                <label for="ve-add-duration">Duration (minutes)</label>
-                <input type="number" id="ve-add-duration" class="form-input" min="5" step="5" value="30">
+                <label for="ve-add-end-time">End Time (HH:MM)</label>
+                <input type="text" id="ve-add-end-time" class="form-input" placeholder="e.g., 14:30">
               </div>
-              <div class="ve-add-popup-actions">
+              <div class="form-group">
+                <label for="ve-add-duration-display">Duration (minutes)</label>
+                <input type="text" id="ve-add-duration-display" class="form-input" disabled>
+              </div>
+       
+       <div class="ve-add-popup-actions">
                 <button class="btn btn-sm btn-secondary" id="ve-add-popup-cancel">Cancel</button>
                 <button class="btn btn-sm btn-primary" id="ve-add-popup-save">Add</button>
               </div>

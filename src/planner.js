@@ -1307,10 +1307,16 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         ELS.visualEditorAddPopup = document.getElementById('visualEditorAddPopup');
         ELS.veAddPopupTitle = document.getElementById('ve-add-popup-title');
         ELS.veAddStartTime = document.getElementById('ve-add-start-time');
-        ELS.veAddDuration = document.getElementById('ve-add-duration');
+        ELS.veAddEndTime = document.getElementById('ve-add-end-time');
+        ELS.veAddDurationDisplay = document.getElementById('ve-add-duration-display');
         ELS.veAddPopupCancel = document.getElementById('ve-add-popup-cancel');
         ELS.veAddPopupSave = document.getElementById('ve-add-popup-save');
-        // Legacy Elements
+        
+        // Add listeners to auto-calculate duration
+        if (ELS.veAddStartTime) ELS.veAddStartTime.addEventListener('change', updateDurationDisplay);
+        if (ELS.veAddEndTime) ELS.veAddEndTime.addEventListener('change', updateDurationDisplay);
+
+// Legacy Elements
         ELS.legacyEditorContainer = document.getElementById('legacyEditorContainer');
         ELS.modalStartTime = document.getElementById('modalStartTime');
         ELS.modalAddActivity = document.getElementById('modalAddActivity');
@@ -1941,7 +1947,28 @@ ELS.exceptionReasonGroup.style.display = 'none';
         }
         // --- END LOGIC CHANGE ---
     };
+const updateDurationDisplay = () => {
+        const startMin = parseTimeToMinutes(ELS.veAddStartTime.value);
+        const endMin = parseTimeToMinutes(ELS.veAddEndTime.value);
 
+        if (startMin !== null && endMin !== null) {
+            let duration = endMin - startMin;
+            if (duration < 0) {
+                // Handle overnight (e.g., 22:00 to 02:00)
+                duration = (1440 - startMin) + endMin;
+            }
+            
+            if (duration < 0) duration = 0;
+            
+            if (ELS.veAddDurationDisplay) {
+                ELS.veAddDurationDisplay.value = `${duration} minutes`;
+            }
+        } else {
+            if (ELS.veAddDurationDisplay) {
+                ELS.veAddDurationDisplay.value = '';
+            }
+        }
+    };
     // --- POPUP & MENU ---
     
     const handleToolboxClick = (e) => {
@@ -1959,7 +1986,8 @@ ELS.exceptionReasonGroup.style.display = 'none';
         BUILDER_STATE.addPopupState = { isOpen: true, componentId, componentName, isEditing: false, editIndex: -1 };
         ELS.veAddPopupTitle.textContent = `Add: ${componentName}`;
         ELS.veAddStartTime.value = '';
-        ELS.veAddDuration.value = '30';
+        ELS.veAddEndTime.value = '';
+        ELS.veAddDurationDisplay.value = '';
         ELS.visualEditorAddPopup.style.display = 'block';
         ELS.veAddStartTime.focus();
     };
@@ -1971,13 +1999,26 @@ ELS.exceptionReasonGroup.style.display = 'none';
 
     const handleAddPopupSave = () => {
         const { componentId, isEditing, editIndex } = BUILDER_STATE.addPopupState;
-        const startTime = parseTimeToMinutes(ELS.veAddStartTime.value);
-        const durationToAdd = parseInt(ELS.veAddDuration.value, 10);
+const startTime = parseTimeToMinutes(ELS.veAddStartTime.value);
+        const endTime = parseTimeToMinutes(ELS.veAddEndTime.value);
         
-        if (isNaN(durationToAdd) || durationToAdd <= 0) {
-            APP.Utils.showToast("Invalid duration.", "danger");
+        // --- NEW DURATION CALCULATION ---
+        if (startTime === null || endTime === null) {
+            APP.Utils.showToast("Invalid Start or End time. Use HH:MM format.", "danger");
             return;
         }
+
+        let durationToAdd = endTime - startTime;
+        if (durationToAdd < 0) {
+            // Handle overnight
+            durationToAdd = (1440 - startTime) + endTime;
+        }
+        
+        if (isNaN(durationToAdd) || durationToAdd <= 0) {
+            APP.Utils.showToast("Invalid duration. End time must be after start time.", "danger");
+return;
+        }
+        // --- END NEW DURATION CALCULATION ---
 
         if (isEditing) {
              // --- EDIT LOGIC (Unchanged) ---
@@ -2067,9 +2108,10 @@ ELS.exceptionReasonGroup.style.display = 'none';
             };
             ELS.veAddPopupTitle.textContent = `Edit: ${component.name}`;
             ELS.veAddStartTime.value = APP.Utils.formatMinutesToTime(time);
-            ELS.veAddDuration.value = seg.duration_min;
-            
-            // Don't allow changing start time for anchored items
+            ELS.veAddEndTime.value = APP.Utils.formatMinutesToTime(time + seg.duration_min);
+            ELS.veAddDurationDisplay.value = `${seg.duration_min} minutes`;
+
+// Don't allow changing start time for anchored items
             ELS.veAddStartTime.disabled = isAnchored(seg.component_id);
 
             ELS.visualEditorAddPopup.style.display = 'block';
