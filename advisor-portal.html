@@ -513,14 +513,15 @@ overflow-y: scroll; /* Allow vertical scrolling for time */
     /* Activity Blocks (Positioned Events) */
     .activity-block {
         position: absolute;
-        left: 2px;
+left: 2px;
         right: 2px; 
         padding: 3px 6px; /* Good default padding */
         font-size: 11px;
-        overflow: hidden; /* This is correct */
+overflow: hidden; /* This is correct */
         border-radius: var(--border-radius);
         box-shadow: var(--shadow-sm);
-        border: 1px solid rgba(0,0,0,0.1);
+border: 1px solid rgba(0,0,0,0.1);
+        pointer-events: auto; /* <-- ADD THIS LINE */
         line-height: 1.2; /* Good default line height */
     }
 
