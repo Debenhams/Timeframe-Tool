@@ -696,7 +696,7 @@ overflow-y: scroll; /* Allow vertical scrolling for time */
         position: absolute;
         left: 0; top: 0; height: 5000px; width: 1px;
         background-color: var(--color-border);
-        z-index: 1;
+       z-index: -1;
     }
 
     .timeline-body {
@@ -787,6 +787,12 @@ overflow-y: scroll; /* Allow vertical scrolling for time */
            padding: 16px;
        }
     }
+
+    /* Hides text for simple blocks on Team Schedule */
+    #tab-team-schedule .timeline-bar.is-simple-block span {
+        display: none;
+    }
+
   </style>
 </head>
 <body>
@@ -2101,9 +2107,17 @@ function renderGanttSegments(segments) {
         // Calculate contrasting text color
         const textColor = getContrastingTextColor(color);
 
+        // --- NEW LOGIC ---
+        let blockClass = 'timeline-bar';
+        const lowerCode = seg.code.toLowerCase();
+        if (lowerCode.includes('break') || lowerCode.includes('lunch')) {
+            blockClass += ' is-simple-block';
+        }
+        // --- END NEW LOGIC ---
+
         // The 'title' attribute provides the native browser tooltip on hover.
         return `
-        <div class="timeline-bar" style="left: ${startPct}%; width: ${widthPct}%; background-color: ${color}; color: ${textColor};" title="${seg.code} (${seg.start} - ${seg.end})">
+        <div class="${blockClass}" style="left: ${startPct}%; width: ${widthPct}%; background-color: ${color}; color: ${textColor};" title="${seg.code} (${seg.start} - ${seg.end})">
             <span>${seg.code}</span>
         </div>
         `;
