@@ -2120,11 +2120,19 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         const absoluteTimeSegments = [];
         let currentTime = startTimeMin;
 
-        // Final normalization
-        const normalized = normalizeShiftLength(segments);
-        
-        // Final check for zero-duration segments (from aggressive trimming)
-        const finalSegments = normalized.filter(seg => seg.duration_min > 0);
+        // --- BEGIN FIX ---
+        let finalSegments;
+        if (mode === 'exception') {
+            // For exceptions, we MUST normalize to maintain the fixed shift length
+            const normalized = normalizeShiftLength(segments);
+            // Final check for zero-duration segments (from aggressive trimming)
+            finalSegments = normalized.filter(seg => seg.duration_min > 0);
+        } else {
+            // For definitions, the length is dynamic. DO NOT normalize.
+            // Just filter out any accidental zero-duration segments.
+            finalSegments = segments.filter(seg => seg.duration_min > 0);
+        }
+        // --- END FIX ---
 
         for (const seg of finalSegments) {
             if (!seg.component_id) {
