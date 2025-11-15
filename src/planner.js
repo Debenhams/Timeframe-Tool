@@ -316,7 +316,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
     DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
       try {
         const weekEndISO = APP.Utils.addDaysISO(isoDate, 6);
-        
         const { data, error } = await supabase
           .from(HISTORY_TABLE)
           // V16.13: Added start_week_offset to selection
@@ -324,22 +323,22 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
           .lte('start_date', weekEndISO)
           .or(`end_date.is.null,end_date.gte.${isoDate}`)
           .order('id', { ascending: true });
-
+          
         if (error && (error.code === '42P01' || error.code === 'PGRST116')) {
             return await fetchSnapshotAssignments();
         }
-if (error) return handleError(error, 'Fetch effective assignments');
+        if (error) return handleError(error, 'Fetch effective assignments');
 
-// --- BEGIN FIX ---
+        // --- THIS IS THE FIX ---
         // If the history table exists but is EMPTY, fall back to the snapshot
         if (!data || data.length === 0) {
             console.warn("History table is empty. Falling back to snapshot assignments.");
             return await fetchSnapshotAssignments();
         }
-        // --- END FIX ---
+        // --- END OF FIX ---
 
-const byAdvisor = new Map();
-(data || []).forEach(row => {
+        const byAdvisor = new Map();
+        (data || []).forEach(row => {
           const existing = byAdvisor.get(row.advisor_id);
           if (!existing) {
             byAdvisor.set(row.advisor_id, row);
@@ -354,7 +353,7 @@ const byAdvisor = new Map();
             if (rowIsBounded && !existingIsBounded) {
                  byAdvisor.set(row.advisor_id, row);
             } else if (rowIsBounded === existingIsBounded) {
-                 byAdvisor.set(row.advisor_id, row); 
+                byAdvisor.set(row.advisor_id, row); 
             }
           }
         });
