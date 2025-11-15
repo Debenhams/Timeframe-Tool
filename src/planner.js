@@ -1421,9 +1421,9 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             
             renderToolbox();
             renderTimeline();
-        } else {
-            if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'block';
-            ELS.exceptionReasonGroup.style.display = 'none';
+} else {
+            if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'flex';
+ELS.exceptionReasonGroup.style.display = 'none';
             ELS.modalSave.textContent = "Save Definition";
             if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
                 ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
