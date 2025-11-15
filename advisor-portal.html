@@ -728,10 +728,11 @@ position: absolute;
       position: absolute;
       top: 0;
       height: 100%;
-      display: flex;
+display: flex;
       align-items: center;
       overflow: hidden;
-      border-radius: var(--border-radius);
+      border-radius: var(--border-radius); /* This is correct */
+      z-index: 25; /* <-- THIS IS THE FIX */
       font-size: 12px;
       font-weight: 500;
       padding-left: 6px;
