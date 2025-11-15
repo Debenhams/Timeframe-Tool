@@ -804,7 +804,9 @@ tbody tr:hover { background-color: var(--color-hover-bg); }
     flex-grow: 1; /* Allows it to fill the modal body */
     min-height: 0; /* Critical for child overflow scrolling in a flex parent */
 }
-.builder-controls { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
+
+.builder-controls { display: flex; justify-content: space-between; align-items: flex-end;
+margin-bottom: 24px; }
 .time-picker-input { width: 120px; }
 .builder-grid-container { flex-grow: 1; overflow-y: auto; border-radius: var(--border-radius); }
 .builder-grid th { font-size: 12px; padding: 10px 16px; position: sticky; top: 0; z-index: 1; }

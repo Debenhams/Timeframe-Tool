@@ -1429,10 +1429,10 @@ if (error) return handleError(error, 'Fetch effective assignments');
             
             renderToolbox();
             renderTimeline();
-        } else {
-        if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'flex';
-        ELS.exceptionReasonGroup.style.display = 'none';
-        ELS.modalSave.textContent = "Save Definition";
+} else {
+            if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'flex';
+ELS.exceptionReasonGroup.style.display = 'none';
+            ELS.modalSave.textContent = "Save Definition";
             if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
                 ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
             }
