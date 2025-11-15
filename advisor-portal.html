@@ -725,20 +725,20 @@ overflow-y: scroll; /* Allow vertical scrolling for time */
     .timeline-track { position: relative; height: 100%; }
 
 .timeline-bar {
-  position: absolute;
-  top: 2px;
-  height: calc(var(--timeline-row-height) - 4px);
-  display: flex;
-  align-items: center;
-  overflow: hidden;
-  border-radius: var(--border-radius);
-  z-index: 5;
-  font-size: 12px;
-  font-weight: 500;
-  padding-left: 6px;
-  white-space: nowrap;
-  box-shadow: var(--shadow-sm);
-}
+      position: absolute;
+      top: 0;                          /* Fix for gaps */
+      height: 100%;                    /* Fix for gaps */
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      border-radius: 0;                /* Fix for arched edges */
+      z-index: 25;                     /* NEW FIX for white lines */
+      font-size: 12px;
+      font-weight: 500;
+      padding-left: 6px;
+      white-space: nowrap;
+      box-shadow: var(--shadow-sm);
+    }
 
 
     /* === Placeholder Content === */
