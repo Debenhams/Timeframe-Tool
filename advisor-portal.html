@@ -467,7 +467,7 @@ overflow-y: scroll; /* Allow vertical scrolling for time */
     /* Time Axis (Left Column) - Improved alignment */
     .time-axis-cell {
         border-right: 1px solid var(--color-border);
-        border-bottom: 1px solid #F3F4F6; /* Lighter dotted line for half hours */
+        border-bottom: none;
         height: var(--timegrid-row-height);
         display: flex;
         align-items: flex-start;
@@ -493,9 +493,9 @@ overflow-y: scroll; /* Allow vertical scrolling for time */
     }
 
     /* Solid line for hour marks */
-    .time-axis-cell.hour-mark, .day-column-cell.hour-mark {
-        border-bottom: 1px solid var(--color-border);
-    }
+.day-column-cell.hour-mark {
+    border-bottom: 1px solid var(--color-border);
+}
 
     /* Containers for the absolutely positioned events */
     .day-column-events {
