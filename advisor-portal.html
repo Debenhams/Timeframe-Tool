@@ -510,49 +510,54 @@ overflow-y: scroll; /* Allow vertical scrolling for time */
         border-right: none;
     }
 
-    /* Activity Blocks (Positioned Events) */
-    .activity-block {
+    /* === MY SCHEDULE: Activity Blocks (Positioned Events) === */
+    /* This rule applies to ALL blocks ONLY in the My Schedule tab */
+    #tab-my-schedule .activity-block {
         position: absolute;
-left: 2px;
+        left: 2px;
         right: 2px; 
-        padding: 3px 6px; /* Good default padding */
+        padding: 3px 6px;
         font-size: 11px;
-overflow: hidden; /* This is correct */
+        overflow: hidden;
         border-radius: var(--border-radius);
         box-shadow: var(--shadow-sm);
-border: 1px solid rgba(0,0,0,0.1);
-        pointer-events: auto; /* <-- ADD THIS LINE */
-        line-height: 1.2; /* Good default line height */
+        border: 1px solid rgba(0,0,0,0.1);
+        line-height: 1.2;
+        
+        /* FIX 1: This enables the mouse hover for the tooltip */
+        pointer-events: auto; 
+        
+        /* FIX 2: This centers ALL text (DEB Email, Break, etc.) */
+        display: flex;
+        flex-direction: column; /* Stacks title/time vertically */
+        align-items: center;     /* Horizontal center */
+        justify-content: center;  /* Vertical center */
+        text-align: center;
     }
 
-    .activity-title {
+    /* This rule applies to ALL titles (DEB Email, Break...) */
+    #tab-my-schedule .activity-title {
         font-weight: 600;
         display: block;
     }
 
-    .activity-time {
-        display: block; /* Times are VISIBLE by default */
+    /* This rule makes ALL times visible by default */
+    #tab-my-schedule .activity-time {
+        display: block;
         font-size: 10px;
         opacity: 0.85;
     }
     
-    /* --- NEW RULES FOR BREAK/LUNCH ONLY --- */
+    /* --- Overrides for Break/Lunch ONLY --- */
     
-    /* This targets ONLY the blocks we tagged in JS */
-    .is-simple-block {
-        display: flex;
-        align-items: center; /* Vertical center */
-        justify-content: center; /* Horizontal center */
-    }
-    
-    /* This HIDES the time ONLY inside those blocks */
-    .is-simple-block .activity-time {
+    /* This HIDES the time ONLY for Break/Lunch */
+    #tab-my-schedule .is-simple-block .activity-time {
         display: none;
     }
     
-    /* This centers the title ONLY inside those blocks */
-    .is-simple-block .activity-title {
-        text-align: center;
+    /* FIX 3: This NUDGES the text down ONLY for Break/Lunch */
+    #tab-my-schedule .is-simple-block .activity-title {
+        padding-top: 2px; /* Nudge text down slightly */
     }
 
 
