@@ -1310,14 +1310,17 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         ELS.veUndo = document.getElementById('ve-undo');
         ELS.veRedo = document.getElementById('ve-redo');
         
-        // Popups
+        // --- THIS IS THE FIX ---
+        // Popups (Caches all the new elements)
         ELS.visualEditorAddPopup = document.getElementById('visualEditorAddPopup');
         ELS.veAddPopupTitle = document.getElementById('ve-add-popup-title');
-ELS.veAddStartTime = document.getElementById('ve-add-start-time');
-ELS.veAddEndTime = document.getElementById('ve-add-end-time'); // <-- NEW
-ELS.veAddDurationDisplay = document.getElementById('ve-add-duration-display'); // <-- NEW
-ELS.veAddPopupCancel = document.getElementById('ve-add-popup-cancel');
+        ELS.veAddStartTime = document.getElementById('ve-add-start-time');
+        ELS.veAddEndTime = document.getElementById('ve-add-end-time');
+        ELS.veAddDurationDisplay = document.getElementById('ve-add-duration-display');
+        ELS.veAddPopupCancel = document.getElementById('ve-add-popup-cancel');
         ELS.veAddPopupSave = document.getElementById('ve-add-popup-save');
+        // --- END FIX ---
+
         // Legacy Elements
         ELS.legacyEditorContainer = document.getElementById('legacyEditorContainer');
         ELS.modalStartTime = document.getElementById('modalStartTime');
@@ -1358,13 +1361,13 @@ ELS.veAddPopupCancel = document.getElementById('ve-add-popup-cancel');
         if (ELS.veAddPopupCancel) ELS.veAddPopupCancel.addEventListener('click', closeAddPopup);
         if (ELS.veAddPopupSave) ELS.veAddPopupSave.addEventListener('click', handleAddPopupSave);
         
-        // --- NEW ---
-        // Add listeners to auto-calculate duration
+        // --- THIS IS THE FIX ---
+        // Add listeners to auto-calculate duration (flatpickr code is removed)
         if (ELS.veAddStartTime) ELS.veAddStartTime.addEventListener('change', updateDurationDisplay);
         if (ELS.veAddEndTime) ELS.veAddEndTime.addEventListener('change', updateDurationDisplay);
-        // --- END NEW ---
+        // --- END FIX ---
 
-if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.addEventListener('click', handleContextMenuClick);
+        if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.addEventListener('click', handleContextMenuClick);
         if (ELS.veUndo) ELS.veUndo.addEventListener('click', handleUndo);
         if (ELS.veRedo) ELS.veRedo.addEventListener('click', handleRedo);
 
@@ -1385,8 +1388,8 @@ if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.addEventListener('c
                      if (newTimeMin !== null && newTimeMin !== BUILDER_STATE.startTimeMin) {
                         BUILDER_STATE.startTimeMin = newTimeMin;
                         if (BUILDER_STATE.isOpen && BUILDER_STATE.mode === 'definition') renderLegacyTable();
-                   
-     }
+               
+                 }
                 }
             });
         }
@@ -1979,12 +1982,11 @@ const updateDurationDisplay = () => {
     };
     // --- POPUP & MENU ---
     
-    const handleToolboxClick = (e) => {
+   const handleToolboxClick = (e) => {
         // Click fallback for touch/non-drag users
         const item = e.target.closest('.ve-toolbox-item');
         if (!item) return;
         const { componentId, componentName } = item.dataset;
-        
         // Don't allow adding anchored components this way
         if (isAnchored(componentId)) {
             APP.Utils.showToast("Breaks and Lunches are anchored. Please edit them directly on the timeline.", "warning");
@@ -1992,11 +1994,16 @@ const updateDurationDisplay = () => {
         }
 
         BUILDER_STATE.addPopupState = { isOpen: true, componentId, componentName, isEditing: false, editIndex: -1 };
+        
+        // --- THIS IS THE FIX ---
+        // (Ensures all new elements are reset)
         ELS.veAddPopupTitle.textContent = `Add: ${componentName}`;
-ELS.veAddStartTime.value = '';
-ELS.veAddEndTime.value = ''; // <-- NEW
-ELS.veAddDurationDisplay.value = ''; // <-- NEW
-ELS.visualEditorAddPopup.style.display = 'block';
+        ELS.veAddStartTime.value = '';
+        ELS.veAddEndTime.value = '';
+        ELS.veAddDurationDisplay.value = '';
+        ELS.visualEditorAddPopup.style.display = 'block';
+        // --- END FIX ---
+
         ELS.veAddStartTime.focus();
     };
 
