@@ -380,9 +380,10 @@
     /* 1. Top Summary Section */
     .summary-grid {
         display: grid;
-        grid-template-columns: 80px repeat(7, 1fr); /* 80px for the time axis label */
+grid-template-columns: 80px repeat(7, 1fr); /* 80px for the time axis label */
         border-bottom: 2px solid var(--color-border);
-        flex-shrink: 0; /* Prevent summary from shrinking */
+flex-shrink: 0; /* Prevent summary from shrinking */
+        padding-right: 17px; /* Compensate for the scrollbar on the grid below */
     }
 
     .summary-header {
