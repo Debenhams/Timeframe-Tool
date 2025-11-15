@@ -328,18 +328,10 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         if (error && (error.code === '42P01' || error.code === 'PGRST116')) {
             return await fetchSnapshotAssignments();
         }
-if (error) return handleError(error, 'Fetch effective assignments');
-
-        // --- BEGIN FIX ---
-        // If the history table exists but is EMPTY, fall back to the snapshot
-        if (!data || data.length === 0) {
-            console.warn("History table is empty. Falling back to snapshot assignments.");
-            return await fetchSnapshotAssignments();
-        }
-        // --- END FIX ---
+        if (error) return handleError(error, 'Fetch effective assignments');
 
         const byAdvisor = new Map();
-(data || []).forEach(row => {
+        (data || []).forEach(row => {
           const existing = byAdvisor.get(row.advisor_id);
           if (!existing) {
             byAdvisor.set(row.advisor_id, row);
@@ -1429,9 +1421,9 @@ if (error) return handleError(error, 'Fetch effective assignments');
             
             renderToolbox();
             renderTimeline();
-} else {
-            if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'flex';
-ELS.exceptionReasonGroup.style.display = 'none';
+        } else {
+            if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'block';
+            ELS.exceptionReasonGroup.style.display = 'none';
             ELS.modalSave.textContent = "Save Definition";
             if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
                 ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
