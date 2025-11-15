@@ -2223,7 +2223,7 @@ return;
         BUILDER_STATE.segments.forEach((seg, index) => {
             const start = currentTime;
             const end = currentTime + seg.duration_min;
-            html += `<tr data-index="${index}"><td>${index + 1}</td><td><select class="form-select sequence-component" data-index="${index}"><option value="">-- Select --</option>${componentOptions}</select></td><td><input type="number" class="form-input sequence-duration" data-index="${index}" value="${seg.duration_min}" min="5" step="5"></td><td><input type="text" class="form-input sequence-start-time" data-index="${index}" value="${APP.Utils.formatMinutesToTime(start)}" data-minutes="${start}"></td><td>${APP.Utils.formatMinutesToTime(end)}</td><td class="actions-cell"><div class="btn-group"><button class="btn btn-sm" data-action="insert-before" data-index="${index}">+ Above</button><button class="btn btn-sm" data-action="insert-after" data-index="${index}">+ Below</button><button class="btn btn-sm" data-action="split-row" data-index="${index}">Split</button><button class="btn btn-sm btn-danger delete-sequence-item" data-index="${index}">X</button></div></td></tr>`;
+            html += `<tr data-index="${index}"><td>${index + 1}</td><td><select class="form-select sequence-component" data-index="${index}"><option value="">-- Select --</option>${componentOptions}</select></td><td><input type="number" class="form-input sequence-duration" data-index="${index}" value="${seg.duration_min}" min="5" step="5"></td><td><input type="text" class="form-input sequence-start-time" data-index="${index}" value="${APP.Utils.formatMinutesToTime(start)}" data-minutes="${start}"></td><td><input type="text" class="form-input sequence-end-time" data-index="${index}" value="${APP.Utils.formatMinutesToTime(end)}" data-minutes="${end}"></td><td class="actions-cell"><div class="btn-group"><button class="btn btn-sm" data-action="insert-before" data-index="${index}">+ Above</button><button class="btn btn-sm" data-action="insert-after" data-index="${index}">+ Below</button><button class="btn btn-sm" data-action="split-row" data-index="${index}">Split</button><button class="btn btn-sm btn-danger delete-sequence-item" data-index="${index}">X</button></div></td></tr>`;
             currentTime = end;
         });
         ELS.modalSequenceBody.innerHTML = html;
@@ -2280,9 +2280,35 @@ return;
                 }
                 BUILDER_STATE.segments[index - 1].duration_min = newPrevDuration;
                 BUILDER_STATE.segments[index].duration_min = newCurrDuration;
+}
+} else if (target.classList.contains('sequence-end-time')) {
+                const newEndTimeMin = parseTimeToMinutes(target.value);
+                const originalEndTimeMin = parseInt(target.dataset.minutes, 10);
+
+                if (newEndTimeMin === null || newEndTimeMin === originalEndTimeMin) {
+                    target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin);
+                    return; // No change or invalid, so just exit
+                }
+
+                // Find the start time of this row to calculate duration
+                const row = target.closest('tr');
+                if (!row) return; // Safety check
+                const startTimeInput = row.querySelector('.sequence-start-time');
+                if (!startTimeInput) return; // Safety check
+                
+                const startTimeMin = parseInt(startTimeInput.dataset.minutes, 10);
+                const newDuration = newEndTimeMin - startTimeMin;
+
+                if (isNaN(newDuration) || newDuration < 5) {
+                    APP.Utils.showToast("Duration must be at least 5 minutes.", "warning");
+                    target.value = APP.Utils.formatMinutesToTime(originalEndTimeMin); // Revert
+                    return; // Exit
+                }
+
+                // Update the state
+                BUILDER_STATE.segments[index].duration_min = newDuration;
             }
-        }
-        renderLegacyTable();
+renderLegacyTable();
     };
 
     const handleLegacySequenceClick = (e) => {
