@@ -959,18 +959,13 @@ td .form-input-color.edit-value { width: 60px; height: 30px; }
     width: 100px;
     min-width: 150px;
 }
-/* === ROTATION EDITOR LAYOUT FIX === */
+/* === ROTATION EDITOR LAYOUT FIX (v2 - More Aggressive) === */
 
-/* Target the table container in the rotation editor */
-#rotationGrid .table-container {
-    /* We can't remove overflow-x, but we can help the table fit */
-}
-
-/* Make the header and data cells narrower */
+/* Target the table headers and cells */
 #rotationGrid th,
 #rotationGrid td {
-    padding: 10px 6px; /* Reduced from 12px 16px */
-    white-space: nowrap; /* Keep headers on one line */
+    padding: 10px 4px; /* Drastically reduce left/right padding */
+    white-space: nowrap; 
 }
 
 /* Make the header text slightly smaller */
@@ -978,8 +973,10 @@ td .form-input-color.edit-value { width: 60px; height: 30px; }
     font-size: 11px;
 }
 
-/* Make the dropdown (select) boxes inside the grid smaller */
+/* Make the dropdown (select) boxes inside the grid much tighter */
 #rotationGrid .form-select {
-    padding: 6px 4px; /* Tighter padding */
+    padding: 6px 2px; /* Tighter left/right padding */
     font-size: 12px;
+    min-width: 120px; /* Prevent it from collapsing too much */
+    width: 100%; /* Ensure it fills the (now smaller) cell */
 }
