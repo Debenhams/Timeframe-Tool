@@ -316,6 +316,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
     DataService.fetchEffectiveAssignmentsForDate = async (isoDate) => {
       try {
         const weekEndISO = APP.Utils.addDaysISO(isoDate, 6);
+        
         const { data, error } = await supabase
           .from(HISTORY_TABLE)
           // V16.13: Added start_week_offset to selection
@@ -323,19 +324,11 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
           .lte('start_date', weekEndISO)
           .or(`end_date.is.null,end_date.gte.${isoDate}`)
           .order('id', { ascending: true });
-          
+
         if (error && (error.code === '42P01' || error.code === 'PGRST116')) {
             return await fetchSnapshotAssignments();
         }
         if (error) return handleError(error, 'Fetch effective assignments');
-
-        // --- THIS IS THE FIX ---
-        // If the history table exists but is EMPTY, fall back to the snapshot
-        if (!data || data.length === 0) {
-            console.warn("History table is empty. Falling back to snapshot assignments.");
-            return await fetchSnapshotAssignments();
-        }
-        // --- END OF FIX ---
 
         const byAdvisor = new Map();
         (data || []).forEach(row => {
@@ -353,7 +346,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             if (rowIsBounded && !existingIsBounded) {
                  byAdvisor.set(row.advisor_id, row);
             } else if (rowIsBounded === existingIsBounded) {
-                byAdvisor.set(row.advisor_id, row); 
+                 byAdvisor.set(row.advisor_id, row); 
             }
           }
         });
@@ -1310,17 +1303,13 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         ELS.veUndo = document.getElementById('ve-undo');
         ELS.veRedo = document.getElementById('ve-redo');
         
-        // --- THIS IS THE FIX ---
-        // Popups (Caches all the new elements)
+        // Popups
         ELS.visualEditorAddPopup = document.getElementById('visualEditorAddPopup');
         ELS.veAddPopupTitle = document.getElementById('ve-add-popup-title');
         ELS.veAddStartTime = document.getElementById('ve-add-start-time');
-        ELS.veAddEndTime = document.getElementById('ve-add-end-time');
-        ELS.veAddDurationDisplay = document.getElementById('ve-add-duration-display');
+        ELS.veAddDuration = document.getElementById('ve-add-duration');
         ELS.veAddPopupCancel = document.getElementById('ve-add-popup-cancel');
         ELS.veAddPopupSave = document.getElementById('ve-add-popup-save');
-        // --- END FIX ---
-
         // Legacy Elements
         ELS.legacyEditorContainer = document.getElementById('legacyEditorContainer');
         ELS.modalStartTime = document.getElementById('modalStartTime');
@@ -1361,12 +1350,6 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         if (ELS.veAddPopupCancel) ELS.veAddPopupCancel.addEventListener('click', closeAddPopup);
         if (ELS.veAddPopupSave) ELS.veAddPopupSave.addEventListener('click', handleAddPopupSave);
         
-        // --- THIS IS THE FIX ---
-        // Add listeners to auto-calculate duration (flatpickr code is removed)
-        if (ELS.veAddStartTime) ELS.veAddStartTime.addEventListener('change', updateDurationDisplay);
-        if (ELS.veAddEndTime) ELS.veAddEndTime.addEventListener('change', updateDurationDisplay);
-        // --- END FIX ---
-
         if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.addEventListener('click', handleContextMenuClick);
         if (ELS.veUndo) ELS.veUndo.addEventListener('click', handleUndo);
         if (ELS.veRedo) ELS.veRedo.addEventListener('click', handleRedo);
@@ -1388,8 +1371,8 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
                      if (newTimeMin !== null && newTimeMin !== BUILDER_STATE.startTimeMin) {
                         BUILDER_STATE.startTimeMin = newTimeMin;
                         if (BUILDER_STATE.isOpen && BUILDER_STATE.mode === 'definition') renderLegacyTable();
-               
-                 }
+                   
+     }
                 }
             });
         }
@@ -1439,9 +1422,9 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             renderToolbox();
             renderTimeline();
         } else {
-        if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'flex';
-        ELS.exceptionReasonGroup.style.display = 'none';
-        ELS.modalSave.textContent = "Save Definition";
+            if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'block';
+            ELS.exceptionReasonGroup.style.display = 'none';
+            ELS.modalSave.textContent = "Save Definition";
             if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
                 ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
             }
@@ -1958,35 +1941,15 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         }
         // --- END LOGIC CHANGE ---
     };
-const updateDurationDisplay = () => {
-        const startMin = parseTimeToMinutes(ELS.veAddStartTime.value);
-        const endMin = parseTimeToMinutes(ELS.veAddEndTime.value);
 
-        if (startMin !== null && endMin !== null) {
-            let duration = endMin - startMin;
-            if (duration < 0) {
-                // Handle overnight (e.g., 22:00 to 02:00)
-                duration = (1440 - startMin) + endMin;
-            }
-            
-            if (duration < 0) duration = 0;
-            
-            if (ELS.veAddDurationDisplay) {
-                ELS.veAddDurationDisplay.value = `${duration} minutes`;
-            }
-        } else {
-            if (ELS.veAddDurationDisplay) {
-                ELS.veAddDurationDisplay.value = '';
-            }
-        }
-    };
     // --- POPUP & MENU ---
     
-   const handleToolboxClick = (e) => {
+    const handleToolboxClick = (e) => {
         // Click fallback for touch/non-drag users
         const item = e.target.closest('.ve-toolbox-item');
         if (!item) return;
         const { componentId, componentName } = item.dataset;
+        
         // Don't allow adding anchored components this way
         if (isAnchored(componentId)) {
             APP.Utils.showToast("Breaks and Lunches are anchored. Please edit them directly on the timeline.", "warning");
@@ -1994,16 +1957,10 @@ const updateDurationDisplay = () => {
         }
 
         BUILDER_STATE.addPopupState = { isOpen: true, componentId, componentName, isEditing: false, editIndex: -1 };
-        
-        // --- THIS IS THE FIX ---
-        // (Ensures all new elements are reset)
         ELS.veAddPopupTitle.textContent = `Add: ${componentName}`;
         ELS.veAddStartTime.value = '';
-        ELS.veAddEndTime.value = '';
-        ELS.veAddDurationDisplay.value = '';
+        ELS.veAddDuration.value = '30';
         ELS.visualEditorAddPopup.style.display = 'block';
-        // --- END FIX ---
-
         ELS.veAddStartTime.focus();
     };
 
@@ -2014,26 +1971,13 @@ const updateDurationDisplay = () => {
 
     const handleAddPopupSave = () => {
         const { componentId, isEditing, editIndex } = BUILDER_STATE.addPopupState;
-const startTime = parseTimeToMinutes(ELS.veAddStartTime.value);
-const endTime = parseTimeToMinutes(ELS.veAddEndTime.value); // <-- NEW
-        
-        // --- NEW DURATION CALCULATION ---
-        if (startTime === null || endTime === null) {
-            APP.Utils.showToast("Invalid Start or End time.", "danger");
-            return;
-        }
-
-        let durationToAdd = endTime - startTime;
-        if (durationToAdd < 0) {
-            // Handle overnight
-            durationToAdd = (1440 - startTime) + endTime;
-        }
+        const startTime = parseTimeToMinutes(ELS.veAddStartTime.value);
+        const durationToAdd = parseInt(ELS.veAddDuration.value, 10);
         
         if (isNaN(durationToAdd) || durationToAdd <= 0) {
-    APP.Utils.showToast("Invalid duration. End time must be after start time.", "danger");
-return;
+            APP.Utils.showToast("Invalid duration.", "danger");
+            return;
         }
-        // --- END NEW DURATION CALCULATION ---
 
         if (isEditing) {
              // --- EDIT LOGIC (Unchanged) ---
@@ -2122,16 +2066,8 @@ return;
                 isEditing: true, editIndex: index
             };
             ELS.veAddPopupTitle.textContent = `Edit: ${component.name}`;
-const startTimeStr = APP.Utils.formatMinutesToTime(time);
-const endTimeStr = APP.Utils.formatMinutesToTime(time + seg.duration_min);
-ELS.veAddStartTime.value = startTimeStr;
-ELS.veAddEndTime.value = endTimeStr; // <-- NEW
-ELS.veAddDurationDisplay.value = `${seg.duration_min} minutes`; // <-- NEW
-        
-        // --- Propagate changes to flatpickr instances ---
-        if (ELS.veAddStartTime._flatpickr) ELS.veAddStartTime._flatpickr.setDate(startTimeStr, false);
-        if (ELS.veAddEndTime._flatpickr) ELS.veAddEndTime._flatpickr.setDate(endTimeStr, false);
-        // --- End propagate ---
+            ELS.veAddStartTime.value = APP.Utils.formatMinutesToTime(time);
+            ELS.veAddDuration.value = seg.duration_min;
             
             // Don't allow changing start time for anchored items
             ELS.veAddStartTime.disabled = isAnchored(seg.component_id);
@@ -2177,19 +2113,11 @@ ELS.veAddDurationDisplay.value = `${seg.duration_min} minutes`; // <-- NEW
         const absoluteTimeSegments = [];
         let currentTime = startTimeMin;
 
-        // --- BEGIN FIX ---
-        let finalSegments;
-        if (mode === 'exception') {
-            // For exceptions, we MUST normalize to maintain the fixed shift length
-            const normalized = normalizeShiftLength(segments);
-            // Final check for zero-duration segments (from aggressive trimming)
-            finalSegments = normalized.filter(seg => seg.duration_min > 0);
-        } else {
-            // For definitions, the length is dynamic. DO NOT normalize.
-            // Just filter out any accidental zero-duration segments.
-            finalSegments = segments.filter(seg => seg.duration_min > 0);
-        }
-        // --- END FIX ---
+        // Final normalization
+        const normalized = normalizeShiftLength(segments);
+        
+        // Final check for zero-duration segments (from aggressive trimming)
+        const finalSegments = normalized.filter(seg => seg.duration_min > 0);
 
         for (const seg of finalSegments) {
             if (!seg.component_id) {
