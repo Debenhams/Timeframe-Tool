@@ -1878,12 +1878,21 @@ function drawMyRotaCalendar(){
     // We iterate up to (but not including) endMin for the grid lines
     for (let m = startMin; m < endMin; m += TIMEGRID_INTERVAL_MIN) {
         const time = m2t(m);
-        const isHour = m % 60 === 0;
-        const hourClass = isHour ? 'hour-mark' : '';
+        
+        // NEW LOGIC:
+        // 'isHourLabel' is true when the slot *starts* on the hour (e.g., 08:00)
+        const isHourLabel = m % 60 === 0;
+        // 'isHourLine' is true when the slot *ends* on the hour (e.g., the 07:30 slot)
+        const isHourLine = (m + TIMEGRID_INTERVAL_MIN) % 60 === 0;
+        
+        // Apply the 'hour-mark' class based on the line logic
+        const hourClass = isHourLine ? 'hour-mark' : '';
 
-        // Time Axis Cell - Show time only on the hour, using span for precise positioning
+        // Time Axis Cell
         html += `<div class="time-axis-cell ${hourClass}">`;
-        if (isHour) {
+        
+        // Add the label based on the label logic
+        if (isHourLabel) {
              html += `<span class="time-axis-label-text">${time}</span>`;
         }
         html += `</div>`;
