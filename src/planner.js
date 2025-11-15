@@ -2642,9 +2642,13 @@ const handleDuplicateShift = async (originalId) => {
         // Use the utility function to determine the number of weeks
         let numWeeks = 0;
         if (pattern) {
-// Ensure a minimum of 6 weeks is displayed if the pattern exists but has fewer than 6 defined.
-}
-const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+            numWeeks = APP.Utils.calculateRotationLength(pattern);
+            // Ensure a minimum of 6 weeks is displayed if the pattern exists but has fewer than 6 defined.
+            if (numWeeks < 6) numWeeks = 6; 
+        }
+       
+        const weeks = Array.from({length: numWeeks}, (_, i) => i + 1);
+        const days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
         
         // Generate shift definition options
         const definitionOpts = STATE.shiftDefinitions
