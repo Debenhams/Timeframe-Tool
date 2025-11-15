@@ -2155,11 +2155,19 @@ return;
         const absoluteTimeSegments = [];
         let currentTime = startTimeMin;
 
-        // Final normalization
-        const normalized = normalizeShiftLength(segments);
-        
-        // Final check for zero-duration segments (from aggressive trimming)
-        const finalSegments = normalized.filter(seg => seg.duration_min > 0);
+        // --- BEGIN FIX ---
+        let finalSegments;
+        if (BUILDER_STATE.mode === 'exception') { // Apply normalization ONLY for exceptions
+            // For exceptions, we MUST normalize to maintain the fixed shift length
+            const normalized = normalizeShiftLength(segments);
+            // Final check for zero-duration segments (from aggressive trimming)
+            finalSegments = normalized.filter(seg => seg.duration_min > 0);
+        } else {
+            // For definitions, the length is dynamic. DO NOT normalize.
+            // Just filter out any accidental zero-duration segments.
+            finalSegments = segments.filter(seg => seg.duration_min > 0);
+        }
+        // --- END FIX ---
 
         for (const seg of finalSegments) {
             if (!seg.component_id) {
