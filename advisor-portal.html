@@ -516,28 +516,28 @@ overflow-y: scroll; /* Allow vertical scrolling for time */
 /* Inset slightly from the edges for a cleaner look */
         left: 2px;
 right: 2px; 
-        padding: 3px 6px; /* Reduced vertical padding */
-        font-size: 12px;
-        overflow: visible; /* CRITICAL: Allows text to overflow */
+        padding: 2px 5px; /* Tighter vertical padding */
+        font-size: 11px; /* Smaller base font */
+        overflow: hidden; /* CRITICAL: Must be hidden to prevent overlap */
         border-radius: var(--border-radius);
 /* Add subtle shadow */
         box-shadow: var(--shadow-sm);
         pointer-events: auto;
-        line-height: normal; /* Use normal line height */
+        line-height: 1.2; /* Tighter line height for all text */
 border: 1px solid rgba(0,0,0,0.1);
     }
 
     .activity-title {
         font-weight: 600;
 display: block;
-        line-height: 1.2; /* Tighter line-height for title */
+        /* line-height is inherited from .activity-block */
     }
 
     .activity-time {
         display: block;
-        font-size: 11px;
+        font-size: 10px; /* Smaller font for the time */
 opacity: 0.85;
-        line-height: 1.1; /* Tighter line-height for time */
+        /* line-height is inherited from .activity-block */
     }
 
 
