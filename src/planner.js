@@ -2383,8 +2383,10 @@ return;
 
                 <td class="actions">
                     <button class="btn btn-sm btn-secondary btn-edit-shift" data-definition-id="${def.id}">Edit</button>
+                    <button class="btn btn-sm btn-secondary btn-duplicate-shift" data-definition-id="${def.id}">Duplicate</button>
                     <button class="btn btn-sm btn-primary edit-structure" data-definition-id="${def.id}">Edit Structure</button>
-                    <button class="btn btn-sm btn-danger delete-definition" data-definition-id="${def.id}">Delete</button>
+               
+     <button class="btn btn-sm btn-danger delete-definition" data-definition-id="${def.id}">Delete</button>
 
                     <button class="btn btn-sm btn-success btn-save-shift" data-definition-id="${def.id}" style="display:none;">Save</button>
                     <button class="btn btn-sm btn-secondary btn-cancel-shift" data-definition-id="${def.id}" style="display:none;">Cancel</button>
@@ -2504,8 +2506,9 @@ return;
             }
         } else if (e.target.classList.contains('delete-definition')) {
             handleDeleteDefinition(definitionId);
-
-        // --- NEW LOGIC FOR NEW BUTTONS ---
+        } else if (e.target.classList.contains('btn-duplicate-shift')) {
+            handleDuplicateShift(definitionId);
+// --- NEW LOGIC FOR NEW BUTTONS ---
         } else if (e.target.classList.contains('btn-edit-shift')) {
             toggleRowEdit(row, true);
         } else if (e.target.classList.contains('btn-cancel-shift')) {
@@ -2530,7 +2533,58 @@ return;
             }
         }
     };
+const handleDuplicateShift = async (originalId) => {
+        const originalShift = APP.StateManager.getShiftDefinitionById(originalId);
+        if (!originalShift) {
+            APP.Utils.showToast(`Could not find data for shift`, "danger");
+            return;
+        }
 
+        const newCode = prompt(`Enter a new UNIQUE CODE for the copy of "${originalShift.code}":`, `${originalShift.code}_COPY`);
+
+        if (!newCode || newCode.trim() === '') {
+            return; // User cancelled
+        }
+        
+        const newName = prompt(`Enter a new name:`, `${originalShift.name} (Copy)`);
+
+        if (!newName || newName.trim() === '') {
+            return; // User cancelled
+        }
+
+        if (newCode === originalShift.code) {
+             APP.Utils.showToast("The new code must be different from the original.", "warning");
+             return;
+        }
+
+        if (APP.StateManager.getShiftDefinitionByCode(newCode)) {
+            APP.Utils.showToast(`A shift with the code "${newCode}" already exists.`, "danger");
+            return;
+        }
+
+        // Create the new shift object, deep copying the structure
+        const newShift = {
+            code: String(newCode),
+            name: newName,
+            start_time_min: originalShift.start_time_min,
+            structure: JSON.parse(JSON.stringify(originalShift.structure)) // Deep copy
+        };
+
+        // Save to database
+        const { data, error } = await APP.DataService.saveRecord('shift_definitions', newShift);
+
+        if (error) {
+            // Error is handled by DataService
+            return;
+        }
+
+        // Update local state
+        APP.StateManager.syncRecord('shift_definitions', data);
+        APP.StateManager.saveHistory("Duplicate Shift Definition");
+        
+        APP.Utils.showToast(`Shift duplicated as "${newName}".`, "success");
+        ShiftDefinitionEditor.render(); // Re-render the list
+    };
     APP.Components = APP.Components || {};
     APP.Components.ShiftDefinitionEditor = ShiftDefinitionEditor;
 }(window.APP));
