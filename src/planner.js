@@ -1357,22 +1357,14 @@ ELS.veAddPopupCancel = document.getElementById('ve-add-popup-cancel');
 
         if (ELS.veAddPopupCancel) ELS.veAddPopupCancel.addEventListener('click', closeAddPopup);
         if (ELS.veAddPopupSave) ELS.veAddPopupSave.addEventListener('click', handleAddPopupSave);
+        
         // --- NEW ---
         // Add listeners to auto-calculate duration
         if (ELS.veAddStartTime) ELS.veAddStartTime.addEventListener('change', updateDurationDisplay);
         if (ELS.veAddEndTime) ELS.veAddEndTime.addEventListener('change', updateDurationDisplay);
-
-        // Add flatpickr to the new time inputs
-        if (typeof flatpickr !== 'undefined') {
-            if (ELS.veAddStartTime) {
-                flatpickr(ELS.veAddStartTime, { enableTime: true, noCalendar: true, dateFormat: "H:i", time_24hr: true, minuteIncrement: 5 });
-            }
-            if (ELS.veAddEndTime) {
-                flatpickr(ELS.veAddEndTime, { enableTime: true, noCalendar: true, dateFormat: "H:i", time_24hr: true, minuteIncrement: 5 });
-            }
-        }
         // --- END NEW ---
-        if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.addEventListener('click', handleContextMenuClick);
+
+if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.addEventListener('click', handleContextMenuClick);
         if (ELS.veUndo) ELS.veUndo.addEventListener('click', handleUndo);
         if (ELS.veRedo) ELS.veRedo.addEventListener('click', handleRedo);
 
