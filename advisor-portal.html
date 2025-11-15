@@ -513,32 +513,31 @@ overflow-y: scroll; /* Allow vertical scrolling for time */
     /* Activity Blocks (Positioned Events) */
     .activity-block {
         position: absolute;
-/* Inset slightly from the edges for a cleaner look */
+        /* Inset slightly from the edges for a cleaner look */
         left: 2px;
-right: 2px; 
-        padding: 3px 6px; /* Tighter vertical padding */
-        font-size: 11px; /* Smaller base font */
-        overflow: hidden; /* Keep text clipped */
+        right: 2px; 
+        padding: 2px 4px; /* Minimal padding */
+        font-size: 10px; /* Smaller base font */
+        overflow: hidden; /* CRITICAL: Must be hidden */
         border-radius: var(--border-radius);
-/* Add subtle shadow */
+        /* Add subtle shadow */
         box-shadow: var(--shadow-sm);
         pointer-events: auto;
-        line-height: 1.2; /* Tighter line height for all text */
-border: 1px solid rgba(0,0,0,0.1);
-        min-height: 42px; /* Set minimum height for 3 lines */
+        line-height: 1.15; /* Very tight line height */
+        border: 1px solid rgba(0,0,0,0.1);
+        /* REMOVED min-height and display:flex to restore top-alignment */
     }
 
     .activity-title {
         font-weight: 600;
-display: block;
-        /* line-height is inherited */
+        display: block;
+        font-size: 11px; /* Title slightly larger */
     }
 
     .activity-time {
         display: block;
-        font-size: 10px; /* Smaller font for the time */
-opacity: 0.85;
-        /* line-height is inherited */
+        font-size: 9px; /* Time even smaller */
+        opacity: 0.9;
     }
 
 
