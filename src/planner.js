@@ -1313,9 +1313,10 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         // Popups
         ELS.visualEditorAddPopup = document.getElementById('visualEditorAddPopup');
         ELS.veAddPopupTitle = document.getElementById('ve-add-popup-title');
-        ELS.veAddStartTime = document.getElementById('ve-add-start-time');
-        ELS.veAddDuration = document.getElementById('ve-add-duration');
-        ELS.veAddPopupCancel = document.getElementById('ve-add-popup-cancel');
+ELS.veAddStartTime = document.getElementById('ve-add-start-time');
+ELS.veAddEndTime = document.getElementById('ve-add-end-time'); // <-- NEW
+ELS.veAddDurationDisplay = document.getElementById('ve-add-duration-display'); // <-- NEW
+ELS.veAddPopupCancel = document.getElementById('ve-add-popup-cancel');
         ELS.veAddPopupSave = document.getElementById('ve-add-popup-save');
         // Legacy Elements
         ELS.legacyEditorContainer = document.getElementById('legacyEditorContainer');
@@ -1356,7 +1357,21 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 
         if (ELS.veAddPopupCancel) ELS.veAddPopupCancel.addEventListener('click', closeAddPopup);
         if (ELS.veAddPopupSave) ELS.veAddPopupSave.addEventListener('click', handleAddPopupSave);
-        
+        // --- NEW ---
+        // Add listeners to auto-calculate duration
+        if (ELS.veAddStartTime) ELS.veAddStartTime.addEventListener('change', updateDurationDisplay);
+        if (ELS.veAddEndTime) ELS.veAddEndTime.addEventListener('change', updateDurationDisplay);
+
+        // Add flatpickr to the new time inputs
+        if (typeof flatpickr !== 'undefined') {
+            if (ELS.veAddStartTime) {
+                flatpickr(ELS.veAddStartTime, { enableTime: true, noCalendar: true, dateFormat: "H:i", time_24hr: true, minuteIncrement: 5 });
+            }
+            if (ELS.veAddEndTime) {
+                flatpickr(ELS.veAddEndTime, { enableTime: true, noCalendar: true, dateFormat: "H:i", time_24hr: true, minuteIncrement: 5 });
+            }
+        }
+        // --- END NEW ---
         if (ELS.visualEditorContextMenu) ELS.visualEditorContextMenu.addEventListener('click', handleContextMenuClick);
         if (ELS.veUndo) ELS.veUndo.addEventListener('click', handleUndo);
         if (ELS.veRedo) ELS.veRedo.addEventListener('click', handleRedo);
@@ -1948,7 +1963,28 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         }
         // --- END LOGIC CHANGE ---
     };
+const updateDurationDisplay = () => {
+        const startMin = parseTimeToMinutes(ELS.veAddStartTime.value);
+        const endMin = parseTimeToMinutes(ELS.veAddEndTime.value);
 
+        if (startMin !== null && endMin !== null) {
+            let duration = endMin - startMin;
+            if (duration < 0) {
+                // Handle overnight (e.g., 22:00 to 02:00)
+                duration = (1440 - startMin) + endMin;
+            }
+            
+            if (duration < 0) duration = 0;
+            
+            if (ELS.veAddDurationDisplay) {
+                ELS.veAddDurationDisplay.value = `${duration} minutes`;
+            }
+        } else {
+            if (ELS.veAddDurationDisplay) {
+                ELS.veAddDurationDisplay.value = '';
+            }
+        }
+    };
     // --- POPUP & MENU ---
     
     const handleToolboxClick = (e) => {
@@ -1965,9 +2001,10 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 
         BUILDER_STATE.addPopupState = { isOpen: true, componentId, componentName, isEditing: false, editIndex: -1 };
         ELS.veAddPopupTitle.textContent = `Add: ${componentName}`;
-        ELS.veAddStartTime.value = '';
-        ELS.veAddDuration.value = '30';
-        ELS.visualEditorAddPopup.style.display = 'block';
+ELS.veAddStartTime.value = '';
+ELS.veAddEndTime.value = ''; // <-- NEW
+ELS.veAddDurationDisplay.value = ''; // <-- NEW
+ELS.visualEditorAddPopup.style.display = 'block';
         ELS.veAddStartTime.focus();
     };
 
@@ -1978,13 +2015,26 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
 
     const handleAddPopupSave = () => {
         const { componentId, isEditing, editIndex } = BUILDER_STATE.addPopupState;
-        const startTime = parseTimeToMinutes(ELS.veAddStartTime.value);
-        const durationToAdd = parseInt(ELS.veAddDuration.value, 10);
+const startTime = parseTimeToMinutes(ELS.veAddStartTime.value);
+const endTime = parseTimeToMinutes(ELS.veAddEndTime.value); // <-- NEW
         
-        if (isNaN(durationToAdd) || durationToAdd <= 0) {
-            APP.Utils.showToast("Invalid duration.", "danger");
+        // --- NEW DURATION CALCULATION ---
+        if (startTime === null || endTime === null) {
+            APP.Utils.showToast("Invalid Start or End time.", "danger");
             return;
         }
+
+        let durationToAdd = endTime - startTime;
+        if (durationToAdd < 0) {
+            // Handle overnight
+            durationToAdd = (1440 - startTime) + endTime;
+        }
+        
+        if (isNaN(durationToAdd) || durationToAdd <= 0) {
+    APP.Utils.showToast("Invalid duration. End time must be after start time.", "danger");
+return;
+        }
+        // --- END NEW DURATION CALCULATION ---
 
         if (isEditing) {
              // --- EDIT LOGIC (Unchanged) ---
@@ -2073,8 +2123,16 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
                 isEditing: true, editIndex: index
             };
             ELS.veAddPopupTitle.textContent = `Edit: ${component.name}`;
-            ELS.veAddStartTime.value = APP.Utils.formatMinutesToTime(time);
-            ELS.veAddDuration.value = seg.duration_min;
+const startTimeStr = APP.Utils.formatMinutesToTime(time);
+const endTimeStr = APP.Utils.formatMinutesToTime(time + seg.duration_min);
+ELS.veAddStartTime.value = startTimeStr;
+ELS.veAddEndTime.value = endTimeStr; // <-- NEW
+ELS.veAddDurationDisplay.value = `${seg.duration_min} minutes`; // <-- NEW
+        
+        // --- Propagate changes to flatpickr instances ---
+        if (ELS.veAddStartTime._flatpickr) ELS.veAddStartTime._flatpickr.setDate(startTimeStr, false);
+        if (ELS.veAddEndTime._flatpickr) ELS.veAddEndTime._flatpickr.setDate(endTimeStr, false);
+        // --- End propagate ---
             
             // Don't allow changing start time for anchored items
             ELS.veAddStartTime.disabled = isAnchored(seg.component_id);
