@@ -4716,6 +4716,7 @@ APP.Core = Core;
 (function(APP) {
     const Dashboard = {};
     const ELS = {}; // Cache for our widget elements
+const ACKNOWLEDGED_ALERTS = new Set(); // This will store IDs of "read" exceptions
 
     Dashboard.initialize = () => {
         // Cache the "App" buttons
@@ -4739,6 +4740,7 @@ APP.Core = Core;
         if (ELS.btnAlerts) ELS.btnAlerts.addEventListener('click', handleAlertsClick);
         if (ELS.btnUnassigned) ELS.btnUnassigned.addEventListener('click', handleUnassignedClick);
         if (ELS.modalClose) ELS.modalClose.addEventListener('click', closeModal);
+        if (ELS.modalBody) ELS.modalBody.addEventListener('click', handleAcknowledgeClick);
     };
 
     // The main render function for the dashboard
@@ -4771,16 +4773,17 @@ APP.Core = Core;
     // --- Widget-Specific Logic ---
 
     // 1. Daily Stats Widget
-    const renderDailyStats = (allExceptions, weekStart) => {
-        const weekEnd = APP.Utils.addDaysISO(weekStart, 6);
-        const exceptionsThisWeek = allExceptions.filter(ex => {
-            return ex.exception_date >= weekStart && ex.exception_date <= weekEnd;
-        });
-        const count = exceptionsThisWeek.length;
+const renderDailyStats = (allExceptions, weekStart) => {
+    const weekEnd = APP.Utils.addDaysISO(weekStart, 6);
+    const exceptionsThisWeek = allExceptions.filter(ex => {
+        // Find exceptions this week that are NOT in our "read" list
+        return ex.exception_date >= weekStart && ex.exception_date <= weekEnd && !ACKNOWLEDGED_ALERTS.has(ex.id);
+    });
+    const count = exceptionsThisWeek.length;
 
-        ELS.badgeStats.textContent = count;
-        ELS.badgeStats.style.display = count > 0 ? 'flex' : 'none';
-    };
+    ELS.badgeStats.textContent = count;
+    ELS.badgeStats.style.display = count > 0 ? 'flex' : 'none';
+};
 
     // 2. Rotation Alerts Widget
     const renderRotationAlerts = (effectiveMap, allAdvisors, weekStart) => {
@@ -4816,23 +4819,36 @@ APP.Core = Core;
     // --- Click Handlers ---
 
     const handleStatsClick = () => {
-        const weekStart = APP.StateManager.getState().weekStart;
-        const weekEnd = APP.Utils.addDaysISO(weekStart, 6);
-        const exceptionsThisWeek = APP.StateManager.getState().scheduleExceptions.filter(ex => {
-            return ex.exception_date >= weekStart && ex.exception_date <= weekEnd;
-        });
+    const weekStart = APP.StateManager.getState().weekStart;
+    const weekEnd = APP.Utils.addDaysISO(weekStart, 6);
+    // Get ALL exceptions for the week (including acknowledged ones)
+    const exceptionsThisWeek = APP.StateManager.getState().scheduleExceptions.filter(ex => {
+        return ex.exception_date >= weekStart && ex.exception_date <= weekEnd;
+    });
 
-        let html = '<p style="padding: 24px;">No live exceptions found for this week.</p>';
-        if (exceptionsThisWeek.length > 0) {
-            html = '<ul class="dashboard-detail-list">';
-            exceptionsThisWeek.forEach(ex => {
-                const advisor = APP.StateManager.getAdvisorById(ex.advisor_id);
-                html += `<li><strong>${advisor ? advisor.name : 'Unknown'}</strong> has an exception on ${APP.Utils.convertISOToUKDate(ex.exception_date)} (${ex.reason || 'No reason'})</li>`;
-            });
-            html += '</ul>';
-        }
-        openModal("Daily Stats", html);
-    };
+    let html = '<p style="padding: 24px;">No live exceptions found for this week.</p>';
+    if (exceptionsThisWeek.length > 0) {
+        html = '<ul class="dashboard-detail-list">';
+        exceptionsThisWeek.forEach(ex => {
+            const advisor = APP.StateManager.getAdvisorById(ex.advisor_id);
+            const isAcknowledged = ACKNOWLEDGED_ALERTS.has(ex.id);
+
+            html += `
+                <li class="${isAcknowledged ? 'is-acknowledged' : ''}">
+                    <div class="list-item-content">
+                        <strong>${advisor ? advisor.name : 'Unknown'}</strong> has an exception on ${APP.Utils.convertISOToUKDate(ex.exception_date)} (${ex.reason || 'No reason'})
+                    </div>
+                    <div class="list-item-action">
+                        <button class="btn btn-sm btn-secondary btn-acknowledge" data-exception-id="${ex.id}" ${isAcknowledged ? 'disabled' : ''}>
+                            ${isAcknowledged ? '✓ Cleared' : 'Clear'}
+                        </button>
+                    </div>
+                </li>`;
+        });
+        html += '</ul>';
+    }
+    openModal("Daily Stats", html);
+};
 
     const handleAlertsClick = () => {
         const weekStart = APP.StateManager.getState().weekStart;
@@ -4875,7 +4891,26 @@ APP.Core = Core;
         }
         openModal("Unassigned Advisors", html);
     };
+const handleAcknowledgeClick = (e) => {
+    const target = e.target.closest('.btn-acknowledge');
+    if (target && !target.disabled) {
+        const exceptionId = target.dataset.exceptionId;
+        if (exceptionId) {
+            // 1. Add to our "read" list
+            ACKNOWLEDGED_ALERTS.add(exceptionId);
 
+            // 2. Disable the button
+            target.disabled = true;
+            target.textContent = '✓ Cleared';
+
+            // 3. Mark the row
+            target.closest('li').classList.add('is-acknowledged');
+
+            // 4. Re-render the dashboard to update the badge count
+            Dashboard.render();
+        }
+    }
+};
     // --- Modal Functions ---
     const openModal = (title, content) => {
         ELS.modalTitle.textContent = title;
