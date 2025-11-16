@@ -793,33 +793,39 @@ display: flex;
         display: none;
     }
 
-/* === FIX 3: Clean Timeline + Stacking Bug (VS-Clean) === */
+/* === FIX 4: Clean Timeline + Stacking + 8am Cutoff === */
 
 /* 1. Remove all horizontal grid lines */
 #tab-my-schedule .day-column-cell,
 #tab-my-schedule .day-column-cell.hour-mark {
-    border-bottom: none !important; /* !important is needed to override the base style */
+    border-bottom: none !important;
 }
 
-/* 2. Fix the event container layout (The REAL Fix) */
+/* 2. Fix the event container layout (Fixes "Scattered Times") */
 #tab-my-schedule .day-column-events {
-    /* This is the key: force it to span ALL grid rows, from first to last */
     grid-row-start: 1;
-    grid-row-end: -1; /* This spans to the very last row */
-    
-    /* Re-add the vertical day separator */
+    grid-row-end: -1;
     border-right: 1px solid var(--color-border);
+    /* These were missing from the original code */
+    position: relative;
+    pointer-events: none;
 }
 #tab-my-schedule .day-column-events:last-child {
     border-right: none;
 }
 
-/* 3. Ensure activity blocks are positioned correctly */
-/* The original file  already makes these absolute, 
-   but this selector makes sure they behave inside the new container. */
+/* 3. Force activity blocks to be absolute */
 #tab-my-schedule .day-column-events .activity-block {
-    position: absolute;
+    position: absolute !important; 
     pointer-events: auto;
+}
+
+/* 4. Fix the "8am Cut Off" */
+#tab-my-schedule .time-axis-label-text {
+    position: absolute;
+    top: -6px; /* Was -8px. This centers it for 12px font. */
+    background-color: var(--color-panel-bg);
+    padding: 0 4px;
 }
 /* === END FIX === */
 
