@@ -453,13 +453,14 @@ flex-shrink: 0; /* Prevent summary from shrinking */
     /* 2. Detailed Time Grid Section */
     .time-grid-wrapper {
         flex-grow: 1;
-overflow-y: scroll; /* Allow vertical scrolling for time */
+        overflow-y: scroll; /* Allow vertical scrolling for time */
         position: relative;
-}
+    }
 
     .time-grid {
         display: grid;
-        grid-template-columns: 80px repeat(7, 1fr); /* 80px for the time axis */
+        grid-template-columns: 80px repeat(7, 1fr);
+        /* 80px for the time axis */
         position: relative;
         width: 100%;
     }
@@ -1063,10 +1064,10 @@ const ELS = {
 
 // --- Constants & Helpers ---
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
-
 // Constants for the My Schedule Time Grid visualization
 const TIMEGRID_START_H = 8; // 8 AM
-const TIMEGRID_END_H = 21; // 9 PM
+const TIMEGRID_END_H = 21;
+// 9 PM
 const TIMEGRID_INTERVAL_MIN = 30; // 30 minute slots
 
 // Constants for the Team Daily Gantt visualization (New)
@@ -1906,7 +1907,6 @@ function drawMyRotaCalendar(){
     // 4. Generate Detailed Time Grid (Bottom Section)
     html += `<div class="time-grid-wrapper">
                 <div class="time-grid">`;
-
     // 4a. Generate Grid Cells (Time Axis and Background)
     const startMin = TIMEGRID_START_H * 60;
     const endMin = TIMEGRID_END_H * 60;
@@ -1914,26 +1914,22 @@ function drawMyRotaCalendar(){
     // We iterate up to (but not including) endMin for the grid lines
     for (let m = startMin; m < endMin; m += TIMEGRID_INTERVAL_MIN) {
         const time = m2t(m);
-        
         // NEW LOGIC:
         // 'isHourLabel' is true when the slot *starts* on the hour (e.g., 08:00)
         const isHourLabel = m % 60 === 0;
         // 'isHourLine' is true when the slot *ends* on the hour (e.g., the 07:30 slot)
         const isHourLine = (m + TIMEGRID_INTERVAL_MIN) % 60 === 0;
-        
         // Apply the 'hour-mark' class based on the line logic
-        const hourClass = isHourLine ? 'hour-mark' : '';
+        const hourClass = isHourLine ?
+        'hour-mark' : '';
 
         // Time Axis Cell
         html += `<div class="time-axis-cell ${hourClass}">`;
-        
         // Add the label based on the label logic
         if (isHourLabel) {
              html += `<span class="time-axis-label-text">${time}</span>`;
         }
         html += `</div>`;
-
-
         // Day Column Background Cells (These provide the horizontal lines)
         for (let i = 0; i < 7; i++) {
             html += `<div class="day-column-cell ${hourClass}"></div>`;
