@@ -980,3 +980,35 @@ td .form-input-color.edit-value { width: 60px; height: 30px; }
     min-width: 120px; /* Prevent it from collapsing too much */
     width: 100%; /* Ensure it fills the (now smaller) cell */
 }
+/* === New Home Dashboard === */
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+.widget {
+    background-color: var(--color-panel-bg);
+    border-radius: var(--border-radius);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+}
+
+.widget h3 {
+    padding: 16px 20px;
+    margin: 0;
+    border-bottom: 1px solid var(--color-border);
+    font-size: 15px;
+}
+
+.widget .widget-content {
+    padding: 20px;
+    flex-grow: 1;
+    color: var(--color-text-muted);
+}
+
+.widget .widget-content p {
+    margin: 0;
+}
