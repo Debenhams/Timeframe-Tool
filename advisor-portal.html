@@ -380,10 +380,12 @@
     /* 1. Top Summary Section */
     .summary-grid {
         display: grid;
-grid-template-columns: 80px repeat(7, 1fr); /* 80px for the time axis label */
+        /* REMOVED 80px column */
+        grid-template-columns: repeat(7, 1fr); 
         border-bottom: 2px solid var(--color-border);
-flex-shrink: 0; /* Prevent summary from shrinking */
-        padding-right: 17px; /* Compensate for the scrollbar on the grid below */
+ flex-shrink: 0; /* Prevent summary from shrinking */
+        padding-right: 17px;
+ /* Compensate for the scrollbar on the grid below */
     }
 
     .summary-header {
@@ -393,11 +395,6 @@ flex-shrink: 0; /* Prevent summary from shrinking */
         border-bottom: 1px solid var(--color-border);
         font-weight: 600;
         font-size: 16px;
-    }
-
-    .summary-axis-label {
-        /* Empty cell above the time axis */
-        border-right: 1px solid var(--color-border);
     }
 
     .summary-day {
@@ -459,33 +456,12 @@ flex-shrink: 0; /* Prevent summary from shrinking */
 
     .time-grid {
         display: grid;
-        grid-template-columns: 80px repeat(7, 1fr);
-        /* 80px for the time axis */
+        /* REMOVED 80px column */
+        grid-template-columns: repeat(7, 1fr);
         position: relative;
         width: 100%;
-    }
+ }
 
-    /* Time Axis (Left Column) - Improved alignment */
-    .time-axis-cell {
-        border-right: 1px solid var(--color-border);
-        border-bottom: none;
-        height: var(--timegrid-row-height);
-        display: flex;
-        align-items: flex-start;
-        justify-content: flex-end;
-        padding-right: 8px;
-        font-size: 12px;
-        color: var(--color-text-muted);
-        position: relative;
-    }
-
-    /* Use a span inside to precisely position the time text relative to the hour line */
-    .time-axis-label-text {
-        position: absolute;
-        top: -8px; /* Position slightly above the line */
-        background-color: var(--color-panel-bg); /* Hide the line behind the text */
-        padding: 0 4px;
-    }
 
     /* Day Columns (The background grid cells providing horizontal lines) */
     .day-column-cell {
@@ -1861,6 +1837,7 @@ function drawMyRotaCalendar(){
             // Use getMainActivitySummary to summarize the shift
             const mainActivity = getMainActivitySummary(segments);
 
+          
             // Calculate duration
             const durationMin = segments.reduce((acc, seg) => {
                  return acc + (seg.endMin - seg.startMin);
@@ -1870,7 +1847,6 @@ function drawMyRotaCalendar(){
             const durationH = Math.floor(durationMin / 60);
             const durationM = durationMin % 60;
             const durationStr = `${durationH}h ${String(durationM).padStart(2, '0')}m`;
-            
             // Format: Activity \n Start - End \n Duration
             summary = { type: 'shift', text: `${mainActivity}\n${start} - ${end}\n${durationStr}` };
         }
@@ -1883,10 +1859,8 @@ function drawMyRotaCalendar(){
 
     // 3. Generate Summary Grid (Top Section)
     const monthName = STATE.monday.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-
     html += `<div class="summary-grid">
-                <div class="summary-header">${monthName}</div> 
-                <div class="summary-axis-label"></div>`; // Empty cell above time axis
+                <div class="summary-header">${monthName}</div>`; 
 
     weekData.forEach(day => {
         html += `<div class="summary-day">
@@ -1902,34 +1876,25 @@ function drawMyRotaCalendar(){
         
         html += `</div>`;
     });
+
     html += `</div>`; // Close summary-grid
 
     // 4. Generate Detailed Time Grid (Bottom Section)
     html += `<div class="time-grid-wrapper">
                 <div class="time-grid">`;
-    // 4a. Generate Grid Cells (Time Axis and Background)
+
+    // 4a. Generate Grid Cells (Background)
     const startMin = TIMEGRID_START_H * 60;
     const endMin = TIMEGRID_END_H * 60;
     
     // We iterate up to (but not including) endMin for the grid lines
     for (let m = startMin; m < endMin; m += TIMEGRID_INTERVAL_MIN) {
-        const time = m2t(m);
-        // NEW LOGIC:
-        // 'isHourLabel' is true when the slot *starts* on the hour (e.g., 08:00)
-        const isHourLabel = m % 60 === 0;
+        
         // 'isHourLine' is true when the slot *ends* on the hour (e.g., the 07:30 slot)
         const isHourLine = (m + TIMEGRID_INTERVAL_MIN) % 60 === 0;
         // Apply the 'hour-mark' class based on the line logic
-        const hourClass = isHourLine ?
-        'hour-mark' : '';
-
-        // Time Axis Cell
-        html += `<div class="time-axis-cell ${hourClass}">`;
-        // Add the label based on the label logic
-        if (isHourLabel) {
-             html += `<span class="time-axis-label-text">${time}</span>`;
-        }
-        html += `</div>`;
+        const hourClass = isHourLine ? 'hour-mark' : '';
+        
         // Day Column Background Cells (These provide the horizontal lines)
         for (let i = 0; i < 7; i++) {
             html += `<div class="day-column-cell ${hourClass}"></div>`;
@@ -1941,21 +1906,22 @@ function drawMyRotaCalendar(){
     // We need the actual pixel height for calculations.
     const rowHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--timegrid-row-height')) || 24;
     const pixelsPerMinute = rowHeight / TIMEGRID_INTERVAL_MIN;
-
     weekData.forEach((day, index) => {
-        // Calculate the column index (Start at 2 because column 1 is the time axis)
-        const colIndex = index + 2; 
+        // CHANGED column index to start at 1 (was 2)
+        const colIndex = index + 1; 
         html += `<div class="day-column-events" style="grid-column: ${colIndex};">`;
 
         day.segments.forEach(seg => {
             // Constrain visualization to the grid boundaries
             const visibleStartMin = Math.max(seg.startMin, startMin);
+    
             const visibleEndMin = Math.min(seg.endMin, endMin);
 
             // Only render if the segment is visible within the time range
             if (visibleStartMin < visibleEndMin) {
                  // Calculate position and height
                 const topOffsetMin = visibleStartMin - startMin;
+       
                 const durationMin = visibleEndMin - visibleStartMin;
 
                 const topPx = topOffsetMin * pixelsPerMinute;
@@ -1966,10 +1932,8 @@ function drawMyRotaCalendar(){
                 
                 // Calculate contrasting text color for accessibility
                 const textColor = getContrastingTextColor(color);
-                
                 // Format: Activity \n Start - End
                 const tooltip = `${seg.code}: ${seg.start} - ${seg.end}`;
-                
                 // --- NEW LOGIC ---
                 let blockClass = 'activity-block';
                 const lowerCode = seg.code.toLowerCase();
@@ -1980,20 +1944,19 @@ function drawMyRotaCalendar(){
 
                 html += `<div class="${blockClass}" title="${tooltip}" style="top: ${topPx}px; height: ${heightPx}px; background-color: ${color}; color: ${textColor};">
                             <span class="activity-title">${seg.code}</span>
-                            <span class="activity-time">${seg.start} - ${seg.end}</span>
-                  </div>`;
-}
+                      
+           <span class="activity-time">${seg.start} - ${seg.end}</span>
+                      </div>`;
+            }
         });
 
         html += `</div>`; // Close day-column-events
     });
-
-
     html += `   </div>
             </div>`; // Close time-grid and wrapper
     html += `</div>`; // Close schedule-container
 
-  ELS.myRotaGrid.innerHTML = html;
+    ELS.myRotaGrid.innerHTML = html;
 }
 
 // Helper to determine the main activity summary (UNCHANGED)
