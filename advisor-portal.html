@@ -380,10 +380,9 @@
     /* 1. Top Summary Section */
     .summary-grid {
         display: grid;
-grid-template-columns: 80px repeat(7, 1fr); /* 80px for the time axis label */
+        grid-template-columns: 80px repeat(7, 1fr); /* 80px for the time axis label */
         border-bottom: 2px solid var(--color-border);
-flex-shrink: 0; /* Prevent summary from shrinking */
-        padding-right: 17px; /* Compensate for the scrollbar on the grid below */
+        flex-shrink: 0; /* Prevent summary from shrinking */
     }
 
     .summary-header {
@@ -453,14 +452,13 @@ flex-shrink: 0; /* Prevent summary from shrinking */
     /* 2. Detailed Time Grid Section */
     .time-grid-wrapper {
         flex-grow: 1;
-        overflow-y: scroll; /* Allow vertical scrolling for time */
+        overflow-y: auto; /* Allow vertical scrolling for time */
         position: relative;
     }
 
     .time-grid {
         display: grid;
-        grid-template-columns: 80px repeat(7, 1fr);
-        /* 80px for the time axis */
+        grid-template-columns: 80px repeat(7, 1fr); /* 80px for the time axis */
         position: relative;
         width: 100%;
     }
@@ -468,7 +466,7 @@ flex-shrink: 0; /* Prevent summary from shrinking */
     /* Time Axis (Left Column) - Improved alignment */
     .time-axis-cell {
         border-right: 1px solid var(--color-border);
-        border-bottom: none;
+        border-bottom: 1px solid #F3F4F6; /* Lighter dotted line for half hours */
         height: var(--timegrid-row-height);
         display: flex;
         align-items: flex-start;
@@ -494,9 +492,9 @@ flex-shrink: 0; /* Prevent summary from shrinking */
     }
 
     /* Solid line for hour marks */
-.day-column-cell.hour-mark {
-    border-bottom: 1px solid var(--color-border);
-}
+    .time-axis-cell.hour-mark, .day-column-cell.hour-mark {
+        border-bottom: 1px solid var(--color-border);
+    }
 
     /* Containers for the absolutely positioned events */
     .day-column-events {
@@ -511,54 +509,32 @@ flex-shrink: 0; /* Prevent summary from shrinking */
         border-right: none;
     }
 
-    /* === MY SCHEDULE: Activity Blocks (Positioned Events) === */
-    /* This rule applies to ALL blocks ONLY in the My Schedule tab */
-    #tab-my-schedule .activity-block {
+    /* Activity Blocks (Positioned Events) */
+    .activity-block {
         position: absolute;
+        /* Inset slightly from the edges for a cleaner look */
         left: 2px;
         right: 2px; 
-        padding: 3px 6px;
-        font-size: 11px;
+        padding: 6px;
+        font-size: 12px;
         overflow: hidden;
         border-radius: var(--border-radius);
+        /* Add subtle shadow */
         box-shadow: var(--shadow-sm);
+        pointer-events: auto;
+        line-height: 1.3;
         border: 1px solid rgba(0,0,0,0.1);
-        line-height: 1.2;
-        
-        /* FIX 1: This enables the mouse hover for the tooltip */
-        pointer-events: auto; 
-        
-        /* FIX 2: This centers ALL text (DEB Email, Break, etc.) */
-        display: flex;
-        flex-direction: column; /* Stacks title/time vertically */
-        align-items: center;     /* Horizontal center */
-        justify-content: center;  /* Vertical center */
-        text-align: center;
     }
 
-    /* This rule applies to ALL titles (DEB Email, Break...) */
-    #tab-my-schedule .activity-title {
+    .activity-title {
         font-weight: 600;
         display: block;
     }
 
-    /* This rule makes ALL times visible by default */
-    #tab-my-schedule .activity-time {
+    .activity-time {
         display: block;
-        font-size: 10px;
+        font-size: 11px;
         opacity: 0.85;
-    }
-    
-    /* --- Overrides for Break/Lunch ONLY --- */
-    
-    /* This HIDES the time ONLY for Break/Lunch */
-    #tab-my-schedule .is-simple-block .activity-time {
-        display: none;
-    }
-    
-    /* FIX 3: This NUDGES the text down ONLY for Break/Lunch */
-    #tab-my-schedule .is-simple-block .activity-title {
-        padding-top: 2px; /* Nudge text down slightly */
     }
 
 
@@ -694,11 +670,11 @@ flex-shrink: 0; /* Prevent summary from shrinking */
     /* Vertical lines extending down from the header */
     .time-tick::after {
         content: '';
-position: absolute;
+        position: absolute;
         left: 0; top: 0; height: 5000px; width: 1px;
         background-color: var(--color-border);
-        z-index: -1; 
-}
+        z-index: 1;
+    }
 
     .timeline-body {
         position: relative;
@@ -708,8 +684,8 @@ position: absolute;
       display: grid;
       grid-template-columns: var(--timeline-name-col) 1fr;
       height: var(--timeline-row-height);
-      margin-bottom: 4px; /* <-- ADD THIS LINE BACK */
-}
+      margin-bottom: 4px;
+    }
 
     /* Alternating row colors for clarity */
     .timeline-row:nth-child(odd) { background-color: #FFFFFF; }
@@ -725,15 +701,15 @@ position: absolute;
 
     .timeline-track { position: relative; height: 100%; }
 
-.timeline-bar {
+    .timeline-bar {
       position: absolute;
-      top: 0;
-      height: 100%;
-display: flex;
+      top: 2px;
+      height: calc(var(--timeline-row-height) - 4px);
+      display: flex;
       align-items: center;
       overflow: hidden;
-      border-radius: 0;
-      z-index: 25; /* <-- THIS IS THE FIX */
+      border-radius: var(--border-radius);
+      z-index: 5;
       font-size: 12px;
       font-weight: 500;
       padding-left: 6px;
@@ -788,48 +764,6 @@ display: flex;
            padding: 16px;
        }
     }
-
-    /* Hides text for simple blocks on Team Schedule */
-    #tab-team-schedule .timeline-bar.is-simple-block span {
-        display: none;
-    }
-
-/* === FIX 4: Clean Timeline + Stacking + 8am Cutoff === */
-
-/* 1. Remove all horizontal grid lines */
-#tab-my-schedule .day-column-cell,
-#tab-my-schedule .day-column-cell.hour-mark {
-    border-bottom: none !important;
-}
-
-/* 2. Fix the event container layout (Fixes "Scattered Times") */
-#tab-my-schedule .day-column-events {
-    grid-row-start: 1;
-    grid-row-end: -1;
-    border-right: 1px solid var(--color-border);
-    /* These were missing from the original code */
-    position: relative;
-    pointer-events: none;
-}
-#tab-my-schedule .day-column-events:last-child {
-    border-right: none;
-}
-
-/* 3. Force activity blocks to be absolute */
-#tab-my-schedule .day-column-events .activity-block {
-    position: absolute !important; 
-    pointer-events: auto;
-}
-
-/* 4. Fix the "8am Cut Off" */
-#tab-my-schedule .time-axis-label-text {
-    position: absolute;
-    top: -6px; /* Was -8px. This centers it for 12px font. */
-    background-color: var(--color-panel-bg);
-    padding: 0 4px;
-}
-/* === END FIX === */
-
   </style>
 </head>
 <body>
@@ -1064,10 +998,10 @@ const ELS = {
 
 // --- Constants & Helpers ---
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+
 // Constants for the My Schedule Time Grid visualization
-const TIMEGRID_START_H = 5; // 5 AM
-const TIMEGRID_END_H = 23;
-// 11 PM
+const TIMEGRID_START_H = 8; // 8 AM
+const TIMEGRID_END_H = 21; // 9 PM
 const TIMEGRID_INTERVAL_MIN = 30; // 30 minute slots
 
 // Constants for the Team Daily Gantt visualization (New)
@@ -1907,6 +1841,7 @@ function drawMyRotaCalendar(){
     // 4. Generate Detailed Time Grid (Bottom Section)
     html += `<div class="time-grid-wrapper">
                 <div class="time-grid">`;
+
     // 4a. Generate Grid Cells (Time Axis and Background)
     const startMin = TIMEGRID_START_H * 60;
     const endMin = TIMEGRID_END_H * 60;
@@ -1914,22 +1849,17 @@ function drawMyRotaCalendar(){
     // We iterate up to (but not including) endMin for the grid lines
     for (let m = startMin; m < endMin; m += TIMEGRID_INTERVAL_MIN) {
         const time = m2t(m);
-        // NEW LOGIC:
-        // 'isHourLabel' is true when the slot *starts* on the hour (e.g., 08:00)
-        const isHourLabel = m % 60 === 0;
-        // 'isHourLine' is true when the slot *ends* on the hour (e.g., the 07:30 slot)
-        const isHourLine = (m + TIMEGRID_INTERVAL_MIN) % 60 === 0;
-        // Apply the 'hour-mark' class based on the line logic
-        const hourClass = isHourLine ?
-        'hour-mark' : '';
+        const isHour = m % 60 === 0;
+        const hourClass = isHour ? 'hour-mark' : '';
 
-        // Time Axis Cell
+        // Time Axis Cell - Show time only on the hour, using span for precise positioning
         html += `<div class="time-axis-cell ${hourClass}">`;
-        // Add the label based on the label logic
-        if (isHourLabel) {
+        if (isHour) {
              html += `<span class="time-axis-label-text">${time}</span>`;
         }
         html += `</div>`;
+
+
         // Day Column Background Cells (These provide the horizontal lines)
         for (let i = 0; i < 7; i++) {
             html += `<div class="day-column-cell ${hourClass}"></div>`;
@@ -1968,21 +1898,11 @@ function drawMyRotaCalendar(){
                 const textColor = getContrastingTextColor(color);
                 
                 // Format: Activity \n Start - End
-                const tooltip = `${seg.code}: ${seg.start} - ${seg.end}`;
-                
-                // --- NEW LOGIC ---
-                let blockClass = 'activity-block';
-                const lowerCode = seg.code.toLowerCase();
-                if (lowerCode.includes('break') || lowerCode.includes('lunch')) {
-                    blockClass += ' is-simple-block';
-                }
-                // --- END NEW LOGIC ---
-
-                html += `<div class="${blockClass}" title="${tooltip}" style="top: ${topPx}px; height: ${heightPx}px; background-color: ${color}; color: ${textColor};">
+                html += `<div class="activity-block" style="top: ${topPx}px; height: ${heightPx}px; background-color: ${color}; color: ${textColor};">
                             <span class="activity-title">${seg.code}</span>
                             <span class="activity-time">${seg.start} - ${seg.end}</span>
-                  </div>`;
-}
+                         </div>`;
+            }
         });
 
         html += `</div>`; // Close day-column-events
@@ -2148,17 +2068,9 @@ function renderGanttSegments(segments) {
         // Calculate contrasting text color
         const textColor = getContrastingTextColor(color);
 
-        // --- NEW LOGIC ---
-        let blockClass = 'timeline-bar';
-        const lowerCode = seg.code.toLowerCase();
-        if (lowerCode.includes('break') || lowerCode.includes('lunch')) {
-            blockClass += ' is-simple-block';
-        }
-        // --- END NEW LOGIC ---
-
         // The 'title' attribute provides the native browser tooltip on hover.
         return `
-        <div class="${blockClass}" style="left: ${startPct}%; width: ${widthPct}%; background-color: ${color}; color: ${textColor};" title="${seg.code} (${seg.start} - ${seg.end})">
+        <div class="timeline-bar" style="left: ${startPct}%; width: ${widthPct}%; background-color: ${color}; color: ${textColor};" title="${seg.code} (${seg.start} - ${seg.end})">
             <span>${seg.code}</span>
         </div>
         `;
