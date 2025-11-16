@@ -1003,12 +1003,12 @@ const { data, error } = await APP.DataService.updateRecord('schedule_components'
         ELS.grid.innerHTML = html;
 
         // Wire Buttons
-        ELS.grid.querySelectorAll('.act-assign-week, .act-change-forward').forEach(btn => {
-          btn.addEventListener('click', () => handleRowAction('assign_from_week', btn.dataset.advisorId));
-        });
-        ELS.grid.querySelectorAll('.act-change-week').forEach(btn => {
-          btn.addEventListener('click', () => handleRowAction('change_one_week', btn.dataset.advisorId));
-        });
+ELS.grid.querySelectorAll('.act-assign-week').forEach(btn => {
+  btn.addEventListener('click', () => handleRowAction('assign_from_week', btn.dataset.advisorId));
+});
+ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn => {
+  btn.addEventListener('click', () => handleRowAction('change_one_week', btn.dataset.advisorId));
+});
         ELS.grid.querySelectorAll('.act-view-plan').forEach(btn => {
           btn.addEventListener('click', () => handleViewPlan(btn.dataset.advisorId));
         });
