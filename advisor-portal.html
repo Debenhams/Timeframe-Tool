@@ -817,14 +817,15 @@ display: flex;
 
 /* 3. Force activity blocks to be absolute */
 #tab-my-schedule .day-column-events .activity-block {
-    position: absolute !important; 
+    position: absolute !important;
     pointer-events: auto;
 }
 
 /* 4. Fix the "8am Cut Off" */
 #tab-my-schedule .time-axis-label-text {
     position: absolute;
-    top: -6px; /* Was -8px. This centers it for 12px font. */
+    top: -6px;
+    /* Was -8px. This centers it for 12px font. */
     background-color: var(--color-panel-bg);
     padding: 0 4px;
 }
@@ -1065,9 +1066,9 @@ const ELS = {
 // --- Constants & Helpers ---
 const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 // Constants for the My Schedule Time Grid visualization
-const TIMEGRID_START_H = 8; // 8 AM
-const TIMEGRID_END_H = 21;
-// 9 PM
+const TIMEGRID_START_H = 5; // 5 AM
+const TIMEGRID_END_H = 23;
+// 11 PM
 const TIMEGRID_INTERVAL_MIN = 30; // 30 minute slots
 
 // Constants for the Team Daily Gantt visualization (New)
