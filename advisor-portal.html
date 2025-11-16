@@ -793,23 +793,33 @@ display: flex;
         display: none;
     }
 
-/* === FIX: Clean Timeline (Idea 1) === */
-/* Remove all horizontal grid lines from the day columns */
-#tab-my-schedule .day-column-cell {
-    border-bottom: none !important;
-}
+/* === FIX 3: Clean Timeline + Stacking Bug (VS-Clean) === */
 
-/* Ensure the hour-mark lines are also removed */
+/* 1. Remove all horizontal grid lines */
+#tab-my-schedule .day-column-cell,
 #tab-my-schedule .day-column-cell.hour-mark {
-    border-bottom: none !important;
+    border-bottom: none !important; /* !important is needed to override the base style */
 }
 
-/* Add a faint vertical line between days for separation */
+/* 2. Fix the event container layout (The REAL Fix) */
 #tab-my-schedule .day-column-events {
+    /* This is the key: force it to span ALL grid rows, from first to last */
+    grid-row-start: 1;
+    grid-row-end: -1; /* This spans to the very last row */
+    
+    /* Re-add the vertical day separator */
     border-right: 1px solid var(--color-border);
 }
 #tab-my-schedule .day-column-events:last-child {
     border-right: none;
+}
+
+/* 3. Ensure activity blocks are positioned correctly */
+/* The original file  already makes these absolute, 
+   but this selector makes sure they behave inside the new container. */
+#tab-my-schedule .day-column-events .activity-block {
+    position: absolute;
+    pointer-events: auto;
 }
 /* === END FIX === */
 
