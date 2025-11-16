@@ -2158,33 +2158,40 @@ async function startRealtime() {
         return;
     }
 
-    if (STATE.teamMemberIds.size === 0) {
-        return;
-    }
-
+    // --- START OF NEW, SIMPLIFIED LISTENER ---
+    // We are removing the team size check because we want to listen
+    // even if the advisor is the only one on the team.
+    
     console.log("Starting Realtime listener...");
 
-    // Subscribe to changes relevant to the team's schedule
-    STATE.rotaRealtimeChannel = supabase
-        .channel('rota-changes-advisor-portal-v3')
-        // 1. Listen to assignment history changes for the team
-        // We filter server-side to only receive updates for the relevant team members.
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'rotation_assignments_history', filter: `advisor_id=in.(${Array.from(STATE.teamMemberIds).join(',')})` }, debouncedRealtimeUpdate)
-        // 2. Listen to definition changes (Global)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'shift_definitions' }, debouncedRealtimeUpdate)
-         // 3. Listen to component changes (Global)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_components' }, debouncedRealtimeUpdate)
-        // 4. Listen to pattern changes (Global)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'rotation_patterns' }, debouncedRealtimeUpdate)
-        // 5. Listen to exceptions for the team
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'schedule_exceptions', filter: `advisor_id=in.(${Array.from(STATE.teamMemberIds).join(',')})` }, debouncedRealtimeUpdate)
-        .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-                console.log('Realtime connected!');
-            } else if (status === 'CHANNEL_ERROR') {
-                console.error('Realtime connection error.');
+    // 1. Get the "Walkie-Talkie" channel
+    STATE.rotaRealtimeChannel = supabase.channel('rota-changes-advisor-portal-v3');
+
+    // 2. Listen for the 'schedule_update' event we just created
+    STATE.rotaRealtimeChannel.on(
+        'broadcast',
+        { event: 'schedule_update' },
+        (payload) => {
+            console.log('Realtime update received:', payload);
+            
+            // The payload tells us *who* was updated.
+            // We only refresh if the update is for *me* (the logged-in advisor).
+            if (payload.payload && payload.payload.advisor_id == STATE.advisorId) {
+                // Run the same function as before to refresh the data.
+                debouncedRealtimeUpdate(payload);
             }
-        });
+        }
+    );
+
+    // 3. Subscribe to the channel
+    STATE.rotaRealtimeChannel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+            console.log('Realtime connected!');
+        } else if (status === 'CHANNEL_ERROR') {
+            console.error('Realtime connection error.');
+        }
+    });
+    // --- END OF NEW, SIMPLIFIED LISTENER ---
 }
 
 async function stopRealtime() {

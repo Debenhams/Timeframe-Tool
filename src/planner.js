@@ -500,20 +500,28 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         if (error) return handleError(error, `Fetch Snapshot`);
         return { data, error: null };
     };
-
-    // V16.13: New function to get full history for one advisor
+// V16.13: New function to get full history for one advisor
     DataService.fetchAssignmentHistoryForAdvisor = async (advisorId) => {
-        if (!supabase) return { data: null, error: "DB not initialized." };
+        if (!supabase) return { data: null, error: "DB not initialized."
+};
         
         const { data, error } = await supabase
             .from(HISTORY_TABLE)
             .select('*')
             .eq('advisor_id', advisorId)
-            .order('start_date', { ascending: false }); // Show newest first
+            .order('start_date', { ascending: false });
+// Show newest first
             
         if (error) return handleError(error, `Fetch History for ${advisorId}`);
-        return { data, error: null };
+return { data, error: null };
     };
+
+    // --- NEW FUNCTION TO FIX LIVE UPDATE ---
+    // This gives other parts of the app access to the 'supabase' object
+    DataService.getSupabaseClient = () => {
+        return supabase;
+    };
+    // --- END NEW FUNCTION ---
 
     APP.DataService = DataService;
 }(window.APP));
@@ -2217,25 +2225,52 @@ return;
         let result;
         if (mode === 'definition') {
             result = await APP.DataService.updateRecord('shift_definitions', { structure: absoluteTimeSegments }, { id: contextId });
-            if (!result.error) {
+if (!result.error) {
                 APP.StateManager.syncRecord('shift_definitions', result.data);
-                APP.StateManager.saveHistory("Update Shift Structure");
+APP.StateManager.saveHistory("Update Shift Structure");
                 APP.Utils.showToast("Shift definition saved.", "success");
                 if (APP.Components.ShiftDefinitionEditor) APP.Components.ShiftDefinitionEditor.render();
-            }
+}
         } else if (mode === 'exception') {
-            const record = { advisor_id: contextId, exception_date: exceptionDate, structure: absoluteTimeSegments, reason: reason || null };
+            const record = { advisor_id: contextId, exception_date: exceptionDate, structure: absoluteTimeSegments, reason: reason ||
+null };
             result = await APP.DataService.saveRecord('schedule_exceptions', record, 'advisor_id, exception_date');
             if (!result.error) {
                 APP.StateManager.syncRecord('schedule_exceptions', result.data);
-                APP.StateManager.saveHistory("Save Schedule Exception");
+APP.StateManager.saveHistory("Save Schedule Exception");
                 APP.Utils.showToast("Schedule exception saved.", "success");
+
+                // --- START OF NEW CODE TO FIX LIVE UPDATE ---
+                try {
+                    // This is the "Walkie-Talkie" channel from the Advisor Portal
+                    const channel = APP.DataService.getSupabaseClient().channel('rota-changes-advisor-portal-v3');
+                    
+                    // This sends the "signal" over the channel
+                    channel.send({
+                        type: 'broadcast',
+                        event: 'schedule_update',
+                        payload: { 
+                            message: 'A schedule was updated', 
+                            advisor_id: contextId, // Tell the portal *who* was updated
+                            date: exceptionDate
+                        }
+                    });
+                    
+                    // We don't need to stay connected, so we unsubscribe.
+                    // This is a "fire-and-forget" message.
+                    APP.DataService.getSupabaseClient().removeChannel(channel);
+
+                } catch (e) {
+                    console.warn("Realtime broadcast failed:", e);
+                }
+                // --- END OF NEW CODE ---
+
             }
         }
 
         if (result && !result.error) {
             SequentialBuilder.close();
-            if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
+if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
         }
     };
 
