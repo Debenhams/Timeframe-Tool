@@ -4077,6 +4077,7 @@ const handleDeleteRotation = async () => {
             if (APP.Components.ShiftTradeCenter) {
                 APP.Components.ShiftTradeCenter.initialize();
                 APP.Components.AdvisorAdmin.initialize();
+                
                 APP.Components.Dashboard.initialize();
             }
         } catch (error) {
@@ -4703,6 +4704,188 @@ APP.Core = Core;
         }
     };
 
+
+    // Expose the component
+    APP.Components = APP.Components || {};
+    APP.Components.Dashboard = Dashboard;
+}(window.APP));
+/**
+ * MODULE: APP.Components.Dashboard
+ * Manages the new "App Icon" home dashboard.
+ */
+(function(APP) {
+    const Dashboard = {};
+    const ELS = {}; // Cache for our widget elements
+
+    Dashboard.initialize = () => {
+        // Cache the "App" buttons
+        ELS.btnStats = document.getElementById('btn-dash-stats');
+        ELS.btnAlerts = document.getElementById('btn-dash-alerts');
+        ELS.btnUnassigned = document.getElementById('btn-dash-unassigned');
+
+        // Cache the "Badges"
+        ELS.badgeStats = document.getElementById('badge-dash-stats');
+        ELS.badgeAlerts = document.getElementById('badge-dash-alerts');
+        ELS.badgeUnassigned = document.getElementById('badge-dash-unassigned');
+
+        // Cache the new modal elements
+        ELS.modal = document.getElementById('dashboardModal');
+        ELS.modalTitle = document.getElementById('dashboardModalTitle');
+        ELS.modalBody = document.getElementById('dashboardModalBody');
+        ELS.modalClose = document.getElementById('dashboardModalClose');
+
+        // Wire up click listeners
+        if (ELS.btnStats) ELS.btnStats.addEventListener('click', handleStatsClick);
+        if (ELS.btnAlerts) ELS.btnAlerts.addEventListener('click', handleAlertsClick);
+        if (ELS.btnUnassigned) ELS.btnUnassigned.addEventListener('click', handleUnassignedClick);
+        if (ELS.modalClose) ELS.modalClose.addEventListener('click', closeModal);
+    };
+
+    // The main render function for the dashboard
+    Dashboard.render = async () => {
+        if (!ELS.btnStats) return; // Haven't been initialized yet
+
+        const STATE = APP.StateManager.getState();
+        if (!STATE.isBooted) return; // Data isn't ready
+
+        const weekStart = STATE.weekStart;
+        if (!weekStart) {
+            // We can't show stats without a week
+            return;
+        }
+
+        // We must ensure the assignments for this week are loaded
+        await APP.StateManager.loadEffectiveAssignments(weekStart);
+
+        // Now we have the data, let's get it
+        const effectiveMap = STATE.effectiveAssignmentsCache.get(weekStart);
+        const allAdvisors = STATE.advisors;
+        const allExceptions = STATE.scheduleExceptions;
+
+        // Run the logic for each widget
+        renderDailyStats(allExceptions, weekStart);
+        renderRotationAlerts(effectiveMap, allAdvisors, weekStart);
+        renderUnassigned(effectiveMap, allAdvisors);
+    };
+
+    // --- Widget-Specific Logic ---
+
+    // 1. Daily Stats Widget
+    const renderDailyStats = (allExceptions, weekStart) => {
+        const weekEnd = APP.Utils.addDaysISO(weekStart, 6);
+        const exceptionsThisWeek = allExceptions.filter(ex => {
+            return ex.exception_date >= weekStart && ex.exception_date <= weekEnd;
+        });
+        const count = exceptionsThisWeek.length;
+
+        ELS.badgeStats.textContent = count;
+        ELS.badgeStats.style.display = count > 0 ? 'flex' : 'none';
+    };
+
+    // 2. Rotation Alerts Widget
+    const renderRotationAlerts = (effectiveMap, allAdvisors, weekStart) => {
+        const weekEnd = APP.Utils.addDaysISO(weekStart, 6);
+        const alerts = [];
+
+        effectiveMap.forEach((assignment, advisorId) => {
+            if (assignment.end_date && assignment.end_date >= weekStart && assignment.end_date <= weekEnd) {
+                const advisor = allAdvisors.find(a => a.id == advisorId);
+                if (advisor) {
+                    alerts.push({
+                        name: advisor.name,
+                        endDate: APP.Utils.convertISOToUKDate(assignment.end_date)
+                    });
+                }
+            }
+        });
+
+        const count = alerts.length;
+        ELS.badgeAlerts.textContent = count;
+        ELS.badgeAlerts.style.display = count > 0 ? 'flex' : 'none';
+    };
+
+    // 3. Unassigned Advisors Widget
+    const renderUnassigned = (effectiveMap, allAdvisors) => {
+        const unassigned = allAdvisors.filter(adv => !effectiveMap.has(adv.id));
+        const count = unassigned.length;
+
+        ELS.badgeUnassigned.textContent = count;
+        ELS.badgeUnassigned.style.display = count > 0 ? 'flex' : 'none';
+    };
+
+    // --- Click Handlers ---
+
+    const handleStatsClick = () => {
+        const weekStart = APP.StateManager.getState().weekStart;
+        const weekEnd = APP.Utils.addDaysISO(weekStart, 6);
+        const exceptionsThisWeek = APP.StateManager.getState().scheduleExceptions.filter(ex => {
+            return ex.exception_date >= weekStart && ex.exception_date <= weekEnd;
+        });
+
+        let html = '<p style="padding: 24px;">No live exceptions found for this week.</p>';
+        if (exceptionsThisWeek.length > 0) {
+            html = '<ul class="dashboard-detail-list">';
+            exceptionsThisWeek.forEach(ex => {
+                const advisor = APP.StateManager.getAdvisorById(ex.advisor_id);
+                html += `<li><strong>${advisor ? advisor.name : 'Unknown'}</strong> has an exception on ${APP.Utils.convertISOToUKDate(ex.exception_date)} (${ex.reason || 'No reason'})</li>`;
+            });
+            html += '</ul>';
+        }
+        openModal("Daily Stats", html);
+    };
+
+    const handleAlertsClick = () => {
+        const weekStart = APP.StateManager.getState().weekStart;
+        const weekEnd = APP.Utils.addDaysISO(weekStart, 6);
+        const effectiveMap = APP.StateManager.getState().effectiveAssignmentsCache.get(weekStart);
+        const allAdvisors = APP.StateManager.getState().advisors;
+        const alerts = [];
+
+        effectiveMap.forEach((assignment, advisorId) => {
+            if (assignment.end_date && assignment.end_date >= weekStart && assignment.end_date <= weekEnd) {
+                const advisor = allAdvisors.find(a => a.id == advisorId);
+                if (advisor) alerts.push({ name: advisor.name, endDate: APP.Utils.convertISOToUKDate(assignment.end_date) });
+            }
+        });
+
+        let html = '<p style="padding: 24px;">No rotations are ending this week.</p>';
+        if (alerts.length > 0) {
+            html = '<ul class="dashboard-detail-list">';
+            alerts.forEach(alert => {
+                html += `<li><strong>${alert.name}</strong>'s current assignment ends on ${alert.endDate}.</li>`;
+            });
+            html += '</ul>';
+        }
+        openModal("Rotation Alerts", html);
+    };
+
+    const handleUnassignedClick = () => {
+        const weekStart = APP.StateManager.getState().weekStart;
+        const effectiveMap = APP.StateManager.getState().effectiveAssignmentsCache.get(weekStart);
+        const allAdvisors = APP.StateManager.getState().advisors;
+        const unassigned = allAdvisors.filter(adv => !effectiveMap.has(adv.id));
+
+        let html = '<p style="padding: 24px;">All advisors have an assignment for this week.</p>';
+        if (unassigned.length > 0) {
+            html = '<ul class="dashboard-detail-list">';
+            unassigned.forEach(adv => {
+                html += `<li><strong>${adv.name}</strong> has no rotation assigned for this week.</li>`;
+            });
+            html += '</ul>';
+        }
+        openModal("Unassigned Advisors", html);
+    };
+
+    // --- Modal Functions ---
+    const openModal = (title, content) => {
+        ELS.modalTitle.textContent = title;
+        ELS.modalBody.innerHTML = content;
+        ELS.modal.style.display = 'flex';
+    };
+
+    const closeModal = () => {
+        ELS.modal.style.display = 'none';
+    };
 
     // Expose the component
     APP.Components = APP.Components || {};

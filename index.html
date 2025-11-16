@@ -141,27 +141,38 @@
 
     <main class="content-area" id="main-content-area">
       <section id="tab-home" class="tab-content active">
-    <div class="dashboard-grid">
 
-        <div class="widget" id="widget-daily-stats">
-            <h3>Daily Stats (This Week)</h3>
-            <div class="widget-content">
-                <p>Loading stats...</p>
-            </div>
-        </div>
+    <div class="dashboard-app-grid">
 
-        <div class="widget" id="widget-rotation-alerts">
-            <h3>Rotation Alerts (This Week)</h3>
-            <div class="widget-content">
-                <p>Loading alerts...</p>
+        <button class="dashboard-app" id="btn-dash-stats">
+            <div class="app-badge" id="badge-dash-stats" style="display: none;">0</div>
+            <div class="app-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20v-6M12 8V4M20 12h-6M4 12h6M17.66 17.66l-3-3M6.34 6.34l-3-3M17.66 6.34l-3 3M6.34 17.66l-3 3"/></svg>
             </div>
-        </div>
+            <span class="app-title">Daily Stats</span>
+        </button>
 
-        <div class="widget" id="widget-unassigned">
-            <h3>Unassigned Advisors (This Week)</h3>
-            <div class="widget-content">
-                <p>Loading advisor list...</p>
+        <button class="dashboard-app" id="btn-dash-alerts">
+            <div class="app-badge" id="badge-dash-alerts" style="display: none;">0</div>
+            <div class="app-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
             </div>
+            <span class="app-title">Rotation Alerts</span>
+        </button>
+
+        <button class="dashboard-app" id="btn-dash-unassigned">
+            <div class="app-badge" id="badge-dash-unassigned" style="display: none;">0</div>
+            <div class="app-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="23" y1="7" x2="23" y2="7"></line><line x1="23" y1="1" x2="23" y2="1"></line></svg>
+            </div>
+            <span class="app-title">Unassigned Advisors</span>
+        </button>
+
+        <div class="dashboard-chart-widget" id="widget-headcount-chart">
+             <h3>Live Headcount (Coming Soon)</h3>
+             <div class="widget-content">
+                <p>(Chart will go here)</p>
+             </div>
         </div>
 
     </div>
@@ -478,7 +489,18 @@
     </div>
   </div>
   <div id="notification-container"></div>
-
+<div class="modal-backdrop" id="dashboardModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="dashboardModalTitle">Dashboard Details</h2>
+        <button class="btn-icon modal-close" id="dashboardModalClose">
+           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="modal-body" id="dashboardModalBody">
+         </div>
+    </div>
+  </div>
   <script src="./src/planner.js?v=16.11"></script>
   <script src="./src/init.js?v=16.11"></script>
 

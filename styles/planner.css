@@ -980,35 +980,118 @@ td .form-input-color.edit-value { width: 60px; height: 30px; }
     min-width: 120px; /* Prevent it from collapsing too much */
     width: 100%; /* Ensure it fills the (now smaller) cell */
 }
-/* === New Home Dashboard === */
-.dashboard-grid {
+/* === New Home Dashboard (App Icon Style) === */
+.dashboard-app-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    /* Create a responsive grid of icons */
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 24px;
 }
 
-.widget {
+/* The 'coming soon' chart widget */
+.dashboard-chart-widget {
+    /* Span the full width of the grid */
+    grid-column: 1 / -1;
     background-color: var(--color-panel-bg);
     border-radius: var(--border-radius);
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--color-border);
-    display: flex;
-    flex-direction: column;
 }
-
-.widget h3 {
+.dashboard-chart-widget h3 {
     padding: 16px 20px;
     margin: 0;
     border-bottom: 1px solid var(--color-border);
     font-size: 15px;
 }
-
-.widget .widget-content {
+.dashboard-chart-widget .widget-content {
     padding: 20px;
-    flex-grow: 1;
     color: var(--color-text-muted);
 }
 
-.widget .widget-content p {
+/* The App Icon Button */
+.dashboard-app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative; /* For the badge */
+
+    /* The premium dark-mode feel */
+    background-color: var(--sidebar-bg); /* Dark background */
+    color: var(--sidebar-text); /* Light text */
+    box-shadow: var(--shadow-sm);
+}
+
+.dashboard-app:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+    color: #fff;
+}
+
+.dashboard-app .app-icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 12px;
+    color: #fff; /* White icon */
+}
+
+.dashboard-app .app-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.dashboard-app .app-title {
+    font-size: 14px;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* The Notification Badge */
+.app-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background-color: var(--color-danger);
+    color: white;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* The new Modal Body (for lists) */
+#dashboardModal .modal-body {
+    padding: 0; /* Remove padding to let list be full-width */
+}
+
+/* Simple list for modal content */
+.dashboard-detail-list {
+    list-style-type: none;
+    padding: 0;
     margin: 0;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.dashboard-detail-list li {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+    font-size: 14px;
+}
+.dashboard-detail-list li:last-child {
+    border-bottom: none;
+}
+.dashboard-detail-list li strong {
+    color: var(--brand-primary);
 }
