@@ -793,46 +793,39 @@ display: flex;
         display: none;
     }
 
-/* === FIX 5: High-Specificity Fix for CSS Conflict === */
+/* === FIX 4: Clean Timeline + Stacking + 8am Cutoff === */
 
-/* 1. HIDE the "Wrong Side" (Right) Time Axis */
-/* This axis is from the Planner.css and we hide it only on "My Schedule" */
-#tab-my-schedule .timeline-container .header-timeline,
-#tab-my-schedule .timeline-container .time-tick {
-    display: none !important;
+/* 1. Remove all horizontal grid lines */
+#tab-my-schedule .day-column-cell,
+#tab-my-schedule .day-column-cell.hour-mark {
+    border-bottom: none !important;
 }
 
-/* 2. FIX the "Cut Off" (Left) Time Axis */
-/* This is the correct axis from the Portal's CSS */
-#tab-my-schedule .time-axis-label-text {
-    position: absolute;
-    top: -6px !important; /* Was -8px. This centers it. */
-    background-color: var(--color-panel-bg);
-    padding: 0 4px;
-}
-
-/* 3. FIX the "Scattered Blocks" Stacking Bug */
-/* This forces the event containers to span the full grid height */
+/* 2. Fix the event container layout (Fixes "Scattered Times") */
 #tab-my-schedule .day-column-events {
-    grid-row: 1 / span 100 !important; /* Force full height */
-    position: relative !important;
-    pointer-events: none !important;
+    grid-row-start: 1;
+    grid-row-end: -1;
     border-right: 1px solid var(--color-border);
+    /* These were missing from the original code */
+    position: relative;
+    pointer-events: none;
 }
 #tab-my-schedule .day-column-events:last-child {
     border-right: none;
 }
 
-/* This forces the blocks to use absolute positioning */
+/* 3. Force activity blocks to be absolute */
 #tab-my-schedule .day-column-events .activity-block {
-    position: absolute !important;
-    pointer-events: auto !important;
+    position: absolute !important; 
+    pointer-events: auto;
 }
 
-/* 4. REMOVE the Messy Horizontal Lines */
-#tab-my-schedule .day-column-cell,
-#tab-my-schedule .day-column-cell.hour-mark {
-    border-bottom: none !important;
+/* 4. Fix the "8am Cut Off" */
+#tab-my-schedule .time-axis-label-text {
+    position: absolute;
+    top: -6px; /* Was -8px. This centers it for 12px font. */
+    background-color: var(--color-panel-bg);
+    padding: 0 4px;
 }
 /* === END FIX === */
 
