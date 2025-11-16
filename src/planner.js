@@ -753,7 +753,7 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         if (!ELS.grid) return;
         const STATE = APP.StateManager.getState();
         const components = STATE.scheduleComponents.sort((a,b) => a.name.localeCompare(b.name));
-        let html = '<table><thead><tr><th>Name</th><th>Type</th><th>Color</th><th>Default Duration</th><th>Paid</th><th>Actions</th></tr></thead><tbody>';
+        let html = '<table><thead><tr><th>Name</th><th>Type</th><th>Color</th><th>Default Duration</th><th>Paid</th><th>Override</th><th>Actions</th></tr></thead><tbody>';
         components.forEach(comp => {
             html += `<tr data-component-id="${comp.id}">
                 <td><span class="display-value">${comp.name}</span><input type="text" class="form-input edit-value" name="comp-name" value="${comp.name}" style="display:none;"></td>
@@ -772,6 +772,13 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
                     <select class="form-select edit-value" name="comp-paid" style="display:none; width: 70px;">
                         <option value="true" ${comp.is_paid ? 'selected' : ''}>Yes</option>
                         <option value="false" ${!comp.is_paid ? 'selected' : ''}>No</option>
+                    </select>
+                </td>
+                <td>
+                    <span class="display-value">${comp.is_full_day_override ? 'Yes' : 'No'}</span>
+                    <select class="form-select edit-value" name="comp-override" style="display:none; width: 70px;">
+                        <option value="true" ${comp.is_full_day_override ? 'selected' : ''}>Yes</option>
+                        <option value="false" ${!comp.is_full_day_override ? 'selected' : ''}>No</option>
                     </select>
                 </td>
                 <td class="actions">
@@ -793,12 +800,13 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         const color = prompt("Enter hex color code:", "#3498db");
         const duration = parseInt(prompt("Enter default duration in minutes:", "60"), 10);
         const isPaid = confirm("Is this a paid activity?");
+        const isOverride = confirm("Is this a 'Full Day Override' component (e.g., Sick, Holiday)?");
         if (!name || !type || !color || isNaN(duration)) {
             APP.Utils.showToast("Invalid input.", "danger");
             return;
         }
-        const newComponent = { name, type, color, default_duration_min: duration, is_paid: isPaid };
-        const { data, error } = await APP.DataService.saveRecord('schedule_components', newComponent);
+        const newComponent = { name, type, color, default_duration_min: duration, is_paid: isPaid, is_full_day_override: isOverride };
+const { data, error } = await APP.DataService.saveRecord('schedule_components', newComponent);
         if (!error) {
             APP.StateManager.syncRecord('schedule_components', data);
             APP.Utils.showToast(`Component '${name}' created.`, "success");
@@ -836,12 +844,13 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
         const color = row.querySelector('[name="comp-color"]').value;
         const duration = parseInt(row.querySelector('[name="comp-duration"]').value, 10);
         const isPaid = row.querySelector('[name="comp-paid"]').value === 'true';
+        const isOverride = row.querySelector('[name="comp-override"]').value === 'true';
         if (!name || !type || !color || isNaN(duration) || duration < 0) {
             APP.Utils.showToast("Invalid data.", "danger");
             return;
         }
-        const updatedComponent = { id: id, name, type, color, default_duration_min: duration, is_paid: isPaid };
-        const { data, error } = await APP.DataService.updateRecord('schedule_components', updatedComponent, { id: id });
+        const updatedComponent = { id: id, name, type, color, default_duration_min: duration, is_paid: isPaid, is_full_day_override: isOverride };
+const { data, error } = await APP.DataService.updateRecord('schedule_components', updatedComponent, { id: id });
         if (!error) {
             APP.StateManager.syncRecord('schedule_components', data);
             APP.Utils.showToast(`Component '${name}' updated.`, "success");
@@ -1916,36 +1925,54 @@ ELS.exceptionReasonGroup.style.display = 'none';
         const component = APP.StateManager.getComponentById(componentId);
         if (!component) return;
 
-        if (isAnchored(componentId)) {
-            APP.Utils.showToast("Breaks and Lunches cannot be added this way. Please edit them manually.", "warning");
-            return;
-        }
+        // --- NEW OVERRIDE LOGIC ---
+        if (component && component.is_full_day_override) {
+            // This component is a "Full Day Override" (e.g., Sick, Holiday)
+            // It will replace the *entire* schedule, ignoring all anchors.
 
-        const rect = ELS.visualEditorTimeline.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const pct = Math.max(0, Math.min(1, x / rect.width));
-        
-        const pipeCapacity = BUILDER_STATE.fixedShiftLength;
-        const relativeMinutes = Math.round(pct * pipeCapacity);
-        const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
-        const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
-        
-        // --- THIS IS THE LOGIC CHANGE ---
-        // We now call carveOutTime, which REPLACES time, instead of insertStone, which PUSHES time.
-        const newSegments = carveOutTime(
-            BUILDER_STATE.segments,
-            componentId,
-            component.default_duration_min,
-            insertTimeAbs
-        );
-        
-        // newSegments will be null if the carve-out failed (e.g., dropped on a break)
-        if (newSegments) {
+            // 1. Create the new single-segment schedule
+            const newSegments = [{ 
+                component_id: componentId, 
+                duration_min: BUILDER_STATE.fixedShiftLength 
+            }];
+            
+            // 2. Apply it to the state
             BUILDER_STATE.segments = newSegments;
+
+            // 3. Re-render and save history
             renderTimeline();
             saveVisualHistory();
+        
+        } else {
+            // --- ORIGINAL LOGIC (for non-override components) ---
+            if (isAnchored(componentId)) {
+                APP.Utils.showToast("Breaks and Lunches cannot be added this way. Please edit them manually.", "warning");
+                return;
+            }
+
+            const rect = ELS.visualEditorTimeline.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const pct = Math.max(0, Math.min(1, x / rect.width));
+            
+            const pipeCapacity = BUILDER_STATE.fixedShiftLength;
+            const relativeMinutes = Math.round(pct * pipeCapacity);
+            const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
+            const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
+
+            const newSegments = carveOutTime(
+                BUILDER_STATE.segments,
+                componentId,
+                component.default_duration_min,
+                insertTimeAbs
+            );
+
+            if (newSegments) {
+                BUILDER_STATE.segments = newSegments;
+                renderTimeline();
+                saveVisualHistory();
+            }
         }
-        // --- END LOGIC CHANGE ---
+        // --- END OF NEW LOGIC ---
     };
 const updateDurationDisplay = () => {
         const startMin = parseTimeToMinutes(ELS.veAddStartTime.value);
