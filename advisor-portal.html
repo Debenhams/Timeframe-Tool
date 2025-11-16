@@ -793,6 +793,26 @@ display: flex;
         display: none;
     }
 
+/* === FIX: Clean Timeline (Idea 1) === */
+/* Remove all horizontal grid lines from the day columns */
+#tab-my-schedule .day-column-cell {
+    border-bottom: none !important;
+}
+
+/* Ensure the hour-mark lines are also removed */
+#tab-my-schedule .day-column-cell.hour-mark {
+    border-bottom: none !important;
+}
+
+/* Add a faint vertical line between days for separation */
+#tab-my-schedule .day-column-events {
+    border-right: 1px solid var(--color-border);
+}
+#tab-my-schedule .day-column-events:last-child {
+    border-right: none;
+}
+/* === END FIX === */
+
   </style>
 </head>
 <body>
