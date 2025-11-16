@@ -1095,3 +1095,29 @@ td .form-input-color.edit-value { width: 60px; height: 30px; }
 .dashboard-detail-list li strong {
     color: var(--brand-primary);
 }
+/* "Coming Soon" App Icon Styling */
+.dashboard-app.coming-soon {
+    opacity: 0.6;
+    cursor: not-allowed;
+    overflow: hidden; /* To contain the banner */
+}
+
+.dashboard-app.coming-soon:hover {
+    transform: none; /* Disable hover effect */
+    box-shadow: var(--shadow-sm);
+    color: var(--sidebar-text);
+}
+
+.app-banner {
+    position: absolute;
+    top: 10px;
+    right: -30px;
+    background-color: var(--brand-accent);
+    color: white;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 30px;
+    transform: rotate(45deg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    text-transform: uppercase;
+}
