@@ -3369,16 +3369,7 @@ const handleDeleteRotation = async () => {
         
         ELS.tree.innerHTML = html || '<div class="visualization-empty">No teams or advisors found.</div>';
 
-        // Auto-select the first advisor on initial load if none are selected (Bootstrapping UI)
-        if (STATE.selectedAdvisors.size === 0 && STATE.advisors.length > 0 && !STATE.treeInitialized) {
-            const firstAdvisor = advisors.find(a => a.leader_id);
-             if (firstAdvisor) {
-                STATE.selectedAdvisors.add(firstAdvisor.id);
-                STATE.treeInitialized = true;
-                // Trigger the main render function to ensure coordination
-                ScheduleViewer.render();
-            }
-        }
+        
     };
 
     const handleTreeChange = (e) => {
