@@ -3662,39 +3662,66 @@ const handleDeleteRotation = async () => {
    };
    
    const updateCurrentTimeIndicator = (ELS_DAILY) => {
-       if (!ELS_DAILY || !ELS_DAILY.currentTimeIndicator || !ELS_DAILY.timelineContainer) return;
+    if (!ELS_DAILY || !ELS_DAILY.currentTimeIndicator || !ELS_DAILY.timelineContainer) return;
 
-        // NOTE: This relies on the client's local time.
-       const now = new Date();
-       
-       const STATE = APP.StateManager.getState();
-       // Get the specific date ISO for the selected day in the view
-       const viewDateISO = APP.Utils.getISODateForDayName(STATE.weekStart, STATE.selectedDay);
-       const todayISO = APP.Utils.formatDateToISO(now);
+    // Get the current time *in the UK (London)*
+    const now = new Date();
+    let ukTimeStr;
+    let ukDateStr;
 
-       // Only show if the view is 'daily' AND the date being viewed is today's date
-       if (STATE.scheduleViewMode !== 'daily' || viewDateISO !== todayISO) {
-           ELS_DAILY.currentTimeIndicator.style.display = 'none';
-           return;
-       }
+    try {
+        // Get the time in HH:MM format for London
+        ukTimeStr = now.toLocaleTimeString('en-GB', { 
+            timeZone: 'Europe/London', 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: false 
+        });
 
-       const currentMinutes = now.getHours() * 60 + now.getMinutes();
-       
-       if (currentMinutes < Config.TIMELINE_START_MIN || currentMinutes > Config.TIMELINE_END_MIN) {
-           ELS_DAILY.currentTimeIndicator.style.display = 'none';
-           return;
-       }
+        // Get the date in YYYY-MM-DD format for London
+        ukDateStr = now.toLocaleDateString('en-CA', { 
+            timeZone: 'Europe/London' 
+        });
 
-       const pct = ((currentMinutes - Config.TIMELINE_START_MIN) / Config.TIMELINE_DURATION_MIN) * 100;
-       
-       const nameColElement = ELS_DAILY.timelineContainer.querySelector('.header-name');
-       // Use offsetWidth for accurate measurement of the sticky name column
-       const nameColWidth = nameColElement ? nameColElement.offsetWidth : 220;
+    } catch (e) {
+        console.error("Timezone 'Europe/London' not supported, falling back to local time.");
+        // Fallback for older browsers
+        const fallbackMinutes = (now.getUTCHours() * 60 + now.getUTCMinutes()) - now.getTimezoneOffset();
+        ukTimeStr = `${String(Math.floor(fallbackMinutes / 60)).padStart(2, '0')}:${String(fallbackMinutes % 60).padStart(2, '0')}`;
+        ukDateStr = APP.Utils.formatDateToISO(now);
+    }
 
-       ELS_DAILY.currentTimeIndicator.style.display = 'block';
-       // Position correctly relative to the start of the container, accounting for the name column width
-       ELS_DAILY.currentTimeIndicator.style.left = `calc(${nameColWidth}px + ${pct}%)`;
-   };
+    const [h, m] = ukTimeStr.split(':').map(Number);
+    const currentMinutes = h * 60 + m;
+
+    // --- The rest of the function is the same ---
+
+    const STATE = APP.StateManager.getState();
+    // Get the specific date ISO for the selected day in the view
+    const viewDateISO = APP.Utils.getISODateForDayName(STATE.weekStart, STATE.selectedDay);
+
+    const todayISO = ukDateStr; // 'en-CA' format is YYYY-MM-DD
+
+    // Only show if the view is 'daily' AND the date being viewed is today's date
+    if (STATE.scheduleViewMode !== 'daily' || viewDateISO !== todayISO) {
+        ELS_DAILY.currentTimeIndicator.style.display = 'none';
+        return;
+    }
+
+    if (currentMinutes < Config.TIMELINE_START_MIN || currentMinutes > Config.TIMELINE_END_MIN) {
+        ELS_DAILY.currentTimeIndicator.style.display = 'none';
+        return;
+    }
+
+    const pct = ((currentMinutes - Config.TIMELINE_START_MIN) / Config.TIMELINE_DURATION_MIN) * 100;
+    const nameColElement = ELS_DAILY.timelineContainer.querySelector('.header-name');
+    // Use offsetWidth for accurate measurement of the sticky name column
+    const nameColWidth = nameColElement ? nameColElement.offsetWidth : 220;
+
+    ELS_DAILY.currentTimeIndicator.style.display = 'block';
+    // Position correctly relative to the start of the container, accounting for the name column width
+    ELS_DAILY.currentTimeIndicator.style.left = `calc(${nameColWidth}px + ${pct}%)`;
+};
 
    // Updated mouse tracking to correctly account for horizontal scrolling
    const updateMouseTimeIndicator = (e, ELS_DAILY) => {
