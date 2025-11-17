@@ -943,7 +943,7 @@ display: flex;
       <div class="content-area-constrained">
 
        <div class="notice-container">
-           <div id="realtimeNote" class="notice success" style="display:none;">
+           <div id="realtimeNote" class="notice danger" style="display:none;">
                 Live Update: The schedule data was just updated.
            </div>
            <div id="infoNote" class="notice info" style="display:none;"></div>
@@ -1526,6 +1526,12 @@ function setupAppUIEvents() {
             renderViews();
         }
     });
+    // Listen for clicks on the new "Acknowledge" button
+ELS.realtimeNote.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'ackAlertBtn') {
+        acknowledgeUpdate();
+    }
+});
 }
 
 // (New Helper) Updates the options in the Team Day Selector based on the current week
@@ -2131,55 +2137,70 @@ function renderGanttSegments(segments) {
 
 // --- Realtime Updates (Ensuring functionality with Debounce) ---
 
-// Create a debounced version of the update handler
-const debouncedRealtimeUpdate = debounce(async (payload) => {
-    console.log('Debounced Realtime update processing:', payload.table);
+// This is the NEW function that shows the "sticky" alert
+function showUpdateNotification() {
+    console.log("Showing sticky update notification.");
 
-    // If definitions or components changed, reload them first (as they are foundational)
-    if (payload.table === 'shift_definitions') {
-        await loadAllDefinitions();
-    } else if (payload.table === 'schedule_components') {
-        await loadComponents();
-    }
+    // 1. Show the Favicon Badge
+    showFaviconBadge();
 
-    // Re-fetch the current week's data and re-render the views
-    await loadAndRender();
+    // 2. Set the HTML to include the "Okay" button
+    ELS.realtimeNote.innerHTML = `
+        Live Update: Your schedule for today has been changed.
+        <button id="ackAlertBtn" class="btn secondary" style="margin-left: 16px; padding: 4px 10px;">Okay</button>
+    `;
 
-    // Show the notification banner
+    // 3. Show the banner (it will now stay until "Okay" is clicked)
     ELS.realtimeNote.style.display = 'block';
-    // Hide the notification after a few seconds
-    setTimeout(() => { ELS.realtimeNote.style.display = 'none'; }, 5000);
+}
 
-}, 500); // Wait 500ms before executing
+// This is the NEW function that runs when "Okay" is clicked
+function acknowledgeUpdate() {
+    console.log("Alert acknowledged.");
+
+    // 1. Hide the banner
+    ELS.realtimeNote.style.display = 'none';
+
+    // 2. Clear the Favicon Badge
+    clearFaviconBadge();
+
+    // 3. NOW we reload the schedule to show the change
+    loadAndRender();
+}
 
 
 async function startRealtime() {
     if (STATE.rotaRealtimeChannel) {
-        return;
+        return; // Already started
     }
 
-    // --- START OF NEW, SIMPLIFIED LISTENER ---
-    // We are removing the team size check because we want to listen
-    // even if the advisor is the only one on the team.
-    
     console.log("Starting Realtime listener...");
 
     // 1. Get the "Walkie-Talkie" channel
     STATE.rotaRealtimeChannel = supabase.channel('rota-changes-advisor-portal-v3');
 
-    // 2. Listen for the 'schedule_update' event we just created
+    // 2. Listen for the 'schedule_update' event
     STATE.rotaRealtimeChannel.on(
         'broadcast',
         { event: 'schedule_update' },
         (payload) => {
             console.log('Realtime update received:', payload);
-            
-            // The payload tells us *who* was updated.
-            // We only refresh if the update is for *me* (the logged-in advisor).
-            if (payload.payload && payload.payload.advisor_id == STATE.advisorId) {
-                // Run the same function as before to refresh the data.
-                debouncedRealtimeUpdate(payload);
+
+            // --- THIS IS THE NEW LOGIC ---
+            if (payload.payload) {
+                const update = payload.payload;
+                const isForMe = update.advisor_id == STATE.advisorId;
+                const isForToday = update.date == TODAY_ISO;
+
+                // Only fire if the update is for ME and for TODAY
+                if (isForMe && isForToday) {
+                    // Call the new "sticky" notification function
+                    showUpdateNotification();
+                } else {
+                    console.log("Ignoring realtime update (not for today or not for me).");
+                }
             }
+            // --- END OF NEW LOGIC ---
         }
     );
 
@@ -2191,9 +2212,48 @@ async function startRealtime() {
             console.error('Realtime connection error.');
         }
     });
+
     // --- END OF NEW, SIMPLIFIED LISTENER ---
 }
+// --- Favicon Badge Helpers ---
+function showFaviconBadge() {
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32;
+        canvas.height = 32;
+        const ctx = canvas.getContext('2d');
 
+        // Draw a red circle
+        ctx.fillStyle = '#EF4444'; // Red color
+        ctx.beginPath();
+        ctx.arc(16, 16, 16, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Draw a white "!"
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 24px ' + getComputedStyle(document.body).fontFamily;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('!', 16, 17);
+
+        // Set as favicon
+        const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
+        link.type = 'image/x-icon';
+        link.rel = 'shortcut icon';
+        link.href = canvas.toDataURL("image/png");
+        document.getElementsByTagName('head')[0].appendChild(link);
+    } catch (e) {
+        console.warn("Favicon badge not supported or failed to draw.", e);
+    }
+}
+
+function clearFaviconBadge() {
+    const link = document.querySelector("link[rel*='icon']");
+    if (link) {
+        // Setting to an empty data URL is a common way to "clear" it
+        link.href = 'data:,';
+    }
+}
 async function stopRealtime() {
     if (STATE.rotaRealtimeChannel) {
         console.log("Stopping Realtime listener.");
