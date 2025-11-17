@@ -3647,11 +3647,7 @@ const handleDeleteRotation = async () => {
     // --- INTRADAY INDICATORS (Daily View Only) ---
     
     const setupIntradayIndicators = (ELS_DAILY) => {
-       // Clear previous interval to prevent stacking
-       if (timeIndicatorInterval) clearInterval(timeIndicatorInterval);
-       // Update current time indicator every minute
-       timeIndicatorInterval = setInterval(() => updateCurrentTimeIndicator(ELS_DAILY), 60000);
-       updateCurrentTimeIndicator(ELS_DAILY);
+       
 
        // Setup mouse tracking for precision cursor
        if (ELS_DAILY.timelineContainer) {
