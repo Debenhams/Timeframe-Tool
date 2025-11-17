@@ -2165,6 +2165,8 @@ function acknowledgeUpdate() {
     // 2. Clear the Favicon Badge
     clearFaviconBadge();
 
+    // 3. NOW we reload the schedule to show the change
+    loadAndRender();
 }
 
 
@@ -2187,30 +2189,31 @@ async function startRealtime() {
 
             if (payload.payload) {
                 const update = payload.payload;
-                const isForMe = update.advisor_id == STATE.advisorId;
-                const isForToday = update.date == TODAY_ISO;
 
-                // --- THIS IS THE CORRECT LOGIC ---
+                // --- THIS IS THE NEW LOGIC ---
 
-                // 1. As long as the change is for me...
-                if (isForMe) {
+                // 1. Check if the update is for ANYONE on my team
+                //    (STATE.teamMemberIds was loaded when you logged in)
+                const isForMyTeam = STATE.teamMemberIds.has(update.advisor_id);
 
-                    // ...ALWAYS reload the data silently in the background.
-                    // This makes future changes appear live.
-                    loadAndRender(); 
+                if (isForMyTeam) {
+                    // 2. ALWAYS reload the data silently in the background
+                    // This makes the "Team Schedule" tab (and "My Schedule") update instantly.
+                    loadAndRender();
 
-                    // 2. NOW, check if it's *also* for today.
-                    if (isForToday) {
-                        // If it is, *then* show the sticky alert.
+                    // 3. Now, check if a *personal alert* is needed
+                    const isForMe = update.advisor_id == STATE.advisorId;
+                    const isForToday = update.date == TODAY_ISO;
+
+                    if (isForMe && isForToday) {
+                        // Only show the sticky red alert if it's for ME and for TODAY
                         showUpdateNotification();
-                    } else {
-                        console.log("Silently updating for a future date.");
                     }
 
                 } else {
-                    console.log("Ignoring realtime update (not for me).");
+                    console.log("Ignoring update (not for my team).");
                 }
-                // --- END OF CORRECT LOGIC ---
+                // --- END OF NEW LOGIC ---
             }
         }
     );
