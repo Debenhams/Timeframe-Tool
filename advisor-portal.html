@@ -358,6 +358,7 @@
     .notice{padding:12px 20px;border-radius:var(--border-radius); box-shadow: var(--shadow-md);}
     .notice.success{background:#D1FAE5;border:1px solid #A7F3D0;color:#065F46;}
     .notice.info{background:#DBEAFE;border:1px solid #93C5FD;color:#1E40AF;}
+    .notice.danger{background:#FEE2E2;border:1px solid #FCA5A5;color:#991B1B;}
 
     .tag{background:var(--color-hover-bg);color:var(--color-text);border-radius:999px;padding:4px 12px;font-weight:600; font-size: 12px; display: inline-block;}
     
@@ -2164,8 +2165,6 @@ function acknowledgeUpdate() {
     // 2. Clear the Favicon Badge
     clearFaviconBadge();
 
-    // 3. NOW we reload the schedule to show the change
-    loadAndRender();
 }
 
 
@@ -2194,6 +2193,7 @@ async function startRealtime() {
 
                 // Only fire if the update is for ME and for TODAY
                 if (isForMe && isForToday) {
+                    loadAndRender(); //
                     // Call the new "sticky" notification function
                     showUpdateNotification();
                 } else {
