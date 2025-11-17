@@ -3647,13 +3647,24 @@ const handleDeleteRotation = async () => {
     // --- INTRADAY INDICATORS (Daily View Only) ---
     
     const setupIntradayIndicators = (ELS_DAILY) => {
+       // We have removed the red "current time" indicator lines
        
-
        // Setup mouse tracking for precision cursor
+       
+       // We attach mousemove to the main container, as it bubbles up
        if (ELS_DAILY.timelineContainer) {
            ELS_DAILY.timelineContainer.addEventListener('mousemove', (e) => updateMouseTimeIndicator(e, ELS_DAILY));
-           ELS_DAILY.timelineContainer.addEventListener('mouseenter', () => showMouseIndicator(ELS_DAILY));
-           ELS_DAILY.timelineContainer.addEventListener('mouseleave', () => hideMouseIndicator(ELS_DAILY));
+       }
+       
+       // We attach mouseenter/leave to the *children* (header and body)
+       // because these events do not bubble. This fixes the bug.
+       if (ELS_DAILY.timeHeader) {
+           ELS_DAILY.timeHeader.addEventListener('mouseenter', () => showMouseIndicator(ELS_DAILY));
+           ELS_DAILY.timeHeader.addEventListener('mouseleave', () => hideMouseIndicator(ELS_DAILY));
+       }
+       if (ELS_DAILY.plannerBody) {
+            ELS_DAILY.plannerBody.addEventListener('mouseenter', () => showMouseIndicator(ELS_DAILY));
+            ELS_DAILY.plannerBody.addEventListener('mouseleave', () => hideMouseIndicator(ELS_DAILY));
        }
    };
    
