@@ -2185,22 +2185,33 @@ async function startRealtime() {
         (payload) => {
             console.log('Realtime update received:', payload);
 
-            // --- THIS IS THE NEW LOGIC ---
             if (payload.payload) {
                 const update = payload.payload;
                 const isForMe = update.advisor_id == STATE.advisorId;
                 const isForToday = update.date == TODAY_ISO;
 
-                // Only fire if the update is for ME and for TODAY
-                if (isForMe && isForToday) {
-                    loadAndRender(); //
-                    // Call the new "sticky" notification function
-                    showUpdateNotification();
+                // --- THIS IS THE CORRECT LOGIC ---
+
+                // 1. As long as the change is for me...
+                if (isForMe) {
+
+                    // ...ALWAYS reload the data silently in the background.
+                    // This makes future changes appear live.
+                    loadAndRender(); 
+
+                    // 2. NOW, check if it's *also* for today.
+                    if (isForToday) {
+                        // If it is, *then* show the sticky alert.
+                        showUpdateNotification();
+                    } else {
+                        console.log("Silently updating for a future date.");
+                    }
+
                 } else {
-                    console.log("Ignoring realtime update (not for today or not for me).");
+                    console.log("Ignoring realtime update (not for me).");
                 }
+                // --- END OF CORRECT LOGIC ---
             }
-            // --- END OF NEW LOGIC ---
         }
     );
 
@@ -2212,8 +2223,6 @@ async function startRealtime() {
             console.error('Realtime connection error.');
         }
     });
-
-    // --- END OF NEW, SIMPLIFIED LISTENER ---
 }
 // --- Favicon Badge Helpers ---
 function showFaviconBadge() {
