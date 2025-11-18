@@ -766,55 +766,46 @@ display: flex;
        }
     }
 
-    /* === FIX: Proportional Stack (Sized by time, Stacked at top) === */
-
-    /* 1. Remove all horizontal grid lines */
-    #tab-my-schedule .day-column-cell,
-    #tab-my-schedule .day-column-cell.hour-mark {
-        border-bottom: none !important;
+    /* Hides text for simple blocks on Team Schedule */
+    #tab-team-schedule .timeline-bar.is-simple-block span {
+        display: none;
     }
 
-    /* 2. Stack items vertically with no gap at the top */
-    #tab-my-schedule .day-column-events {
-        display: flex !important;
-        flex-direction: column;
-        width: 100%;
-        height: 100%;
-        border-right: 1px solid var(--color-border);
-        padding: 0;
-        grid-row: 1 / span 100 !important; /* Override grid positioning */
-        pointer-events: none;
-    }
-    
-    #tab-my-schedule .day-column-events:last-child {
-        border-right: none;
-    }
+/* === FIX 4: Clean Timeline + Stacking + 8am Cutoff === */
 
-    /* 3. Blocks flow naturally (Relative) but keep their calculated Height */
-    #tab-my-schedule .activity-block {
-        position: relative !important; /* Sits in the flow */
-        top: auto !important;          /* Ignore vertical start time position */
-        left: 2px !important;
-        right: 2px !important;
-        width: auto !important;
-        margin-bottom: 1px;            /* Tiny separator line */
-        
-        /* Center Text */
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        
-        padding: 2px 4px;
-        border-radius: var(--border-radius);
-        box-shadow: var(--shadow-sm);
-        border: 1px solid rgba(0,0,0,0.1);
-        line-height: 1.1;
-        pointer-events: auto;
-        overflow: hidden;
-        flex-shrink: 0; /* Important: Prevents big blocks from shrinking */
-    }
+/* 1. Remove all horizontal grid lines */
+#tab-my-schedule .day-column-cell,
+#tab-my-schedule .day-column-cell.hour-mark {
+    border-bottom: none !important;
+}
+
+/* 2. Fix the event container layout (Fixes "Scattered Times") */
+#tab-my-schedule .day-column-events {
+    grid-row-start: 1;
+    grid-row-end: -1;
+    border-right: 1px solid var(--color-border);
+    /* These were missing from the original code */
+    position: relative;
+    pointer-events: none;
+}
+#tab-my-schedule .day-column-events:last-child {
+    border-right: none;
+}
+
+/* 3. Force activity blocks to be absolute */
+#tab-my-schedule .day-column-events .activity-block {
+    position: absolute !important; 
+    pointer-events: auto;
+}
+
+/* 4. Fix the "8am Cut Off" */
+#tab-my-schedule .time-axis-label-text {
+    position: absolute;
+    top: -6px; /* Was -8px. This centers it for 12px font. */
+    background-color: var(--color-panel-bg);
+    padding: 0 4px;
+}
+/* === END FIX === */
 
   </style>
 </head>
@@ -1915,31 +1906,53 @@ function drawMyRotaCalendar(){
         }
     }
 
-    // 4b. Generate Stacked Event Containers (No Gaps)
+    // 4b. Generate Event Containers and Positioned Events
+    
+    // We need the actual pixel height for calculations.
+    const rowHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--timegrid-row-height')) || 24;
+    const pixelsPerMinute = rowHeight / TIMEGRID_INTERVAL_MIN;
     weekData.forEach((day, index) => {
+        // CHANGED column index to start at 1 (was 2)
         const colIndex = index + 1; 
         html += `<div class="day-column-events" style="grid-column: ${colIndex};">`;
 
         day.segments.forEach(seg => {
-            const color = seg.color || '#475569';
-            const textColor = getContrastingTextColor(color);
-            const tooltip = `${seg.code}: ${seg.start} - ${seg.end}`;
+            // Constrain visualization to the grid boundaries
+            const visibleStartMin = Math.max(seg.startMin, startMin);
+    
+            const visibleEndMin = Math.min(seg.endMin, endMin);
 
-            // --- CALCULATE SIZE ONLY ---
-            const duration = seg.endMin - seg.startMin;
-            const heightPx = duration * pixelsPerMinute; 
+            // Only render if the segment is visible within the time range
+            if (visibleStartMin < visibleEndMin) {
+                 // Calculate position and height
+                const topOffsetMin = visibleStartMin - startMin;
+       
+                const durationMin = visibleEndMin - visibleStartMin;
 
-            let blockClass = 'activity-block';
-            const lowerCode = seg.code.toLowerCase();
-            if (lowerCode.includes('break') || lowerCode.includes('lunch')) {
-                blockClass += ' is-simple-block';
+                const topPx = topOffsetMin * pixelsPerMinute;
+                const heightPx = durationMin * pixelsPerMinute;
+
+                // Use the specific color mapping
+                const color = seg.color || '#475569';
+                
+                // Calculate contrasting text color for accessibility
+                const textColor = getContrastingTextColor(color);
+                // Format: Activity \n Start - End
+                const tooltip = `${seg.code}: ${seg.start} - ${seg.end}`;
+                // --- NEW LOGIC ---
+                let blockClass = 'activity-block';
+                const lowerCode = seg.code.toLowerCase();
+                if (lowerCode.includes('break') || lowerCode.includes('lunch')) {
+                    blockClass += ' is-simple-block';
+                }
+                // --- END NEW LOGIC ---
+
+                html += `<div class="${blockClass}" title="${tooltip}" style="top: ${topPx}px; height: ${heightPx}px; background-color: ${color}; color: ${textColor};">
+                            <span class="activity-title">${seg.code}</span>
+                      
+           <span class="activity-time">${seg.start} - ${seg.end}</span>
+                      </div>`;
             }
-
-            // STYLE: Set Height (Size) but remove Top (Position)
-            html += `<div class="${blockClass}" title="${tooltip}" style="height: ${heightPx}px; background-color: ${color}; color: ${textColor};">
-                        <span class="activity-title">${seg.code}</span>
-                        <span class="activity-time">${seg.start} - ${seg.end}</span>
-                     </div>`;
         });
 
         html += `</div>`; // Close day-column-events
