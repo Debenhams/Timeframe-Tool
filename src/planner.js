@@ -2698,6 +2698,8 @@ const handleDuplicateShift = async (originalId) => {
    
      if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNewRotation);
         if (ELS.btnDelete) ELS.btnDelete.addEventListener('click', handleDeleteRotation);
+        ELS.btnDuplicate = document.getElementById('btnDuplicateRotation');
+if (ELS.btnDuplicate) ELS.btnDuplicate.addEventListener('click', handleDuplicateRotation);
         if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeekTop);
         if (ELS.btnDeleteFirstWeek) ELS.btnDeleteFirstWeek.addEventListener('click', handleDeleteFirstWeek); // <-- ADD THIS LINE
         if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
@@ -2920,6 +2922,55 @@ const toggleRowEdit = (row, isEditing) => {
             // Update related components
             if (APP.Components.AssignmentManager) {
                 APP.Components.AssignmentManager.render(); // Update assignment dropdowns
+            }
+        }
+    };
+    const handleDuplicateRotation = async () => {
+        const STATE = APP.StateManager.getState();
+        const currentRotationName = STATE.currentRotation;
+        
+        // 1. Validate that a rotation is currently selected
+        if (!currentRotationName) {
+            APP.Utils.showToast("Please select a rotation to duplicate first.", "warning");
+            return;
+        }
+
+        const currentPattern = APP.StateManager.getPatternByName(currentRotationName);
+        if (!currentPattern) return;
+
+        // 2. Prompt for new name
+        const newName = prompt(`Enter name for the duplicate of '${currentRotationName}':`, `${currentRotationName} (Copy)`);
+        if (!newName || newName.trim() === '') return;
+
+        // 3. Check if name already exists
+        if (APP.StateManager.getPatternByName(newName)) {
+            APP.Utils.showToast("Error: A rotation with that name already exists.", "danger");
+            return;
+        }
+
+        // 4. Create copy (Deep copy the pattern object to avoid reference issues)
+        const newPatternData = JSON.parse(JSON.stringify(currentPattern.pattern));
+        const newRecord = { name: newName, pattern: newPatternData };
+
+        // 5. Save to database
+        const { data, error } = await APP.DataService.saveRecord('rotation_patterns', newRecord);
+
+        if (!error) {
+            // Sync to local state
+            APP.StateManager.syncRecord('rotation_patterns', data);
+            
+            // Switch focus to the new rotation
+            STATE.currentRotation = newName;
+            
+            APP.StateManager.saveHistory(`Duplicate Rotation: ${newName}`);
+            APP.Utils.showToast(`Rotation duplicated as '${newName}'.`, "success");
+            
+            // Re-render the editor to show the new rotation
+            RotationEditor.render();
+            
+            // Update AssignmentManager dropdowns so the new rotation is available for assignment immediately
+            if (APP.Components.AssignmentManager) {
+                APP.Components.AssignmentManager.render(); 
             }
         }
     };
