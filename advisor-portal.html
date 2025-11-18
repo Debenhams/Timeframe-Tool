@@ -1164,17 +1164,15 @@ function getEffectiveWeek(weekStartISO, assignment, getPatternByName) {
         if (numWeeksInRotation === 0) return null;
 
         // Get the offset, defaulting to 1
-        const offset = assignment.start_week_offset || 1;
+const offset = assignment.start_week_offset || 1;
 
-        // Calculate the effective week number
-        const effectiveWeek = diffWeeks + offset;
+// Calculate total weeks elapsed
+const rawWeek = diffWeeks + offset;
 
-        // Check if this effective week is beyond the pattern's length
-        if (effectiveWeek > numWeeksInRotation) {
-            return null; // Rotation finished
-        }
+// INFINITE LOOP FIX: Wrap around using modulo arithmetic
+const effectiveWeek = ((rawWeek - 1) % numWeeksInRotation) + 1;
 
-        return effectiveWeek;
+return effectiveWeek;
     } catch (e) {
         console.error("Error calculating effective week:", e);
         return null;

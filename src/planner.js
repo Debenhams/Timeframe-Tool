@@ -211,17 +211,16 @@ Config.TIMELINE_DURATION_MIN = Config.TIMELINE_END_MIN - Config.TIMELINE_START_M
             if (numWeeksInRotation === 0) return null;
             
             // Get the offset, defaulting to 1
-            const offset = assignment.start_week_offset || 1;
+const offset = assignment.start_week_offset || 1;
 
-            // Calculate the effective week number
-            const effectiveWeek = diffWeeks + offset;
-                
-            // Check if this effective week is beyond the pattern's length
-            if (effectiveWeek > numWeeksInRotation) {
-                return null; // Rotation finished
-            }
+// Calculate total weeks elapsed (1-based)
+const rawWeek = diffWeeks + offset;
 
-            return effectiveWeek;
+// INFINITE LOOP FIX: Wrap around using modulo arithmetic
+// Formula: ((Input - 1) % Length) + 1
+const effectiveWeek = ((rawWeek - 1) % numWeeksInRotation) + 1;
+
+return effectiveWeek;
         } catch (e) {
             console.error("Error calculating effective week:", e);
             return null;
