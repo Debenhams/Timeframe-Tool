@@ -2684,6 +2684,7 @@ const handleDuplicateShift = async (originalId) => {
 (function(APP) {
     const RotationEditor = {};
     const ELS = {};
+    let COPIED_SHIFT_CODE = null; // <--- ADD THIS LINE
 
     RotationEditor.initialize = () => {
         ELS.familySelect = document.getElementById('rotationFamily');
@@ -2703,6 +2704,8 @@ if (ELS.btnDuplicate) ELS.btnDuplicate.addEventListener('click', handleDuplicate
         if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeekTop);
         if (ELS.btnDeleteFirstWeek) ELS.btnDeleteFirstWeek.addEventListener('click', handleDeleteFirstWeek); // <-- ADD THIS LINE
         if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
+        // Enable Copy/Paste shortcuts
+        if (ELS.grid) ELS.grid.addEventListener('keydown', handleGridKeydown);
     };
 
     RotationEditor.render = () => {
@@ -3240,7 +3243,31 @@ const handleDeleteRotation = async () => {
             // Error toast handled in DataService
         }
     };
+// Handle Ctrl+C and Ctrl+V on grid dropdowns
+    const handleGridKeydown = (e) => {
+        // Only act if the user is on a rotation dropdown
+        if (!e.target.classList.contains('rotation-grid-select')) return;
 
+        // DETECT CTRL+C (Copy)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+            e.preventDefault(); // Stop browser defaults
+            COPIED_SHIFT_CODE = e.target.value; // Store the value
+            APP.Utils.showToast("Shift copied to clipboard.", "success", 1000);
+        }
+
+        // DETECT CTRL+V (Paste)
+        if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+            e.preventDefault(); // Stop browser defaults
+            if (COPIED_SHIFT_CODE !== null) {
+                e.target.value = COPIED_SHIFT_CODE; // Apply value
+                
+                // CRITICAL: Manually fire the 'change' event so the Auto-Save logic runs
+                e.target.dispatchEvent(new Event('change', { bubbles: true }));
+                
+                APP.Utils.showToast("Shift pasted.", "success", 1000);
+            }
+        }
+    };
     APP.Components = APP.Components || {};
     APP.Components.RotationEditor = RotationEditor;
 }(window.APP));
