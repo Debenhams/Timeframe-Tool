@@ -3262,14 +3262,9 @@ const handleDeleteRotation = async () => {
         ELS.btnClearSelection = document.getElementById('btnClearSelection');
         ELS.visualizationContainer = document.getElementById('visualizationContainer');
         ELS.scheduleViewTitle = document.getElementById('scheduleViewTitle');
-   
         ELS.viewToggleGroup = document.getElementById('viewToggleGroup');
         ELS.dayToggleContainer = document.getElementById('dayToggleContainer');
         ELS.plannerDay = document.getElementById('plannerDay');
-
-        // NEW: Cache Day Toggle Buttons
-        ELS.btnPrevDay = document.getElementById('btnPrevDay');
-        ELS.btnNextDay = document.getElementById('btnNextDay');
 
         // Event Listeners
         if (ELS.treeSearch) ELS.treeSearch.addEventListener('input', renderTree);
@@ -3281,38 +3276,10 @@ const handleDeleteRotation = async () => {
             renderPlannerContent();
         });
 
-        // NEW: Day Toggle Listeners
-        if (ELS.btnPrevDay) ELS.btnPrevDay.addEventListener('click', () => cycleDay(-1));
-        if (ELS.btnNextDay) ELS.btnNextDay.addEventListener('click', () => cycleDay(1));
-
         if (ELS.viewToggleGroup) ELS.viewToggleGroup.addEventListener('click', handleViewToggle);
 
         // Add listener for Live Editing clicks
         if (ELS.visualizationContainer) ELS.visualizationContainer.addEventListener('click', handleVisualizationClick);
-    };
-
-    // NEW: Helper to cycle days (prev/next)
-    const cycleDay = (offset) => {
-        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        const current = APP.StateManager.getState().selectedDay || 'Monday';
-        let idx = days.indexOf(current);
-        if (idx === -1) idx = 0;
-        
-        // Wrap around logic
-        let newIdx = (idx + offset);
-        if (newIdx < 0) newIdx = 6;
-        if (newIdx > 6) newIdx = 0;
-        
-        const newDay = days[newIdx];
-        
-        // Update State
-        APP.StateManager.getState().selectedDay = newDay;
-        
-        // Update Dropdown
-        if (ELS.plannerDay) ELS.plannerDay.value = newDay;
-        
-        // Trigger Render
-        renderPlannerContent();
     };
 
     // Main render function (coordinates tree and planner rendering)
