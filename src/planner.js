@@ -1312,10 +1312,6 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         ELS.visualEditorContainer = document.getElementById('visualEditorContainer');
         ELS.visualEditorControlsGroup = document.getElementById('visualEditorControlsGroup');
         ELS.visualEditorToolbox = document.getElementById('visualEditorToolbox');
-        
-        // Search Bar Init
-        ELS.veToolboxSearch = document.getElementById('veToolboxSearch');
-        if (ELS.veToolboxSearch) ELS.veToolboxSearch.addEventListener('input', renderToolbox);
         ELS.visualEditorTimeline = document.getElementById('visualEditorTimeline');
         ELS.visualEditorTimeRuler = document.getElementById('visualEditorTimeRuler');
         ELS.visualEditorDropCursor = document.getElementById('visualEditorDropCursor');
@@ -1470,20 +1466,7 @@ ELS.exceptionReasonGroup.style.display = 'none';
     const renderToolbox = () => {
         if (!ELS.visualEditorToolbox) return;
         const STATE = APP.StateManager.getState();
-
-        // Get search filter
-        const filter = ELS.veToolboxSearch ? ELS.veToolboxSearch.value.toLowerCase() : '';
-
-        // Filter and Sort
-        const components = STATE.scheduleComponents
-            .filter(c => c.name.toLowerCase().includes(filter))
-            .sort((a, b) => a.name.localeCompare(b.name));
-
-        if (components.length === 0) {
-            ELS.visualEditorToolbox.innerHTML = '<div style="padding: 8px; font-size: 11px; color: #9CA3AF; text-align: center;">No results found.</div>';
-            return;
-        }
-
+        const components = STATE.scheduleComponents.sort((a, b) => a.name.localeCompare(b.name));
         ELS.visualEditorToolbox.innerHTML = components.map(comp => {
             const textColor = APP.Utils.getContrastingTextColor(comp.color);
             return `
