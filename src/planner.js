@@ -3555,7 +3555,8 @@ const handleDeleteRotation = async () => {
     // Made public as it's used by TradeCenter preview as well
     ScheduleViewer.renderSegments = (segments) => {
         if (!segments || segments.length === 0) {
-            return '';
+            // Show "RD" label instead of blank space
+            return '<div class="timeline-rdo-fill">RD</div>';
         }
         
         return segments.map(seg => {
