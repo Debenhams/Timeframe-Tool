@@ -766,54 +766,55 @@ display: flex;
        }
     }
 
-    /* Hides text for simple blocks on Team Schedule */
-    #tab-team-schedule .timeline-bar.is-simple-block span {
-        display: none;
+    /* === FIX: Proportional Stack (Sized by time, Stacked at top) === */
+
+    /* 1. Remove all horizontal grid lines */
+    #tab-my-schedule .day-column-cell,
+    #tab-my-schedule .day-column-cell.hour-mark {
+        border-bottom: none !important;
     }
 
-/* === FIX 5: Stacked View (No Gaps) === */
-
-/* 1. Flex Column to stack items vertically */
-#tab-my-schedule .day-column-events {
-    display: flex !important;
-    flex-direction: column;
-    gap: 4px; /* Clean gap between blocks */
-    padding: 4px;
-    height: 100%;
-    border-right: 1px solid var(--color-border);
+    /* 2. Stack items vertically with no gap at the top */
+    #tab-my-schedule .day-column-events {
+        display: flex !important;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+        border-right: 1px solid var(--color-border);
+        padding: 0;
+        grid-row: 1 / span 100 !important; /* Override grid positioning */
+        pointer-events: none;
+    }
     
-    /* Override grid positioning */
-    position: relative !important;
-    grid-row: 1 / span 100 !important; 
-    pointer-events: none; /* Let clicks pass through container */
-}
+    #tab-my-schedule .day-column-events:last-child {
+        border-right: none;
+    }
 
-/* 2. Relative positioning for natural flow */
-#tab-my-schedule .activity-block {
-    position: relative !important; 
-    top: auto !important;          
-    height: auto !important;       
-    left: auto !important;
-    right: auto !important;
-    
-    width: 100%;
-    min-height: 60px; /* Minimum height for readability */
-    margin-bottom: 0;
-    pointer-events: auto; /* Re-enable clicks on blocks */
-    
-    /* Center Content */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-}
-
-/* 3. Hide grid lines (they don't match stack) */
-#tab-my-schedule .day-column-cell {
-    display: none !important;
-}
-/* === END FIX === */
+    /* 3. Blocks flow naturally (Relative) but keep their calculated Height */
+    #tab-my-schedule .activity-block {
+        position: relative !important; /* Sits in the flow */
+        top: auto !important;          /* Ignore vertical start time position */
+        left: 2px !important;
+        right: 2px !important;
+        width: auto !important;
+        margin-bottom: 1px;            /* Tiny separator line */
+        
+        /* Center Text */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        
+        padding: 2px 4px;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid rgba(0,0,0,0.1);
+        line-height: 1.1;
+        pointer-events: auto;
+        overflow: hidden;
+        flex-shrink: 0; /* Important: Prevents big blocks from shrinking */
+    }
 
   </style>
 </head>
@@ -1920,10 +1921,13 @@ function drawMyRotaCalendar(){
         html += `<div class="day-column-events" style="grid-column: ${colIndex};">`;
 
         day.segments.forEach(seg => {
-            // No calculations needed. Just render the block.
             const color = seg.color || '#475569';
             const textColor = getContrastingTextColor(color);
             const tooltip = `${seg.code}: ${seg.start} - ${seg.end}`;
+
+            // --- CALCULATE SIZE ONLY ---
+            const duration = seg.endMin - seg.startMin;
+            const heightPx = duration * pixelsPerMinute; 
 
             let blockClass = 'activity-block';
             const lowerCode = seg.code.toLowerCase();
@@ -1931,7 +1935,8 @@ function drawMyRotaCalendar(){
                 blockClass += ' is-simple-block';
             }
 
-            html += `<div class="${blockClass}" title="${tooltip}" style="background-color: ${color}; color: ${textColor};">
+            // STYLE: Set Height (Size) but remove Top (Position)
+            html += `<div class="${blockClass}" title="${tooltip}" style="height: ${heightPx}px; background-color: ${color}; color: ${textColor};">
                         <span class="activity-title">${seg.code}</span>
                         <span class="activity-time">${seg.start} - ${seg.end}</span>
                      </div>`;
