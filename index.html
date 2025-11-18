@@ -337,9 +337,12 @@
         <div class="card">
             <div class="editor-controls">
             <div class="form-group">
-                <label for="rotationFamily">Rotation Family</label>
-                <select id="rotationFamily" class="form-select"></select>
+            <label for="rotationFamily">Rotation Family</label>
+            <div style="display: flex; gap: 8px;">
+                <select id="rotationFamily" class="form-select" style="flex-grow: 1;"></select>
+                <button id="btnRenameRotation" class="btn btn-secondary" style="padding: 6px 12px;">Rename</button>
             </div>
+        </div>
             <div class="editor-buttons">
                 <span id="autoSaveStatus" class="auto-save-status"></span>
                 <button id="btnLegacyAddWeek" class="btn btn-secondary" style="display:none;">Add Week</button> <button id="btnAddWeek" class="btn btn-secondary" disabled>[+] Add Week (Top)</button>

@@ -2702,6 +2702,8 @@ const handleDuplicateShift = async (originalId) => {
         if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeekTop);
         if (ELS.btnDeleteFirstWeek) ELS.btnDeleteFirstWeek.addEventListener('click', handleDeleteFirstWeek); // <-- ADD THIS LINE
         if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
+        ELS.btnRename = document.getElementById('btnRenameRotation');
+    if (ELS.btnRename) ELS.btnRename.addEventListener('click', handleRenameRotation);
     };
 
     RotationEditor.render = () => {
@@ -3120,6 +3122,49 @@ const handleDeleteRotation = async () => {
 
     // Auto-save functionality for grid cell changes
     const handleGridChange = async (e) => {
+    const handleRenameRotation = async () => {
+        const STATE = APP.StateManager.getState();
+        const oldName = STATE.currentRotation;
+        
+        if (!oldName) return APP.Utils.showToast("Please select a rotation to rename.", "warning");
+
+        const newName = prompt("Rename '" + oldName + "' to:", oldName);
+        if (!newName || newName.trim() === "" || newName === oldName) return;
+
+        // Check if name already exists
+        if (APP.StateManager.getPatternByName(newName)) {
+            return APP.Utils.showToast("A rotation with that name already exists.", "danger");
+        }
+
+        // 1. Create the New Rotation (Copy of the old one)
+        const oldPattern = APP.StateManager.getPatternByName(oldName);
+        const newPatternRecord = { name: newName, pattern: oldPattern.pattern };
+        
+        const { error: createError } = await APP.DataService.saveRecord('rotation_patterns', newPatternRecord);
+        if (createError) return APP.Utils.showToast("Error creating new name.", "danger");
+
+        // 2. SAFETY STEP: Move all Advisors to the New Name
+        // We update the History table AND the Snapshot table so no one loses their schedule.
+        await APP.DataService.updateRecord('rotation_assignments_history', { rotation_name: newName }, { rotation_name: oldName });
+        await APP.DataService.updateRecord('rotation_assignments', { rotation_name: newName }, { rotation_name: oldName });
+
+        // 3. Delete the Old Rotation
+        await APP.DataService.deleteRecord('rotation_patterns', { name: oldName });
+
+        // 4. Update the App State
+        oldPattern.name = newName; 
+        STATE.currentRotation = newName;
+        
+        // 5. Refresh the screen
+        APP.StateManager.saveHistory("Rename Rotation");
+        APP.Utils.showToast("Rotation renamed & all advisors updated.", "success");
+        
+        renderDropdown(); 
+        // Refresh Assignments tab if it's open
+        if (APP.Components.AssignmentManager) APP.Components.AssignmentManager.render();
+        // Refresh Schedule View if it's open
+        if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
+    };
         if (!e.target.classList.contains('rotation-grid-select')) return;
         
         // Show saving indicator
@@ -3194,6 +3239,46 @@ const handleDeleteRotation = async () => {
     APP.Components = APP.Components || {};
     APP.Components.RotationEditor = RotationEditor;
 }(window.APP));
+const handleRenameRotation = async () => {
+    const STATE = APP.StateManager.getState();
+    const oldName = STATE.currentRotation;
+
+    if (!oldName) {
+        return APP.Utils.showToast("Please select a rotation to rename.", "warning");
+    }
+
+    const newName = prompt("Enter the new name for this rotation:", oldName);
+    if (!newName || newName.trim() === "" || newName === oldName) return;
+
+    // Check if name already exists
+    if (APP.StateManager.getPatternByName(newName)) {
+        return APP.Utils.showToast("A rotation with that name already exists.", "danger");
+    }
+
+    // 1. Update Database
+    // Note: This relies on the database cascading the change to assignments. 
+    // If your database doesn't cascade updates, old assignments might break.
+    const { data, error } = await APP.DataService.updateRecord('rotation_patterns', { name: newName }, { name: oldName });
+
+    if (!error) {
+        // 2. Update State manually (because PK changed)
+        const pattern = APP.StateManager.getPatternByName(oldName);
+        if (pattern) {
+            pattern.name = newName;
+            STATE.currentRotation = newName;
+        }
+
+        APP.StateManager.saveHistory("Rename Rotation");
+        APP.Utils.showToast("Rotation renamed successfully.", "success");
+
+        // 3. Re-render
+        renderDropdown(); // Update dropdown text
+        // Also refresh Assignments tab if it's open, as names changed
+        if (APP.Components.AssignmentManager) APP.Components.AssignmentManager.render();
+    } else {
+        APP.Utils.showToast("Error renaming rotation. Check console.", "danger");
+    }
+};
 
 /**
  * MODULE: APP.Components.ScheduleViewer
