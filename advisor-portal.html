@@ -2022,12 +2022,9 @@ function renderTeamGridCell(segments) {
     const start = segments[0].start;
     const end = segments[segments.length - 1].end;
     
-    // Summarize activities
-    const mainActivity = getMainActivitySummary(segments);
-
+    // Modified to show ONLY the time (Activity removed)
     return `
         <span class="weekly-shift-time">${start} - ${end}</span>
-        <span class="weekly-shift-details">${mainActivity}</span>
     `;
 }
 
