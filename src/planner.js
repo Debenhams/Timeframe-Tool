@@ -2684,7 +2684,6 @@ const handleDuplicateShift = async (originalId) => {
 (function(APP) {
     const RotationEditor = {};
     const ELS = {};
-    let COPIED_SHIFT_CODE = null; // <--- ADD THIS LINE
 
     RotationEditor.initialize = () => {
         ELS.familySelect = document.getElementById('rotationFamily');
@@ -2704,8 +2703,6 @@ if (ELS.btnDuplicate) ELS.btnDuplicate.addEventListener('click', handleDuplicate
         if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeekTop);
         if (ELS.btnDeleteFirstWeek) ELS.btnDeleteFirstWeek.addEventListener('click', handleDeleteFirstWeek); // <-- ADD THIS LINE
         if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
-        // Enable Copy/Paste shortcuts
-        if (ELS.grid) ELS.grid.addEventListener('keydown', handleGridKeydown);
     };
 
     RotationEditor.render = () => {
@@ -3243,31 +3240,7 @@ const handleDeleteRotation = async () => {
             // Error toast handled in DataService
         }
     };
-// Handle Ctrl+C and Ctrl+V on grid dropdowns
-    const handleGridKeydown = (e) => {
-        // Only act if the user is on a rotation dropdown
-        if (!e.target.classList.contains('rotation-grid-select')) return;
 
-        // DETECT CTRL+C (Copy)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
-            e.preventDefault(); // Stop browser defaults
-            COPIED_SHIFT_CODE = e.target.value; // Store the value
-            APP.Utils.showToast("Shift copied to clipboard.", "success", 1000);
-        }
-
-        // DETECT CTRL+V (Paste)
-        if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
-            e.preventDefault(); // Stop browser defaults
-            if (COPIED_SHIFT_CODE !== null) {
-                e.target.value = COPIED_SHIFT_CODE; // Apply value
-                
-                // CRITICAL: Manually fire the 'change' event so the Auto-Save logic runs
-                e.target.dispatchEvent(new Event('change', { bubbles: true }));
-                
-                APP.Utils.showToast("Shift pasted.", "success", 1000);
-            }
-        }
-    };
     APP.Components = APP.Components || {};
     APP.Components.RotationEditor = RotationEditor;
 }(window.APP));
@@ -3499,10 +3472,17 @@ const handleDeleteRotation = async () => {
     // --- DAILY VIEW (GANTT) ---
 
     const renderDailyPlanner = () => {
-        // Updated time range in title
-        ELS.scheduleViewTitle.textContent = "Schedule Visualization (Daily 05:00 - 23:00)";
+        const STATE = APP.StateManager.getState();
 
-        // Setup the structure for the Gantt chart
+        // 1. Calculate the specific date for the selected day
+        // This uses the weekStart (e.g., 2023-11-13) and selectedDay (e.g., "Tuesday")
+        const dateISO = APP.Utils.getISODateForDayName(STATE.weekStart, STATE.selectedDay);
+        const dateFriendly = dateISO ? APP.Utils.convertISOToUKDate(dateISO) : "";
+
+        // 2. Update the Title dynamically (e.g., "Tuesday, 14/11/2023")
+        ELS.scheduleViewTitle.textContent = `Schedule Visualization (${STATE.selectedDay}, ${dateFriendly})`;
+
+        // 3. Setup the structure for the Gantt chart
         ELS.visualizationContainer.innerHTML = `
             <div class="timeline-container" id="timelineContainer">
                 <div class="timeline-header">
@@ -3515,8 +3495,8 @@ const handleDeleteRotation = async () => {
                 <div id="mouseTimeTooltip" class="mouse-time-tooltip">00:00</div>
             </div>
         `;
-        
-        // Cache dynamic elements
+
+        // 4. Cache dynamic elements
         const ELS_DAILY = {
             timeHeader: document.getElementById('timeHeader'),
             plannerBody: document.getElementById('plannerBody'),
@@ -3528,14 +3508,12 @@ const handleDeleteRotation = async () => {
 
         renderTimeHeader(ELS_DAILY.timeHeader);
         
-        const STATE = APP.StateManager.getState();
         const selected = Array.from(STATE.selectedAdvisors);
-        
         if (selected.length > 0) {
             const advisorsToRender = STATE.advisors
                 .filter(a => selected.includes(a.id))
                 .sort((a,b) => a.name.localeCompare(b.name));
-                
+
             let html = '';
             advisorsToRender.forEach(adv => {
                 // Use the centralized ScheduleCalculator
@@ -3561,6 +3539,7 @@ const handleDeleteRotation = async () => {
 
         setupIntradayIndicators(ELS_DAILY);
     };
+    
 
     const renderTimeHeader = (headerElement) => {
         const startHour = Math.floor(Config.TIMELINE_START_MIN / 60);
