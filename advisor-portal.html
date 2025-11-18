@@ -771,39 +771,47 @@ display: flex;
         display: none;
     }
 
-/* === FIX 4: Clean Timeline + Stacking + 8am Cutoff === */
+/* === FIX 5: Stacked View (No Gaps) === */
 
-/* 1. Remove all horizontal grid lines */
-#tab-my-schedule .day-column-cell,
-#tab-my-schedule .day-column-cell.hour-mark {
-    border-bottom: none !important;
-}
-
-/* 2. Fix the event container layout (Fixes "Scattered Times") */
+/* 1. Flex Column to stack items vertically */
 #tab-my-schedule .day-column-events {
-    grid-row-start: 1;
-    grid-row-end: -1;
+    display: flex !important;
+    flex-direction: column;
+    gap: 4px; /* Clean gap between blocks */
+    padding: 4px;
+    height: 100%;
     border-right: 1px solid var(--color-border);
-    /* These were missing from the original code */
-    position: relative;
-    pointer-events: none;
-}
-#tab-my-schedule .day-column-events:last-child {
-    border-right: none;
-}
-
-/* 3. Force activity blocks to be absolute */
-#tab-my-schedule .day-column-events .activity-block {
-    position: absolute !important; 
-    pointer-events: auto;
+    
+    /* Override grid positioning */
+    position: relative !important;
+    grid-row: 1 / span 100 !important; 
+    pointer-events: none; /* Let clicks pass through container */
 }
 
-/* 4. Fix the "8am Cut Off" */
-#tab-my-schedule .time-axis-label-text {
-    position: absolute;
-    top: -6px; /* Was -8px. This centers it for 12px font. */
-    background-color: var(--color-panel-bg);
-    padding: 0 4px;
+/* 2. Relative positioning for natural flow */
+#tab-my-schedule .activity-block {
+    position: relative !important; 
+    top: auto !important;          
+    height: auto !important;       
+    left: auto !important;
+    right: auto !important;
+    
+    width: 100%;
+    min-height: 60px; /* Minimum height for readability */
+    margin-bottom: 0;
+    pointer-events: auto; /* Re-enable clicks on blocks */
+    
+    /* Center Content */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+/* 3. Hide grid lines (they don't match stack) */
+#tab-my-schedule .day-column-cell {
+    display: none !important;
 }
 /* === END FIX === */
 
@@ -1906,53 +1914,27 @@ function drawMyRotaCalendar(){
         }
     }
 
-    // 4b. Generate Event Containers and Positioned Events
-    
-    // We need the actual pixel height for calculations.
-    const rowHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--timegrid-row-height')) || 24;
-    const pixelsPerMinute = rowHeight / TIMEGRID_INTERVAL_MIN;
+    // 4b. Generate Stacked Event Containers (No Gaps)
     weekData.forEach((day, index) => {
-        // CHANGED column index to start at 1 (was 2)
         const colIndex = index + 1; 
         html += `<div class="day-column-events" style="grid-column: ${colIndex};">`;
 
         day.segments.forEach(seg => {
-            // Constrain visualization to the grid boundaries
-            const visibleStartMin = Math.max(seg.startMin, startMin);
-    
-            const visibleEndMin = Math.min(seg.endMin, endMin);
+            // No calculations needed. Just render the block.
+            const color = seg.color || '#475569';
+            const textColor = getContrastingTextColor(color);
+            const tooltip = `${seg.code}: ${seg.start} - ${seg.end}`;
 
-            // Only render if the segment is visible within the time range
-            if (visibleStartMin < visibleEndMin) {
-                 // Calculate position and height
-                const topOffsetMin = visibleStartMin - startMin;
-       
-                const durationMin = visibleEndMin - visibleStartMin;
-
-                const topPx = topOffsetMin * pixelsPerMinute;
-                const heightPx = durationMin * pixelsPerMinute;
-
-                // Use the specific color mapping
-                const color = seg.color || '#475569';
-                
-                // Calculate contrasting text color for accessibility
-                const textColor = getContrastingTextColor(color);
-                // Format: Activity \n Start - End
-                const tooltip = `${seg.code}: ${seg.start} - ${seg.end}`;
-                // --- NEW LOGIC ---
-                let blockClass = 'activity-block';
-                const lowerCode = seg.code.toLowerCase();
-                if (lowerCode.includes('break') || lowerCode.includes('lunch')) {
-                    blockClass += ' is-simple-block';
-                }
-                // --- END NEW LOGIC ---
-
-                html += `<div class="${blockClass}" title="${tooltip}" style="top: ${topPx}px; height: ${heightPx}px; background-color: ${color}; color: ${textColor};">
-                            <span class="activity-title">${seg.code}</span>
-                      
-           <span class="activity-time">${seg.start} - ${seg.end}</span>
-                      </div>`;
+            let blockClass = 'activity-block';
+            const lowerCode = seg.code.toLowerCase();
+            if (lowerCode.includes('break') || lowerCode.includes('lunch')) {
+                blockClass += ' is-simple-block';
             }
+
+            html += `<div class="${blockClass}" title="${tooltip}" style="background-color: ${color}; color: ${textColor};">
+                        <span class="activity-title">${seg.code}</span>
+                        <span class="activity-time">${seg.start} - ${seg.end}</span>
+                     </div>`;
         });
 
         html += `</div>`; // Close day-column-events
