@@ -271,9 +271,10 @@
                              <button class="btn-toggle active" data-view="daily">Daily</button>
                              <button class="btn-toggle" data-view="weekly">Weekly</button>
                          </div>
-                         <div class="planner-day-toggle" id="dayToggleContainer">
-                             <label for="plannerDay">Day:</label>
-                             <select id="plannerDay" class="form-select">
+                         <div class="planner-day-toggle" id="dayToggleContainer" style="display: flex; align-items: center; gap: 4px;">
+                             <label for="plannerDay" style="margin-right: 4px;">Day:</label>
+                             <button id="btnPrevDay" class="btn-icon" title="Previous Day" style="padding: 4px; width: 28px; height: 28px;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+                             <select id="plannerDay" class="form-select" style="min-width: 110px;">
                                  <option value="Monday">Monday</option>
                                  <option value="Tuesday">Tuesday</option>
                                  <option value="Wednesday">Wednesday</option>
@@ -282,7 +283,9 @@
                                  <option value="Saturday">Saturday</option>
                                  <option value="Sunday">Sunday</option>
                              </select>
+                             <button id="btnNextDay" class="btn-icon" title="Next Day" style="padding: 4px; width: 28px; height: 28px;"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
                          </div>
+                     </div>
                      </div>
                  </div>
                  <div class="visualization-container" id="visualizationContainer"></div>

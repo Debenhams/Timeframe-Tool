@@ -3265,7 +3265,35 @@ const handleDeleteRotation = async () => {
         ELS.viewToggleGroup = document.getElementById('viewToggleGroup');
         ELS.dayToggleContainer = document.getElementById('dayToggleContainer');
         ELS.plannerDay = document.getElementById('plannerDay');
+// --- Day Navigation Logic ---
+        ELS.btnPrevDay = document.getElementById('btnPrevDay');
+        ELS.btnNextDay = document.getElementById('btnNextDay');
 
+        const cycleDay = (offset) => {
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            // Get current day from the dropdown to ensure we stay in sync
+            const currentDay = ELS.plannerDay ? ELS.plannerDay.value : 'Monday';
+            let idx = days.indexOf(currentDay);
+            if (idx === -1) idx = 0;
+            
+            // Calculate new index with wrap-around
+            let newIdx = (idx + offset) % 7;
+            if (newIdx < 0) newIdx += 7;
+            
+            const newDay = days[newIdx];
+            
+            // Update State and Dropdown
+            APP.StateManager.getState().selectedDay = newDay;
+            if (ELS.plannerDay) {
+                ELS.plannerDay.value = newDay;
+                // Trigger the existing change listener to re-render the view
+                ELS.plannerDay.dispatchEvent(new Event('change'));
+            }
+        };
+
+        if (ELS.btnPrevDay) ELS.btnPrevDay.addEventListener('click', () => cycleDay(-1));
+        if (ELS.btnNextDay) ELS.btnNextDay.addEventListener('click', () => cycleDay(1));
+        // ----------------------------
         // Event Listeners
         if (ELS.treeSearch) ELS.treeSearch.addEventListener('input', renderTree);
         if (ELS.btnClearSelection) ELS.btnClearSelection.addEventListener('click', clearSelection);
