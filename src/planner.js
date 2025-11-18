@@ -3265,32 +3265,7 @@ const handleDeleteRotation = async () => {
         ELS.viewToggleGroup = document.getElementById('viewToggleGroup');
         ELS.dayToggleContainer = document.getElementById('dayToggleContainer');
         ELS.plannerDay = document.getElementById('plannerDay');
-// --- New Day Navigation Logic ---
-        ELS.btnPrevDay = document.getElementById('btnPrevDay');
-        ELS.btnNextDay = document.getElementById('btnNextDay');
-        
-        const changeDay = (offset) => {
-            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-            const currentDay = APP.StateManager.getState().selectedDay;
-            const idx = days.indexOf(currentDay);
-            if (idx === -1) return;
-            
-            let newIdx = (idx + offset) % 7;
-            if (newIdx < 0) newIdx += 7; // Handle wrap-around for previous button
-            
-            const newDay = days[newIdx];
-            APP.StateManager.getState().selectedDay = newDay;
-            if (ELS.plannerDay) ELS.plannerDay.value = newDay;
-            
-            // Only render if we are in daily view
-            if (APP.StateManager.getState().scheduleViewMode === 'daily') {
-                renderPlannerContent();
-            }
-        };
 
-        if (ELS.btnPrevDay) ELS.btnPrevDay.addEventListener('click', () => changeDay(-1));
-        if (ELS.btnNextDay) ELS.btnNextDay.addEventListener('click', () => changeDay(1));
-        // --------------------------------
         // Event Listeners
         if (ELS.treeSearch) ELS.treeSearch.addEventListener('input', renderTree);
         if (ELS.btnClearSelection) ELS.btnClearSelection.addEventListener('click', clearSelection);
