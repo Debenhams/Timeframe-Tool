@@ -822,72 +822,7 @@ display: flex;
     flex-shrink: 0; /* Prevent blocks from squishing */
 }
 /* === END FIX === */
-/* === PREMIUM THEME UPGRADES (Visual Polish) === */
 
-    /* 1. Subtle Body Gradient (Removes flat gray look) */
-    body {
-        background: linear-gradient(to bottom, #F3F4F6 0%, #FFFFFF 100%);
-        background-attachment: fixed; /* Keeps gradient in place while scrolling */
-    }
-
-    /* 2. Glassmorphism Top Bar */
-    .top-bar {
-        background-color: rgba(255, 255, 255, 0.85); /* Semi-transparent */
-        backdrop-filter: blur(12px); /* The "Frosted Glass" blur effect */
-        -webkit-backdrop-filter: blur(12px); /* Safari support */
-        border-bottom: 1px solid rgba(0,0,0,0.05); /* Much subtler border */
-        position: sticky;
-        top: 0;
-        z-index: 50;
-    }
-
-    /* 3. Floating Cards with "Elevation" Shadows */
-    .tab-content {
-        border: none; /* Remove hard borders */
-        box-shadow: 
-            0 4px 6px -1px rgba(0, 0, 0, 0.05), 
-            0 10px 15px -3px rgba(0, 0, 0, 0.05); /* Soft, multi-layer shadow */
-        transition: box-shadow 0.3s ease;
-    }
-
-    /* 4. Polished "Gem-Like" Activity Blocks */
-    #tab-my-schedule .activity-block {
-        /* Subtle Vertical Gradient (Lightens top by 10%) */
-        background-image: linear-gradient(to bottom, rgba(255,255,255,0.15), rgba(0,0,0,0.05));
-        
-        /* Inner Highlight (Top Edge Light) */
-        box-shadow: 
-            inset 0 1px 0 rgba(255, 255, 255, 0.4), /* Inner light glow */
-            0 2px 4px rgba(0,0,0,0.05); /* Outer soft shadow */
-            
-        /* Solid Anchor Border on Left */
-        border-left: 4px solid rgba(0, 0, 0, 0.2) !important;
-        border: 1px solid rgba(0,0,0,0.05); /* Very faint border elsewhere */
-        
-        /* Smooth Animation for Hover */
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    /* 5. Micro-Interaction: Hover Lift */
-    #tab-my-schedule .activity-block:hover {
-        transform: translateY(-2px); /* Physically lifts up */
-        box-shadow: 
-            inset 0 1px 0 rgba(255, 255, 255, 0.4),
-            0 8px 12px -2px rgba(0, 0, 0, 0.1); /* Shadow grows deeper */
-        z-index: 50 !important;
-    }
-
-    /* 6. Typography & Contrast */
-    h1, h2, .view-title {
-        color: #111827; /* Richer, darker black/blue */
-        letter-spacing: -0.02em; /* Slightly tighter, more modern headings */
-    }
-
-    #tab-my-schedule .activity-time {
-        opacity: 0.85; /* Soften the time text */
-        font-weight: 500;
-        mix-blend-mode: overlay; /* Makes text blend nicely with background color */
-    }
   </style>
 </head>
 <body>
