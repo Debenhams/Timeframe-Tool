@@ -3265,7 +3265,38 @@ const handleDeleteRotation = async () => {
         ELS.viewToggleGroup = document.getElementById('viewToggleGroup');
         ELS.dayToggleContainer = document.getElementById('dayToggleContainer');
         ELS.plannerDay = document.getElementById('plannerDay');
+// --- Tiny Day Nav Buttons ---
+        ELS.btnPrevDay = document.getElementById('btnPrevDay');
+        ELS.btnNextDay = document.getElementById('btnNextDay');
 
+        const toggleDayNav = () => {
+            const isDaily = APP.StateManager.getState().scheduleViewMode === 'daily';
+            if(ELS.btnPrevDay) ELS.btnPrevDay.style.display = isDaily ? 'block' : 'none';
+            if(ELS.btnNextDay) ELS.btnNextDay.style.display = isDaily ? 'block' : 'none';
+        };
+
+        const cycleDay = (offset) => {
+            const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+            const current = APP.StateManager.getState().selectedDay;
+            let idx = days.indexOf(current);
+            if (idx === -1) idx = 0;
+            
+            let newIdx = (idx + offset) % 7;
+            if (newIdx < 0) newIdx += 7;
+            
+            const newDay = days[newIdx];
+            APP.StateManager.getState().selectedDay = newDay;
+            if (ELS.plannerDay) ELS.plannerDay.value = newDay;
+            renderPlannerContent();
+        };
+
+        if (ELS.btnPrevDay) ELS.btnPrevDay.addEventListener('click', () => cycleDay(-1));
+        if (ELS.btnNextDay) ELS.btnNextDay.addEventListener('click', () => cycleDay(1));
+        
+        // Update visibility when view toggles
+        if (ELS.viewToggleGroup) ELS.viewToggleGroup.addEventListener('click', () => setTimeout(toggleDayNav, 50));
+        toggleDayNav(); // Initial check
+        // ----------------------------
         // Event Listeners
         if (ELS.treeSearch) ELS.treeSearch.addEventListener('input', renderTree);
         if (ELS.btnClearSelection) ELS.btnClearSelection.addEventListener('click', clearSelection);

@@ -265,8 +265,12 @@
             </div>
             <div class="planner-viewer card">
                  <div class="planner-header">
-                     <h2 id="scheduleViewTitle">Schedule Visualization</h2>
-                     <div class="planner-view-controls">
+                     <div class="view-toggle-group" id="viewToggleGroup">
+                             <button id="btnPrevDay" class="btn-toggle" title="Prev Day" style="padding: 0 10px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+                             <button class="btn-toggle active" data-view="daily">Daily</button>
+                             <button class="btn-toggle" data-view="weekly">Weekly</button>
+                             <button id="btnNextDay" class="btn-toggle" title="Next Day" style="padding: 0 10px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+                         </div>
                          <div class="view-toggle-group" id="viewToggleGroup">
                              <button class="btn-toggle active" data-view="daily">Daily</button>
                              <button class="btn-toggle" data-view="weekly">Weekly</button>
