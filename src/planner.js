@@ -1348,6 +1348,9 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         }
         
         // Toolbox Listeners
+        ELS.veToolboxSearch = document.getElementById('veToolboxSearch');
+        if (ELS.veToolboxSearch) ELS.veToolboxSearch.addEventListener('input', renderToolbox);
+
         if (ELS.visualEditorToolbox) {
             ELS.visualEditorToolbox.addEventListener('click', handleToolboxClick);
             ELS.visualEditorToolbox.addEventListener('dragstart', handleToolboxDragStart);
@@ -1465,8 +1468,12 @@ ELS.exceptionReasonGroup.style.display = 'none';
 
     const renderToolbox = () => {
         if (!ELS.visualEditorToolbox) return;
+        const searchTerm = ELS.veToolboxSearch ? ELS.veToolboxSearch.value.toLowerCase().trim() : '';
+
         const STATE = APP.StateManager.getState();
-        const components = STATE.scheduleComponents.sort((a, b) => a.name.localeCompare(b.name));
+        const components = STATE.scheduleComponents
+            .filter(c => !searchTerm || c.name.toLowerCase().includes(searchTerm))
+            .sort((a, b) => a.name.localeCompare(b.name));
         ELS.visualEditorToolbox.innerHTML = components.map(comp => {
             const textColor = APP.Utils.getContrastingTextColor(comp.color);
             return `
