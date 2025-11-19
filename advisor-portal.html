@@ -389,20 +389,16 @@
         background-color: rgba(0,0,0,0.04); z-index: -1;
     }
     
-    /* Restored Gaps */
-    /* FIXED: Restored Team Schedule Gaps */
+    /* FIXED: Compact Rows with Tiny Gaps */
     .timeline-row {
       display: grid; 
       grid-template-columns: var(--timeline-name-col) 1fr;
-      /* Fixed height to match original design exactly */
-      height: 36px; 
-      /* Enforce the 4px gap between advisor rows */
-      margin-bottom: 4px !important; 
+      height: 36px; /* Standard Height */
+      margin-bottom: 2px !important; /* Very small gap between advisors */
     }
-    /* Increased contrast so you can clearly see the gaps */
-    .timeline-row:nth-child(odd) { background-color: rgba(255,255,255,0.6); }
-    .timeline-row:nth-child(even) { background-color: rgba(255,255,255,0.3); }
-    .timeline-row:hover { background-color: rgba(255,255,255,0.9) !important; }
+    .timeline-row:nth-child(odd) { background-color: rgba(255,255,255,0.3); }
+    .timeline-row:nth-child(even) { background-color: rgba(255,255,255,0.1); }
+    .timeline-row:hover { background-color: rgba(255,255,255,0.6) !important; }
 
     .timeline-name { 
         padding: 0 20px; border-right: 1px solid rgba(0,0,0,0.06); 
@@ -411,14 +407,15 @@
     }
     .timeline-track { position: relative; height: 100%; }
 
-    /* === CONTINUOUS PIPE (Fused) === */
+    /* FIXED: Full Height Bars (No Internal Gaps) */
     .timeline-bar {
-      position: absolute; top: 6px; bottom: 6px;
+      position: absolute; 
+      top: 0; bottom: 0; height: 100%; /* Fill the row completely */
       display: flex; align-items: center; overflow: hidden;
       border-radius: 0; 
       z-index: 25;
       font-size: 12px; font-weight: 600; padding-left: 8px; white-space: nowrap;
-      box-shadow: none;
+      box-shadow: none; /* Flat look for continuous pipe */
     }
     .timeline-bar:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
     .timeline-bar:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
