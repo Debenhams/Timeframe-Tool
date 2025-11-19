@@ -10,7 +10,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   
   <style>
-    /* === VARIABLES & CONFIGURATION (2026 Solid-Sidebar & Fused-Pipe) === */
+    /* === VARIABLES & CONFIGURATION (2026 Upgrades: Ghost Scroll, Pills, & Fixes) === */
     :root {
       /* Professional Palette */
       --brand-primary: #2563EB; /* Vibrant Royal Blue */
@@ -26,8 +26,8 @@
       --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
       --glass-blur: blur(20px);
       
-      /* Sidebar (Reverted to Solid Dark) */
-      --sidebar-bg: #111827; /* Solid Dark Blue-Black */
+      /* Sidebar (Solid Dark - As requested) */
+      --sidebar-bg: #111827; 
       --sidebar-text: #9CA3AF;
       --sidebar-text-hover: #FFFFFF;
       --sidebar-width: 260px;
@@ -42,7 +42,7 @@
       /* Schedule Colors */
       --color-shift-summary: #059669; 
       
-      /* Login Branding */
+      /* Branding */
       --debenhams-teal: #70E6D6;
       --debenhams-dark: #000000;
       --login-bg: #000000;
@@ -56,7 +56,7 @@
     *{ box-sizing: border-box; }
     
     body {
-        /* The "Aurora" Background remains for the main content area */
+        /* Aurora Background */
         background: radial-gradient(circle at 10% 20%, rgb(224, 242, 254) 0%, rgb(243, 244, 246) 40%, rgb(236, 253, 245) 90%);
         color: var(--color-text);
         font: 14px/1.5 var(--font-family);
@@ -64,27 +64,38 @@
         -webkit-font-smoothing: antialiased;
     }
 
-    /* === AUTH OVERLAY === */
+    /* UPGRADE 1: Custom "Ghost" Scrollbars */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.0); border-radius: 10px; transition: background 0.3s; }
+    /* Only show scrollbar thumb on hover of the container, or make it very subtle */
+    *:hover::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.1); }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.25); }
+
+    /* === AUTH OVERLAY (Reverted to Original Sizes) === */
     .auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; display: flex; }
     .auth-container { display: flex; width: 100%; height: 100%; }
-    .auth-banner { width: 60%; background-color: var(--debenhams-teal); display: flex; justify-content: center; align-items: center; position: relative; }
+    
+    /* Reverted to 75% width */
+    .auth-banner { width: 75%; background-color: var(--debenhams-teal); display: flex; justify-content: center; align-items: center; position: relative; }
     .auth-banner::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.4; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cdefs%3E%3Cstyle%3E.bee%7Bfill:none;stroke:rgba(255,255,255,0.35);stroke-width:2;%7D%3C/style%3E%3C/defs%3E%3Cg transform='translate(50 50) rotate(5)'%3E%3Cpolygon class='bee' points='0,-12 12,-6 12,6 0,12 -12,6 -12,-6'/%3E%3Cline class='bee' x1='-6' y1='-9' x2='-6' y2='9'/%3E%3Cline class='bee' x1='0' y1='-12' x2='0' y2='12'/%3E%3Cline class='bee' x1='6' y1='-9' x2='6' y2='9'/%3E%3Cpolygon class='bee' points='0,-12 18,-30 30,-18 12,-6'/%3E%3Cpolygon class='bee' points='0,-12 -18,-30 -30,-18 -12,-6'/%3E%3C/g%3E%3C/svg%3E"); background-size: 90px 90px; }
     
     .banner-content { position: relative; z-index: 1; text-align: center; color: var(--debenhams-dark); }
-    .dg-main-text { font-size: 64px; font-weight: 800; letter-spacing: -1px; line-height: 1; display: block; }
-    .dg-sub-text { font-size: 24px; font-weight: 600; text-transform: uppercase; margin-top: 8px; display: block; letter-spacing: 2px; }
-    .dg-tagline { font-size: 18px; font-weight: 500; text-transform: uppercase; margin-top: 40px; opacity: 0.8; }
+    .dg-main-text { font-size: 72px; font-weight: 800; letter-spacing: -1px; line-height: 1; display: block; }
+    .dg-sub-text { font-size: 28px; font-weight: 600; text-transform: uppercase; margin-top: 8px; display: block; letter-spacing: 2px; }
+    .dg-tagline { font-size: 24px; font-weight: 500; text-transform: uppercase; margin-top: 40px; opacity: 0.8; }
     
-    .auth-form-panel { width: 40%; padding: 60px; display: flex; flex-direction: column; justify-content: center; background-color: var(--login-bg); color: var(--login-text); }
-    .auth-title { font-size: 28px; font-weight: 700; margin-bottom: 8px; margin-top: 0; letter-spacing: -0.5px; }
+    /* Reverted to 25% width */
+    .auth-form-panel { width: 25%; padding: 60px; display: flex; flex-direction: column; justify-content: center; background-color: var(--login-bg); color: var(--login-text); }
+    .auth-title { font-size: 24px; font-weight: 700; margin-bottom: 8px; margin-top: 0; letter-spacing: -0.5px; }
     .auth-motto { margin-top: 0; margin-bottom: 40px; color: var(--login-text-muted); }
     .auth-welcome { margin-bottom: 24px; font-size: 15px; line-height: 1.6; color: #D1D5DB; }
     
     .form-group { margin-bottom: 20px; }
     .form-group label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: #9CA3AF; }
-    .auth-form .form-input { width: 100%; padding: 14px 16px; font-size: 16px; background-color: var(--login-input-bg); border: 1px solid var(--login-input-border); color: var(--login-text); border-radius: 12px; font-family: var(--font-family); transition: all 0.2s; }
+    .auth-form .form-input { width: 100%; padding: 12px 16px; font-size: 16px; background-color: var(--login-input-bg); border: 1px solid var(--login-input-border); color: var(--login-text); border-radius: 12px; font-family: var(--font-family); transition: all 0.2s; }
     .auth-form .form-input:focus { outline: none; border-color: #4B5563; background-color: #374151; }
-    .btn-login { padding: 14px; font-size: 16px; font-weight: 600; background-color: var(--login-button-green); color: white; border: none; border-radius: 12px !important; cursor: pointer; margin-top: 10px; width: 100%; transition: transform 0.1s; }
+    .btn-login { padding: 12px; font-size: 16px; font-weight: 600; background-color: var(--login-button-green); color: white; border: none; border-radius: 30px !important; cursor: pointer; margin-top: 10px; width: 100%; transition: transform 0.1s; }
     .btn-login:active { transform: scale(0.98); }
     .auth-notice { margin-top: 24px; padding: 16px; border-radius: 12px; display: none; font-size: 14px; }
     .auth-notice.error { background-color: rgba(239, 68, 68, 0.1); color: #F87171; border: 1px solid rgba(239, 68, 68, 0.2); }
@@ -100,10 +111,10 @@
 
     /* === APP LAYOUT === */
     
-    /* --- Sidebar (Restored to SOLID DARK) --- */
+    /* --- Sidebar (Solid Dark) --- */
     .app-sidebar {
         width: var(--sidebar-width);
-        background-color: var(--sidebar-bg); /* Solid color */
+        background-color: var(--sidebar-bg); 
         color: var(--sidebar-text);
         flex-direction: column;
         flex-shrink: 0;
@@ -128,21 +139,30 @@
     #advisorName { font-weight: 600; color: white; display: block; font-size: 15px; margin-bottom: 2px; }
     #userEmail, #teamName { font-size: 13px; color: #94A3B8; display: block; }
 
-    .sidebar-nav { display: flex; flex-direction: column; padding: 20px 16px; gap: 6px; flex-grow: 1; }
+    .sidebar-nav { display: flex; flex-direction: column; padding: 20px 16px; gap: 8px; flex-grow: 1; }
 
+    /* UPGRADE 2: Active Pill Navigation */
     .nav-link {
         display: flex; align-items: center; gap: 12px;
         padding: 12px 16px;
         font-size: 14px; font-weight: 500;
         color: var(--sidebar-text);
         background-color: transparent;
-        border: 1px solid transparent; border-radius: 10px;
+        border: none; 
+        border-radius: 50px; /* Full Pill Shape */
         cursor: pointer; text-align: left;
-        transition: all 0.2s;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative; z-index: 1;
     }
 
     .nav-link:hover:not(.disabled) { background-color: rgba(255, 255, 255, 0.1); color: white; }
-    .nav-link.active { background-color: var(--brand-primary); color: white; border: 1px solid rgba(255,255,255,0.1); }
+    
+    .nav-link.active { 
+        background-color: var(--brand-primary); 
+        color: white; 
+        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.5); 
+        font-weight: 600;
+    }
     
     .nav-link.disabled { opacity: 0.5; cursor: not-allowed; }
     .nav-link.disabled .coming-soon-tag {
@@ -159,7 +179,7 @@
 
     .sidebar-footer { padding: 20px; border-top: 1px solid rgba(255,255,255,0.1); margin-top: auto; }
 
-    /* --- Main Content (Kept Glassy) --- */
+    /* --- Main Content --- */
     .app-main-content {
         flex-grow: 1; flex-direction: column; overflow: hidden; height: 100vh;
         background: transparent; 
@@ -168,8 +188,7 @@
     /* Top Bar */
     .top-bar {
         background: rgba(255, 255, 255, 0.4);
-        backdrop-filter: blur(15px);
-        -webkit-backdrop-filter: blur(15px);
+        backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
         border-bottom: var(--glass-border);
         display: flex; align-items: center; justify-content: space-between;
         padding: 16px 32px; flex-shrink: 0; z-index: 10;
@@ -227,8 +246,8 @@
         border-radius: 10px;
         padding: 10px 14px;
         font-family: var(--font-family); font-size: 14px;
-        background: rgba(255,255,255,0.6);
-        box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+        background: rgba(255,255,255,0.5); 
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
         transition: all 0.2s; backdrop-filter: blur(5px);
     }
     input[type="date"]:focus, .form-input:focus, .form-select:focus {
@@ -242,10 +261,8 @@
     .notice.success { background: rgba(209, 250, 229, 0.85); border: 1px solid rgba(16, 185, 129, 0.3); color: #065F46; }
     .notice.info { background: rgba(219, 234, 254, 0.85); border: 1px solid rgba(96, 165, 250, 0.3); color: #1E40AF; }
     .notice.danger { background: rgba(254, 226, 226, 0.85); border: 1px solid rgba(248, 113, 113, 0.3); color: #991B1B; }
-
     .tag { background: rgba(0,0,0,0.05); color: var(--color-text); border-radius: 20px; padding: 4px 12px; font-weight: 600; font-size: 12px; display: inline-block; }
     .bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-
 
     /* === MY ROTA VIEW === */
     .schedule-container { display: flex; flex-direction: column; flex-grow: 1; height: 100%; min-width: 900px; }
@@ -260,7 +277,6 @@
 
     .summary-day { padding: 16px; text-align: center; border-right: 1px solid rgba(0,0,0,0.06); display: flex; flex-direction: column; }
     .summary-day:last-child { border-right: none; }
-    
     .summary-day-name { font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
     .summary-day-date { font-size: 22px; font-weight: 800; color: var(--color-text); margin-bottom: 12px; }
 
@@ -280,7 +296,6 @@
     /* Time Grid */
     .time-grid-wrapper { flex-grow: 1; overflow-y: scroll; position: relative; }
     .time-grid { display: grid; grid-template-columns: repeat(7, 1fr); position: relative; width: 100%; }
-
     .day-column-cell { border-bottom: 1px solid rgba(0,0,0,0.04); height: var(--timegrid-row-height); }
     .day-column-cell.hour-mark { border-bottom: 1px solid rgba(0,0,0,0.08); }
 
@@ -374,6 +389,7 @@
         background-color: rgba(0,0,0,0.04); z-index: -1;
     }
     
+    /* Restored Gaps */
     .timeline-row {
       display: grid; grid-template-columns: var(--timeline-name-col) 1fr;
       height: var(--timeline-row-height); margin-bottom: 4px;
@@ -389,24 +405,15 @@
     }
     .timeline-track { position: relative; height: 100%; }
 
-    /* === THE "CONTINUOUS PIPE" EFFECT (Updated for Fix) === */
+    /* === CONTINUOUS PIPE (Fused) === */
     .timeline-bar {
-      /* Position and Height */
       position: absolute; top: 6px; bottom: 6px;
       display: flex; align-items: center; overflow: hidden;
-      
-      /* FUSED LOOK: Square borders by default so neighbors touch perfectly */
       border-radius: 0; 
       z-index: 25;
-      
-      /* Text */
       font-size: 12px; font-weight: 600; padding-left: 8px; white-space: nowrap;
-      
-      /* Remove box-shadow to make it look flat/continuous */
       box-shadow: none;
     }
-    
-    /* Round the far left of the first block, and far right of the last block */
     .timeline-bar:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
     .timeline-bar:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
     
@@ -428,13 +435,10 @@
       .timeline-container { min-width: 1000px; }
       .content-area { padding: 16px; }
     }
-/* === REST DAY INDICATOR === */
+
+    /* === REST DAY INDICATOR === */
     .timeline-rdo-fill {
-        position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-        display: flex; align-items: center; justify-content: center;
-        background-color: rgba(0, 0, 0, 0.02); 
-        color: #9CA3AF; font-weight: 700; font-size: 12px; 
-        letter-spacing: 1px; user-select: none; z-index: 0;
+        position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: rgba(0, 0, 0, 0.02); color: #9CA3AF; font-weight: 700; font-size: 12px; letter-spacing: 1px; user-select: none; z-index: 0;
     }
   </style>
 </head>
