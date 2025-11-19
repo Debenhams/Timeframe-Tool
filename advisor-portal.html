@@ -10,31 +10,31 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
   
   <style>
-    /* === VARIABLES & CONFIGURATION (2026 Solid-Sidebar & Fused-Pipe) === */
+    /* === VARIABLES & CONFIGURATION (2026 Apple-Glass Style) === */
     :root {
-      /* Professional Palette */
+      /* Professional Palette - Refined for Glass Look */
       --brand-primary: #2563EB; /* Vibrant Royal Blue */
       --brand-accent: #10B981; /* Emerald Green */
       
-      /* Neutrals */
-      --color-text: #111827;
-      --color-text-muted: #4B5563;
+      /* Neutrals - High Contrast for Readability */
+      --color-text: #111827; /* Near Black for sharp text */
+      --color-text-muted: #4B5563; /* Dark Grey for secondary text */
       
-      /* Glass Backgrounds (For Main Content Only) */
-      --glass-panel-bg: rgba(255, 255, 255, 0.75);
+      /* Glass Backgrounds */
+      --glass-panel-bg: rgba(255, 255, 255, 0.65); /* Frosted White */
       --glass-border: 1px solid rgba(255, 255, 255, 0.5);
-      --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+      --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.05); /* Soft diffuse shadow */
       --glass-blur: blur(20px);
       
-      /* Sidebar (Reverted to Solid Dark) */
-      --sidebar-bg: #111827; /* Solid Dark Blue-Black */
-      --sidebar-text: #9CA3AF;
+      /* Sidebar (Dark Glass) */
+      --sidebar-bg: rgba(15, 23, 42, 0.85); /* Deep Blue-Black, translucent */
+      --sidebar-text: #94A3B8;
       --sidebar-text-hover: #FFFFFF;
       --sidebar-width: 260px;
       
       /* Layout & UI */
       --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      --border-radius: 16px;
+      --border-radius: 16px; /* Softer, Apple-like corners */
       --timegrid-row-height: 32px; 
       --timeline-name-col: 220px;
       --timeline-row-height: 44px;
@@ -56,15 +56,15 @@
     *{ box-sizing: border-box; }
     
     body {
-        /* The "Aurora" Background remains for the main content area */
+        /* The "Aurora" Background - Static, subtle gradient */
         background: radial-gradient(circle at 10% 20%, rgb(224, 242, 254) 0%, rgb(243, 244, 246) 40%, rgb(236, 253, 245) 90%);
         color: var(--color-text);
         font: 14px/1.5 var(--font-family);
         display: flex;
-        -webkit-font-smoothing: antialiased;
+        -webkit-font-smoothing: antialiased; /* Makes text crisper on Mac */
     }
 
-    /* === AUTH OVERLAY === */
+    /* === AUTH OVERLAY (Cleaned up) === */
     .auth-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; display: flex; }
     .auth-container { display: flex; width: 100%; height: 100%; }
     .auth-banner { width: 60%; background-color: var(--debenhams-teal); display: flex; justify-content: center; align-items: center; position: relative; }
@@ -98,16 +98,18 @@
     body.authenticated .app-sidebar, body.authenticated .app-main-content { display: flex; }
     body.authenticated #auth-overlay { display: none; }
 
-    /* === APP LAYOUT === */
+    /* === APP LAYOUT (Glassmorphism) === */
     
-    /* --- Sidebar (Restored to SOLID DARK) --- */
+    /* --- Sidebar --- */
     .app-sidebar {
         width: var(--sidebar-width);
-        background-color: var(--sidebar-bg); /* Solid color */
+        background-color: var(--sidebar-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
         color: var(--sidebar-text);
         flex-direction: column;
         flex-shrink: 0;
-        border-right: 1px solid rgba(255, 255, 255, 0.05);
+        border-right: 1px solid rgba(255, 255, 255, 0.1);
         height: 100vh;
         overflow-y: auto;
         z-index: 20;
@@ -136,13 +138,13 @@
         font-size: 14px; font-weight: 500;
         color: var(--sidebar-text);
         background-color: transparent;
-        border: 1px solid transparent; border-radius: 10px;
+        border: 1px solid transparent; border-radius: 12px;
         cursor: pointer; text-align: left;
         transition: all 0.2s;
     }
 
-    .nav-link:hover:not(.disabled) { background-color: rgba(255, 255, 255, 0.1); color: white; }
-    .nav-link.active { background-color: var(--brand-primary); color: white; border: 1px solid rgba(255,255,255,0.1); }
+    .nav-link:hover:not(.disabled) { background-color: rgba(255, 255, 255, 0.08); color: white; border-color: rgba(255,255,255,0.1); }
+    .nav-link.active { background-color: var(--brand-primary); color: white; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4); border: 1px solid rgba(255,255,255,0.2); }
     
     .nav-link.disabled { opacity: 0.5; cursor: not-allowed; }
     .nav-link.disabled .coming-soon-tag {
@@ -159,13 +161,13 @@
 
     .sidebar-footer { padding: 20px; border-top: 1px solid rgba(255,255,255,0.1); margin-top: auto; }
 
-    /* --- Main Content (Kept Glassy) --- */
+    /* --- Main Content --- */
     .app-main-content {
         flex-grow: 1; flex-direction: column; overflow: hidden; height: 100vh;
         background: transparent; 
     }
 
-    /* Top Bar */
+    /* Top Bar - Glass Strip */
     .top-bar {
         background: rgba(255, 255, 255, 0.4);
         backdrop-filter: blur(15px);
@@ -186,9 +188,10 @@
         display: flex; flex-direction: column;
     }
 
-    /* --- Glass Cards --- */
+    /* --- The Glass Cards (Tab Content) --- */
     .tab-content {
         display: none; height: 100%; width: 100%;
+        /* THE GLASS EFFECT */
         background: var(--glass-panel-bg);
         backdrop-filter: var(--glass-blur);
         -webkit-backdrop-filter: var(--glass-blur);
@@ -199,6 +202,7 @@
     }
     .tab-content.active { display: flex; flex-direction: column; }
     
+    /* Padding inside the glass cards */
     #tab-time-off, #tab-shift-swap, #tab-metrics, #tab-overtime { padding: 32px; overflow-y: auto; }
 
     /* === UI COMPONENTS === */
@@ -238,7 +242,7 @@
     
     /* Notices */
     .notice-container { position: absolute; top: 100px; left: 50%; transform: translateX(-50%); z-index: 100; }
-    .notice { padding: 14px 24px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); font-weight: 500; backdrop-filter: blur(12px); }
+    .notice { padding: 14px 24px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); font-weight: 500; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
     .notice.success { background: rgba(209, 250, 229, 0.85); border: 1px solid rgba(16, 185, 129, 0.3); color: #065F46; }
     .notice.info { background: rgba(219, 234, 254, 0.85); border: 1px solid rgba(96, 165, 250, 0.3); color: #1E40AF; }
     .notice.danger { background: rgba(254, 226, 226, 0.85); border: 1px solid rgba(248, 113, 113, 0.3); color: #991B1B; }
@@ -247,7 +251,7 @@
     .bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 
 
-    /* === MY ROTA VIEW === */
+    /* === MY ROTA VIEW (Calendar) === */
     .schedule-container { display: flex; flex-direction: column; flex-grow: 1; height: 100%; min-width: 900px; }
 
     /* Top Summary */
@@ -293,19 +297,23 @@
     .day-column-events:last-child { border-right: none; }
     #tab-my-schedule .day-column-cell { border-bottom: none !important; }
 
-    /* Activity Blocks */
+    /* Activity Blocks (The "Gummy" Pills) */
     #tab-my-schedule .activity-block {
         position: relative !important; width: 100% !important;
         margin: 0 !important; margin-bottom: 2px !important;
         left: auto !important; right: auto !important; top: auto !important;
+        
         border-radius: 8px;
         border: none;
+        /* The "Gummy" effect: Inner shadow for depth, outer shadow for lift */
         box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 2px 5px rgba(0,0,0,0.1);
+        
         display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
         padding: 2px 4px; line-height: 1.2; pointer-events: auto; overflow: hidden; flex-shrink: 0;
         font-weight: 600;
-        backdrop-filter: brightness(1.05);
+        backdrop-filter: brightness(1.05); /* Slight pop */
     }
+    
     #tab-my-schedule .activity-title { display: block; font-size: 12px; }
     #tab-my-schedule .activity-time { display: block; font-size: 10px; opacity: 0.9; font-weight: 400; }
     #tab-my-schedule .is-simple-block .activity-time { display: none; }
@@ -389,27 +397,15 @@
     }
     .timeline-track { position: relative; height: 100%; }
 
-    /* === THE "CONTINUOUS PIPE" EFFECT (Updated for Fix) === */
     .timeline-bar {
-      /* Position and Height */
-      position: absolute; top: 6px; bottom: 6px;
+      position: absolute; top: 4px; bottom: 4px; /* Slight gap for floating look */
       display: flex; align-items: center; overflow: hidden;
-      
-      /* FUSED LOOK: Square borders by default so neighbors touch perfectly */
-      border-radius: 0; 
-      z-index: 25;
-      
-      /* Text */
+      border-radius: 6px; z-index: 25;
       font-size: 12px; font-weight: 600; padding-left: 8px; white-space: nowrap;
-      
-      /* Remove box-shadow to make it look flat/continuous */
-      box-shadow: none;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      /* Subtle shine */
+      background-image: linear-gradient(to bottom, rgba(255,255,255,0.15), rgba(0,0,0,0.05));
     }
-    
-    /* Round the far left of the first block, and far right of the last block */
-    .timeline-bar:first-child { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }
-    .timeline-bar:last-child { border-top-right-radius: 8px; border-bottom-right-radius: 8px; }
-    
     #tab-team-schedule .timeline-bar.is-simple-block span { display: none; }
 
     /* Placeholder */
@@ -428,7 +424,6 @@
       .timeline-container { min-width: 1000px; }
       .content-area { padding: 16px; }
     }
-
 /* === REST DAY INDICATOR === */
     .timeline-rdo-fill {
         position: absolute; top: 0; left: 0; width: 100%; height: 100%;
