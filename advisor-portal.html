@@ -390,13 +390,19 @@
     }
     
     /* Restored Gaps */
+    /* FIXED: Restored Team Schedule Gaps */
     .timeline-row {
-      display: grid; grid-template-columns: var(--timeline-name-col) 1fr;
-      height: var(--timeline-row-height); margin-bottom: 4px;
+      display: grid; 
+      grid-template-columns: var(--timeline-name-col) 1fr;
+      /* Fixed height to match original design exactly */
+      height: 36px; 
+      /* Enforce the 4px gap between advisor rows */
+      margin-bottom: 4px !important; 
     }
-    .timeline-row:nth-child(odd) { background-color: rgba(255,255,255,0.3); }
-    .timeline-row:nth-child(even) { background-color: rgba(255,255,255,0.1); }
-    .timeline-row:hover { background-color: rgba(255,255,255,0.6) !important; }
+    /* Increased contrast so you can clearly see the gaps */
+    .timeline-row:nth-child(odd) { background-color: rgba(255,255,255,0.6); }
+    .timeline-row:nth-child(even) { background-color: rgba(255,255,255,0.3); }
+    .timeline-row:hover { background-color: rgba(255,255,255,0.9) !important; }
 
     .timeline-name { 
         padding: 0 20px; border-right: 1px solid rgba(0,0,0,0.06); 
