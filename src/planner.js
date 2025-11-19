@@ -2703,6 +2703,30 @@ if (ELS.btnDuplicate) ELS.btnDuplicate.addEventListener('click', handleDuplicate
         if (ELS.btnAddWeek) ELS.btnAddWeek.addEventListener('click', handleAddWeekTop);
         if (ELS.btnDeleteFirstWeek) ELS.btnDeleteFirstWeek.addEventListener('click', handleDeleteFirstWeek); // <-- ADD THIS LINE
         if (ELS.grid) ELS.grid.addEventListener('change', handleGridChange);
+        if (ELS.grid) ELS.grid.addEventListener('keydown', handleGridKeydown);
+    };
+
+    let clipboardShiftCode = null;
+
+    const handleGridKeydown = (e) => {
+        // Only activate for the grid select boxes
+        if (!e.target.classList.contains('rotation-grid-select')) return;
+
+        // Copy (Ctrl+C)
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+            clipboardShiftCode = e.target.value;
+            APP.Utils.showToast("Copied", "success", 800);
+        }
+
+        // Paste (Ctrl+V)
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+            if (clipboardShiftCode !== null) {
+                e.preventDefault();
+                e.target.value = clipboardShiftCode;
+                // Trigger change event manually so the auto-save logic runs
+                e.target.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
     };
 
     RotationEditor.render = () => {
