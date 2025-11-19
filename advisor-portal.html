@@ -1561,14 +1561,24 @@ ELS.realtimeNote.addEventListener('click', (e) => {
 // (New Helper) Updates the options in the Team Day Selector based on the current week
 function updateTeamDaySelector() {
     let html = '';
+    let targetIndex = 0; // Default to Monday
+
     DAYS.forEach((dayName, i) => {
         const date = addDays(STATE.monday, i);
+        
+        // Check if this specific date matches Today's date
+        if (fmtDateLocal(date) === TODAY_ISO) {
+            targetIndex = i;
+        }
+
         html += `<option value="${i}">${dayName} (${fmtDateFriendly(date)})</option>`;
     });
+
     ELS.teamDaySelector.innerHTML = html;
-    // Reset selection to Monday when week changes
-    STATE.teamViewDayIndex = 0;
-    ELS.teamDaySelector.value = 0;
+    
+    // Set the selection to Today (if found in this week) or Monday (if looking at future/past weeks)
+    STATE.teamViewDayIndex = targetIndex;
+    ELS.teamDaySelector.value = targetIndex;
 }
 
 
