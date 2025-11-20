@@ -984,6 +984,10 @@ display: flex;
                     <label for="teamDaySelector">Select Day:</label>
                     <select id="teamDaySelector" class="form-select"></select>
                 </div>
+                <div class="day-selector-group" id="teamSelectorGroup" style="display: none; margin-left: 16px; border-left: 1px solid rgba(0,0,0,0.1); padding-left: 16px;">
+                    <label for="teamSelector">View Team:</label>
+                    <select id="teamSelector" class="form-select"></select>
+                </div>
                 <div class="view-toggle-group" id="teamViewToggleGroup">
                     <button class="btn-toggle active" data-view="daily">Daily Timeline</button>
                     <button class="btn-toggle" data-view="weekly">Weekly Grid</button>
@@ -1062,6 +1066,8 @@ const ELS = {
     teamViewToggleGroup: document.getElementById("teamViewToggleGroup"),
     teamDaySelectorGroup: document.getElementById("teamDaySelectorGroup"),
     teamDaySelector: document.getElementById("teamDaySelector"),
+    teamSelector: document.getElementById("teamSelector"),
+    teamSelectorGroup: document.getElementById("teamSelectorGroup"),
 };
 
 // --- Constants & Helpers ---
@@ -1434,29 +1440,67 @@ async function identifyAdvisorAndTeam(user) {
     if (advisorDetails) {
         STATE.advisorName = advisorDetails.name;
         STATE.leaderId = advisorDetails.leader_id;
-    }
-
-    if (!STATE.leaderId) {
-        ELS.teamToggleBtn.disabled = true;
-        ELS.teamToggleBtn.classList.add('disabled');
-        return;
-    }
-
-    // 3. Fetch Team Members and Leader Name
-    const [teamRes, leaderRes] = await Promise.all([
-        supabase.from("advisors").select("id, name").eq("leader_id", STATE.leaderId).order('name'),
-        supabase.from("leaders").select("name").eq("id", STATE.leaderId).maybeSingle()
-    ]);
-
-    if (teamRes.data) {
-        STATE.teamMembers = teamRes.data;
-        STATE.teamMemberIds = new Set(teamRes.data.map(t => t.id));
-    }
+        // --- NEW LOGIC: SUBORDINATES & TEAM SELECTOR ---
     
-    if (leaderRes.data) {
-        ELS.teamNamePill.textContent = `Team: ${leaderRes.data.name}`;
+    // Check if the logged-in user IS a leader (i.e., do people report to ME?)
+    const { data: mySubordinates } = await supabase
+        .from("advisors")
+        .select("id, name")
+        .eq("leader_id", STATE.advisorId) // Check if *I* am the leader_id
+        .order('name');
+
+    if (mySubordinates && mySubordinates.length > 0) {
+        // SCENARIO: I AM A TEAM LEADER
+        STATE.teamMembers = mySubordinates;
+        STATE.teamMemberIds = new Set(mySubordinates.map(t => t.id));
+        
+        // Set the header name to My Name (or my Team's name)
+        ELS.teamNamePill.textContent = `Team: ${STATE.advisorName}`;
         ELS.teamNamePill.style.display = '';
+
+        // ** NEW FEATURE: POPULATE TEAM DROPDOWN **
+        const { data: allLeaders } = await supabase.from("leaders").select("id, name").order("name");
+        if (allLeaders) {
+            // Default option is "My Team"
+            let opts = `<option value="${STATE.advisorId}">My Team (${STATE.advisorName})</option>`;
+            
+            allLeaders.forEach(l => {
+                // Add other leaders (excluding myself)
+                if (l.id !== STATE.advisorId) {
+                    opts += `<option value="${l.id}">${l.name}</option>`;
+                }
+            });
+            
+            ELS.teamSelector.innerHTML = opts;
+            ELS.teamSelectorGroup.style.display = 'flex'; // Reveal the dropdown
+        }
+        
+    } else {
+        // SCENARIO: I AM A REGULAR ADVISOR (Dropdown remains hidden)
+        if (!STATE.leaderId) {
+             ELS.teamToggleBtn.disabled = true;
+             ELS.teamToggleBtn.classList.add('disabled');
+             return;
+        }
+
+        const [teamRes, leaderRes] = await Promise.all([
+            supabase.from("advisors").select("id, name").eq("leader_id", STATE.leaderId).order('name'),
+            supabase.from("leaders").select("name").eq("id", STATE.leaderId).maybeSingle()
+        ]);
+
+        if (teamRes.data) {
+            STATE.teamMembers = teamRes.data;
+            STATE.teamMemberIds = new Set(teamRes.data.map(t => t.id));
+        }
+        
+        if (leaderRes.data) {
+            ELS.teamNamePill.textContent = `Team: ${leaderRes.data.name}`;
+            ELS.teamNamePill.style.display = '';
+        }
     }
+    // --- NEW LOGIC ENDS HERE ---
+    }
+
 
     if (STATE.teamMembers.length <= 1) {
         ELS.teamToggleBtn.disabled = true;
@@ -1556,6 +1600,34 @@ ELS.realtimeNote.addEventListener('click', (e) => {
         acknowledgeUpdate();
     }
 });
+// Team Selector Logic
+    if (ELS.teamSelector) {
+        ELS.teamSelector.addEventListener('change', async (e) => {
+            const newLeaderId = e.target.value;
+            
+            // Show loading state
+            ELS.teamScheduleContainer.innerHTML = `<div class="notice info" style="margin: 24px;">Switching teams...</div>`;
+
+            // Fetch the new team
+            const { data: newTeam } = await supabase
+                .from("advisors")
+                .select("id, name")
+                .eq("leader_id", newLeaderId)
+                .order('name');
+
+            if (newTeam) {
+                STATE.teamMembers = newTeam;
+                STATE.teamMemberIds = new Set(newTeam.map(t => t.id));
+                
+                // Update header pill
+                const selText = e.target.options[e.target.selectedIndex].text;
+                ELS.teamNamePill.textContent = `Viewing: ${selText}`;
+                
+                // Reload the schedule data
+                loadAndRender();
+            }
+        });
+    }
 }
 
 // (New Helper) Updates the options in the Team Day Selector based on the current week
