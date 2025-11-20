@@ -1440,43 +1440,59 @@ async function identifyAdvisorAndTeam(user) {
     if (advisorDetails) {
         STATE.advisorName = advisorDetails.name;
         STATE.leaderId = advisorDetails.leader_id;
-        // --- NEW LOGIC: SUBORDINATES & TEAM SELECTOR ---
+        // --- NEW LOGIC: SUBORDINATES & TEAM SELECTOR (ATL FIX) ---
     
-    // Check if the logged-in user IS a leader (i.e., do people report to ME?)
+    // 1. Check if people report to me (Subordinates)
     const { data: mySubordinates } = await supabase
         .from("advisors")
         .select("id, name")
-        .eq("leader_id", STATE.advisorId) // Check if *I* am the leader_id
+        .eq("leader_id", STATE.advisorId)
         .order('name');
 
-    if (mySubordinates && mySubordinates.length > 0) {
-        // SCENARIO: I AM A TEAM LEADER
-        STATE.teamMembers = mySubordinates;
-        STATE.teamMemberIds = new Set(mySubordinates.map(t => t.id));
+    // 2. Check if I am explicitly listed in the 'leaders' table (For ATLs with no team)
+    const { data: meAsLeader } = await supabase
+        .from("leaders")
+        .select("id")
+        .eq("id", STATE.advisorId)
+        .maybeSingle();
+
+    // Determine if I am a Leader (either have subordinates OR am in the leaders table)
+    const isLeader = (mySubordinates && mySubordinates.length > 0) || !!meAsLeader;
+
+    if (isLeader) {
+        // SCENARIO: I AM A TEAM LEADER OR ATL
         
-        // Set the header name to My Name (or my Team's name)
+        if (mySubordinates && mySubordinates.length > 0) {
+            // I have a team, show them
+            STATE.teamMembers = mySubordinates;
+        } else {
+            // I am an ATL with no team yet. 
+            // Show MYSELF in the team view so the grid isn't empty and the button works.
+            STATE.teamMembers = [{ id: STATE.advisorId, name: STATE.advisorName }];
+        }
+        
+        STATE.teamMemberIds = new Set(STATE.teamMembers.map(t => t.id));
+        
         ELS.teamNamePill.textContent = `Team: ${STATE.advisorName}`;
         ELS.teamNamePill.style.display = '';
 
-        // ** NEW FEATURE: POPULATE TEAM DROPDOWN **
+        // ** POPULATE TEAM DROPDOWN **
         const { data: allLeaders } = await supabase.from("leaders").select("id, name").order("name");
         if (allLeaders) {
-            // Default option is "My Team"
             let opts = `<option value="${STATE.advisorId}">My Team (${STATE.advisorName})</option>`;
             
             allLeaders.forEach(l => {
-                // Add other leaders (excluding myself)
                 if (l.id !== STATE.advisorId) {
                     opts += `<option value="${l.id}">${l.name}</option>`;
                 }
             });
             
             ELS.teamSelector.innerHTML = opts;
-            ELS.teamSelectorGroup.style.display = 'flex'; // Reveal the dropdown
+            ELS.teamSelectorGroup.style.display = 'flex'; 
         }
         
     } else {
-        // SCENARIO: I AM A REGULAR ADVISOR (Dropdown remains hidden)
+        // SCENARIO: I AM A REGULAR ADVISOR (No Dropdown)
         if (!STATE.leaderId) {
              ELS.teamToggleBtn.disabled = true;
              ELS.teamToggleBtn.classList.add('disabled');
@@ -1498,7 +1514,7 @@ async function identifyAdvisorAndTeam(user) {
             ELS.teamNamePill.style.display = '';
         }
     }
-    // --- NEW LOGIC ENDS HERE ---
+    // --- END NEW LOGIC ---
     }
 
 
