@@ -985,8 +985,13 @@ display: flex;
                     <select id="teamDaySelector" class="form-select"></select>
                 </div>
                 <div class="day-selector-group" id="teamSelectorGroup" style="display: none; margin-left: 16px; border-left: 1px solid rgba(0,0,0,0.1); padding-left: 16px;">
-                    <label for="teamSelector">View Team:</label>
-                    <select id="teamSelector" class="form-select"></select>
+                    <label style="margin-right:8px;">View Team:</label>
+                    <div style="position:relative;">
+                        <button id="teamSelectorBtn" class="form-select" style="text-align:left; min-width:220px; display:flex; justify-content:space-between; align-items:center; background:white; cursor:pointer;">
+                            <span>My Team</span> <span style="font-size:10px;">▼</span>
+                        </button>
+                        <div id="teamSelectorList" style="display:none; position:absolute; top:100%; left:0; width:100%; background:#fff; border:1px solid #E5E7EB; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15); z-index:50; padding:8px; max-height:400px; overflow-y:auto;"></div>
+                    </div>
                 </div>
                 <div class="view-toggle-group" id="teamViewToggleGroup">
                     <button class="btn-toggle active" data-view="daily">Daily Timeline</button>
@@ -1476,20 +1481,40 @@ async function identifyAdvisorAndTeam(user) {
         ELS.teamNamePill.textContent = `Team: ${STATE.advisorName}`;
         ELS.teamNamePill.style.display = '';
 
-        // ** POPULATE TEAM DROPDOWN **
+        // ** NEW FEATURE: MULTI-SELECT DROPDOWN **
         const { data: allLeaders } = await supabase.from("leaders").select("id, name").order("name");
         if (allLeaders) {
-            let opts = `<option value="${STATE.advisorId}">My Team (${STATE.advisorName})</option>`;
+            const listEl = document.getElementById('teamSelectorList');
+            const btnEl = document.getElementById('teamSelectorBtn');
+
+            // 1. Add "My Team" (Default Checked)
+            let html = `<label style="display:flex; align-items:center; padding:8px; cursor:pointer; border-bottom:1px solid #f3f4f6;">
+                            <input type="checkbox" value="${STATE.advisorId}" checked style="margin-right:8px;"> 
+                            <span style="font-weight:700; font-size:13px;">My Team</span>
+                        </label>`;
             
+            // 2. Add Other Leaders
             allLeaders.forEach(l => {
                 if (l.id !== STATE.advisorId) {
-                    opts += `<option value="${l.id}">${l.name}</option>`;
+                    html += `<label style="display:flex; align-items:center; padding:8px; cursor:pointer;">
+                                <input type="checkbox" value="${l.id}" style="margin-right:8px;"> 
+                                <span style="font-size:13px;">${l.name}</span>
+                            </label>`;
                 }
             });
             
-            ELS.teamSelector.innerHTML = opts;
-            ELS.teamSelectorGroup.style.display = 'flex'; 
+            listEl.innerHTML = html;
+            document.getElementById('teamSelectorGroup').style.display = 'flex';
+
+            // Helper to update button text based on selection
+            window.updateTeamBtnText = () => {
+                const checked = listEl.querySelectorAll('input[type="checkbox"]:checked');
+                if (checked.length === 0) btnEl.firstElementChild.textContent = "Select Team...";
+                else if (checked.length === 1) btnEl.firstElementChild.textContent = checked[0].nextElementSibling.textContent;
+                else btnEl.firstElementChild.textContent = `${checked.length} Teams Selected`;
+            };
         }
+        
         
     } else {
         // SCENARIO: I AM A REGULAR ADVISOR (No Dropdown)
@@ -1616,30 +1641,51 @@ ELS.realtimeNote.addEventListener('click', (e) => {
         acknowledgeUpdate();
     }
 });
-// Team Selector Logic
-    if (ELS.teamSelector) {
-        ELS.teamSelector.addEventListener('change', async (e) => {
-            const newLeaderId = e.target.value;
-            
-            // Show loading state
-            ELS.teamScheduleContainer.innerHTML = `<div class="notice info" style="margin: 24px;">Switching teams...</div>`;
+// Team Selector Logic (Multi-Select)
+    const teamBtn = document.getElementById('teamSelectorBtn');
+    const teamList = document.getElementById('teamSelectorList');
 
-            // Fetch the new team
+    if (teamBtn && teamList) {
+        // Toggle Dropdown
+        teamBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            teamList.style.display = teamList.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // Close when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!teamBtn.contains(e.target) && !teamList.contains(e.target)) {
+                teamList.style.display = 'none';
+            }
+        });
+
+        // Handle Checkbox Changes
+        teamList.addEventListener('change', async () => {
+            window.updateTeamBtnText(); // Update button label
+            
+            const checkedBoxes = Array.from(teamList.querySelectorAll('input[type="checkbox"]:checked'));
+            const selectedIds = checkedBoxes.map(cb => cb.value);
+
+            if (selectedIds.length === 0) {
+                 ELS.teamScheduleContainer.innerHTML = `<div class="notice info" style="margin: 24px;">Please select at least one team.</div>`;
+                 return;
+            }
+
+            ELS.teamScheduleContainer.innerHTML = `<div class="notice info" style="margin: 24px;">Loading teams...</div>`;
+
+            // Fetch combined team members
             const { data: newTeam } = await supabase
                 .from("advisors")
                 .select("id, name")
-                .eq("leader_id", newLeaderId)
+                .in("leader_id", selectedIds) // Fetch matches for ANY selected leader
                 .order('name');
 
             if (newTeam) {
                 STATE.teamMembers = newTeam;
                 STATE.teamMemberIds = new Set(newTeam.map(t => t.id));
                 
-                // Update header pill
-                const selText = e.target.options[e.target.selectedIndex].text;
-                ELS.teamNamePill.textContent = `Viewing: ${selText}`;
+                ELS.teamNamePill.textContent = selectedIds.length > 1 ? `Viewing: ${selectedIds.length} Teams` : `Viewing: ${checkedBoxes[0].nextElementSibling.textContent}`;
                 
-                // Reload the schedule data
                 loadAndRender();
             }
         });
