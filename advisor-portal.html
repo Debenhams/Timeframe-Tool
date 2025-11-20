@@ -1502,7 +1502,7 @@ async function identifyAdvisorAndTeam(user) {
     }
 
 
-    if (STATE.teamMembers.length <= 1) {
+    if (STATE.teamMembers.length <= 0) {
         ELS.teamToggleBtn.disabled = true;
         ELS.teamToggleBtn.classList.add('disabled');
     }
@@ -1836,24 +1836,30 @@ async function loadAndRender(){
         mondayISO: mondayISO
     };
     
-    // 1. Fetch all data in parallel
+   // 1. Fetch all data in parallel
     try {
+        // FIX: Create a list that includes the Team AND Me (so My Schedule works)
+        const idsToFetch = Array.from(STATE.teamMemberIds);
+        if (STATE.advisorId && !idsToFetch.includes(STATE.advisorId)) {
+            idsToFetch.push(STATE.advisorId);
+        }
+
         const [exceptionsRes, patternsRes, assignmentsRes] = await Promise.all([
-            // Get exceptions for all team members for this week
+            // Get exceptions for Team + Me
             supabase.from("schedule_exceptions")
                     .select("advisor_id, exception_date, structure")
-                    .in("advisor_id", Array.from(STATE.teamMemberIds))
+                    .in("advisor_id", idsToFetch)
                     .in("exception_date", dateRange),
                     
             // Get all rotation patterns
             supabase.from("rotation_patterns").select("name, pattern"),
             
-            // Get all relevant assignment history records
+            // Get history for Team + Me
             supabase.from("rotation_assignments_history")
                      .select("advisor_id, rotation_name, start_date, end_date, start_week_offset")
-                     .in("advisor_id", Array.from(STATE.teamMemberIds))
-                     .lte('start_date', dateRange[6]) // start date is on or before end of week
-                     .or(`end_date.is.null,end_date.gte.${mondayISO}`) // end date is null or after start of week
+                     .in("advisor_id", idsToFetch)
+                     .lte('start_date', dateRange[6]) 
+                     .or(`end_date.is.null,end_date.gte.${mondayISO}`)
         ]);
 
         // 2. Process and store the data in STATE
@@ -1866,12 +1872,13 @@ async function loadAndRender(){
         (patternsRes.data || []).forEach(p => {
             STATE.rotationPatterns[p.name] = p;
         });
-        
+
         // Process Assignments (Find the *effective* one for this week)
         STATE.assignments.clear();
         const assignments = assignmentsRes.data || [];
         
-        STATE.teamMemberIds.forEach(advId => {
+        // FIX: Loop through 'idsToFetch' so we process YOUR assignment too
+        idsToFetch.forEach(advId => {
             const relevantAssignments = assignments
                 .filter(a => a.advisor_id === advId)
                 .sort((a, b) => new Date(b.start_date) - new Date(a.start_date)); // Sort by start_date DESC
