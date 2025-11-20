@@ -1481,8 +1481,7 @@ async function identifyAdvisorAndTeam(user) {
         ELS.teamNamePill.textContent = `Team: ${STATE.advisorName}`;
         ELS.teamNamePill.style.display = '';
 
-        // ** NEW FEATURE: MULTI-SELECT WITH SITE TAGS **
-        // Updated query to fetch 'sites(name)' alongside leader details
+        // ** NEW FEATURE: MULTI-SELECT WITH SINGLE LINE TAGS **
         const { data: allLeaders } = await supabase
             .from("leaders")
             .select("id, name, sites (name)")
@@ -1491,16 +1490,22 @@ async function identifyAdvisorAndTeam(user) {
         if (allLeaders) {
             const listEl = document.getElementById('teamSelectorList');
             const btnEl = document.getElementById('teamSelectorBtn');
+            
+            // FIX: Force container to fit content on one line
+            listEl.style.minWidth = '100%';
+            listEl.style.width = 'max-content'; 
 
             // 1. Add "My Team" (Default Checked)
-            // We get my own site info from the list if possible, or leave blank
             const myInfo = allLeaders.find(l => l.id === STATE.advisorId);
             const mySiteName = myInfo && myInfo.sites ? myInfo.sites.name : '';
-            const mySiteTag = mySiteName ? `<span style="background:#F3F4F6; color:#4B5563; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-left:auto;">${mySiteName}</span>` : '';
+            // Styled tag: Smaller font, stays on one line
+            const mySiteTag = mySiteName ? `<span style="background:#F3F4F6; color:#6B7280; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-left:12px; flex-shrink:0;">${mySiteName}</span>` : '';
 
-            let html = `<label style="display:flex; align-items:center; padding:8px; cursor:pointer; border-bottom:1px solid #f3f4f6;">
-                            <input type="checkbox" value="${STATE.advisorId}" checked style="margin-right:8px;"> 
-                            <span style="font-weight:700; font-size:13px;">My Team</span>
+            let html = `<label style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; border-bottom:1px solid #f3f4f6; white-space:nowrap;">
+                            <div style="display:flex; align-items:center;">
+                                <input type="checkbox" value="${STATE.advisorId}" checked style="margin-right:8px;"> 
+                                <span style="font-weight:700; font-size:13px;">My Team</span>
+                            </div>
                             ${mySiteTag}
                         </label>`;
             
@@ -1508,11 +1513,13 @@ async function identifyAdvisorAndTeam(user) {
             allLeaders.forEach(l => {
                 if (l.id !== STATE.advisorId) {
                     const siteName = l.sites ? l.sites.name : '';
-                    const siteTag = siteName ? `<span style="background:#F3F4F6; color:#4B5563; padding:2px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-left:auto;">${siteName}</span>` : '';
+                    const siteTag = siteName ? `<span style="background:#F3F4F6; color:#6B7280; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-left:12px; flex-shrink:0;">${siteName}</span>` : '';
 
-                    html += `<label style="display:flex; align-items:center; padding:8px; cursor:pointer;">
-                                <input type="checkbox" value="${l.id}" style="margin-right:8px;"> 
-                                <span style="font-size:13px;">${l.name}</span>
+                    html += `<label style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; white-space:nowrap;">
+                                <div style="display:flex; align-items:center;">
+                                    <input type="checkbox" value="${l.id}" style="margin-right:8px;"> 
+                                    <span style="font-size:13px;">${l.name}</span>
+                                </div>
                                 ${siteTag}
                             </label>`;
                 }
@@ -1527,7 +1534,7 @@ async function identifyAdvisorAndTeam(user) {
                 if (checked.length === 0) btnEl.firstElementChild.textContent = "Select Team...";
                 else if (checked.length === 1) {
                     // Get the name ONLY (ignore the tag text)
-                    const label = checked[0].parentElement;
+                    const label = checked[0].closest('label');
                     const nameSpan = label.querySelector('span:not([style*="background"])'); 
                     btnEl.firstElementChild.textContent = nameSpan ? nameSpan.textContent : "1 Team Selected";
                 }
