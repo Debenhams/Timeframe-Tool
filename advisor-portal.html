@@ -2345,19 +2345,16 @@ function renderGanttSegments(segments) {
 // --- Realtime Updates (Ensuring functionality with Debounce) ---
 
 // This is the NEW function that shows the "sticky" alert
-function showUpdateNotification() {
+function showUpdateNotification(customMessage) {
     console.log("Showing sticky update notification.");
-
     // 1. Show the Favicon Badge
     showFaviconBadge();
-
-    // 2. Set the HTML to include the "Okay" button
+    // 2. Set the HTML to include the dynamic message and "Okay" button
     ELS.realtimeNote.innerHTML = `
-        Live Update: Your schedule for today has been changed.
+        ${customMessage}
         <button id="ackAlertBtn" class="btn secondary" style="margin-left: 16px; padding: 4px 10px;">Okay</button>
     `;
-
-    // 3. Show the banner (it will now stay until "Okay" is clicked)
+    // 3. Show the banner
     ELS.realtimeNote.style.display = 'block';
 }
 
@@ -2396,12 +2393,12 @@ async function startRealtime() {
             if (payload.payload) {
                 const update = payload.payload;
 
-                // --- UPDATED LOGIC: TEAM OR ME ---
+                // --- UPDATED LOGIC: SMART NAMED ALERTS ---
 
-                // 1. Check if the update is for my TEAM (Subordinates)
+                // 1. Check if the update is for the VIEWED TEAM
                 const isForMyTeam = STATE.teamMemberIds.has(update.advisor_id);
                 
-                // 2. Check if the update is for ME (The User)
+                // 2. Check if the update is for ME
                 const isForMe = update.advisor_id == STATE.advisorId;
 
                 // 3. Process if it matches EITHER
@@ -2409,10 +2406,22 @@ async function startRealtime() {
                     // Reload data (Background refresh)
                     loadAndRender();
 
-                    // Check for personal alert (Only if it's ME and TODAY)
-                    const isForToday = update.date == TODAY_ISO;
-                    if (isForMe && isForToday) {
-                        showUpdateNotification();
+                    // Check for alert (Only if TODAY)
+                    if (update.date == TODAY_ISO) {
+                        let msg = "";
+                        
+                        if (isForMe) {
+                            msg = "Live Update: <strong>Your</strong> schedule for today has been changed.";
+                        } else {
+                            // Lookup the name from the local state
+                            // (Note: STATE.teamMembers contains the list of people currently being viewed)
+                            const member = STATE.teamMembers.find(m => m.id == update.advisor_id);
+                            const name = member ? member.name : "A Team Member";
+                            msg = `Live Update: <strong>${name}'s</strong> schedule for today has been changed.`;
+                        }
+                        
+                        // Trigger the banner with the specific name
+                        showUpdateNotification(msg);
                     }
                 } else {
                     console.log("Ignoring update (not for me or my team).");
