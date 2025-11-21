@@ -877,12 +877,35 @@ display: flex;
                     <label for="emailInput">Email Address</label>
                     <input type="email" id="emailInput" class="form-input" placeholder="Enter your work email" autofocus>
                 </div>
+               
                 <div class="form-group">
                     <label for="passwordInput">Password</label>
                     <input type="password" id="passwordInput" class="form-input" placeholder="Enter your password">
-                    <span class="auth-link" onclick="toggleAuthView('forgot')">Forgot Password?</span>
+                    <div style="display:flex; justify-content:space-between; margin-top:8px;">
+                        <span class="auth-link" onclick="toggleAuthView('forgot')">Forgot Password?</span>
+                        <span class="auth-link" onclick="toggleAuthView('signup')" style="color: var(--brand-primary); font-weight:600;">First Time Login?</span>
+                    </div>
                 </div>
+            
                 <button type="submit" id="signInBtn" class="btn-login">Sign In</button>
+            </form>
+        </div>
+
+        <div id="signUpView" style="display:none;">
+             <form id="signup-form" class="auth-form">
+                <p class="auth-welcome"><strong>Setup Account</strong><br>Enter your email and create a new password.</p>
+
+                <div class="form-group">
+                    <label for="signupEmailInput">Email Address</label>
+                    <input type="email" id="signupEmailInput" class="form-input" placeholder="Enter your work email">
+                </div>
+                <div class="form-group">
+                    <label for="signupPasswordInput">Create Password</label>
+                    <input type="password" id="signupPasswordInput" class="form-input" placeholder="Min 6 characters">
+                </div>
+           
+                <button type="submit" id="signUpBtn" class="btn-login">Create Account</button>
+                <span class="auth-link" onclick="toggleAuthView('signin')">Back to Sign In</span>
             </form>
         </div>
 
@@ -1605,14 +1628,14 @@ async function identifyAdvisorAndTeam(user) {
 
 function setupAuthUIEvents() {
     if (ELS.authForm) {
-        ELS.authForm.addEventListener('submit', handleSignInWithPassword);
-    }
-    if (ELS.forgotPasswordForm) {
-        ELS.forgotPasswordForm.addEventListener('submit', handleForgotPasswordRequest);
-    }
-    if (ELS.updatePasswordForm) {
-         ELS.updatePasswordForm.addEventListener('submit', handlePasswordUpdate);
-    }
+        if (ELS.authForm) ELS.authForm.addEventListener('submit', handleSignInWithPassword);
+    if (ELS.forgotPasswordForm) ELS.forgotPasswordForm.addEventListener('submit', handleForgotPasswordRequest);
+    if (ELS.updatePasswordForm) ELS.updatePasswordForm.addEventListener('submit', handlePasswordUpdate);
+    
+    // NEW LISTENER
+    const signUpForm = document.getElementById('signup-form');
+    if (signUpForm) signUpForm.addEventListener('submit', handleSignUp);
+}
 }
 
 // Toggle between Auth views
@@ -1621,21 +1644,28 @@ function toggleAuthView(view) {
     ELS.signInView.style.display = 'none';
     ELS.forgotPasswordView.style.display = 'none';
     ELS.updatePasswordView.style.display = 'none';
+    
+    // Use getElementById directly since we just added this ID
+    const signUpView = document.getElementById('signUpView');
+    if(signUpView) signUpView.style.display = 'none';
 
     if (view === 'forgot') {
         ELS.forgotPasswordView.style.display = 'block';
-        if (ELS.emailInput.value) {
-            ELS.resetEmailInput.value = ELS.emailInput.value;
-        }
+        if (ELS.emailInput.value) ELS.resetEmailInput.value = ELS.emailInput.value;
         ELS.resetEmailInput.focus();
     } else if (view === 'update') {
         ELS.updatePasswordView.style.display = 'block';
         ELS.newPasswordInput.focus();
+    } else if (view === 'signup') {
+        if(signUpView) signUpView.style.display = 'block';
+        const signUpInput = document.getElementById('signupEmailInput');
+        if(signUpInput) signUpInput.focus();
     } else {
         ELS.signInView.style.display = 'block';
         ELS.emailInput.focus();
     }
 }
+
 // Expose toggle function to global scope for onclick attribute
 window.toggleAuthView = toggleAuthView;
 
@@ -1918,6 +1948,49 @@ async function handlePasswordUpdate(event) {
     }
 }
 
+async function handleSignUp(event) {
+    event.preventDefault();
+    ELS.authNotice.style.display = 'none';
+    
+    const email = document.getElementById('signupEmailInput').value.trim();
+    const password = document.getElementById('signupPasswordInput').value;
+    const btn = document.getElementById('signUpBtn');
+
+    if (!email || !password || password.length < 6) {
+        ELS.authNotice.textContent = "Please enter a valid email and a password (min 6 chars).";
+        ELS.authNotice.className = 'auth-notice error';
+        ELS.authNotice.style.display = 'block';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Creating...";
+
+    try {
+        const { data, error } = await supabase.auth.signUp({
+            email: email,
+            password: password,
+        });
+
+        if (error) throw error;
+
+        // Success message
+        ELS.authNotice.innerHTML = "<strong>Success!</strong><br>A confirmation link has been sent to " + email + ".<br>Please check your inbox to log in.";
+        ELS.authNotice.className = 'auth-notice success';
+        ELS.authNotice.style.display = 'block';
+        
+        // Clear inputs
+        document.getElementById('signupPasswordInput').value = '';
+
+    } catch (e) {
+        ELS.authNotice.textContent = "Error: " + e.message;
+        ELS.authNotice.className = 'auth-notice error';
+        ELS.authNotice.style.display = 'block';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Create Account";
+    }
+}
 
 async function handleSignOut(){
     await stopRealtime();
