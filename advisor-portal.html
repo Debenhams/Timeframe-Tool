@@ -1494,129 +1494,152 @@ async function identifyAdvisorAndTeam(user) {
     if (advisorDetails) {
         STATE.advisorName = advisorDetails.name;
         STATE.leaderId = advisorDetails.leader_id;
-        // --- NEW LOGIC: SUBORDINATES & TEAM SELECTOR (ATL FIX) ---
-    
-    // 1. Check if people report to me (Subordinates)
-    const { data: mySubordinates } = await supabase
-        .from("advisors")
-        .select("id, name")
-        .eq("leader_id", STATE.advisorId)
-        .order('name');
 
-    // 2. Check if I am explicitly listed in the 'leaders' table (For ATLs with no team)
-    const { data: meAsLeader } = await supabase
-        .from("leaders")
-        .select("id")
-        .eq("id", STATE.advisorId)
-        .maybeSingle();
-
-    // Determine if I am a Leader (either have subordinates OR am in the leaders table)
-    const isLeader = (mySubordinates && mySubordinates.length > 0) || !!meAsLeader;
-
-    if (isLeader) {
-        // SCENARIO: I AM A TEAM LEADER OR ATL
+        // --- NEW LOGIC: NAME-BASED MULTI-TEAM + DIRECTOR ---
         
-        if (mySubordinates && mySubordinates.length > 0) {
-            // I have a team, show them
-            STATE.teamMembers = mySubordinates;
-        } else {
-            // I am an ATL with no team yet. 
-            // Show MYSELF in the team view so the grid isn't empty and the button works.
-            STATE.teamMembers = [{ id: STATE.advisorId, name: STATE.advisorName }];
-        }
-        
-        STATE.teamMemberIds = new Set(STATE.teamMembers.map(t => t.id));
-        
-        ELS.teamNamePill.textContent = `Team: ${STATE.advisorName}`;
-        ELS.teamNamePill.style.display = '';
-
-        // ** NEW FEATURE: MULTI-SELECT WITH SINGLE LINE TAGS **
-        const { data: allLeaders } = await supabase
+        // 1. Find ALL Leader IDs that match my Name (Fix for Leaders with 2+ Teams)
+        const { data: myLeaderIdentities } = await supabase
             .from("leaders")
-            .select("id, name, sites (name)")
-            .order("name");
+            .select("id, name")
+            .eq("name", STATE.advisorName); 
 
-        if (allLeaders) {
-            const listEl = document.getElementById('teamSelectorList');
-            const btnEl = document.getElementById('teamSelectorBtn');
+        // 2. Check for direct subordinates (Standard check)
+        const { data: directSubordinates } = await supabase
+            .from("advisors")
+            .select("id")
+            .eq("leader_id", STATE.advisorId);
+
+        // 3. Check if I am explicitly listed in 'leaders' (Fix for ATLs) + Check Role
+        const { data: meAsLeader } = await supabase
+            .from("leaders")
+            .select("id, role")
+            .eq("id", STATE.advisorId)
+            .maybeSingle();
+
+        const isDirector = meAsLeader && meAsLeader.role === 'Director';
+        // I am a leader if: (I have name matches) OR (I have subordinates) OR (I am in the leaders table)
+        const isLeader = (myLeaderIdentities && myLeaderIdentities.length > 0) || (directSubordinates && directSubordinates.length > 0) || !!meAsLeader;
+
+        if (isDirector) {
+             // === SCENARIO: DIRECTOR ===
+             STATE.isDirector = true;
+             STATE.teamMembers = []; // Placeholder, Dashboard will handle data
+             ELS.teamNamePill.textContent = `Director Mode: ${STATE.advisorName}`;
+             ELS.teamNamePill.style.color = '#F59E0B'; // Gold
+             ELS.teamNamePill.style.display = '';
+             
+        } else if (isLeader) {
+            // === SCENARIO: TEAM LEADER / ATL ===
+            STATE.isDirector = false;
             
-            // FIX: Force container to fit content on one line
-            listEl.style.minWidth = '100%';
-            listEl.style.width = 'max-content'; 
+            // A. Gather ALL my Leader IDs (Login ID + Any IDs found by Name)
+            const myIds = new Set();
+            myIds.add(STATE.advisorId); 
+            if (myLeaderIdentities) {
+                myLeaderIdentities.forEach(identity => myIds.add(identity.id));
+            }
+            const myIdArray = Array.from(myIds);
 
-            // 1. Add "My Team" (Default Checked)
-            const myInfo = allLeaders.find(l => l.id === STATE.advisorId);
-            const mySiteName = myInfo && myInfo.sites ? myInfo.sites.name : '';
-            // Styled tag: Smaller font, stays on one line
-            const mySiteTag = mySiteName ? `<span style="background:#F3F4F6; color:#6B7280; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-left:12px; flex-shrink:0;">${mySiteName}</span>` : '';
+            // B. Fetch ALL staff reporting to ANY of my IDs
+            const { data: allMyTeams } = await supabase
+                .from("advisors")
+                .select("id, name")
+                .in("leader_id", myIdArray)
+                .order('name');
 
-            let html = `<label style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; border-bottom:1px solid #f3f4f6; white-space:nowrap;">
-                            <div style="display:flex; align-items:center;">
-                                <input type="checkbox" value="${STATE.advisorId}" checked style="margin-right:8px;"> 
-                                <span style="font-weight:700; font-size:13px;">My Team</span>
-                            </div>
-                            ${mySiteTag}
-                        </label>`;
+            if (allMyTeams && allMyTeams.length > 0) {
+                STATE.teamMembers = allMyTeams;
+            } else {
+                // ATL with no team yet -> Show myself so grid isn't empty
+                STATE.teamMembers = [{ id: STATE.advisorId, name: STATE.advisorName }];
+            }
             
-            // 2. Add Other Leaders
-            allLeaders.forEach(l => {
-                if (l.id !== STATE.advisorId) {
-                    const siteName = l.sites ? l.sites.name : '';
-                    const siteTag = siteName ? `<span style="background:#F3F4F6; color:#6B7280; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-left:12px; flex-shrink:0;">${siteName}</span>` : '';
-
-                    html += `<label style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; white-space:nowrap;">
-                                <div style="display:flex; align-items:center;">
-                                    <input type="checkbox" value="${l.id}" style="margin-right:8px;"> 
-                                    <span style="font-size:13px;">${l.name}</span>
-                                </div>
-                                ${siteTag}
-                            </label>`;
-                }
-            });
+            STATE.teamMemberIds = new Set(STATE.teamMembers.map(t => t.id));
             
-            listEl.innerHTML = html;
-            document.getElementById('teamSelectorGroup').style.display = 'flex';
-
-            // Helper to update button text based on selection
-            window.updateTeamBtnText = () => {
-                const checked = listEl.querySelectorAll('input[type="checkbox"]:checked');
-                if (checked.length === 0) btnEl.firstElementChild.textContent = "Select Team...";
-                else if (checked.length === 1) {
-                    // Get the name ONLY (ignore the tag text)
-                    const label = checked[0].closest('label');
-                    const nameSpan = label.querySelector('span:not([style*="background"])'); 
-                    btnEl.firstElementChild.textContent = nameSpan ? nameSpan.textContent : "1 Team Selected";
-                }
-                else btnEl.firstElementChild.textContent = `${checked.length} Teams Selected`;
-            };
-        }
-        
-        
-        
-    } else {
-        // SCENARIO: I AM A REGULAR ADVISOR (No Dropdown)
-        if (!STATE.leaderId) {
-             ELS.teamToggleBtn.disabled = true;
-             ELS.teamToggleBtn.classList.add('disabled');
-             return;
-        }
-
-        const [teamRes, leaderRes] = await Promise.all([
-            supabase.from("advisors").select("id, name").eq("leader_id", STATE.leaderId).order('name'),
-            supabase.from("leaders").select("name").eq("id", STATE.leaderId).maybeSingle()
-        ]);
-
-        if (teamRes.data) {
-            STATE.teamMembers = teamRes.data;
-            STATE.teamMemberIds = new Set(teamRes.data.map(t => t.id));
-        }
-        
-        if (leaderRes.data) {
-            ELS.teamNamePill.textContent = `Team: ${leaderRes.data.name}`;
+            ELS.teamNamePill.textContent = `Team: ${STATE.advisorName}`;
             ELS.teamNamePill.style.display = '';
+
+            // C. Render the Dropdown (With One-Line Tags)
+            const { data: allLeaders } = await supabase
+                .from("leaders")
+                .select("id, name, sites (name)")
+                .order("name");
+
+            if (allLeaders) {
+                const listEl = document.getElementById('teamSelectorList');
+                const btnEl = document.getElementById('teamSelectorBtn');
+                
+                listEl.style.minWidth = '100%';
+                listEl.style.width = 'max-content'; 
+
+                // Add "My Team"
+                const myInfo = allLeaders.find(l => l.id === STATE.advisorId);
+                const mySiteName = myInfo && myInfo.sites ? myInfo.sites.name : '';
+                const mySiteTag = mySiteName ? `<span style="background:#F3F4F6; color:#6B7280; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-left:12px; flex-shrink:0;">${mySiteName}</span>` : '';
+
+                let html = `<label style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; border-bottom:1px solid #f3f4f6; white-space:nowrap;">
+                                <div style="display:flex; align-items:center;">
+                                    <input type="checkbox" value="${STATE.advisorId}" checked style="margin-right:8px;"> 
+                                    <span style="font-weight:700; font-size:13px;">My Team (Combined)</span>
+                                </div>
+                                ${mySiteTag}
+                            </label>`;
+                
+                // Add Other Leaders
+                allLeaders.forEach(l => {
+                    // Don't list myself again
+                    if (l.name !== STATE.advisorName) {
+                        const siteName = l.sites ? l.sites.name : '';
+                        const siteTag = siteName ? `<span style="background:#F3F4F6; color:#6B7280; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-left:12px; flex-shrink:0;">${siteName}</span>` : '';
+
+                        html += `<label style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; white-space:nowrap;">
+                                    <div style="display:flex; align-items:center;">
+                                        <input type="checkbox" value="${l.id}" style="margin-right:8px;"> 
+                                        <span style="font-size:13px;">${l.name}</span>
+                                    </div>
+                                    ${siteTag}
+                                </label>`;
+                    }
+                });
+                
+                listEl.innerHTML = html;
+                document.getElementById('teamSelectorGroup').style.display = 'flex';
+
+                window.updateTeamBtnText = () => {
+                    const checked = listEl.querySelectorAll('input[type="checkbox"]:checked');
+                    if (checked.length === 0) btnEl.firstElementChild.textContent = "Select Team...";
+                    else if (checked.length === 1) {
+                        const label = checked[0].closest('label');
+                        const nameSpan = label.querySelector('span:not([style*="background"])'); 
+                        btnEl.firstElementChild.textContent = nameSpan ? nameSpan.textContent : "1 Team Selected";
+                    }
+                    else btnEl.firstElementChild.textContent = `${checked.length} Teams Selected`;
+                };
+            }
+            
+        } else {
+            // === SCENARIO: REGULAR ADVISOR ===
+            if (!STATE.leaderId) {
+                 ELS.teamToggleBtn.disabled = true;
+                 ELS.teamToggleBtn.classList.add('disabled');
+                 return;
+            }
+
+            const [teamRes, leaderRes] = await Promise.all([
+                supabase.from("advisors").select("id, name").eq("leader_id", STATE.leaderId).order('name'),
+                supabase.from("leaders").select("name").eq("id", STATE.leaderId).maybeSingle()
+            ]);
+
+            if (teamRes.data) {
+                STATE.teamMembers = teamRes.data;
+                STATE.teamMemberIds = new Set(teamRes.data.map(t => t.id));
+            }
+            
+            if (leaderRes.data) {
+                ELS.teamNamePill.textContent = `Team: ${leaderRes.data.name}`;
+                ELS.teamNamePill.style.display = '';
+            }
         }
-    }
-    // --- END NEW LOGIC ---
     }
 
 
