@@ -822,7 +822,33 @@ display: flex;
     flex-shrink: 0; /* Prevent blocks from squishing */
 }
 /* === END FIX === */
-
+/* Explicit Rest Day Indicator (Striped) */
+.timeline-rdo-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    /* Diagonal Grey Stripes Pattern */
+    background-image: repeating-linear-gradient(
+        45deg,
+        rgba(0, 0, 0, 0.03),
+        rgba(0, 0, 0, 0.03) 10px,
+        rgba(0, 0, 0, 0.06) 10px,
+        rgba(0, 0, 0, 0.06) 20px
+    );
+    
+    color: #9CA3AF; 
+    font-weight: 700; 
+    font-size: 12px; 
+    letter-spacing: 1px;
+    user-select: none;
+    z-index: 0;
+}
   </style>
 </head>
 <body>
@@ -2285,7 +2311,6 @@ function renderGanttTimeHeader(headerElement) {
 
 function renderGanttSegments(segments) {
     if (!segments || segments.length === 0) {
-        // FIX: Return visual indicator instead of empty string
         return '<div class="timeline-rdo-fill">RDO</div>';
     }
     
