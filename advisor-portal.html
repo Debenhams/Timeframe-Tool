@@ -2370,30 +2370,28 @@ async function startRealtime() {
             if (payload.payload) {
                 const update = payload.payload;
 
-                // --- THIS IS THE NEW LOGIC ---
+                // --- UPDATED LOGIC: TEAM OR ME ---
 
-                // 1. Check if the update is for ANYONE on my team
-                //    (STATE.teamMemberIds was loaded when you logged in)
+                // 1. Check if the update is for my TEAM (Subordinates)
                 const isForMyTeam = STATE.teamMemberIds.has(update.advisor_id);
+                
+                // 2. Check if the update is for ME (The User)
+                const isForMe = update.advisor_id == STATE.advisorId;
 
-                if (isForMyTeam) {
-                    // 2. ALWAYS reload the data silently in the background
-                    // This makes the "Team Schedule" tab (and "My Schedule") update instantly.
+                // 3. Process if it matches EITHER
+                if (isForMyTeam || isForMe) {
+                    // Reload data (Background refresh)
                     loadAndRender();
 
-                    // 3. Now, check if a *personal alert* is needed
-                    const isForMe = update.advisor_id == STATE.advisorId;
+                    // Check for personal alert (Only if it's ME and TODAY)
                     const isForToday = update.date == TODAY_ISO;
-
                     if (isForMe && isForToday) {
-                        // Only show the sticky red alert if it's for ME and for TODAY
                         showUpdateNotification();
                     }
-
                 } else {
-                    console.log("Ignoring update (not for my team).");
+                    console.log("Ignoring update (not for me or my team).");
                 }
-                // --- END OF NEW LOGIC ---
+                
             }
         }
     );
