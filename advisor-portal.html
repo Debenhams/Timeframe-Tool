@@ -2285,7 +2285,8 @@ function renderGanttTimeHeader(headerElement) {
 
 function renderGanttSegments(segments) {
     if (!segments || segments.length === 0) {
-        return '';
+        // FIX: Return visual indicator instead of empty string
+        return '<div class="timeline-rdo-fill">RDO</div>';
     }
     
     return segments.map(seg => {
