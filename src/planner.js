@@ -946,20 +946,23 @@ const { data, error } = await APP.DataService.updateRecord('schedule_components'
 
         // Loop through each leader to create team groups
         leaders.forEach(leader => {
+            // Get this leader's team first
+            const teamAdvisors = APP.StateManager.getAdvisorsByLeader(leader.id);
+
+            // FIX: If this leader has NO advisors, skip them entirely (Hide empty header)
+            if (teamAdvisors.length === 0) return;
+
             // Get the site/brand name, or use an empty string if it doesn't exist
             const brandName = (leader.sites && leader.sites.name) ? `(${leader.sites.name})` : '';
 
             // Add a header row for the team
             html += `
-                <tr class="team-header-row">
+                 <tr class="team-header-row">
                     <td colspan="6">${leader.name}'s Team ${brandName}</td>
                 </tr>
             `;
 
-            // Get and sort this leader's team
-
-            // Get and sort this leader's team
-            const teamAdvisors = APP.StateManager.getAdvisorsByLeader(leader.id);
+            // Sort the team alphabetically
             teamAdvisors.sort((a, b) => a.name.localeCompare(b.name));
 
             // Now loop through just this team's advisors

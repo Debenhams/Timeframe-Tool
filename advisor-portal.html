@@ -1559,63 +1559,71 @@ async function identifyAdvisorAndTeam(user) {
             ELS.teamNamePill.textContent = `Team: ${STATE.advisorName}`;
             ELS.teamNamePill.style.display = '';
 
-            // C. Render the Dropdown (With One-Line Tags)
-            const { data: allLeaders } = await supabase
-                .from("leaders")
-                .select("id, name, sites (name)")
-                .order("name");
+            // ** NEW FEATURE: MULTI-SELECT (FILTERED - HIDES EMPTY TEAMS) **
+        
+        // 1. Fetch Leaders AND check who actually has staff assigned
+        const [ { data: allLeaders }, { data: staffAssignments } ] = await Promise.all([
+            supabase.from("leaders").select("id, name, sites (name)").order("name"),
+            supabase.from("advisors").select("leader_id") // Get list of used leader IDs
+        ]);
 
-            if (allLeaders) {
-                const listEl = document.getElementById('teamSelectorList');
-                const btnEl = document.getElementById('teamSelectorBtn');
-                
-                listEl.style.minWidth = '100%';
-                listEl.style.width = 'max-content'; 
+        // Create a "Set" of ID's that have at least one team member
+        const leadersWithTeam = new Set();
+        if (staffAssignments) {
+            staffAssignments.forEach(s => leadersWithTeam.add(s.leader_id));
+        }
 
-                // Add "My Team"
-                const myInfo = allLeaders.find(l => l.id === STATE.advisorId);
-                const mySiteName = myInfo && myInfo.sites ? myInfo.sites.name : '';
-                const mySiteTag = mySiteName ? `<span style="background:#F3F4F6; color:#6B7280; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-left:12px; flex-shrink:0;">${mySiteName}</span>` : '';
+        if (allLeaders) {
+            const listEl = document.getElementById('teamSelectorList');
+            const btnEl = document.getElementById('teamSelectorBtn');
+            
+            listEl.style.minWidth = '100%';
+            listEl.style.width = 'max-content'; 
 
-                let html = `<label style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; border-bottom:1px solid #f3f4f6; white-space:nowrap;">
+            // 1. Add "My Team" (Always show myself)
+            const myInfo = allLeaders.find(l => l.id === STATE.advisorId);
+            const mySiteName = myInfo && myInfo.sites ? myInfo.sites.name : '';
+            const mySiteTag = mySiteName ? `<span style="background:#F3F4F6; color:#6B7280; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-left:12px; flex-shrink:0;">${mySiteName}</span>` : '';
+
+            let html = `<label style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; border-bottom:1px solid #f3f4f6; white-space:nowrap;">
+                            <div style="display:flex; align-items:center;">
+                                <input type="checkbox" value="${STATE.advisorId}" checked style="margin-right:8px;"> 
+                                <span style="font-weight:700; font-size:13px;">My Team (Combined)</span>
+                            </div>
+                            ${mySiteTag}
+                        </label>`;
+            
+            // 2. Add Other Leaders (ONLY if they have a team)
+            allLeaders.forEach(l => {
+                // Show if: (It's NOT me) AND (They have staff in the Set)
+                if (l.id !== STATE.advisorId && leadersWithTeam.has(l.id)) {
+                    const siteName = l.sites ? l.sites.name : '';
+                    const siteTag = siteName ? `<span style="background:#F3F4F6; color:#6B7280; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-left:12px; flex-shrink:0;">${siteName}</span>` : '';
+
+                    html += `<label style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; white-space:nowrap;">
                                 <div style="display:flex; align-items:center;">
-                                    <input type="checkbox" value="${STATE.advisorId}" checked style="margin-right:8px;"> 
-                                    <span style="font-weight:700; font-size:13px;">My Team (Combined)</span>
+                                    <input type="checkbox" value="${l.id}" style="margin-right:8px;"> 
+                                    <span style="font-size:13px;">${l.name}</span>
                                 </div>
-                                ${mySiteTag}
+                                ${siteTag}
                             </label>`;
-                
-                // Add Other Leaders
-                allLeaders.forEach(l => {
-                    // Don't list myself again
-                    if (l.name !== STATE.advisorName) {
-                        const siteName = l.sites ? l.sites.name : '';
-                        const siteTag = siteName ? `<span style="background:#F3F4F6; color:#6B7280; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-left:12px; flex-shrink:0;">${siteName}</span>` : '';
+                }
+            });
+            
+            listEl.innerHTML = html;
+            document.getElementById('teamSelectorGroup').style.display = 'flex';
 
-                        html += `<label style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; white-space:nowrap;">
-                                    <div style="display:flex; align-items:center;">
-                                        <input type="checkbox" value="${l.id}" style="margin-right:8px;"> 
-                                        <span style="font-size:13px;">${l.name}</span>
-                                    </div>
-                                    ${siteTag}
-                                </label>`;
-                    }
-                });
-                
-                listEl.innerHTML = html;
-                document.getElementById('teamSelectorGroup').style.display = 'flex';
-
-                window.updateTeamBtnText = () => {
-                    const checked = listEl.querySelectorAll('input[type="checkbox"]:checked');
-                    if (checked.length === 0) btnEl.firstElementChild.textContent = "Select Team...";
-                    else if (checked.length === 1) {
-                        const label = checked[0].closest('label');
-                        const nameSpan = label.querySelector('span:not([style*="background"])'); 
-                        btnEl.firstElementChild.textContent = nameSpan ? nameSpan.textContent : "1 Team Selected";
-                    }
-                    else btnEl.firstElementChild.textContent = `${checked.length} Teams Selected`;
-                };
-            }
+            window.updateTeamBtnText = () => {
+                const checked = listEl.querySelectorAll('input[type="checkbox"]:checked');
+                if (checked.length === 0) btnEl.firstElementChild.textContent = "Select Team...";
+                else if (checked.length === 1) {
+                    const label = checked[0].closest('label');
+                    const nameSpan = label.querySelector('span:not([style*="background"])'); 
+                    btnEl.firstElementChild.textContent = nameSpan ? nameSpan.textContent : "1 Team Selected";
+                }
+                else btnEl.firstElementChild.textContent = `${checked.length} Teams Selected`;
+            };
+        }
             
         } else {
             // === SCENARIO: REGULAR ADVISOR ===
