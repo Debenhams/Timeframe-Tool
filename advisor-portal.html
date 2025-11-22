@@ -2011,6 +2011,10 @@ async function handleSignUp(event) {
         const { data, error } = await supabase.auth.signUp({
             email: email,
             password: password,
+            options: {
+                // Fix 404: Force the email link to come back to THIS exact page
+                emailRedirectTo: window.location.href 
+            }
         });
 
         if (error) throw error;
