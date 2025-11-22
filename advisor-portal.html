@@ -2623,6 +2623,10 @@ function drawTeamDailyGantt() {
     const dayIndex = STATE.teamViewDayIndex;
     const dayName = DAYS[dayIndex];
     const mondayISO = STATE.currentWeekData.mondayISO;
+    
+    // FIX: Calculate specific date for the selected day view
+    const specificDate = addDays(new Date(mondayISO + "T00:00:00"), dayIndex);
+    const specificDateISO = fmtDateLocal(specificDate);
 
     // Setup the structure for the Gantt chart
     let html = `
@@ -2644,9 +2648,10 @@ function drawTeamDailyGantt() {
 
     // Render the time header (05:00 - 23:00)
     renderGanttTimeHeader(ELS_GANTT.timeHeader);
-    
+
     // Render the rows
     let bodyHtml = '';
+
     STATE.teamMembers.forEach(member => {
         // Calculate segments for the specific day
         const segments = calculateLiveSegments(member.id, dayName, mondayISO);
@@ -2659,7 +2664,7 @@ function drawTeamDailyGantt() {
         <div class="timeline-row" style="${rowStyle}">
             <div class="timeline-name">${member.name} ${isCurrentUser ? '<span class="tag">(You)</span>' : ''}</div>
             <div class="timeline-track">
-                ${renderGanttSegments(segments, member.id, mondayISO)}
+                ${renderGanttSegments(segments, member.id, specificDateISO)}
             </div>
         </div>
         `;
@@ -2943,38 +2948,38 @@ async function startRealtime() {
             if (payload.payload) {
                 const update = payload.payload;
 
-                // --- UPDATED LOGIC: SMART NAMED ALERTS ---
+                // --- UPDATED LOGIC: DIRECTOR & TEAM ALERTS ---
 
-                // 1. Check if the update is for the VIEWED TEAM
+                // 1. Check matches
                 const isForMyTeam = STATE.teamMemberIds.has(update.advisor_id);
-                
-                // 2. Check if the update is for ME
                 const isForMe = update.advisor_id == STATE.advisorId;
 
-                // 3. Process if it matches EITHER
-                if (isForMyTeam || isForMe) {
-                    // Reload data (Background refresh)
+                // 2. Gatekeeper: Reload Data
+                // Director gets EVERYTHING (for Dashboard). Leaders get Team + Self.
+                if (STATE.isDirector || isForMyTeam || isForMe) {
+                    
+                    // A. Reload data silently (Background refresh)
                     loadAndRender();
 
-                    // Check for alert (Only if TODAY)
+                    // B. Handle Alerts (Red Banner)
+                    // Director Request: "He doesnt need alerts" -> Skip for Director unless it's his own.
+                    if (STATE.isDirector && !isForMe) return;
+
+                    // For others: Check if today
                     if (update.date == TODAY_ISO) {
                         let msg = "";
-                        
                         if (isForMe) {
                             msg = "Live Update: <strong>Your</strong> schedule for today has been changed.";
                         } else {
-                            // Lookup the name from the local state
-                            // (Note: STATE.teamMembers contains the list of people currently being viewed)
+                            // Lookup name
                             const member = STATE.teamMembers.find(m => m.id == update.advisor_id);
                             const name = member ? member.name : "A Team Member";
                             msg = `Live Update: <strong>${name}'s</strong> schedule for today has been changed.`;
                         }
-                        
-                        // Trigger the banner with the specific name
                         showUpdateNotification(msg);
                     }
                 } else {
-                    console.log("Ignoring update (not for me or my team).");
+                    console.log("Ignoring update (irrelevant to current view).");
                 }
                 
             }
