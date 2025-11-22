@@ -1934,6 +1934,15 @@ ELS.realtimeNote.addEventListener('click', (e) => {
 
             if (selectedIds.length === 0) {
                  ELS.teamScheduleContainer.innerHTML = `<div class="notice info" style="margin: 24px;">Please select at least one team.</div>`;
+                 
+                 // FIX: Reset the Header Label when empty
+                 if (STATE.isDirector) {
+                     ELS.teamNamePill.textContent = `Director Mode: ${STATE.advisorName}`;
+                     ELS.teamNamePill.style.color = '#F59E0B'; // Gold
+                 } else {
+                     ELS.teamNamePill.textContent = `Team: ${STATE.advisorName}`;
+                     ELS.teamNamePill.style.color = ''; // Reset to default white
+                 }
                  return;
             }
 
