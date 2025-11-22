@@ -2178,6 +2178,7 @@ async function handleSignUp(event) {
 
 async function handleSignOut(){
     await stopRealtime();
+    
     await supabase.auth.signOut();
     location.href = location.pathname;
 }
@@ -2729,6 +2730,7 @@ async function calculateDirectorStats() {
         if (siteCoverage < 70) statusClass = 'red';
 
         gridHtml += `
+        <div class="dir-brand-card" onclick="jumpToSiteSchedule('${site}')">
             <div class="dir-brand-card">
                 <div class="dir-brand-header">
                     <div class="dir-brand-name">${site}</div>
@@ -2944,7 +2946,41 @@ async function stopRealtime() {
         STATE.rotaRealtimeChannel = null;
     }
 }
+// --- DIRECTOR FEATURE: JUMP TO SITE ---
+window.jumpToSiteSchedule = (siteName) => {
+    console.log("Jumping to site:", siteName);
+    
+    // 1. Switch to Team Schedule Tab
+    switchTab('tab-team-schedule');
 
+    // 2. Find the Dropdown List
+    const list = document.getElementById('teamSelectorList');
+    const boxes = list.querySelectorAll('input[type="checkbox"]:not(#selectAllTeams)');
+    const selectAll = document.getElementById('selectAllTeams');
+    if (selectAll) selectAll.checked = false; // Reset master toggle
+
+    // 3. Loop through all boxes and tick ONLY the ones matching the Site Name
+    let count = 0;
+    boxes.forEach(box => {
+        const label = box.closest('label');
+        // Find the grey tag inside the label
+        const tag = label.querySelector('span[style*="background"]');
+        
+        if (tag && tag.textContent.trim() === siteName) {
+            box.checked = true;
+            count++;
+        } else {
+            box.checked = false;
+        }
+    });
+
+    // 4. Update the Button Text manually
+    const btn = document.getElementById('teamSelectorBtn');
+    if (btn) btn.firstElementChild.textContent = `Viewing: ${siteName} (${count} Teams)`;
+
+    // 5. Trigger the "Change" event to force the grid to reload with new selection
+    list.dispatchEvent(new Event('change'));
+};
 
 // --- Initialization Trigger ---
 document.addEventListener("DOMContentLoaded", init);
