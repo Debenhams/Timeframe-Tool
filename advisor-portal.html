@@ -902,8 +902,10 @@ display: flex;
     
     .dir-brand-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
         gap: 20px;
+        width: 100%; /* Force full width */
+        padding-bottom: 20px; /* Add breathing room at bottom */
     }
 
     .dir-brand-card {
