@@ -1240,8 +1240,12 @@ display: flex;
             </div>
         </div>
 
-        <div style="margin-top:16px; border-top:1px solid #eee; padding-top:16px;">
-            <button class="btn" style="width:100%; background-color: #2563EB;" onclick="handleDirectorSave()">Update Schedule</button>
+        <div style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; display:flex; gap:12px;">
+            <button type="button" class="btn btn-secondary" onclick="handleDirectorUndo()" id="btnDirectorUndo" disabled style="flex:1; opacity:0.7;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
+                Undo
+            </button>
+            <button type="button" class="btn" style="flex:2; background-color: #2563EB;" onclick="handleDirectorSave()" id="btnDirectorSave">Update Schedule</button>
         </div>
 
       </div>
@@ -2947,41 +2951,31 @@ async function startRealtime() {
 
             if (payload.payload) {
                 const update = payload.payload;
+                console.log("Realtime update received:", update.type);
 
-                // --- UPDATED LOGIC: DIRECTOR & TEAM ALERTS ---
-
-                // 1. Check matches
+                // --- DIRECTOR & TEAM ALERTS ---
                 const isForMyTeam = STATE.teamMemberIds.has(update.advisor_id);
                 const isForMe = update.advisor_id == STATE.advisorId;
 
-                // 2. Gatekeeper: Reload Data
-                // Director gets EVERYTHING (for Dashboard). Leaders get Team + Self.
+                // GATEKEEPER: Director gets EVERYTHING. Leaders get Team + Self.
                 if (STATE.isDirector || isForMyTeam || isForMe) {
-                    
-                    // A. Reload data silently (Background refresh)
+                    console.log("Refreshing data due to relevant update.");
+                    // 1. Silent Refresh (Keeps dashboard/grid live)
                     loadAndRender();
 
-                    // B. Handle Alerts (Red Banner)
-                    // Director Request: "He doesnt need alerts" -> Skip for Director unless it's his own.
+                    // 2. Alerts (Red Banner) - Skip for Director unless it's him
                     if (STATE.isDirector && !isForMe) return;
 
                     // For others: Check if today
-                    if (update.date == TODAY_ISO) {
-                        let msg = "";
-                        if (isForMe) {
-                            msg = "Live Update: <strong>Your</strong> schedule for today has been changed.";
-                        } else {
-                            // Lookup name
-                            const member = STATE.teamMembers.find(m => m.id == update.advisor_id);
-                            const name = member ? member.name : "A Team Member";
-                            msg = `Live Update: <strong>${name}'s</strong> schedule for today has been changed.`;
-                        }
+                    if (update.date && update.date === TODAY_ISO) {
+                        let msg = isForMe ? 
+                            "Live Update: Your schedule changed." : 
+                            "Live Update: A team member's schedule changed.";
                         showUpdateNotification(msg);
                     }
                 } else {
                     console.log("Ignoring update (irrelevant to current view).");
                 }
-                
             }
         }
     );
@@ -3076,40 +3070,114 @@ window.jumpToSiteSchedule = (siteName) => {
     // 5. Trigger the "Change" event to force the grid to reload with new selection
     list.dispatchEvent(new Event('change'));
 };
-// --- DIRECTOR GOD MODE LOGIC ---
+// --- DIRECTOR GOD MODE LOGIC (V2: Robust + Undo) ---
 
-// 1. OPEN THE EDITOR (Restricted to Today)
-window.openDirectorEditor = (advisorId, dateISO, currentStart, currentEnd) => {
+// Global state for Undo functionality
+window.directorUndoState = null;
+
+// 1. OPEN THE EDITOR
+window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd) => {
     if (!STATE.isDirector) return;
 
-    // RESTRICTION: Only allow editing if date is TODAY
-    // We compare the clicked date (dateISO) with the global today string (TODAY_ISO)
+    // A. RESTRICTION: Only allow editing if date is TODAY
     if (dateISO !== TODAY_ISO) {
-        // Optional: Show a toast saying "Historic/Future data is read-only"
-        // For now, we just do nothing or alert
-        alert("Director Mode: You can only edit the LIVE schedule (Today).");
+        alert("Director Mode: You can only edit the LIVE schedule (Today).\n\nHistoric/Future data is read-only here.");
         return;
     }
 
     const advisor = STATE.teamMembers.find(m => m.id == advisorId);
     const name = advisor ? advisor.name : "Advisor";
 
+    // B. Capture Undo State BEFORE loading the form
+    // We fetch the actual database structure to store for undoing
+    document.getElementById('dirEditTitle').textContent = `Loading ${name}...`;
+    const { data: currentState } = await supabase
+        .from('schedule_exceptions')
+        .select('structure, reason')
+        .eq('advisor_id', advisorId)
+        .eq('exception_date', dateISO)
+        .single();
+
+    // Store for Undo button
+    window.directorUndoState = {
+        advisor_id: advisorId,
+        exception_date: dateISO,
+        structure: currentState ? currentState.structure : [], // Default to empty if none exists
+        reason: currentState ? currentState.reason : ""
+    };
+    
+    // Enable Undo Button
+    const undoBtn = document.getElementById('btnDirectorUndo');
+    undoBtn.disabled = false;
+    undoBtn.style.opacity = '1';
+    undoBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg> Undo Revisions`;
+
+    // C. Populate Form
     document.getElementById('dirEditTitle').textContent = `Edit Live: ${name}`;
     document.getElementById('dirEditAdvisorId').value = advisorId;
     document.getElementById('dirEditDateISO').value = dateISO;
-    
     document.getElementById('dirEditStart').value = currentStart;
     document.getElementById('dirEditEnd').value = currentEnd;
-    document.getElementById('dirEditReason').value = ""; 
+    // Pre-fill reason but allow additions
+    const currentReason = window.directorUndoState.reason || "";
+    document.getElementById('dirEditReason').value = currentReason; 
 
     document.getElementById('directorEditModal').style.display = 'flex';
 };
 
 window.closeDirectorEditor = () => {
     document.getElementById('directorEditModal').style.display = 'none';
+    window.directorUndoState = null; // Clear undo state on close
 };
 
-// 2. SAVE THE CHANGES (Crop & Extend - Preserves EVERYTHING)
+// 2. INJECT ACTIVITY NOTE (Text Only)
+window.injectDirectorActivity = (activityName) => {
+    const reasonInput = document.getElementById('dirEditReason');
+    const currentVal = reasonInput.value;
+    const newNote = `[REQ: Add ${activityName}]`;
+    if (currentVal.includes(newNote)) return;
+    reasonInput.value = currentVal ? `${currentVal} ${newNote}` : newNote;
+    
+    // Visual feedback
+    const btn = event.target;
+    const oldBg = btn.style.backgroundColor;
+    btn.style.backgroundColor = '#dbeafe'; setTimeout(() => { btn.style.backgroundColor = oldBg; }, 200);
+};
+
+
+// 3. HANDLE UNDO (Revert to state at opening)
+window.handleDirectorUndo = async () => {
+    if (!window.directorUndoState) return;
+    if (!confirm("Revert schedule back to how it was before you opened this editor?")) return;
+
+    const undoBtn = document.getElementById('btnDirectorUndo');
+    undoBtn.textContent = "Reverting...";
+    undoBtn.disabled = true;
+
+    // Write the stored state back to Supabase
+    const { error } = await supabase.from('schedule_exceptions').upsert({
+        advisor_id: window.directorUndoState.advisor_id,
+        exception_date: window.directorUndoState.exception_date,
+        structure: window.directorUndoState.structure,
+        reason: window.directorUndoState.reason // Restore original reason
+    }, { onConflict: 'advisor_id, exception_date' });
+
+    if (error) {
+        alert("Undo failed: " + error.message);
+        undoBtn.textContent = "Undo Error";
+    } else {
+        // Broadcast the revert
+        if (STATE.rotaRealtimeChannel) {
+             STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: window.directorUndoState.advisor_id, date: window.directorUndoState.exception_date } });
+        }
+        closeDirectorEditor();
+        await loadAndRender();
+        alert("Schedule reverted successfully.");
+    }
+};
+
+
+// 4. SAVE THE CHANGES (Robust "Crop & Extend")
 window.handleDirectorSave = async () => {
     const advisorId = document.getElementById('dirEditAdvisorId').value;
     const dateISO = document.getElementById('dirEditDateISO').value;
@@ -3117,154 +3185,78 @@ window.handleDirectorSave = async () => {
     const newEndStr = document.getElementById('dirEditEnd').value;
     const reason = document.getElementById('dirEditReason').value || "Director Override";
 
-    if (!newStartStr || !newEndStr) {
-        alert("Please set start and end times.");
-        return;
-    }
-
-    // 1. Convert Inputs to Minutes
+    if (!newStartStr || !newEndStr) { alert("Please set start and end times."); return; }
     const targetStart = hhmmToMinutes(newStartStr);
     const targetEnd = hhmmToMinutes(newEndStr);
-    
-    if (targetEnd <= targetStart) {
-        alert("End time must be after start time.");
-        return;
-    }
+    if (targetEnd <= targetStart) { alert("End time must be after start time."); return; }
 
-    // 2. Fetch Existing Structure (The DNA)
-    // We get the live segments as they look right now
+    // Fetch current live setup
     const dayName = new Date(dateISO).toLocaleDateString('en-US', { weekday: 'long' });
     const currentSegments = calculateLiveSegments(advisorId, dayName, STATE.currentWeekData.mondayISO);
 
     if (!currentSegments || currentSegments.length === 0) {
-        alert("Cannot edit an empty day (RDO) this way. Please use the Planner to create a shift first.");
-        return;
+        alert("Cannot edit an empty day (RDO) this way. Please use the Planner."); return;
     }
 
-    // 3. "Crop & Extend" Logic
     let newStructure = [];
+    const comps = Object.values(STATE.components);
     
-    // Helper: Find Component ID by Name (needed because live segments only have names)
+    // ROBUST ID FINDER: Handles casing and variations
     const getCompId = (name) => {
-        const comp = Object.values(STATE.components).find(c => c.name === name);
-        return comp ? comp.id : null;
+        const cleanName = name.toLowerCase().trim();
+        // 1. Exact Match
+        let match = comps.find(c => c.name.toLowerCase() === cleanName);
+        // 2. Type Match (for breaks/lunch)
+        if (!match) {
+            if (cleanName.includes('break')) match = comps.find(c => c.type === 'Break');
+            if (cleanName.includes('lunch')) match = comps.find(c => c.type === 'Lunch');
+            if (cleanName.includes('meeting')) match = comps.find(c => c.name.toLowerCase().includes('meeting'));
+        }
+        // 3. Fallback to main activity
+        if (!match) match = comps.find(c => c.type === 'Activity') || comps[0];
+        return match ? match.id : null;
     };
     
-    // A. Process Existing Segments (Trim them to fit new window)
+    // A. Crop Existing
     for (const seg of currentSegments) {
-        let s = seg.startMin;
-        let e = seg.endMin;
+        let s = seg.startMin, e = seg.endMin;
+        if (e <= targetStart || s >= targetEnd) continue; // Outside new window
+        if (s < targetStart) s = targetStart; // Clip start
+        if (e > targetEnd) e = targetEnd; // Clip end
         
-        // Crop Start: If segment ends before new start, discard it.
-        if (e <= targetStart) continue;
-        // Crop End: If segment starts after new end, discard it.
-        if (s >= targetEnd) continue;
-        
-        // Clip Edges:
-        if (s < targetStart) s = targetStart;
-        if (e > targetEnd) e = targetEnd;
-        
-        const cId = getCompId(seg.code);
-        if (cId) {
-            newStructure.push({ component_id: cId, start_min: s, end_min: e });
-        }
+        const cId = getCompId(seg.code); // Use robust finder
+        if (cId) newStructure.push({ component_id: cId, start_min: s, end_min: e });
     }
 
-    // B. Fill Gaps (Extend)
-    // If the new window is wider than the old one, we need to fill the empty space.
-    // We check the very first and very last segments of our NEW structure.
-    
+    // B. Extend (Fill Gaps)
     if (newStructure.length > 0) {
-        // Check Front Gap (Did we start earlier than the old shift?)
-        const firstSeg = newStructure[0];
-        if (firstSeg.start_min > targetStart) {
-            // Fill with default activity (or extend first segment)
-            // We will insert a new block of "Phones" (or whatever the first block is)
-            newStructure.unshift({ 
-                component_id: firstSeg.component_id, 
-                start_min: targetStart, 
-                end_min: firstSeg.start_min 
-            });
+        if (newStructure[0].start_min > targetStart) {
+            // Fill front gap with first activity type
+            newStructure.unshift({ component_id: newStructure[0].component_id, start_min: targetStart, end_min: newStructure[0].start_min });
         }
-        
-        // Check Back Gap (Did we end later than the old shift?)
-        const lastSeg = newStructure[newStructure.length - 1];
-        if (lastSeg.end_min < targetEnd) {
-            // Extend the last segment to fill the time
-            // (This is safer than adding a new block, keeps the timeline clean)
-            lastSeg.end_min = targetEnd;
-        }
+        // Extend last segment to fill back gap
+        newStructure[newStructure.length - 1].end_min = targetEnd;
     } else {
-        // If we cropped everything away (e.g. moved shift entirely), create fresh block
-        const defaultCompId = getCompId("Phones") || Object.values(STATE.components)[0].id;
-        newStructure.push({ component_id: defaultCompId, start_min: targetStart, end_min: targetEnd });
+        // If everything was cropped, create fresh block
+        const defaultId = getCompId("Phones");
+        newStructure.push({ component_id: defaultId, start_min: targetStart, end_min: targetEnd });
     }
     
-    // 4. Check for "Quick Add" Requests
-    // If the user clicked "Meeting", it's in the text box as "[REQ: Add Meeting]"
-    // For V1, we just save this text so the Planner sees it. 
-    // (Implementing auto-insertion logic here is risky without the full builder engine).
-    
-    // 5. Save to Database
-    const record = {
-        advisor_id: advisorId,
-        exception_date: dateISO,
-        structure: newStructure,
-        reason: reason
-    };
+    // Save
+    const saveBtn = document.getElementById('btnDirectorSave');
+    saveBtn.textContent = "Updating..."; saveBtn.disabled = true;
 
-    // UI Feedback
-    const btn = document.querySelector('#directorEditModal .btn[onclick="handleDirectorSave()"]');
-    const originalText = btn.textContent;
-    btn.textContent = "Updating...";
-    btn.disabled = true;
-
-    const { error } = await supabase.from('schedule_exceptions').upsert(record, { onConflict: 'advisor_id, exception_date' });
-
-    if (error) {
-        alert("Database Error: " + error.message);
-    } else {
-        // Success!
-        if (STATE.rotaRealtimeChannel) {
-            STATE.rotaRealtimeChannel.send({
-                type: 'broadcast',
-                event: 'schedule_update',
-                payload: { advisor_id: advisorId, date: dateISO }
-            });
-        }
-        closeDirectorEditor();
-        await loadAndRender(); 
-    }
-    
-    btn.textContent = originalText;
-    btn.disabled = false;
-};
-
-window.handleDirectorDelete = async () => {
-    if (!confirm("Are you sure you want to clear this shift?")) return;
-    
-    const advisorId = document.getElementById('dirEditAdvisorId').value;
-    const dateISO = document.getElementById('dirEditDateISO').value;
-    
     const { error } = await supabase.from('schedule_exceptions').upsert({
-        advisor_id: advisorId,
-        exception_date: dateISO,
-        structure: [], // Empty = RDO
-        reason: "Cleared by Director"
+        advisor_id: advisorId, exception_date: dateISO, structure: newStructure, reason: reason
     }, { onConflict: 'advisor_id, exception_date' });
 
-    if (!error) {
-        if (STATE.rotaRealtimeChannel) {
-            STATE.rotaRealtimeChannel.send({
-                type: 'broadcast',
-                event: 'schedule_update',
-                payload: { advisor_id: advisorId, date: dateISO }
-            });
-        }
-        closeDirectorEditor();
-        loadAndRender();
+    if (error) { alert("Error: " + error.message); } else {
+        if (STATE.rotaRealtimeChannel) STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: advisorId, date: dateISO } });
+        closeDirectorEditor(); await loadAndRender();
     }
+    saveBtn.textContent = "Update Schedule"; saveBtn.disabled = false;
 };
+
 // 3. INJECT ACTIVITY (No Popups - Text Only)
 window.injectDirectorActivity = (activityName) => {
     const reasonInput = document.getElementById('dirEditReason');
