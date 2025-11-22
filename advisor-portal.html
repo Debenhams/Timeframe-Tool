@@ -1607,10 +1607,55 @@ async function identifyAdvisorAndTeam(user) {
         if (isDirector) {
              // === SCENARIO: DIRECTOR ===
              STATE.isDirector = true;
-             STATE.teamMembers = []; // Placeholder, Dashboard will handle data
+             STATE.teamMembers = []; // Start empty (He will select from dropdown)
              ELS.teamNamePill.textContent = `Director Mode: ${STATE.advisorName}`;
              ELS.teamNamePill.style.color = '#F59E0B'; // Gold
              ELS.teamNamePill.style.display = '';
+
+             // ** DIRECTOR DROPDOWN (Full Access) **
+             const { data: allLeaders } = await supabase
+                .from("leaders")
+                .select("id, name, sites (name)")
+                .order("name");
+
+             if (allLeaders) {
+                const listEl = document.getElementById('teamSelectorList');
+                const btnEl = document.getElementById('teamSelectorBtn');
+                listEl.style.minWidth = '100%'; listEl.style.width = 'max-content'; 
+
+                // 1. Option to "View All Staff" (Special for Director)
+                // 1. "Select All" Option
+                let html = `
+                    <label style="display:flex; align-items:center; padding:8px 12px; cursor:pointer; border-bottom:1px solid #E5E7EB; background:#F9FAFB; position:sticky; top:0; z-index:10;">
+                        <input type="checkbox" id="selectAllTeams" style="margin-right:8px;"> 
+                        <span style="font-weight:700; font-size:13px; color:#4B5563;">SELECT ALL TEAMS</span>
+                    </label>
+                `;
+                
+                // 2. Add All Leaders
+                allLeaders.forEach(l => {
+                    const siteName = l.sites ? l.sites.name : '';
+                    const siteTag = siteName ? `<span style="background:#F3F4F6; color:#6B7280; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; margin-left:12px; flex-shrink:0;">${siteName}</span>` : '';
+
+                    html += `<label style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; cursor:pointer; white-space:nowrap;">
+                                <div style="display:flex; align-items:center;">
+                                    <input type="checkbox" value="${l.id}" style="margin-right:8px;"> 
+                                    <span style="font-size:13px;">${l.name}</span>
+                                </div>
+                                ${siteTag}
+                            </label>`;
+                });
+                
+                listEl.innerHTML = html;
+                document.getElementById('teamSelectorGroup').style.display = 'flex';
+                
+                // Update Button Text Helper
+                window.updateTeamBtnText = () => {
+                    const checked = listEl.querySelectorAll('input[type="checkbox"]:checked');
+                    if (checked.length === 0) btnEl.firstElementChild.textContent = "Select Teams...";
+                    else btnEl.firstElementChild.textContent = `${checked.length} Teams Selected`;
+                };
+             }
              
         } else if (isLeader) {
             // === SCENARIO: TEAM LEADER / ATL ===
@@ -1863,10 +1908,24 @@ ELS.realtimeNote.addEventListener('click', (e) => {
         });
 
         // Handle Checkbox Changes
-        teamList.addEventListener('change', async () => {
-            window.updateTeamBtnText(); // Update button label
+    
+        teamList.addEventListener('change', async (e) => {
             
-            const checkedBoxes = Array.from(teamList.querySelectorAll('input[type="checkbox"]:checked'));
+            // A. Handle "Select All" Logic
+            if (e.target.id === 'selectAllTeams') {
+                const isChecked = e.target.checked;
+                const allBoxes = teamList.querySelectorAll('input[type="checkbox"]:not(#selectAllTeams)');
+                allBoxes.forEach(box => box.checked = isChecked);
+            } else {
+                // If a normal box is unchecked, uncheck the "Select All" master box
+                const selectAll = document.getElementById('selectAllTeams');
+                if (selectAll && !e.target.checked) selectAll.checked = false;
+            }
+
+            // B. Update Button Text
+            if (window.updateTeamBtnText) window.updateTeamBtnText(); 
+            
+            const checkedBoxes = Array.from(teamList.querySelectorAll('input[type="checkbox"]:checked:not(#selectAllTeams)'));
             const selectedIds = checkedBoxes.map(cb => cb.value);
 
             if (selectedIds.length === 0) {
@@ -1880,14 +1939,16 @@ ELS.realtimeNote.addEventListener('click', (e) => {
             const { data: newTeam } = await supabase
                 .from("advisors")
                 .select("id, name")
-                .in("leader_id", selectedIds) // Fetch matches for ANY selected leader
+                .in("leader_id", selectedIds) 
                 .order('name');
 
             if (newTeam) {
                 STATE.teamMembers = newTeam;
                 STATE.teamMemberIds = new Set(newTeam.map(t => t.id));
                 
-                ELS.teamNamePill.textContent = selectedIds.length > 1 ? `Viewing: ${selectedIds.length} Teams` : `Viewing: ${checkedBoxes[0].nextElementSibling.textContent}`;
+                if (ELS.teamNamePill) {
+                    ELS.teamNamePill.textContent = selectedIds.length > 1 ? `Viewing: ${selectedIds.length} Teams` : `Viewing: ${checkedBoxes[0].closest('label').querySelector('span').textContent}`;
+                }
                 
                 loadAndRender();
             }
@@ -2690,6 +2751,7 @@ async function calculateDirectorStats() {
 
     if(gridEl) gridEl.innerHTML = gridHtml || '<div style="padding:20px; text-align:center; color:#999;">No scheduled staff found for this date.</div>';
 }
+
 function renderGanttTimeHeader(headerElement) {
     const startHour = Math.floor(GANTT_START_MIN / 60);
     const endHour = Math.floor(GANTT_END_MIN / 60);
