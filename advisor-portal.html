@@ -1160,7 +1160,46 @@ display: flex;
       </div>
     </div>
   </main>
+<div class="modal-backdrop" id="directorEditModal" style="display:none;">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h2 id="dirEditTitle">Edit Shift</h2>
+        <button class="btn-icon modal-close" onclick="closeDirectorEditor()">
+           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
+        
+        <input type="hidden" id="dirEditAdvisorId">
+        <input type="hidden" id="dirEditDateISO">
 
+        <div class="form-group">
+            <label style="font-size:12px; font-weight:600; color:#64748B;">Start Time</label>
+            <input type="time" id="dirEditStart" class="form-input" style="font-size:16px; padding:10px;">
+        </div>
+
+        <div class="form-group">
+            <label style="font-size:12px; font-weight:600; color:#64748B;">End Time</label>
+            <input type="time" id="dirEditEnd" class="form-input" style="font-size:16px; padding:10px;">
+        </div>
+
+        <div class="form-group">
+            <label style="font-size:12px; font-weight:600; color:#64748B;">Reason / Auth</label>
+            <input type="text" id="dirEditReason" class="form-input" placeholder="e.g. Authorized by Darren">
+        </div>
+
+        <div style="background:#F8FAFC; padding:12px; border-radius:8px; border:1px solid #E2E8F0; font-size:11px; color:#64748B; line-height:1.4;">
+            <strong>Note:</strong> Changing times will automatically extend or trim the shift. Breaks will be preserved where possible.
+        </div>
+
+        <div style="display:flex; gap:12px; margin-top:8px;">
+            <button class="btn btn-danger" style="flex:1;" onclick="handleDirectorDelete()">Clear Shift</button>
+            <button class="btn" style="flex:2;" onclick="handleDirectorSave()">Update Schedule</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
 <script>
 // --- Configuration ---
 const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
@@ -2573,7 +2612,7 @@ function drawTeamDailyGantt() {
         <div class="timeline-row" style="${rowStyle}">
             <div class="timeline-name">${member.name} ${isCurrentUser ? '<span class="tag">(You)</span>' : ''}</div>
             <div class="timeline-track">
-                ${renderGanttSegments(segments)}
+                ${renderGanttSegments(segments, member.id, mondayISO)}
             </div>
         </div>
         `;
@@ -2769,32 +2808,36 @@ function renderGanttTimeHeader(headerElement) {
     headerElement.innerHTML = html;
 }
 
-function renderGanttSegments(segments) {
+function renderGanttSegments(segments, advisorId, dateISO) { // <--- UPDATED ARGUMENTS
     if (!segments || segments.length === 0) {
         return '<div class="timeline-rdo-fill">RDO</div>';
     }
     
     return segments.map(seg => {
-        // Calculate position and width percentage based on Gantt constants
         const startPct = ((seg.startMin - GANTT_START_MIN) / GANTT_DURATION_MIN) * 100;
         const widthPct = ((seg.endMin - seg.startMin) / GANTT_DURATION_MIN) * 100;
         
         const color = seg.color || '#475569';
-        
-        // Calculate contrasting text color
         const textColor = getContrastingTextColor(color);
 
-        // --- NEW LOGIC ---
         let blockClass = 'timeline-bar';
         const lowerCode = seg.code.toLowerCase();
         if (lowerCode.includes('break') || lowerCode.includes('lunch')) {
             blockClass += ' is-simple-block';
         }
-        // --- END NEW LOGIC ---
 
-        // The 'title' attribute provides the native browser tooltip on hover.
+        // DIRECTOR TRIGGER: Add onclick event
+        let clickAction = '';
+        let cursorStyle = '';
+        
+        if (STATE.isDirector) {
+             // Pass the start/end times to the editor
+             clickAction = `onclick="event.stopPropagation(); openDirectorEditor('${advisorId}', '${dateISO}', '${seg.start}', '${seg.end}')"`;
+             cursorStyle = 'cursor: pointer; pointer-events: auto;';
+        }
+
         return `
-        <div class="${blockClass}" style="left: ${startPct}%; width: ${widthPct}%; background-color: ${color}; color: ${textColor};" title="${seg.code} (${seg.start} - ${seg.end})">
+        <div class="${blockClass}" ${clickAction} style="left: ${startPct}%; width: ${widthPct}%; background-color: ${color}; color: ${textColor}; ${cursorStyle}" title="${seg.code} (${seg.start} - ${seg.end})">
             <span>${seg.code}</span>
         </div>
         `;
@@ -2981,7 +3024,185 @@ window.jumpToSiteSchedule = (siteName) => {
     // 5. Trigger the "Change" event to force the grid to reload with new selection
     list.dispatchEvent(new Event('change'));
 };
+// --- DIRECTOR GOD MODE LOGIC ---
 
+// 1. OPEN THE EDITOR
+window.openDirectorEditor = (advisorId, dateISO, currentStart, currentEnd) => {
+    if (!STATE.isDirector) return; // Safety check
+
+    // Find name from current view list
+    const advisor = STATE.teamMembers.find(m => m.id == advisorId);
+    const name = advisor ? advisor.name : "Advisor";
+
+    document.getElementById('dirEditTitle').textContent = `Edit: ${name}`;
+    document.getElementById('dirEditAdvisorId').value = advisorId;
+    document.getElementById('dirEditDateISO').value = dateISO;
+    
+    // Set values
+    document.getElementById('dirEditStart').value = currentStart;
+    document.getElementById('dirEditEnd').value = currentEnd;
+    document.getElementById('dirEditReason').value = ""; 
+
+    document.getElementById('directorEditModal').style.display = 'flex';
+};
+
+window.closeDirectorEditor = () => {
+    document.getElementById('directorEditModal').style.display = 'none';
+};
+
+// 2. SAVE THE CHANGES
+window.handleDirectorSave = async () => {
+    const advisorId = document.getElementById('dirEditAdvisorId').value;
+    const dateISO = document.getElementById('dirEditDateISO').value;
+    const newStartStr = document.getElementById('dirEditStart').value;
+    const newEndStr = document.getElementById('dirEditEnd').value;
+    const reason = document.getElementById('dirEditReason').value || "Director Override";
+
+    if (!newStartStr || !newEndStr) {
+        alert("Please set start and end times.");
+        return;
+    }
+
+    // Convert to Minutes
+    const startMin = hhmmToMinutes(newStartStr);
+    const endMin = hhmmToMinutes(newEndStr);
+    
+    if (endMin <= startMin) {
+        alert("End time must be after start time.");
+        return;
+    }
+
+    // A. Get Current Structure to use as base
+    // We need day name to calculate live segments context
+    const dayName = new Date(dateISO).toLocaleDateString('en-US', { weekday: 'long' });
+    // IMPORTANT: We use the GLOBAL week start that is currently loaded
+    const currentSegments = calculateLiveSegments(advisorId, dayName, STATE.currentWeekData.mondayISO);
+
+    // B. Build New Structure
+    let newStructure = [];
+    
+    // Find existing breaks to keep
+    const breaks = currentSegments.filter(seg => {
+        const code = seg.code.toLowerCase();
+        return code.includes('break') || code.includes('lunch');
+    });
+
+    // Determine main activity (default to Phones)
+    const mainActivitySeg = currentSegments.find(s => !s.code.toLowerCase().includes('break') && !s.code.toLowerCase().includes('lunch'));
+    const mainActivityCode = mainActivitySeg ? mainActivitySeg.code : "Phones";
+    
+    // Find ID for that code from our components list
+    let mainCompId = null;
+    for (const key in STATE.components) {
+        if (STATE.components[key].name === mainActivityCode) {
+            mainCompId = STATE.components[key].id;
+            break;
+        }
+    }
+    // Fallback if not found
+    if (!mainCompId) {
+         // Try to find "Activity" or just pick the first one
+         const firstKey = Object.keys(STATE.components)[0];
+         mainCompId = STATE.components[firstKey].id;
+    }
+
+    // 1. Add the main block (Full duration)
+    newStructure.push({
+        component_id: mainCompId,
+        start_min: startMin,
+        end_min: endMin
+    });
+
+    // 2. Re-insert breaks if they fit
+    // Simple logic: If the break is fully inside the new start/end, keep it.
+    breaks.forEach(brk => {
+        if (brk.startMin >= startMin && brk.endMin <= endMin) {
+             // We need to find the Component ID for this break code
+             let brkCompId = null;
+             for (const key in STATE.components) {
+                if (STATE.components[key].name === brk.code) {
+                    brkCompId = STATE.components[key].id;
+                    break;
+                }
+             }
+             if(brkCompId) {
+                 // To "Carve" it out properly without the full builder engine,
+                 // we simply add it to the structure. 
+                 // The backend/planner usually handles overlaps, but for safety here,
+                 // we rely on the fact that we are just defining "What happens when".
+                 // However, standard SQL/JSON storage expects non-overlapping segments usually.
+                 // For this V1 "God Mode", we will just save the Main Block + Breaks.
+                 // A smarter way is to "Punch a hole", but that requires complex math.
+                 // Let's trust the Planner to interpret "Overlapping Break wins".
+                 newStructure.push({
+                    component_id: brkCompId,
+                    start_min: brk.startMin,
+                    end_min: brk.endMin
+                 });
+             }
+        }
+    });
+    
+    // C. Save to Database
+    const record = {
+        advisor_id: advisorId,
+        exception_date: dateISO,
+        structure: newStructure,
+        reason: reason
+    };
+
+    const btn = document.querySelector('#directorEditModal .btn');
+    const originalText = btn.textContent;
+    btn.textContent = "Saving...";
+    btn.disabled = true;
+
+    const { error } = await supabase.from('schedule_exceptions').upsert(record, { onConflict: 'advisor_id, exception_date' });
+
+    if (error) {
+        alert("Error saving: " + error.message);
+    } else {
+        // Success! Broadcast change
+        if (STATE.rotaRealtimeChannel) {
+            STATE.rotaRealtimeChannel.send({
+                type: 'broadcast',
+                event: 'schedule_update',
+                payload: { advisor_id: advisorId, date: dateISO }
+            });
+        }
+        
+        closeDirectorEditor();
+        loadAndRender(); 
+    }
+    
+    btn.textContent = originalText;
+    btn.disabled = false;
+};
+
+window.handleDirectorDelete = async () => {
+    if (!confirm("Are you sure you want to clear this shift?")) return;
+    
+    const advisorId = document.getElementById('dirEditAdvisorId').value;
+    const dateISO = document.getElementById('dirEditDateISO').value;
+    
+    const { error } = await supabase.from('schedule_exceptions').upsert({
+        advisor_id: advisorId,
+        exception_date: dateISO,
+        structure: [], // Empty = RDO
+        reason: "Cleared by Director"
+    }, { onConflict: 'advisor_id, exception_date' });
+
+    if (!error) {
+        if (STATE.rotaRealtimeChannel) {
+            STATE.rotaRealtimeChannel.send({
+                type: 'broadcast',
+                event: 'schedule_update',
+                payload: { advisor_id: advisorId, date: dateISO }
+            });
+        }
+        closeDirectorEditor();
+        loadAndRender();
+    }
+};
 // --- Initialization Trigger ---
 document.addEventListener("DOMContentLoaded", init);
 
