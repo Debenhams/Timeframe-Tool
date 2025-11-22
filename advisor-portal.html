@@ -1735,9 +1735,13 @@ async function identifyAdvisorAndTeam(user) {
     }
 
 
-    if (STATE.teamMembers.length <= 0) {
+    // Enable for Director even if teamMembers is empty initially
+    if (STATE.teamMembers.length <= 0 && !STATE.isDirector) {
         ELS.teamToggleBtn.disabled = true;
         ELS.teamToggleBtn.classList.add('disabled');
+    } else {
+        ELS.teamToggleBtn.disabled = false;
+        ELS.teamToggleBtn.classList.remove('disabled');
     }
 }
 
@@ -2503,19 +2507,32 @@ function drawTeamDailyGantt() {
 }
 // --- DIRECTOR COMMAND CENTER (The UI Structure) ---
 function renderDirectorDashboard() {
-    // 1. Get Real Date for Display
-    const todayFull = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+    // SMART DATE LOGIC:
+    // If selected week includes Today, show Today. Otherwise, show the Monday of that week.
+    let targetDate = STATE.monday;
+    const today = new Date();
+    today.setHours(0,0,0,0); // Reset time to midnight for comparison
+    const endOfWeek = addDays(STATE.monday, 6);
+
+    if (today >= STATE.monday && today <= endOfWeek) {
+        targetDate = today;
+    }
+
+    const dateString = targetDate.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
 
     // 2. Build the HTML Structure
     let html = `
         <div class="dir-dashboard">
-            <div class="dir-section-title">Operational Command Center <span style="font-weight:400; color:#94A3B8; font-size:14px; margin-left:12px;">${todayFull}</span></div>
+            <div class="dir-section-title">
+                Operational Command Center 
+                <span style="font-weight:400; color:#94A3B8; font-size:14px; margin-left:12px;">${dateString}</span>
+            </div>
             
             <div class="dir-pulse-row">
                 <div class="dir-card">
                     <div class="dir-card-title">Total Headcount</div>
                     <div class="dir-metric-value" id="dir-val-headcount">--</div>
-                    <div class="dir-metric-sub">Scheduled Today</div>
+                    <div class="dir-metric-sub">Scheduled on Date</div>
                 </div>
                 <div class="dir-card">
                     <div class="dir-card-title">Shrinkage</div>
@@ -2536,18 +2553,29 @@ function renderDirectorDashboard() {
 
             <div class="dir-section-title">Site Performance Status</div>
             <div class="dir-brand-grid" id="dir-brand-grid">
-                <div style="grid-column:1/-1; padding:40px; color:#94A3B8; text-align:center;">Waiting for live telemetry...</div>
+                <div style="grid-column:1/-1; padding:40px; color:#94A3B8; text-align:center;">Calculating historic/live data...</div>
             </div>
         </div>
     `;
 
-    // 3. Inject into the "My Schedule" tab container
     ELS.myRotaGrid.innerHTML = html;
 }
+
 // --- DIRECTOR LOGIC: THE CALCULATOR ---
 async function calculateDirectorStats() {
-    const todayISO = TODAY_ISO; // Use global today variable
     
+    // SMART DATE LOGIC (Must match UI)
+    let targetDate = STATE.monday;
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const endOfWeek = addDays(STATE.monday, 6);
+
+    if (today >= STATE.monday && today <= endOfWeek) {
+        targetDate = today;
+    }
+    
+    const targetISO = fmtDateLocal(targetDate); // Use this calculated date, NOT todayISO
+
     // 1. Fetch Hierarchy Map (Advisor -> Leader -> Site)
     const { data: hierarchy } = await supabase
         .from('advisors')
@@ -2559,7 +2587,7 @@ async function calculateDirectorStats() {
     let totalStaff = 0;
     let activeHeadcount = 0;
     let shrinkageCount = 0;
-    let siteStats = {}; // { "Debenhams": { total: 10, active: 8 } }
+    let siteStats = {}; 
 
     // 2. Loop through EVERY advisor in the system
     hierarchy.forEach(adv => {
@@ -2573,19 +2601,22 @@ async function calculateDirectorStats() {
 
         // A. Check for Rotation Assignment (Are they scheduled?)
         const assignment = STATE.assignments.get(advId);
-        // Use the live calculator logic to see if they have segments today
-        const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+        
+        // Use the CALCULATOR logic to see if they have segments on the TARGET DATE
+        // We need the day name for the rotation lookup (e.g., "Monday")
+        const dayName = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
+        
+        // Calculate segments using the Week Start of the selected date (which is STATE.monday)
         const segments = calculateLiveSegments(advId, dayName, STATE.currentWeekData.mondayISO);
         
         const isScheduled = segments.length > 0;
         
-        // B. Check for Sickness/Absence Exception today
-        const exception = STATE.exceptions.find(e => e.advisor_id === advId && e.exception_date === todayISO);
+        // B. Check for Sickness/Absence Exception on the TARGET DATE
+        const exception = STATE.exceptions.find(e => e.advisor_id === advId && e.exception_date === targetISO);
         
         // Determine Status
         let isSick = false;
         if (exception && exception.structure.length > 0) {
-            // Check if structure contains "Absence" or "Sick" component
             const compId = exception.structure[0].component_id;
             const comp = STATE.components[compId];
             if (comp && (comp.type === 'Absence' || comp.name.toLowerCase().includes('sick'))) isSick = true;
@@ -2607,16 +2638,20 @@ async function calculateDirectorStats() {
     });
 
     // 3. Update Pulse Cards
-    document.getElementById('dir-val-headcount').textContent = activeHeadcount;
+    const hcEl = document.getElementById('dir-val-headcount');
+    if(hcEl) hcEl.textContent = activeHeadcount;
     
     const shrinkagePct = totalStaff > 0 ? Math.round((shrinkageCount / totalStaff) * 100) : 0;
     const shrinkEl = document.getElementById('dir-val-shrinkage');
-    shrinkEl.textContent = `${shrinkagePct}%`;
-    if (shrinkagePct > 10) shrinkEl.style.color = '#EF4444'; // Red warning if high
+    if(shrinkEl) {
+        shrinkEl.textContent = `${shrinkagePct}%`;
+        if (shrinkagePct > 10) shrinkEl.style.color = '#EF4444'; 
+        else shrinkEl.style.color = '#1E293B';
+    }
 
-    // Calculate approximate coverage (Active / Total Scheduled)
     const coveragePct = totalStaff > 0 ? Math.round((activeHeadcount / totalStaff) * 100) : 0;
-    document.getElementById('dir-val-coverage').textContent = `${coveragePct}%`;
+    const covEl = document.getElementById('dir-val-coverage');
+    if(covEl) covEl.textContent = `${coveragePct}%`;
 
     // 4. Build Brand Grid
     const gridEl = document.getElementById('dir-brand-grid');
@@ -2624,11 +2659,10 @@ async function calculateDirectorStats() {
 
     Object.keys(siteStats).sort().forEach(site => {
         const stats = siteStats[site];
-        if (stats.total === 0) return; // Skip empty sites
+        if (stats.total === 0) return; 
 
         const siteCoverage = Math.round((stats.active / stats.total) * 100);
         
-        // Determine Status Light
         let statusClass = 'green';
         if (siteCoverage < 85) statusClass = 'amber';
         if (siteCoverage < 70) statusClass = 'red';
@@ -2654,7 +2688,7 @@ async function calculateDirectorStats() {
         `;
     });
 
-    gridEl.innerHTML = gridHtml || '<div style="padding:20px; text-align:center; color:#999;">No scheduled staff found for today.</div>';
+    if(gridEl) gridEl.innerHTML = gridHtml || '<div style="padding:20px; text-align:center; color:#999;">No scheduled staff found for this date.</div>';
 }
 function renderGanttTimeHeader(headerElement) {
     const startHour = Math.floor(GANTT_START_MIN / 60);
