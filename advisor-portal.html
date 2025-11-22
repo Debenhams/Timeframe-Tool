@@ -1232,7 +1232,7 @@ display: flex;
         </div>
 
         <div style="background:#F1F5F9; padding:12px; border-radius:8px; margin-top:8px; border:1px solid #E2E8F0;">
-            <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">INSERT ACTIVITY (Maintains Shift Length)</label>
+            
             <div style="display:flex; gap:8px; margin-bottom:8px;">
                 <select id="dirAddType" class="form-select" style="flex:2; padding:6px; font-size:12px; height:32px;">
                     <option value="Meeting">Meeting</option>
@@ -3078,10 +3078,10 @@ window.jumpToSiteSchedule = (siteName) => {
     // 5. Trigger the "Change" event to force the grid to reload with new selection
     list.dispatchEvent(new Event('change'));
 };
-// --- DIRECTOR GOD MODE LOGIC (V3: Inline Insert + Robust Save) ---
+// --- DIRECTOR GOD MODE LOGIC (V4: Fixed Carve & Live Update) ---
 
 window.directorUndoState = null;
-window.directorPendingInjections = []; // Store added meetings here
+window.directorPendingInjections = [];
 
 // 1. OPEN THE EDITOR
 window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd) => {
@@ -3095,7 +3095,7 @@ window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd)
     const advisor = STATE.teamMembers.find(m => m.id == advisorId);
     const name = advisor ? advisor.name : "Advisor";
 
-    // Capture Undo State
+    // Capture State for Undo
     document.getElementById('dirEditTitle').textContent = `Loading ${name}...`;
     const { data: currentState } = await supabase
         .from('schedule_exceptions')
@@ -3112,12 +3112,12 @@ window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd)
     };
     
     // Reset UI
-    window.directorPendingInjections = []; // Clear previous additions
+    window.directorPendingInjections = [];
     document.getElementById('dirActivityList').innerHTML = ''; 
     
     const undoBtn = document.getElementById('btnDirectorUndo');
     undoBtn.disabled = false;
-    undoBtn.style.opacity = '1';
+    undoBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg> Undo`;
 
     // Populate Form
     document.getElementById('dirEditTitle').textContent = `Edit Live: ${name}`;
@@ -3127,7 +3127,7 @@ window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd)
     document.getElementById('dirEditEnd').value = currentEnd;
     document.getElementById('dirEditReason').value = window.directorUndoState.reason || ""; 
 
-    // Pre-fill the "Add Activity" time box
+    // Default "Add Activity" time
     const startEl = document.getElementById('dirAddStart');
     if (startEl) startEl.value = currentStart;
 
@@ -3136,10 +3136,11 @@ window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd)
 
 window.closeDirectorEditor = () => {
     document.getElementById('directorEditModal').style.display = 'none';
-    window.directorUndoState = null;
+    // We do NOT clear undo state here, allowing re-open to undo if needed (advanced)
+    // But for safety, we reset it on next open.
 };
 
-// 2. ADD ACTIVITY TO LIST (Local UI Only)
+// 2. ADD ACTIVITY TO LIST
 window.addDirectorActivityToList = () => {
     const type = document.getElementById('dirAddType').value;
     const start = document.getElementById('dirAddStart').value;
@@ -3147,18 +3148,13 @@ window.addDirectorActivityToList = () => {
 
     if(!start || !dur) return;
 
-    // Store it
     window.directorPendingInjections.push({ type, start, dur });
 
-    // Show it in the list
     const li = document.createElement('li');
     li.style.marginBottom = '4px';
     li.style.display = 'flex';
     li.style.justifyContent = 'space-between';
-    li.innerHTML = `
-        <span><strong>${type}</strong> @ ${start} (${dur}m)</span>
-        <span style="color:#EF4444; cursor:pointer;" onclick="this.parentElement.remove(); removeInjection('${start}')">x</span>
-    `;
+    li.innerHTML = `<span><strong>${type}</strong> @ ${start} (${dur}m)</span><span style="color:#EF4444; cursor:pointer;" onclick="this.parentElement.remove(); removeInjection('${start}')">x</span>`;
     document.getElementById('dirActivityList').appendChild(li);
 };
 
@@ -3169,7 +3165,7 @@ window.removeInjection = (startVal) => {
 // 3. HANDLE UNDO
 window.handleDirectorUndo = async () => {
     if (!window.directorUndoState) return;
-    if (!confirm("Revert schedule?")) return;
+    if (!confirm("Revert to state before editing?")) return;
 
     const undoBtn = document.getElementById('btnDirectorUndo');
     undoBtn.textContent = "Reverting...";
@@ -3182,16 +3178,15 @@ window.handleDirectorUndo = async () => {
     }, { onConflict: 'advisor_id, exception_date' });
 
     if (!error) {
-        if (STATE.rotaRealtimeChannel) {
-             STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: window.directorUndoState.advisor_id, date: window.directorUndoState.exception_date } });
-        }
-        closeDirectorEditor();
-        await loadAndRender();
+        // Trigger update
+        if (STATE.rotaRealtimeChannel) STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: window.directorUndoState.advisor_id, date: window.directorUndoState.exception_date } });
+        
+        await loadAndRender(); // Refresh Grid
+        closeDirectorEditor(); // Close box
     }
 };
 
-
-// 4. SAVE (Apply Injections -> Then Crop/Extend)
+// 4. SAVE (FIXED: Preserves Non-Overlapping Blocks)
 window.handleDirectorSave = async () => {
     const advisorId = document.getElementById('dirEditAdvisorId').value;
     const dateISO = document.getElementById('dirEditDateISO').value;
@@ -3202,111 +3197,152 @@ window.handleDirectorSave = async () => {
     const targetStart = hhmmToMinutes(newStartStr);
     const targetEnd = hhmmToMinutes(newEndStr);
 
-    // Fetch Current
+    // Get Current Segments
     const dayName = new Date(dateISO).toLocaleDateString('en-US', { weekday: 'long' });
     const currentSegments = calculateLiveSegments(advisorId, dayName, STATE.currentWeekData.mondayISO);
 
     if (!currentSegments || currentSegments.length === 0) {
-        alert("Empty schedule. Use Planner to create one first."); return;
+        alert("Empty schedule. Use Planner."); return;
     }
 
-    // Helper to find IDs
+    // Helper: Find IDs
     const comps = Object.values(STATE.components);
     const getCompId = (name) => {
-        const cleanName = name.toLowerCase().trim();
-        let match = comps.find(c => c.name.toLowerCase() === cleanName);
-        if (!match) match = comps.find(c => c.type === cleanName) || comps.find(c => c.type === 'Activity');
+        const clean = name.toLowerCase().trim();
+        let match = comps.find(c => c.name.toLowerCase() === clean);
+        if (!match) match = comps.find(c => c.type.toLowerCase() === clean) || comps.find(c => c.type === 'Activity');
         return match ? match.id : null;
     };
 
-    // A. Build Base Structure from Existing (Preserve what we can)
+    // Detect "Base Activity" (The main work type to fill gaps with)
+    // Look for the longest segment that isn't a break
+    let baseCompId = null;
+    let maxDur = 0;
+    currentSegments.forEach(seg => {
+        const c = seg.code.toLowerCase();
+        if (!c.includes('break') && !c.includes('lunch') && seg.duration_min > maxDur) {
+            maxDur = seg.duration_min;
+            baseCompId = getCompId(seg.code);
+        }
+    });
+    if (!baseCompId) baseCompId = getCompId('Phones'); // Fallback
+
+    // A. Build "Canvas" (Current Schedule clipped to new Start/End)
     let workStructure = [];
     currentSegments.forEach(seg => {
         const cId = getCompId(seg.code);
-        if(cId) workStructure.push({ component_id: cId, start_min: seg.startMin, end_min: seg.endMin });
+        if (!cId) return;
+        
+        let s = seg.startMin, e = seg.endMin;
+        
+        // Crop to new bounds
+        if (e <= targetStart || s >= targetEnd) return; // Completely outside
+        if (s < targetStart) s = targetStart; // Clip start
+        if (e > targetEnd) e = targetEnd; // Clip end
+        
+        workStructure.push({ component_id: cId, start_min: s, end_min: e });
     });
 
-    // B. Apply Injections (Carve Out Time)
+    // B. Fill Edges (If extended) using Base Activity
+    if (workStructure.length > 0) {
+        if (workStructure[0].start_min > targetStart) {
+            workStructure.unshift({ component_id: baseCompId, start_min: targetStart, end_min: workStructure[0].start_min });
+        }
+        const last = workStructure[workStructure.length - 1];
+        if (last.end_min < targetEnd) {
+            // Check if last segment is work, if so extend it, else add new work block
+            const lastComp = STATE.components[last.component_id];
+            if (lastComp && lastComp.type === 'Activity') {
+                last.end_min = targetEnd;
+            } else {
+                workStructure.push({ component_id: baseCompId, start_min: last.end_min, end_min: targetEnd });
+            }
+        }
+    } else {
+        // Brand new block if everything was cropped
+        workStructure.push({ component_id: baseCompId, start_min: targetStart, end_min: targetEnd });
+    }
+
+    // C. Apply Injections (The Meetings) - CARVE LOGIC
     window.directorPendingInjections.forEach(inj => {
         const injStart = hhmmToMinutes(inj.start);
         const injEnd = injStart + inj.dur;
         const injId = getCompId(inj.type);
 
         if (injId) {
-            let newWork = [];
+            let carvedStructure = [];
             let inserted = false;
             
             workStructure.forEach(seg => {
-                // Case 1: No Overlap
-                if (seg.end_min <= injStart || seg.start_min >= injEnd) {
-                    newWork.push(seg);
-                } 
-                // Case 2: Overlap - Split or Shorten
-                else {
-                    // Before injection
-                    if (seg.start_min < injStart) {
-                        newWork.push({ component_id: seg.component_id, start_min: seg.start_min, end_min: injStart });
-                    }
-                    // The Injection
+                // 1. Segment is BEFORE injection
+                if (seg.end_min <= injStart) {
+                    carvedStructure.push(seg);
+                }
+                // 2. Segment is AFTER injection
+                else if (seg.start_min >= injEnd) {
                     if (!inserted) {
-                        newWork.push({ component_id: injId, start_min: injStart, end_min: injEnd });
+                        carvedStructure.push({ component_id: injId, start_min: injStart, end_min: injEnd });
                         inserted = true;
                     }
-                    // After injection
+                    carvedStructure.push(seg);
+                }
+                // 3. Overlap: Split the segment
+                else {
+                    // Part Before
+                    if (seg.start_min < injStart) {
+                        carvedStructure.push({ component_id: seg.component_id, start_min: seg.start_min, end_min: injStart });
+                    }
+                    // The Injection (Once)
+                    if (!inserted) {
+                        carvedStructure.push({ component_id: injId, start_min: injStart, end_min: injEnd });
+                        inserted = true;
+                    }
+                    // Part After
                     if (seg.end_min > injEnd) {
-                        newWork.push({ component_id: seg.component_id, start_min: injEnd, end_min: seg.end_min });
+                        carvedStructure.push({ component_id: seg.component_id, start_min: injEnd, end_min: seg.end_min });
                     }
                 }
             });
-            
-            if(!inserted) newWork.push({ component_id: injId, start_min: injStart, end_min: injEnd });
 
-            workStructure = newWork.sort((a,b) => a.start_min - b.start_min);
-            reason += ` [Added ${inj.type} ${inj.start}]`;
+            // If injection is past everything, append it
+            if (!inserted) {
+                 carvedStructure.push({ component_id: injId, start_min: injStart, end_min: injEnd });
+            }
+
+            workStructure = carvedStructure;
+            reason += ` [+${inj.type}]`;
         }
     });
 
-    // C. Final Crop/Extend to Main Shift Times
-    let finalStructure = [];
-    workStructure.forEach(seg => {
-        let s = seg.start_min, e = seg.end_min;
-        if (e <= targetStart || s >= targetEnd) return; // Crop
-        if (s < targetStart) s = targetStart; // Clip
-        if (e > targetEnd) e = targetEnd; // Clip
-        finalStructure.push({ component_id: seg.component_id, start_min: s, end_min: e });
-    });
-
-    // Fill Gaps
-    if (finalStructure.length > 0) {
-        if (finalStructure[0].start_min > targetStart) {
-            finalStructure.unshift({ component_id: finalStructure[0].component_id, start_min: targetStart, end_min: finalStructure[0].start_min });
-        }
-        const last = finalStructure[finalStructure.length-1];
-        if (last.end_min < targetEnd) {
-            last.end_min = targetEnd;
-        }
-    } else {
-        // Fallback if empty
-        finalStructure.push({ component_id: getCompId('Phones'), start_min: targetStart, end_min: targetEnd });
-    }
+    // Sort
+    workStructure.sort((a, b) => a.start_min - b.start_min);
 
     // Save
     const saveBtn = document.getElementById('btnDirectorSave');
-    saveBtn.textContent = "Updating..."; saveBtn.disabled = true;
+    saveBtn.textContent = "Saving..."; saveBtn.disabled = true;
 
     const { error } = await supabase.from('schedule_exceptions').upsert({
-        advisor_id: advisorId, exception_date: dateISO, structure: finalStructure, reason: reason
+        advisor_id: advisorId, exception_date: dateISO, structure: workStructure, reason: reason
     }, { onConflict: 'advisor_id, exception_date' });
 
     if (error) { 
         alert("Error: " + error.message); 
+        saveBtn.textContent = "Update Schedule"; saveBtn.disabled = false;
     } else {
+        // Send Signal
         if (STATE.rotaRealtimeChannel) STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: advisorId, date: dateISO } });
-        closeDirectorEditor(); 
-        await loadAndRender();
+        
+        await loadAndRender(); // Immediate refresh
+        
+        // UI Feedback
+        saveBtn.textContent = "Saved!";
+        setTimeout(() => {
+            closeDirectorEditor(); 
+            saveBtn.textContent = "Update Schedule"; saveBtn.disabled = false;
+        }, 500);
     }
-    saveBtn.textContent = "Update Schedule"; saveBtn.disabled = false;
 };
+
 // --- Initialization Trigger ---
 document.addEventListener("DOMContentLoaded", init);
 
