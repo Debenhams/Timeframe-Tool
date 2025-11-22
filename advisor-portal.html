@@ -2735,7 +2735,7 @@ async function calculateDirectorStats() {
 
         gridHtml += `
         <div class="dir-brand-card" onclick="jumpToSiteSchedule('${site}')">
-            <div class="dir-brand-card">
+            <div class="dir-brand-card" onclick="jumpToSiteSchedule('${site}')">
                 <div class="dir-brand-header">
                     <div class="dir-brand-name">${site}</div>
                     <div class="dir-status-light ${statusClass}"></div>
