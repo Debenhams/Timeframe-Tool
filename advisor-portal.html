@@ -859,6 +859,80 @@ display: flex;
     user-select: none;
     z-index: 0;
 }
+/* === DIRECTOR COMMAND CENTER (Quarantined Styles) === */
+    
+    .dir-dashboard {
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+        padding: 8px;
+        height: 100%;
+        overflow-y: auto;
+    }
+
+    /* Top Row: Pulse Cards */
+    .dir-pulse-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 24px;
+        flex-shrink: 0;
+    }
+
+    .dir-card {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: transform 0.2s;
+    }
+    .dir-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08); }
+
+    .dir-card-title { font-size: 13px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .dir-metric-value { font-size: 36px; font-weight: 800; color: #1E293B; line-height: 1; }
+    .dir-metric-sub { font-size: 12px; color: #10B981; font-weight: 600; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+    .dir-metric-sub.down { color: #EF4444; }
+
+    /* Middle Section: Brand Health Grid */
+    .dir-section-title { font-size: 18px; font-weight: 700; color: #334155; margin-bottom: 16px; margin-top: 8px; }
+    
+    .dir-brand-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
+    }
+
+    .dir-brand-card {
+        background: white;
+        border-radius: 16px;
+        padding: 20px;
+        border: 1px solid #E2E8F0;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    .dir-brand-card:hover { border-color: var(--brand-primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+
+    .dir-brand-header { display: flex; justify-content: space-between; align-items: center; }
+    .dir-brand-name { font-weight: 700; font-size: 16px; color: #0F172A; }
+    
+    /* Status Lights */
+    .dir-status-light { height: 10px; width: 10px; border-radius: 50%; background: #CBD5E1; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
+    .dir-status-light.green { background: #10B981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+    .dir-status-light.amber { background: #F59E0B; box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
+    .dir-status-light.red { background: #EF4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+
+    .dir-progress-bar { height: 6px; width: 100%; background: #F1F5F9; border-radius: 3px; overflow: hidden; }
+    .dir-progress-fill { height: 100%; background: var(--brand-primary); border-radius: 3px; width: 0%; transition: width 1s ease-out; }
+    
+    .dir-stat-row { display: flex; justify-content: space-between; font-size: 12px; color: #64748B; font-weight: 500; }
   </style>
 </head>
 <body>
@@ -2072,10 +2146,18 @@ async function loadAndRender(){
     
    // 1. Fetch all data in parallel
     try {
-        // FIX: Create a list that includes the Team AND Me (so My Schedule works)
-        const idsToFetch = Array.from(STATE.teamMemberIds);
-        if (STATE.advisorId && !idsToFetch.includes(STATE.advisorId)) {
-            idsToFetch.push(STATE.advisorId);
+        let idsToFetch = [];
+        
+        if (STATE.isDirector) {
+            // DIRECTOR MODE: Fetch ALL advisors to populate the Command Center
+            const { data: allAdvisors } = await supabase.from('advisors').select('id');
+            if (allAdvisors) idsToFetch = allAdvisors.map(a => a.id);
+        } else {
+            // STANDARD MODE: Fetch Team + Me
+            idsToFetch = Array.from(STATE.teamMemberIds);
+            if (STATE.advisorId && !idsToFetch.includes(STATE.advisorId)) {
+                idsToFetch.push(STATE.advisorId);
+            }
         }
 
         const [exceptionsRes, patternsRes, assignmentsRes] = await Promise.all([
@@ -2155,6 +2237,14 @@ async function loadAndRender(){
 // Renders the views based on the active tab
 function renderViews() {
     if (!STATE.currentWeekData) return;
+
+    // === DIRECTOR OVERRIDE ===
+    if (STATE.isDirector && STATE.currentTab === 'tab-my-schedule') {
+        renderDirectorDashboard();
+        calculateDirectorStats(); // <--- This triggers the math
+        return;
+    }
+    // =========================
 
     if (STATE.currentTab === 'tab-my-schedule') {
         drawMyRotaCalendar();
@@ -2411,7 +2501,161 @@ function drawTeamDailyGantt() {
     });
     ELS_GANTT.plannerBody.innerHTML = bodyHtml;
 }
+// --- DIRECTOR COMMAND CENTER (The UI Structure) ---
+function renderDirectorDashboard() {
+    // 1. Get Real Date for Display
+    const todayFull = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
 
+    // 2. Build the HTML Structure
+    let html = `
+        <div class="dir-dashboard">
+            <div class="dir-section-title">Operational Command Center <span style="font-weight:400; color:#94A3B8; font-size:14px; margin-left:12px;">${todayFull}</span></div>
+            
+            <div class="dir-pulse-row">
+                <div class="dir-card">
+                    <div class="dir-card-title">Total Headcount</div>
+                    <div class="dir-metric-value" id="dir-val-headcount">--</div>
+                    <div class="dir-metric-sub">Scheduled Today</div>
+                </div>
+                <div class="dir-card">
+                    <div class="dir-card-title">Shrinkage</div>
+                    <div class="dir-metric-value" id="dir-val-shrinkage">--%</div>
+                    <div class="dir-metric-sub down">Sickness / Absence</div>
+                </div>
+                <div class="dir-card">
+                    <div class="dir-card-title">Alerts</div>
+                    <div class="dir-metric-value" id="dir-val-alerts">0</div>
+                    <div class="dir-metric-sub">Pending Actions</div>
+                </div>
+                <div class="dir-card">
+                    <div class="dir-card-title">Live Coverage</div>
+                    <div class="dir-metric-value" id="dir-val-coverage">--%</div>
+                    <div class="dir-metric-sub">Vs. Requirement</div>
+                </div>
+            </div>
+
+            <div class="dir-section-title">Site Performance Status</div>
+            <div class="dir-brand-grid" id="dir-brand-grid">
+                <div style="grid-column:1/-1; padding:40px; color:#94A3B8; text-align:center;">Waiting for live telemetry...</div>
+            </div>
+        </div>
+    `;
+
+    // 3. Inject into the "My Schedule" tab container
+    ELS.myRotaGrid.innerHTML = html;
+}
+// --- DIRECTOR LOGIC: THE CALCULATOR ---
+async function calculateDirectorStats() {
+    const todayISO = TODAY_ISO; // Use global today variable
+    
+    // 1. Fetch Hierarchy Map (Advisor -> Leader -> Site)
+    const { data: hierarchy } = await supabase
+        .from('advisors')
+        .select(`id, leader_id, leaders ( site_id, sites (name) )`);
+    
+    if (!hierarchy) return;
+
+    // Data Buckets
+    let totalStaff = 0;
+    let activeHeadcount = 0;
+    let shrinkageCount = 0;
+    let siteStats = {}; // { "Debenhams": { total: 10, active: 8 } }
+
+    // 2. Loop through EVERY advisor in the system
+    hierarchy.forEach(adv => {
+        const advId = adv.id;
+        // Get Site Name (Handle nulls safely)
+        let siteName = "Unassigned";
+        if (adv.leaders && adv.leaders.sites) siteName = adv.leaders.sites.name;
+
+        // Init Site Bucket
+        if (!siteStats[siteName]) siteStats[siteName] = { total: 0, active: 0, shrinkage: 0 };
+
+        // A. Check for Rotation Assignment (Are they scheduled?)
+        const assignment = STATE.assignments.get(advId);
+        // Use the live calculator logic to see if they have segments today
+        const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+        const segments = calculateLiveSegments(advId, dayName, STATE.currentWeekData.mondayISO);
+        
+        const isScheduled = segments.length > 0;
+        
+        // B. Check for Sickness/Absence Exception today
+        const exception = STATE.exceptions.find(e => e.advisor_id === advId && e.exception_date === todayISO);
+        
+        // Determine Status
+        let isSick = false;
+        if (exception && exception.structure.length > 0) {
+            // Check if structure contains "Absence" or "Sick" component
+            const compId = exception.structure[0].component_id;
+            const comp = STATE.components[compId];
+            if (comp && (comp.type === 'Absence' || comp.name.toLowerCase().includes('sick'))) isSick = true;
+        }
+
+        // C. Tally Up
+        if (isScheduled) {
+            totalStaff++;
+            siteStats[siteName].total++;
+            
+            if (isSick) {
+                shrinkageCount++;
+                siteStats[siteName].shrinkage++;
+            } else {
+                activeHeadcount++;
+                siteStats[siteName].active++;
+            }
+        }
+    });
+
+    // 3. Update Pulse Cards
+    document.getElementById('dir-val-headcount').textContent = activeHeadcount;
+    
+    const shrinkagePct = totalStaff > 0 ? Math.round((shrinkageCount / totalStaff) * 100) : 0;
+    const shrinkEl = document.getElementById('dir-val-shrinkage');
+    shrinkEl.textContent = `${shrinkagePct}%`;
+    if (shrinkagePct > 10) shrinkEl.style.color = '#EF4444'; // Red warning if high
+
+    // Calculate approximate coverage (Active / Total Scheduled)
+    const coveragePct = totalStaff > 0 ? Math.round((activeHeadcount / totalStaff) * 100) : 0;
+    document.getElementById('dir-val-coverage').textContent = `${coveragePct}%`;
+
+    // 4. Build Brand Grid
+    const gridEl = document.getElementById('dir-brand-grid');
+    let gridHtml = '';
+
+    Object.keys(siteStats).sort().forEach(site => {
+        const stats = siteStats[site];
+        if (stats.total === 0) return; // Skip empty sites
+
+        const siteCoverage = Math.round((stats.active / stats.total) * 100);
+        
+        // Determine Status Light
+        let statusClass = 'green';
+        if (siteCoverage < 85) statusClass = 'amber';
+        if (siteCoverage < 70) statusClass = 'red';
+
+        gridHtml += `
+            <div class="dir-brand-card">
+                <div class="dir-brand-header">
+                    <div class="dir-brand-name">${site}</div>
+                    <div class="dir-status-light ${statusClass}"></div>
+                </div>
+                <div class="dir-progress-bar">
+                    <div class="dir-progress-fill" style="width: ${siteCoverage}%; background-color: ${statusClass === 'red' ? '#EF4444' : (statusClass === 'amber' ? '#F59E0B' : '#10B981')}"></div>
+                </div>
+                <div class="dir-stat-row">
+                    <span>Headcount</span>
+                    <strong>${stats.active} / ${stats.total}</strong>
+                </div>
+                <div class="dir-stat-row">
+                    <span>Shrinkage</span>
+                    <span>${stats.shrinkage} staff</span>
+                </div>
+            </div>
+        `;
+    });
+
+    gridEl.innerHTML = gridHtml || '<div style="padding:20px; text-align:center; color:#999;">No scheduled staff found for today.</div>';
+}
 function renderGanttTimeHeader(headerElement) {
     const startHour = Math.floor(GANTT_START_MIN / 60);
     const endHour = Math.floor(GANTT_END_MIN / 60);
