@@ -3097,7 +3097,7 @@ window.closeDirectorEditor = () => {
     document.getElementById('directorEditModal').style.display = 'none';
 };
 
-// 2. SAVE THE CHANGES
+// 2. SAVE THE CHANGES (Robust Version)
 window.handleDirectorSave = async () => {
     const advisorId = document.getElementById('dirEditAdvisorId').value;
     const dateISO = document.getElementById('dirEditDateISO').value;
@@ -3110,7 +3110,7 @@ window.handleDirectorSave = async () => {
         return;
     }
 
-    // Convert to Minutes
+    // 1. Convert Inputs to Minutes
     const startMin = hhmmToMinutes(newStartStr);
     const endMin = hhmmToMinutes(newEndStr);
     
@@ -3119,78 +3119,28 @@ window.handleDirectorSave = async () => {
         return;
     }
 
-    // A. Get Current Structure to use as base
-    // We need day name to calculate live segments context
-    const dayName = new Date(dateISO).toLocaleDateString('en-US', { weekday: 'long' });
-    // IMPORTANT: We use the GLOBAL week start that is currently loaded
-    const currentSegments = calculateLiveSegments(advisorId, dayName, STATE.currentWeekData.mondayISO);
-
-    // B. Build New Structure
+    // 2. Prepare the New Schedule Structure
+    // We start with a clean slate based on the Director's inputs
     let newStructure = [];
-    
-    // Find existing breaks to keep
-    const breaks = currentSegments.filter(seg => {
-        const code = seg.code.toLowerCase();
-        return code.includes('break') || code.includes('lunch');
-    });
 
-    // Determine main activity (default to Phones)
-    const mainActivitySeg = currentSegments.find(s => !s.code.toLowerCase().includes('break') && !s.code.toLowerCase().includes('lunch'));
-    const mainActivityCode = mainActivitySeg ? mainActivitySeg.code : "Phones";
-    
-    // Find ID for that code from our components list
+    // A. Find the correct "Work" Activity ID (e.g., Phones)
+    // We look at the component list to find the default activity
     let mainCompId = null;
-    for (const key in STATE.components) {
-        if (STATE.components[key].name === mainActivityCode) {
-            mainCompId = STATE.components[key].id;
-            break;
-        }
-    }
-    // Fallback if not found
-    if (!mainCompId) {
-         // Try to find "Activity" or just pick the first one
-         const firstKey = Object.keys(STATE.components)[0];
-         mainCompId = STATE.components[firstKey].id;
-    }
+    // Try to find a component named "Phones" or "Activity"
+    const comps = Object.values(STATE.components);
+    const workComp = comps.find(c => c.name === 'Phones') || comps.find(c => c.type === 'Activity') || comps[0];
+    if (workComp) mainCompId = workComp.id;
 
-    // 1. Add the main block (Full duration)
+    // B. Build the single block (The Shift)
+    // Note: We rely on the Planner system to re-insert breaks later if needed. 
+    // For "God Mode", we just set the hard limits.
     newStructure.push({
         component_id: mainCompId,
         start_min: startMin,
         end_min: endMin
     });
 
-    // 2. Re-insert breaks if they fit
-    // Simple logic: If the break is fully inside the new start/end, keep it.
-    breaks.forEach(brk => {
-        if (brk.startMin >= startMin && brk.endMin <= endMin) {
-             // We need to find the Component ID for this break code
-             let brkCompId = null;
-             for (const key in STATE.components) {
-                if (STATE.components[key].name === brk.code) {
-                    brkCompId = STATE.components[key].id;
-                    break;
-                }
-             }
-             if(brkCompId) {
-                 // To "Carve" it out properly without the full builder engine,
-                 // we simply add it to the structure. 
-                 // The backend/planner usually handles overlaps, but for safety here,
-                 // we rely on the fact that we are just defining "What happens when".
-                 // However, standard SQL/JSON storage expects non-overlapping segments usually.
-                 // For this V1 "God Mode", we will just save the Main Block + Breaks.
-                 // A smarter way is to "Punch a hole", but that requires complex math.
-                 // Let's trust the Planner to interpret "Overlapping Break wins".
-                 newStructure.push({
-                    component_id: brkCompId,
-                    start_min: brk.startMin,
-                    end_min: brk.endMin
-                 });
-             }
-        }
-    });
-    
-    // C. Save to Database
+    // 3. Save to Database
     const record = {
         advisor_id: advisorId,
         exception_date: dateISO,
@@ -3198,17 +3148,20 @@ window.handleDirectorSave = async () => {
         reason: reason
     };
 
-    const btn = document.querySelector('#directorEditModal .btn');
+    // UI Feedback
+    const btn = document.querySelector('#directorEditModal .btn[onclick="handleDirectorSave()"]');
     const originalText = btn.textContent;
-    btn.textContent = "Saving...";
+    btn.textContent = "Updating...";
     btn.disabled = true;
 
     const { error } = await supabase.from('schedule_exceptions').upsert(record, { onConflict: 'advisor_id, exception_date' });
 
     if (error) {
-        alert("Error saving: " + error.message);
+        alert("Database Error: " + error.message);
     } else {
-        // Success! Broadcast change
+        // 4. Success! Trigger Updates
+        
+        // A. Broadcast to everyone else
         if (STATE.rotaRealtimeChannel) {
             STATE.rotaRealtimeChannel.send({
                 type: 'broadcast',
@@ -3217,8 +3170,9 @@ window.handleDirectorSave = async () => {
             });
         }
         
+        // B. Force Local Refresh immediately
         closeDirectorEditor();
-        loadAndRender(); 
+        await loadAndRender(); // <--- This forces the screen to redraw with new data
     }
     
     btn.textContent = originalText;
@@ -3250,26 +3204,24 @@ window.handleDirectorDelete = async () => {
         loadAndRender();
     }
 };
-// 3. INJECT ACTIVITY (The "Add Meeting" Logic)
+// 3. INJECT ACTIVITY (No Popups - Text Only)
 window.injectDirectorActivity = (activityName) => {
-    // 1. Ask for duration
-    const duration = prompt(`How long is the ${activityName}? (in minutes)`, "60");
-    if (!duration) return;
-    
-    // 2. Ask for Start Time
-    const startStr = prompt(`What time does the ${activityName} start? (HH:MM)`, "14:00");
-    if (!startStr) return;
-
-    // 3. Add to reason automatically so the Planner knows what to do manually later
-    // (Since we are not building the full drag-drop engine here, we flag it for the planning team)
     const reasonInput = document.getElementById('dirEditReason');
-    const currentReason = reasonInput.value;
-    const newNote = `[ACTION REQUIRED]: Add ${activityName} (${duration}m @ ${startStr})`;
+    const currentVal = reasonInput.value;
     
-    reasonInput.value = currentReason ? `${currentReason}, ${newNote}` : newNote;
-
-    // Visual Feedback
-    alert(`Request added to notes. Please click 'Update Schedule' to save this instruction.`);
+    // Simply append the request to the text box
+    // The Planner sees this text and knows what to do
+    const newNote = `[REQ: Add ${activityName}]`;
+    
+    if (currentVal.includes(newNote)) return; // Don't add twice
+    
+    reasonInput.value = currentVal ? `${currentVal} ${newNote}` : newNote;
+    
+    // Visual feedback (Flash the button)
+    const btn = event.target;
+    const oldColor = btn.style.backgroundColor;
+    btn.style.backgroundColor = '#dbeafe'; // Light blue flash
+    setTimeout(() => { btn.style.backgroundColor = oldColor; }, 200);
 };
 // --- Initialization Trigger ---
 document.addEventListener("DOMContentLoaded", init);
