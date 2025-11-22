@@ -1231,13 +1231,21 @@ display: flex;
             <strong>Note:</strong> Changing times will automatically extend or trim the shift. Breaks will be preserved where possible.
         </div>
 
-        <div class="form-group" style="margin-top: 8px;">
-            <label style="font-size:12px; font-weight:600; color:#64748B;">Quick Add Activity</label>
-            <div style="display:flex; gap:8px;">
-                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="injectDirectorActivity('Meeting')">Meeting</button>
-                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="injectDirectorActivity('Training')">Training</button>
-                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="injectDirectorActivity('Admin')">Admin</button>
+        <div style="background:#F1F5F9; padding:12px; border-radius:8px; margin-top:8px; border:1px solid #E2E8F0;">
+            <label style="font-size:11px; font-weight:700; color:#475569; display:block; margin-bottom:6px;">INSERT ACTIVITY (Maintains Shift Length)</label>
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <select id="dirAddType" class="form-select" style="flex:2; padding:6px; font-size:12px; height:32px;">
+                    <option value="Meeting">Meeting</option>
+                    <option value="Training">Training</option>
+                    <option value="Admin">Admin</option>
+                    <option value="121">121</option>
+                    <option value="Break">Break</option>
+                </select>
+                <input type="time" id="dirAddStart" class="form-input" style="flex:2; padding:6px; font-size:12px; height:32px;">
+                <input type="number" id="dirAddDur" class="form-input" placeholder="Mins" value="30" style="flex:1; padding:6px; font-size:12px; height:32px;">
             </div>
+            <button class="btn btn-sm btn-secondary" style="width:100%;" onclick="addDirectorActivityToList()">+ Insert Activity</button>
+            <ul id="dirActivityList" style="list-style:none; padding:0; margin:8px 0 0 0; font-size:12px; color:#0F172A;"></ul>
         </div>
 
         <div style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; display:flex; gap:12px;">
@@ -3070,26 +3078,24 @@ window.jumpToSiteSchedule = (siteName) => {
     // 5. Trigger the "Change" event to force the grid to reload with new selection
     list.dispatchEvent(new Event('change'));
 };
-// --- DIRECTOR GOD MODE LOGIC (V2: Robust + Undo) ---
+// --- DIRECTOR GOD MODE LOGIC (V3: Inline Insert + Robust Save) ---
 
-// Global state for Undo functionality
 window.directorUndoState = null;
+window.directorPendingInjections = []; // Store added meetings here
 
 // 1. OPEN THE EDITOR
 window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd) => {
     if (!STATE.isDirector) return;
 
-    // A. RESTRICTION: Only allow editing if date is TODAY
     if (dateISO !== TODAY_ISO) {
-        alert("Director Mode: You can only edit the LIVE schedule (Today).\n\nHistoric/Future data is read-only here.");
+        alert("Director Mode: You can only edit the LIVE schedule (Today).");
         return;
     }
 
     const advisor = STATE.teamMembers.find(m => m.id == advisorId);
     const name = advisor ? advisor.name : "Advisor";
 
-    // B. Capture Undo State BEFORE loading the form
-    // We fetch the actual database structure to store for undoing
+    // Capture Undo State
     document.getElementById('dirEditTitle').textContent = `Loading ${name}...`;
     const { data: currentState } = await supabase
         .from('schedule_exceptions')
@@ -3098,183 +3104,208 @@ window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd)
         .eq('exception_date', dateISO)
         .single();
 
-    // Store for Undo button
     window.directorUndoState = {
         advisor_id: advisorId,
         exception_date: dateISO,
-        structure: currentState ? currentState.structure : [], // Default to empty if none exists
+        structure: currentState ? currentState.structure : [],
         reason: currentState ? currentState.reason : ""
     };
     
-    // Enable Undo Button
+    // Reset UI
+    window.directorPendingInjections = []; // Clear previous additions
+    document.getElementById('dirActivityList').innerHTML = ''; 
+    
     const undoBtn = document.getElementById('btnDirectorUndo');
     undoBtn.disabled = false;
     undoBtn.style.opacity = '1';
-    undoBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg> Undo Revisions`;
 
-    // C. Populate Form
+    // Populate Form
     document.getElementById('dirEditTitle').textContent = `Edit Live: ${name}`;
     document.getElementById('dirEditAdvisorId').value = advisorId;
     document.getElementById('dirEditDateISO').value = dateISO;
     document.getElementById('dirEditStart').value = currentStart;
     document.getElementById('dirEditEnd').value = currentEnd;
-    // Pre-fill reason but allow additions
-    const currentReason = window.directorUndoState.reason || "";
-    document.getElementById('dirEditReason').value = currentReason; 
+    document.getElementById('dirEditReason').value = window.directorUndoState.reason || ""; 
+
+    // Pre-fill the "Add Activity" time box
+    const startEl = document.getElementById('dirAddStart');
+    if (startEl) startEl.value = currentStart;
 
     document.getElementById('directorEditModal').style.display = 'flex';
 };
 
 window.closeDirectorEditor = () => {
     document.getElementById('directorEditModal').style.display = 'none';
-    window.directorUndoState = null; // Clear undo state on close
+    window.directorUndoState = null;
 };
 
-// 2. INJECT ACTIVITY NOTE (Text Only)
-window.injectDirectorActivity = (activityName) => {
-    const reasonInput = document.getElementById('dirEditReason');
-    const currentVal = reasonInput.value;
-    const newNote = `[REQ: Add ${activityName}]`;
-    if (currentVal.includes(newNote)) return;
-    reasonInput.value = currentVal ? `${currentVal} ${newNote}` : newNote;
-    
-    // Visual feedback
-    const btn = event.target;
-    const oldBg = btn.style.backgroundColor;
-    btn.style.backgroundColor = '#dbeafe'; setTimeout(() => { btn.style.backgroundColor = oldBg; }, 200);
+// 2. ADD ACTIVITY TO LIST (Local UI Only)
+window.addDirectorActivityToList = () => {
+    const type = document.getElementById('dirAddType').value;
+    const start = document.getElementById('dirAddStart').value;
+    const dur = parseInt(document.getElementById('dirAddDur').value);
+
+    if(!start || !dur) return;
+
+    // Store it
+    window.directorPendingInjections.push({ type, start, dur });
+
+    // Show it in the list
+    const li = document.createElement('li');
+    li.style.marginBottom = '4px';
+    li.style.display = 'flex';
+    li.style.justifyContent = 'space-between';
+    li.innerHTML = `
+        <span><strong>${type}</strong> @ ${start} (${dur}m)</span>
+        <span style="color:#EF4444; cursor:pointer;" onclick="this.parentElement.remove(); removeInjection('${start}')">x</span>
+    `;
+    document.getElementById('dirActivityList').appendChild(li);
 };
 
+window.removeInjection = (startVal) => {
+    window.directorPendingInjections = window.directorPendingInjections.filter(i => i.start !== startVal);
+};
 
-// 3. HANDLE UNDO (Revert to state at opening)
+// 3. HANDLE UNDO
 window.handleDirectorUndo = async () => {
     if (!window.directorUndoState) return;
-    if (!confirm("Revert schedule back to how it was before you opened this editor?")) return;
+    if (!confirm("Revert schedule?")) return;
 
     const undoBtn = document.getElementById('btnDirectorUndo');
     undoBtn.textContent = "Reverting...";
-    undoBtn.disabled = true;
-
-    // Write the stored state back to Supabase
+    
     const { error } = await supabase.from('schedule_exceptions').upsert({
         advisor_id: window.directorUndoState.advisor_id,
         exception_date: window.directorUndoState.exception_date,
         structure: window.directorUndoState.structure,
-        reason: window.directorUndoState.reason // Restore original reason
+        reason: window.directorUndoState.reason
     }, { onConflict: 'advisor_id, exception_date' });
 
-    if (error) {
-        alert("Undo failed: " + error.message);
-        undoBtn.textContent = "Undo Error";
-    } else {
-        // Broadcast the revert
+    if (!error) {
         if (STATE.rotaRealtimeChannel) {
              STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: window.directorUndoState.advisor_id, date: window.directorUndoState.exception_date } });
         }
         closeDirectorEditor();
         await loadAndRender();
-        alert("Schedule reverted successfully.");
     }
 };
 
 
-// 4. SAVE THE CHANGES (Robust "Crop & Extend")
+// 4. SAVE (Apply Injections -> Then Crop/Extend)
 window.handleDirectorSave = async () => {
     const advisorId = document.getElementById('dirEditAdvisorId').value;
     const dateISO = document.getElementById('dirEditDateISO').value;
     const newStartStr = document.getElementById('dirEditStart').value;
     const newEndStr = document.getElementById('dirEditEnd').value;
-    const reason = document.getElementById('dirEditReason').value || "Director Override";
+    let reason = document.getElementById('dirEditReason').value || "Director Override";
 
-    if (!newStartStr || !newEndStr) { alert("Please set start and end times."); return; }
     const targetStart = hhmmToMinutes(newStartStr);
     const targetEnd = hhmmToMinutes(newEndStr);
-    if (targetEnd <= targetStart) { alert("End time must be after start time."); return; }
 
-    // Fetch current live setup
+    // Fetch Current
     const dayName = new Date(dateISO).toLocaleDateString('en-US', { weekday: 'long' });
     const currentSegments = calculateLiveSegments(advisorId, dayName, STATE.currentWeekData.mondayISO);
 
     if (!currentSegments || currentSegments.length === 0) {
-        alert("Cannot edit an empty day (RDO) this way. Please use the Planner."); return;
+        alert("Empty schedule. Use Planner to create one first."); return;
     }
 
-    let newStructure = [];
+    // Helper to find IDs
     const comps = Object.values(STATE.components);
-    
-    // ROBUST ID FINDER: Handles casing and variations
     const getCompId = (name) => {
         const cleanName = name.toLowerCase().trim();
-        // 1. Exact Match
         let match = comps.find(c => c.name.toLowerCase() === cleanName);
-        // 2. Type Match (for breaks/lunch)
-        if (!match) {
-            if (cleanName.includes('break')) match = comps.find(c => c.type === 'Break');
-            if (cleanName.includes('lunch')) match = comps.find(c => c.type === 'Lunch');
-            if (cleanName.includes('meeting')) match = comps.find(c => c.name.toLowerCase().includes('meeting'));
-        }
-        // 3. Fallback to main activity
-        if (!match) match = comps.find(c => c.type === 'Activity') || comps[0];
+        if (!match) match = comps.find(c => c.type === cleanName) || comps.find(c => c.type === 'Activity');
         return match ? match.id : null;
     };
-    
-    // A. Crop Existing
-    for (const seg of currentSegments) {
-        let s = seg.startMin, e = seg.endMin;
-        if (e <= targetStart || s >= targetEnd) continue; // Outside new window
-        if (s < targetStart) s = targetStart; // Clip start
-        if (e > targetEnd) e = targetEnd; // Clip end
-        
-        const cId = getCompId(seg.code); // Use robust finder
-        if (cId) newStructure.push({ component_id: cId, start_min: s, end_min: e });
+
+    // A. Build Base Structure from Existing (Preserve what we can)
+    let workStructure = [];
+    currentSegments.forEach(seg => {
+        const cId = getCompId(seg.code);
+        if(cId) workStructure.push({ component_id: cId, start_min: seg.startMin, end_min: seg.endMin });
+    });
+
+    // B. Apply Injections (Carve Out Time)
+    window.directorPendingInjections.forEach(inj => {
+        const injStart = hhmmToMinutes(inj.start);
+        const injEnd = injStart + inj.dur;
+        const injId = getCompId(inj.type);
+
+        if (injId) {
+            let newWork = [];
+            let inserted = false;
+            
+            workStructure.forEach(seg => {
+                // Case 1: No Overlap
+                if (seg.end_min <= injStart || seg.start_min >= injEnd) {
+                    newWork.push(seg);
+                } 
+                // Case 2: Overlap - Split or Shorten
+                else {
+                    // Before injection
+                    if (seg.start_min < injStart) {
+                        newWork.push({ component_id: seg.component_id, start_min: seg.start_min, end_min: injStart });
+                    }
+                    // The Injection
+                    if (!inserted) {
+                        newWork.push({ component_id: injId, start_min: injStart, end_min: injEnd });
+                        inserted = true;
+                    }
+                    // After injection
+                    if (seg.end_min > injEnd) {
+                        newWork.push({ component_id: seg.component_id, start_min: injEnd, end_min: seg.end_min });
+                    }
+                }
+            });
+            
+            if(!inserted) newWork.push({ component_id: injId, start_min: injStart, end_min: injEnd });
+
+            workStructure = newWork.sort((a,b) => a.start_min - b.start_min);
+            reason += ` [Added ${inj.type} ${inj.start}]`;
+        }
+    });
+
+    // C. Final Crop/Extend to Main Shift Times
+    let finalStructure = [];
+    workStructure.forEach(seg => {
+        let s = seg.start_min, e = seg.end_min;
+        if (e <= targetStart || s >= targetEnd) return; // Crop
+        if (s < targetStart) s = targetStart; // Clip
+        if (e > targetEnd) e = targetEnd; // Clip
+        finalStructure.push({ component_id: seg.component_id, start_min: s, end_min: e });
+    });
+
+    // Fill Gaps
+    if (finalStructure.length > 0) {
+        if (finalStructure[0].start_min > targetStart) {
+            finalStructure.unshift({ component_id: finalStructure[0].component_id, start_min: targetStart, end_min: finalStructure[0].start_min });
+        }
+        const last = finalStructure[finalStructure.length-1];
+        if (last.end_min < targetEnd) {
+            last.end_min = targetEnd;
+        }
+    } else {
+        // Fallback if empty
+        finalStructure.push({ component_id: getCompId('Phones'), start_min: targetStart, end_min: targetEnd });
     }
 
-    // B. Extend (Fill Gaps)
-    if (newStructure.length > 0) {
-        if (newStructure[0].start_min > targetStart) {
-            // Fill front gap with first activity type
-            newStructure.unshift({ component_id: newStructure[0].component_id, start_min: targetStart, end_min: newStructure[0].start_min });
-        }
-        // Extend last segment to fill back gap
-        newStructure[newStructure.length - 1].end_min = targetEnd;
-    } else {
-        // If everything was cropped, create fresh block
-        const defaultId = getCompId("Phones");
-        newStructure.push({ component_id: defaultId, start_min: targetStart, end_min: targetEnd });
-    }
-    
     // Save
     const saveBtn = document.getElementById('btnDirectorSave');
     saveBtn.textContent = "Updating..."; saveBtn.disabled = true;
 
     const { error } = await supabase.from('schedule_exceptions').upsert({
-        advisor_id: advisorId, exception_date: dateISO, structure: newStructure, reason: reason
+        advisor_id: advisorId, exception_date: dateISO, structure: finalStructure, reason: reason
     }, { onConflict: 'advisor_id, exception_date' });
 
-    if (error) { alert("Error: " + error.message); } else {
+    if (error) { 
+        alert("Error: " + error.message); 
+    } else {
         if (STATE.rotaRealtimeChannel) STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: advisorId, date: dateISO } });
-        closeDirectorEditor(); await loadAndRender();
+        closeDirectorEditor(); 
+        await loadAndRender();
     }
     saveBtn.textContent = "Update Schedule"; saveBtn.disabled = false;
-};
-
-// 3. INJECT ACTIVITY (No Popups - Text Only)
-window.injectDirectorActivity = (activityName) => {
-    const reasonInput = document.getElementById('dirEditReason');
-    const currentVal = reasonInput.value;
-    
-    // Simply append the request to the text box
-    // The Planner sees this text and knows what to do
-    const newNote = `[REQ: Add ${activityName}]`;
-    
-    if (currentVal.includes(newNote)) return; // Don't add twice
-    
-    reasonInput.value = currentVal ? `${currentVal} ${newNote}` : newNote;
-    
-    // Visual feedback (Flash the button)
-    const btn = event.target;
-    const oldColor = btn.style.backgroundColor;
-    btn.style.backgroundColor = '#dbeafe'; // Light blue flash
-    setTimeout(() => { btn.style.backgroundColor = oldColor; }, 200);
 };
 // --- Initialization Trigger ---
 document.addEventListener("DOMContentLoaded", init);
