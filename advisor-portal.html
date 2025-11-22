@@ -937,6 +937,45 @@ display: flex;
     .dir-progress-fill { height: 100%; background: var(--brand-primary); border-radius: 3px; width: 0%; transition: width 1s ease-out; }
     
     .dir-stat-row { display: flex; justify-content: space-between; font-size: 12px; color: #64748B; font-weight: 500; }
+  /* === DIRECTOR GOD MODE MODAL (Fixed Layout) === */
+#directorEditModal {
+    display: none; 
+    align-items: center; 
+    justify-content: center; 
+    backdrop-filter: blur(4px);
+    z-index: 10000;
+}
+
+#directorEditModal .modal-content {
+    margin: auto;
+    background: white;
+    width: 400px; /* Fixed neat width */
+    border-radius: 20px; /* Apple-style corners */
+    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    padding: 0;
+    overflow: hidden;
+    position: relative;
+    top: auto; /* Reset position */
+    right: auto; /* Reset position */
+    height: auto; /* Reset height */
+    border: 1px solid rgba(0,0,0,0.1);
+    animation: popIn 0.2s ease-out;
+}
+
+@keyframes popIn {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+#directorEditModal .modal-header {
+    background: #F8FAFC;
+    padding: 16px 24px;
+    border-bottom: 1px solid #E2E8F0;
+}
+
+#directorEditModal .modal-body {
+    padding: 24px;
+}
   </style>
 </head>
 <body>
@@ -1192,9 +1231,17 @@ display: flex;
             <strong>Note:</strong> Changing times will automatically extend or trim the shift. Breaks will be preserved where possible.
         </div>
 
-        <div style="display:flex; gap:12px; margin-top:8px;">
-            <button class="btn btn-danger" style="flex:1;" onclick="handleDirectorDelete()">Clear Shift</button>
-            <button class="btn" style="flex:2;" onclick="handleDirectorSave()">Update Schedule</button>
+        <div class="form-group" style="margin-top: 8px;">
+            <label style="font-size:12px; font-weight:600; color:#64748B;">Quick Add Activity</label>
+            <div style="display:flex; gap:8px;">
+                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="injectDirectorActivity('Meeting')">Meeting</button>
+                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="injectDirectorActivity('Training')">Training</button>
+                <button class="btn btn-secondary btn-sm" style="flex:1;" onclick="injectDirectorActivity('Admin')">Admin</button>
+            </div>
+        </div>
+
+        <div style="margin-top:16px; border-top:1px solid #eee; padding-top:16px;">
+            <button class="btn" style="width:100%; background-color: #2563EB;" onclick="handleDirectorSave()">Update Schedule</button>
         </div>
 
       </div>
@@ -3202,6 +3249,27 @@ window.handleDirectorDelete = async () => {
         closeDirectorEditor();
         loadAndRender();
     }
+};
+// 3. INJECT ACTIVITY (The "Add Meeting" Logic)
+window.injectDirectorActivity = (activityName) => {
+    // 1. Ask for duration
+    const duration = prompt(`How long is the ${activityName}? (in minutes)`, "60");
+    if (!duration) return;
+    
+    // 2. Ask for Start Time
+    const startStr = prompt(`What time does the ${activityName} start? (HH:MM)`, "14:00");
+    if (!startStr) return;
+
+    // 3. Add to reason automatically so the Planner knows what to do manually later
+    // (Since we are not building the full drag-drop engine here, we flag it for the planning team)
+    const reasonInput = document.getElementById('dirEditReason');
+    const currentReason = reasonInput.value;
+    const newNote = `[ACTION REQUIRED]: Add ${activityName} (${duration}m @ ${startStr})`;
+    
+    reasonInput.value = currentReason ? `${currentReason}, ${newNote}` : newNote;
+
+    // Visual Feedback
+    alert(`Request added to notes. Please click 'Update Schedule' to save this instruction.`);
 };
 // --- Initialization Trigger ---
 document.addEventListener("DOMContentLoaded", init);
