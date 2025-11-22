@@ -3073,19 +3073,26 @@ window.jumpToSiteSchedule = (siteName) => {
 };
 // --- DIRECTOR GOD MODE LOGIC ---
 
-// 1. OPEN THE EDITOR
+// 1. OPEN THE EDITOR (Restricted to Today)
 window.openDirectorEditor = (advisorId, dateISO, currentStart, currentEnd) => {
-    if (!STATE.isDirector) return; // Safety check
+    if (!STATE.isDirector) return;
 
-    // Find name from current view list
+    // RESTRICTION: Only allow editing if date is TODAY
+    // We compare the clicked date (dateISO) with the global today string (TODAY_ISO)
+    if (dateISO !== TODAY_ISO) {
+        // Optional: Show a toast saying "Historic/Future data is read-only"
+        // For now, we just do nothing or alert
+        alert("Director Mode: You can only edit the LIVE schedule (Today).");
+        return;
+    }
+
     const advisor = STATE.teamMembers.find(m => m.id == advisorId);
     const name = advisor ? advisor.name : "Advisor";
 
-    document.getElementById('dirEditTitle').textContent = `Edit: ${name}`;
+    document.getElementById('dirEditTitle').textContent = `Edit Live: ${name}`;
     document.getElementById('dirEditAdvisorId').value = advisorId;
     document.getElementById('dirEditDateISO').value = dateISO;
     
-    // Set values
     document.getElementById('dirEditStart').value = currentStart;
     document.getElementById('dirEditEnd').value = currentEnd;
     document.getElementById('dirEditReason').value = ""; 
@@ -3097,7 +3104,7 @@ window.closeDirectorEditor = () => {
     document.getElementById('directorEditModal').style.display = 'none';
 };
 
-// 2. SAVE THE CHANGES (Robust Version)
+// 2. SAVE THE CHANGES (Crop & Extend - Preserves EVERYTHING)
 window.handleDirectorSave = async () => {
     const advisorId = document.getElementById('dirEditAdvisorId').value;
     const dateISO = document.getElementById('dirEditDateISO').value;
@@ -3111,36 +3118,89 @@ window.handleDirectorSave = async () => {
     }
 
     // 1. Convert Inputs to Minutes
-    const startMin = hhmmToMinutes(newStartStr);
-    const endMin = hhmmToMinutes(newEndStr);
+    const targetStart = hhmmToMinutes(newStartStr);
+    const targetEnd = hhmmToMinutes(newEndStr);
     
-    if (endMin <= startMin) {
+    if (targetEnd <= targetStart) {
         alert("End time must be after start time.");
         return;
     }
 
-    // 2. Prepare the New Schedule Structure
-    // We start with a clean slate based on the Director's inputs
+    // 2. Fetch Existing Structure (The DNA)
+    // We get the live segments as they look right now
+    const dayName = new Date(dateISO).toLocaleDateString('en-US', { weekday: 'long' });
+    const currentSegments = calculateLiveSegments(advisorId, dayName, STATE.currentWeekData.mondayISO);
+
+    if (!currentSegments || currentSegments.length === 0) {
+        alert("Cannot edit an empty day (RDO) this way. Please use the Planner to create a shift first.");
+        return;
+    }
+
+    // 3. "Crop & Extend" Logic
     let newStructure = [];
+    
+    // Helper: Find Component ID by Name (needed because live segments only have names)
+    const getCompId = (name) => {
+        const comp = Object.values(STATE.components).find(c => c.name === name);
+        return comp ? comp.id : null;
+    };
+    
+    // A. Process Existing Segments (Trim them to fit new window)
+    for (const seg of currentSegments) {
+        let s = seg.startMin;
+        let e = seg.endMin;
+        
+        // Crop Start: If segment ends before new start, discard it.
+        if (e <= targetStart) continue;
+        // Crop End: If segment starts after new end, discard it.
+        if (s >= targetEnd) continue;
+        
+        // Clip Edges:
+        if (s < targetStart) s = targetStart;
+        if (e > targetEnd) e = targetEnd;
+        
+        const cId = getCompId(seg.code);
+        if (cId) {
+            newStructure.push({ component_id: cId, start_min: s, end_min: e });
+        }
+    }
 
-    // A. Find the correct "Work" Activity ID (e.g., Phones)
-    // We look at the component list to find the default activity
-    let mainCompId = null;
-    // Try to find a component named "Phones" or "Activity"
-    const comps = Object.values(STATE.components);
-    const workComp = comps.find(c => c.name === 'Phones') || comps.find(c => c.type === 'Activity') || comps[0];
-    if (workComp) mainCompId = workComp.id;
-
-    // B. Build the single block (The Shift)
-    // Note: We rely on the Planner system to re-insert breaks later if needed. 
-    // For "God Mode", we just set the hard limits.
-    newStructure.push({
-        component_id: mainCompId,
-        start_min: startMin,
-        end_min: endMin
-    });
-
-    // 3. Save to Database
+    // B. Fill Gaps (Extend)
+    // If the new window is wider than the old one, we need to fill the empty space.
+    // We check the very first and very last segments of our NEW structure.
+    
+    if (newStructure.length > 0) {
+        // Check Front Gap (Did we start earlier than the old shift?)
+        const firstSeg = newStructure[0];
+        if (firstSeg.start_min > targetStart) {
+            // Fill with default activity (or extend first segment)
+            // We will insert a new block of "Phones" (or whatever the first block is)
+            newStructure.unshift({ 
+                component_id: firstSeg.component_id, 
+                start_min: targetStart, 
+                end_min: firstSeg.start_min 
+            });
+        }
+        
+        // Check Back Gap (Did we end later than the old shift?)
+        const lastSeg = newStructure[newStructure.length - 1];
+        if (lastSeg.end_min < targetEnd) {
+            // Extend the last segment to fill the time
+            // (This is safer than adding a new block, keeps the timeline clean)
+            lastSeg.end_min = targetEnd;
+        }
+    } else {
+        // If we cropped everything away (e.g. moved shift entirely), create fresh block
+        const defaultCompId = getCompId("Phones") || Object.values(STATE.components)[0].id;
+        newStructure.push({ component_id: defaultCompId, start_min: targetStart, end_min: targetEnd });
+    }
+    
+    // 4. Check for "Quick Add" Requests
+    // If the user clicked "Meeting", it's in the text box as "[REQ: Add Meeting]"
+    // For V1, we just save this text so the Planner sees it. 
+    // (Implementing auto-insertion logic here is risky without the full builder engine).
+    
+    // 5. Save to Database
     const record = {
         advisor_id: advisorId,
         exception_date: dateISO,
@@ -3159,9 +3219,7 @@ window.handleDirectorSave = async () => {
     if (error) {
         alert("Database Error: " + error.message);
     } else {
-        // 4. Success! Trigger Updates
-        
-        // A. Broadcast to everyone else
+        // Success!
         if (STATE.rotaRealtimeChannel) {
             STATE.rotaRealtimeChannel.send({
                 type: 'broadcast',
@@ -3169,10 +3227,8 @@ window.handleDirectorSave = async () => {
                 payload: { advisor_id: advisorId, date: dateISO }
             });
         }
-        
-        // B. Force Local Refresh immediately
         closeDirectorEditor();
-        await loadAndRender(); // <--- This forces the screen to redraw with new data
+        await loadAndRender(); 
     }
     
     btn.textContent = originalText;
