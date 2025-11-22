@@ -797,29 +797,39 @@ display: flex;
 
 /* 3. Blocks are Relative (Stacking) but Height is set by JS */
 #tab-my-schedule .activity-block {
-    position: relative !important; /* Sits in the flow */
+    position: relative !important;
     left: auto !important;
     right: auto !important;
-    top: auto !important;          /* Ignore vertical start time position */
+    top: auto !important;
     width: 100% !important;
-    margin: 0 !important;
-    margin-bottom: 1px !important; /* Tiny separator line */
     
-    /* Center Content */
+    /* FIX: Remove margins to prevent "drift" */
+    margin: 0 !important;
+    /* Add a tiny border-bottom to act as the separator instead of margin */
+    border-bottom: 1px solid rgba(255,255,255,0.5); 
+    
+    padding: 2px 4px;
+    font-size: 11px;
+    overflow: hidden;
+    border-radius: 0; /* Square edges stack better */
+    
+    /* First and Last block rounded corners logic handled by JS if needed, or keep generic radius: */
+    border-radius: 4px;
+
+    box-shadow: none; /* Shadow adds size in some browsers, remove it for precision */
+    border: none; /* We use border-bottom for separation */
+    
+    line-height: 1.1;
+    pointer-events: auto;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
+    flex-shrink: 0;
     
-    padding: 2px 4px;
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-sm);
-    border: 1px solid rgba(0,0,0,0.1);
-    line-height: 1.1;
-    pointer-events: auto;
-    overflow: hidden;
-    flex-shrink: 0; /* Prevent blocks from squishing */
+    /* FIX: Ensure padding doesn't add to the calculated height */
+    box-sizing: border-box; 
 }
 /* === END FIX === */
 /* Explicit Rest Day Indicator (Striped) */
