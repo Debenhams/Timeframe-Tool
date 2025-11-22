@@ -2640,9 +2640,9 @@ async function calculateDirectorStats() {
         targetDate = today;
     }
     
-    const targetISO = fmtDateLocal(targetDate); // Use this calculated date, NOT todayISO
+    const targetISO = fmtDateLocal(targetDate); 
 
-    // 1. Fetch Hierarchy Map (Advisor -> Leader -> Site)
+    // 1. Fetch Hierarchy Map
     const { data: hierarchy } = await supabase
         .from('advisors')
         .select(`id, leader_id, leaders ( site_id, sites (name) )`);
@@ -2655,32 +2655,21 @@ async function calculateDirectorStats() {
     let shrinkageCount = 0;
     let siteStats = {}; 
 
-    // 2. Loop through EVERY advisor in the system
+    // 2. Loop through EVERY advisor
     hierarchy.forEach(adv => {
         const advId = adv.id;
-        // Get Site Name (Handle nulls safely)
         let siteName = "Unassigned";
         if (adv.leaders && adv.leaders.sites) siteName = adv.leaders.sites.name;
 
-        // Init Site Bucket
         if (!siteStats[siteName]) siteStats[siteName] = { total: 0, active: 0, shrinkage: 0 };
 
-        // A. Check for Rotation Assignment (Are they scheduled?)
-        const assignment = STATE.assignments.get(advId);
-        
-        // Use the CALCULATOR logic to see if they have segments on the TARGET DATE
-        // We need the day name for the rotation lookup (e.g., "Monday")
+        // A. Check Rotation
         const dayName = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
-        
-        // Calculate segments using the Week Start of the selected date (which is STATE.monday)
         const segments = calculateLiveSegments(advId, dayName, STATE.currentWeekData.mondayISO);
-        
         const isScheduled = segments.length > 0;
         
-        // B. Check for Sickness/Absence Exception on the TARGET DATE
+        // B. Check Exceptions
         const exception = STATE.exceptions.find(e => e.advisor_id === advId && e.exception_date === targetISO);
-        
-        // Determine Status
         let isSick = false;
         if (exception && exception.structure.length > 0) {
             const compId = exception.structure[0].component_id;
@@ -2711,15 +2700,14 @@ async function calculateDirectorStats() {
     const shrinkEl = document.getElementById('dir-val-shrinkage');
     if(shrinkEl) {
         shrinkEl.textContent = `${shrinkagePct}%`;
-        if (shrinkagePct > 10) shrinkEl.style.color = '#EF4444'; 
-        else shrinkEl.style.color = '#1E293B';
+        shrinkEl.style.color = shrinkagePct > 10 ? '#EF4444' : '#1E293B';
     }
 
     const coveragePct = totalStaff > 0 ? Math.round((activeHeadcount / totalStaff) * 100) : 0;
     const covEl = document.getElementById('dir-val-coverage');
     if(covEl) covEl.textContent = `${coveragePct}%`;
 
-    // 4. Build Brand Grid
+    // 4. Build Brand Grid (FIXED: No Double Divs)
     const gridEl = document.getElementById('dir-brand-grid');
     let gridHtml = '';
 
@@ -2734,7 +2722,6 @@ async function calculateDirectorStats() {
         if (siteCoverage < 70) statusClass = 'red';
 
         gridHtml += `
-        <div class="dir-brand-card" onclick="jumpToSiteSchedule('${site}')">
             <div class="dir-brand-card" onclick="jumpToSiteSchedule('${site}')">
                 <div class="dir-brand-header">
                     <div class="dir-brand-name">${site}</div>
