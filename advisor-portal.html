@@ -973,48 +973,12 @@ display: flex;
     border-bottom: 1px solid #E2E8F0;
 }
 
-/* (2 lines before) */
 #directorEditModal .modal-body {
     padding: 24px;
 }
-
-/* === DIRECTOR GOD MODE MODAL (Enhanced Visualization) === */
-/* Styles for the visualization timeline within the modal */
-#dirActivityList {
-    display: flex;
-    width: 100%;
-    height: 30px; /* Slightly taller for better visibility */
-    border-radius: 8px; /* Match modal style */
-    overflow: hidden;
-    margin-top: 12px !important;
-    margin-bottom: 16px !important;
-    border: 1px solid #E2E8F0;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.05); /* Subtle inset shadow */
-    background-color: #F8FAFC; /* Light background for the track */
-}
-
-.dir-activity-item {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px !important; /* Clearer font size */
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    padding: 0 4px;
-    /* Subtle border between items using white (for contrast on colored backgrounds) */
-    border-right: 1px solid rgba(255, 255, 255, 0.7);
-    transition: width 0.2s ease-out; /* Smooth transitions on change */
-}
-.dir-activity-item:last-child {
-    border-right: none;
-}
-
-/* (2 lines after) */
   </style>
 </head>
+<body>
 
   <div id="auth-overlay" class="auth-overlay">
     <div class="auth-container">
@@ -1237,7 +1201,6 @@ display: flex;
   </main>
 <div class="modal-backdrop" id="directorEditModal" style="display:none;">
     <div class="modal-content" style="max-width: 400px;">
-      /* (2 lines before) */
       <div class="modal-header">
         <h2 id="dirEditTitle">Edit Shift</h2>
         <button class="btn-icon modal-close" onclick="closeDirectorEditor()">
@@ -1249,45 +1212,43 @@ display: flex;
         <input type="hidden" id="dirEditAdvisorId">
         <input type="hidden" id="dirEditDateISO">
 
-        <div style="font-size:12px; font-weight:600; color:#64748B; margin-bottom: -12px;">Schedule Preview</div>
-        <div id="dirActivityList"></div>
-
-        <div style="display: flex; gap: 16px; margin-bottom: 8px;">
-            <div class="form-group" style="flex:1;">
-                <label style="font-size:12px; font-weight:600; color:#64748B;">Shift Start</label>
-                <input type="time" id="dirEditStart" class="form-input" style="font-size:16px; padding:10px;"> 
-            </div>
-
-            <div class="form-group" style="flex:1;">
-                <label style="font-size:12px; font-weight:600; color:#64748B;">Shift End</label>
-                <input type="time" id="dirEditEnd" class="form-input" style="font-size:16px; padding:10px;"> 
-            </div>
+        <div class="form-group">
+            <label style="font-size:12px; font-weight:600; color:#64748B;">Start Time</label>
+            <input type="time" id="dirEditStart" class="form-input" style="font-size:16px; padding:10px;">
         </div>
 
-        <div style="background:#F1F5F9; padding:16px; border-radius:8px; margin-top:8px; border:1px solid #E2E8F0;">
-            <label style="font-size:12px; font-weight:600; color:#334155; display:block; margin-bottom: 12px;">Insert Activity (Replaces Flexible Time)</label>
-            <div style="display:flex; gap:8px; margin-bottom:12px;">
-                <select id="dirAddType" class="form-select" style="flex:3; padding:8px; font-size:13px; height:36px;">
-                    </select>
-                <input type="time" id="dirAddStart" class="form-input" placeholder="Start Time" style="flex:2; padding:8px; font-size:13px; height:36px;">
-                <input type="number" id="dirAddDur" class="form-input" placeholder="Mins" value="30" min="5" step="5" style="flex:1; padding:8px; font-size:13px; height:36px;">
-            </div>
-            <button class="btn btn-sm btn-secondary" style="width:100%;" onclick="addDirectorActivityToList()">+ Insert Activity</button>
-            
-            </div>
-
-        <div style="background:#F8FAFC; padding:12px; border-radius:8px; border:1px solid #E2E8F0; font-size:11px; color:#64748B; line-height:1.4;">
-            <strong>Note:</strong> New activities replace flexible time (e.g., DEB Email). They cannot overlap fixed time (e.g., Breaks/Lunch). Start/End times adjust flexible time only.
+        <div class="form-group">
+            <label style="font-size:12px; font-weight:600; color:#64748B;">End Time</label>
+            <input type="time" id="dirEditEnd" class="form-input" style="font-size:16px; padding:10px;">
         </div>
 
-        <div class="form-group" style="margin-top: 8px;">
-            <label style="font-size:12px; font-weight:600; color:#64748B;">Reason / Auth (Required)</label>
+        <div class="form-group">
+            <label style="font-size:12px; font-weight:600; color:#64748B;">Reason / Auth</label>
             <input type="text" id="dirEditReason" class="form-input" placeholder="e.g. Authorized by Darren">
         </div>
 
+        <div style="background:#F8FAFC; padding:12px; border-radius:8px; border:1px solid #E2E8F0; font-size:11px; color:#64748B; line-height:1.4;">
+            <strong>Note:</strong> Changing times will automatically extend or trim the shift. Breaks will be preserved where possible.
+        </div>
+
+        <div style="background:#F1F5F9; padding:12px; border-radius:8px; margin-top:8px; border:1px solid #E2E8F0;">
+            
+            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                <select id="dirAddType" class="form-select" style="flex:2; padding:6px; font-size:12px; height:32px;">
+                    <option value="Meeting">Meeting</option>
+                    <option value="Training">Training</option>
+                    <option value="Admin">Admin</option>
+                    <option value="121">121</option>
+                    <option value="Break">Break</option>
+                </select>
+                <input type="time" id="dirAddStart" class="form-input" style="flex:2; padding:6px; font-size:12px; height:32px;">
+                <input type="number" id="dirAddDur" class="form-input" placeholder="Mins" value="30" style="flex:1; padding:6px; font-size:12px; height:32px;">
+            </div>
+            <button class="btn btn-sm btn-secondary" style="width:100%;" onclick="addDirectorActivityToList()">+ Insert Activity</button>
+            <ul id="dirActivityList" style="list-style:none; padding:0; margin:8px 0 0 0; font-size:12px; color:#0F172A;"></ul>
+        </div>
 
         <div style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; display:flex; gap:12px;">
-/* (2 lines after) */
             <button type="button" class="btn btn-secondary" onclick="handleDirectorUndo()" id="btnDirectorUndo" disabled style="flex:1; opacity:0.7;">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
                 Undo
@@ -1378,28 +1339,18 @@ function toMonday(d){
 function fmtDateLocal(d){
   return d.toLocaleDateString('en-CA', {year: 'numeric', month: '2-digit', day: '2-digit'});
 }
-
 function fmtDateFriendly(d) {
     return d.toLocaleDateString("en-GB", { month: "short", day: "numeric" });
 }
 function addDays(d,n){ const x=new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate()+n); return x; }
-// Updated hhmmToMinutes (Robust Validation)
-function hhmmToMinutes(t){
-    if (!t) return NaN; // Return NaN for empty input
-    const parts = t.split(":");
-    if (parts.length !== 2) return NaN; // Return NaN for invalid format
-    const h = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10);
-    // Check for invalid numbers or out of range values
-    if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) {
-        return NaN;
-    }
-    return h * 60 + m;
+function hhmmToMinutes(t){ 
+    if (!t) return 0;
+   const [h,m]=(t.split(":")||["0","0"]).map(Number); 
+    return h*60+m; 
 }
 
 // Robust Minutes to Time formatter
 const m2t = (minutes) => {
-
     if (minutes === null || isNaN(minutes)) return "";
     let roundedMinutes = Math.round(minutes);
     // We generally don't wrap around midnight (1440) unless specifically needed for overnight shifts, 
@@ -1541,13 +1492,12 @@ const STATE = {
     rotationPatterns: {}, // Stores rotation_patterns by name
     assignments: new Map(), // Stores assignments by advisor_id
 
-    
     // New State for Team View
     teamViewMode: 'daily', // 'daily' or 'weekly'
     teamViewDayIndex: 0, // 0=Monday, 6=Sunday
 };
 
-
+/* ---- Live Schedule Calculation ---- */
 
 // Converts planner-style structures (using component_id) into display format
 function structureToSegments(structure) {
@@ -1698,18 +1648,16 @@ async function loadAllDefinitions() {
         }
     });
 }
-/* (2 lines before) */
+
 // Load components
 async function loadComponents() {
     const { data } = await supabase.from("schedule_components").select("id, name, color");
     STATE.components = {};
     (data||[]).forEach(c => STATE.components[c.id] = c);
-    // Ensure Director map is initialized after components load (NEW)
 }
 
 
 async function identifyAdvisorAndTeam(user) {
-/* (2 lines after) */
     // 1. Identify Advisor ID
     const { data: profile } = await supabase.from("profiles").select("advisor_id").eq("user_id", user.id).maybeSingle();
 
@@ -2112,64 +2060,12 @@ ELS.realtimeNote.addEventListener('click', (e) => {
                 if (ELS.teamNamePill) {
                     ELS.teamNamePill.textContent = selectedIds.length > 1 ? `Viewing: ${selectedIds.length} Teams` : `Viewing: ${checkedBoxes[0].closest('label').querySelector('span').textContent}`;
                 }
-                /* (2 lines before) */
-//*** (Inside setupAppUIEvents function, near the end of the teamList 'change' listener) ***//
                 
                 loadAndRender();
             }
         });
     }
-
-    // --- Director Click Listener on Team View (NEW) ---
-    // Detects clicks on the team schedule view and opens the editor if permissions allow
-    ELS.teamScheduleContainer.addEventListener('click', (e) => {
-        // Check permissions: Must be Director or Leader (isLeader check added for completeness if it exists in STATE)
-        if (!STATE.isDirector && !STATE.isLeader) return; 
-
-        let advisorId = null;
-        let dateISO = null;
-        let advisorName = null;
-
-        // Detect click on Daily Timeline View
-        // Relies on .timeline-row and data-advisor-id attributes added during rendering
-        const timelineRow = e.target.closest('.timeline-row');
-        if (timelineRow && STATE.currentTab === 'tab-team-schedule' && STATE.teamViewMode === 'daily') {
-            advisorId = timelineRow.dataset.advisorId;
-            // Calculate date based on the currently selected day index
-            const dayIndex = STATE.teamViewDayIndex;
-            dateISO = fmtDateLocal(addDays(STATE.monday, dayIndex));
-            // Extract name from the row itself for reliability
-            const nameEl = timelineRow.querySelector('.timeline-name');
-            if (nameEl) advisorName = nameEl.textContent.trim();
-        }
-
-        // Detect click on Weekly Grid View (Assumes .weekly-cell class and data attributes exist)
-        // Note: This requires the weekly render function (not shown in prompt) to add these attributes.
-         const weeklyCell = e.target.closest('.weekly-cell');
-         if (weeklyCell && STATE.currentTab === 'tab-team-schedule' && STATE.teamViewMode === 'weekly') {
-             // Assuming these attributes are added during the weekly grid render function
-             advisorId = weeklyCell.dataset.advisorId;
-             // Ensure the attribute name matches what is used in the rendering function (e.g. data-date-iso)
-             dateISO = weeklyCell.dataset.dateIso; 
-             // Find advisor name from state/team list for weekly view
-             const advisor = STATE.teamMembers.find(m => m.id === advisorId) || (STATE.advisorId === advisorId ? {name: STATE.advisorName} : null);
-             if (advisor) advisorName = advisor.name;
-         }
-
-        if (advisorId && dateISO && advisorName) {
-            // Call the globally exposed function to open the editor
-            if (window.openDirectorEditor) {
-                // Fix: Pass default times (09:00 - 17:00) because the weekly grid cell doesn't know the exact shift times yet.
-                // This prevents the "Name in the Time Box" error.
-                window.openDirectorEditor(advisorId, dateISO, "09:00", "17:00");
-            }
-        }
-    });
-    // --------------------------------------------------------
 }
-
-// (New Helper) Updates the options in the Team Day Selector based on the current week
-/* (2 lines after) */
 
 // (New Helper) Updates the options in the Team Day Selector based on the current week
 function updateTeamDaySelector() {
@@ -2717,51 +2613,18 @@ function drawTeamScheduleGrid() {
     ELS.teamScheduleContainer.innerHTML = html;
 }
 
-// Renders the Team Schedule in a Weekly Grid format
-function renderTeamWeeklyGrid() {
-    let html = '<table class="team-grid"><thead><tr><th>Advisor</th>';
-    
-    // Headers
-    for (let i = 0; i < 7; i++) {
-        const dayDate = addDays(STATE.monday, i);
-        html += `<th>${DAYS[i]} (${fmtDateFriendly(dayDate)})</th>`;
+function renderTeamGridCell(segments) {
+    if (segments.length === 0) {
+        return `<span class="weekly-rdo">RDO</span>`;
     }
-    html += '</tr></thead><tbody>';
+
+    const start = segments[0].start;
+    const end = segments[segments.length - 1].end;
     
-    // Loop through advisors
-    (STATE.teamMembers || []).forEach(adv => {
-        html += `<tr data-advisor-id="${adv.id}"><td>${adv.name}</td>`;
-
-        // Loop through days of the week
-        for (let i = 0; i < 7; i++) {
-            const dayName = DAYS[i];
-            // Calculate the specific date for this cell (NEW)
-            const cellDateISO = fmtDateLocal(addDays(STATE.monday, i)); 
-            const segments = calculateLiveSegments(adv.id, dayName, fmtDateLocal(STATE.monday));
-
-            // Add class="weekly-cell" and data attributes (UPDATED)
-            // This enables the Director click listener to identify the cell.
-            html += `<td class="weekly-cell" data-advisor-id="${adv.id}" data-date-iso="${cellDateISO}">`;
-
-            if (segments && segments.length > 0) {
-                // Display summary (Start - End)
-                html += `<span class="weekly-shift-time">${segments[0].start} - ${segments[segments.length-1].end}</span>`;
-                
-                // Display details (Activities)
-                // const details = segments.map(s => s.code).join(', ');
-                // Basic implementation for details, can be enhanced
-                // html += `<span class="weekly-shift-details">${details}</span>`;
-
-            } else {
-                html += `<span class="weekly-rdo">RDO</span>`;
-            }
-            html += `</td>`; // Close the <td> (UPDATED)
-        }
-        html += `</tr>`;
-    });
-
-    html += '</tbody></table>';
-    ELS.teamScheduleContainer.innerHTML = html;
+    // Modified to show ONLY the time (Activity removed)
+    return `
+        <span class="weekly-shift-time">${start} - ${end}</span>
+    `;
 }
 
 // --- Team Schedule (Daily Gantt View) Rendering (NEW FEATURE) ---
