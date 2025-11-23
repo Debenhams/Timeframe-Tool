@@ -3078,7 +3078,7 @@ window.jumpToSiteSchedule = (siteName) => {
     // 5. Trigger the "Change" event to force the grid to reload with new selection
     list.dispatchEvent(new Event('change'));
 };
-// --- DIRECTOR GOD MODE LOGIC (V4: Fixed Carve & Live Update) ---
+// --- DIRECTOR GOD MODE LOGIC (V5: FIXED & ROBUST) ---
 
 window.directorUndoState = null;
 window.directorPendingInjections = [];
@@ -3086,7 +3086,6 @@ window.directorPendingInjections = [];
 // 1. OPEN THE EDITOR
 window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd) => {
     if (!STATE.isDirector) return;
-
     if (dateISO !== TODAY_ISO) {
         alert("Director Mode: You can only edit the LIVE schedule (Today).");
         return;
@@ -3097,12 +3096,13 @@ window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd)
 
     // Capture State for Undo
     document.getElementById('dirEditTitle').textContent = `Loading ${name}...`;
+    
     const { data: currentState } = await supabase
         .from('schedule_exceptions')
         .select('structure, reason')
         .eq('advisor_id', advisorId)
         .eq('exception_date', dateISO)
-        .single();
+        .maybeSingle();
 
     window.directorUndoState = {
         advisor_id: advisorId,
@@ -3110,7 +3110,7 @@ window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd)
         structure: currentState ? currentState.structure : [],
         reason: currentState ? currentState.reason : ""
     };
-    
+
     // Reset UI
     window.directorPendingInjections = [];
     document.getElementById('dirActivityList').innerHTML = ''; 
@@ -3136,8 +3136,6 @@ window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd)
 
 window.closeDirectorEditor = () => {
     document.getElementById('directorEditModal').style.display = 'none';
-    // We do NOT clear undo state here, allowing re-open to undo if needed (advanced)
-    // But for safety, we reset it on next open.
 };
 
 // 2. ADD ACTIVITY TO LIST
@@ -3180,166 +3178,215 @@ window.handleDirectorUndo = async () => {
     if (!error) {
         // Trigger update
         if (STATE.rotaRealtimeChannel) STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: window.directorUndoState.advisor_id, date: window.directorUndoState.exception_date } });
-        
         await loadAndRender(); // Refresh Grid
         closeDirectorEditor(); // Close box
+    } else {
+        alert("Undo failed: " + error.message);
     }
 };
 
-// 4. SAVE (FIXED: Preserves Non-Overlapping Blocks)
+// 4. SAVE (CRITICAL FIX: PREVENTS DATA LOSS)
 window.handleDirectorSave = async () => {
-    const advisorId = document.getElementById('dirEditAdvisorId').value;
-    const dateISO = document.getElementById('dirEditDateISO').value;
-    const newStartStr = document.getElementById('dirEditStart').value;
-    const newEndStr = document.getElementById('dirEditEnd').value;
-    let reason = document.getElementById('dirEditReason').value || "Director Override";
-
-    const targetStart = hhmmToMinutes(newStartStr);
-    const targetEnd = hhmmToMinutes(newEndStr);
-
-    // Get Current Segments
-    const dayName = new Date(dateISO).toLocaleDateString('en-US', { weekday: 'long' });
-    const currentSegments = calculateLiveSegments(advisorId, dayName, STATE.currentWeekData.mondayISO);
-
-    if (!currentSegments || currentSegments.length === 0) {
-        alert("Empty schedule. Use Planner."); return;
-    }
-
-    // Helper: Find IDs
-    const comps = Object.values(STATE.components);
-    const getCompId = (name) => {
-        const clean = name.toLowerCase().trim();
-        let match = comps.find(c => c.name.toLowerCase() === clean);
-        if (!match) match = comps.find(c => c.type.toLowerCase() === clean) || comps.find(c => c.type === 'Activity');
-        return match ? match.id : null;
-    };
-
-    // Detect "Base Activity" (The main work type to fill gaps with)
-    // Look for the longest segment that isn't a break
-    let baseCompId = null;
-    let maxDur = 0;
-    currentSegments.forEach(seg => {
-        const c = seg.code.toLowerCase();
-        if (!c.includes('break') && !c.includes('lunch') && seg.duration_min > maxDur) {
-            maxDur = seg.duration_min;
-            baseCompId = getCompId(seg.code);
-        }
-    });
-    if (!baseCompId) baseCompId = getCompId('Phones'); // Fallback
-
-    // A. Build "Canvas" (Current Schedule clipped to new Start/End)
-    let workStructure = [];
-    currentSegments.forEach(seg => {
-        const cId = getCompId(seg.code);
-        if (!cId) return;
+    const saveBtn = document.getElementById('btnDirectorSave');
+    
+    try {
+        const advisorId = document.getElementById('dirEditAdvisorId').value;
+        const dateISO = document.getElementById('dirEditDateISO').value;
+        const newStartStr = document.getElementById('dirEditStart').value;
+        const newEndStr = document.getElementById('dirEditEnd').value;
+        let reason = document.getElementById('dirEditReason').value || "Director Override";
         
-        let s = seg.startMin, e = seg.endMin;
-        
-        // Crop to new bounds
-        if (e <= targetStart || s >= targetEnd) return; // Completely outside
-        if (s < targetStart) s = targetStart; // Clip start
-        if (e > targetEnd) e = targetEnd; // Clip end
-        
-        workStructure.push({ component_id: cId, start_min: s, end_min: e });
-    });
+        const targetStart = hhmmToMinutes(newStartStr);
+        const targetEnd = hhmmToMinutes(newEndStr);
 
-    // B. Fill Edges (If extended) using Base Activity
-    if (workStructure.length > 0) {
-        if (workStructure[0].start_min > targetStart) {
-            workStructure.unshift({ component_id: baseCompId, start_min: targetStart, end_min: workStructure[0].start_min });
+        // Validate inputs
+        if (!advisorId || !dateISO || isNaN(targetStart) || isNaN(targetEnd)) {
+            alert("Invalid inputs. Please check start/end times.");
+            return;
         }
-        const last = workStructure[workStructure.length - 1];
-        if (last.end_min < targetEnd) {
-            // Check if last segment is work, if so extend it, else add new work block
-            const lastComp = STATE.components[last.component_id];
-            if (lastComp && lastComp.type === 'Activity') {
-                last.end_min = targetEnd;
-            } else {
-                workStructure.push({ component_id: baseCompId, start_min: last.end_min, end_min: targetEnd });
-            }
-        }
-    } else {
-        // Brand new block if everything was cropped
-        workStructure.push({ component_id: baseCompId, start_min: targetStart, end_min: targetEnd });
-    }
 
-    // C. Apply Injections (The Meetings) - CARVE LOGIC
-    window.directorPendingInjections.forEach(inj => {
-        const injStart = hhmmToMinutes(inj.start);
-        const injEnd = injStart + inj.dur;
-        const injId = getCompId(inj.type);
+        saveBtn.textContent = "Processing..."; 
+        saveBtn.disabled = true;
 
-        if (injId) {
-            let carvedStructure = [];
-            let inserted = false;
+        // Get Current Segments (The existing schedule for the day)
+        const dayName = new Date(dateISO).toLocaleDateString('en-US', { weekday: 'long' });
+        const currentSegments = calculateLiveSegments(advisorId, dayName, STATE.currentWeekData.mondayISO);
+
+        // --- Helper: Robust ID Finder ---
+        const comps = Object.values(STATE.components);
+        const getCompId = (name) => {
+            if (!name) return null;
+            const clean = name.toLowerCase().trim();
             
-            workStructure.forEach(seg => {
-                // 1. Segment is BEFORE injection
-                if (seg.end_min <= injStart) {
-                    carvedStructure.push(seg);
-                }
-                // 2. Segment is AFTER injection
-                else if (seg.start_min >= injEnd) {
-                    if (!inserted) {
-                        carvedStructure.push({ component_id: injId, start_min: injStart, end_min: injEnd });
-                        inserted = true;
-                    }
-                    carvedStructure.push(seg);
-                }
-                // 3. Overlap: Split the segment
-                else {
-                    // Part Before
-                    if (seg.start_min < injStart) {
-                        carvedStructure.push({ component_id: seg.component_id, start_min: seg.start_min, end_min: injStart });
-                    }
-                    // The Injection (Once)
-                    if (!inserted) {
-                        carvedStructure.push({ component_id: injId, start_min: injStart, end_min: injEnd });
-                        inserted = true;
-                    }
-                    // Part After
-                    if (seg.end_min > injEnd) {
-                        carvedStructure.push({ component_id: seg.component_id, start_min: injEnd, end_min: seg.end_min });
-                    }
+            // Priority 1: Exact Name
+            let match = comps.find(c => c.name.toLowerCase() === clean);
+            // Priority 2: Type Match
+            if (!match) match = comps.find(c => c.type.toLowerCase() === clean);
+            // Priority 3: Fallback to 'Activity' if undefined
+            if (!match) match = comps.find(c => c.type === 'Activity');
+            // Priority 4: Absolute Fail-safe (First available component)
+            if (!match && comps.length > 0) match = comps[0];
+
+            return match ? match.id : null;
+        };
+
+        // Detect "Base Activity" (To fill gaps if we extend the shift)
+        let baseCompId = null;
+        let maxDur = 0;
+        
+        // Find the dominant activity in the current schedule
+        if (currentSegments && currentSegments.length > 0) {
+            currentSegments.forEach(seg => {
+                const c = seg.code.toLowerCase();
+                if (!c.includes('break') && !c.includes('lunch') && seg.duration_min > maxDur) {
+                    maxDur = seg.duration_min;
+                    baseCompId = getCompId(seg.code);
                 }
             });
-
-            // If injection is past everything, append it
-            if (!inserted) {
-                 carvedStructure.push({ component_id: injId, start_min: injStart, end_min: injEnd });
-            }
-
-            workStructure = carvedStructure;
-            reason += ` [+${inj.type}]`;
         }
-    });
+        
+        // Fallback if schedule was empty
+        if (!baseCompId) baseCompId = getCompId('Phones') || getCompId('Activity');
+        
+        if (!baseCompId) {
+            throw new Error("Configuration Error: No 'Activity' or 'Phones' component found in database.");
+        }
 
-    // Sort
-    workStructure.sort((a, b) => a.start_min - b.start_min);
+        // A. Build "Canvas" (Clip current schedule to new Start/End)
+        let workStructure = [];
+        
+        if (currentSegments && currentSegments.length > 0) {
+            currentSegments.forEach(seg => {
+                // CRITICAL FIX: use the robust getCompId so we don't drop segments
+                const cId = getCompId(seg.code);
+                if (!cId) return; // Should theoretically never happen with fix
+                
+                let s = seg.startMin, e = seg.endMin;
+                
+                // Clip to new bounds
+                if (e <= targetStart || s >= targetEnd) return; // Completely outside
+                if (s < targetStart) s = targetStart; 
+                if (e > targetEnd) e = targetEnd; 
+                
+                workStructure.push({ component_id: cId, start_min: s, end_min: e });
+            });
+        }
 
-    // Save
-    const saveBtn = document.getElementById('btnDirectorSave');
-    saveBtn.textContent = "Saving..."; saveBtn.disabled = true;
+        // B. Fill Edges (If extended) using Base Activity
+        if (workStructure.length > 0) {
+            // Fill gap at start
+            if (workStructure[0].start_min > targetStart) {
+                workStructure.unshift({ component_id: baseCompId, start_min: targetStart, end_min: workStructure[0].start_min });
+            }
+            // Fill gap at end
+            const last = workStructure[workStructure.length - 1];
+            if (last.end_min < targetEnd) {
+                // Try to extend the last block if it's work
+                const lastComp = STATE.components[last.component_id];
+                if (lastComp && lastComp.type === 'Activity') {
+                    last.end_min = targetEnd;
+                } else {
+                    workStructure.push({ component_id: baseCompId, start_min: last.end_min, end_min: targetEnd });
+                }
+            }
+        } else {
+            // Brand new block if schedule was empty or fully cropped
+            workStructure.push({ component_id: baseCompId, start_min: targetStart, end_min: targetEnd });
+        }
 
-    const { error } = await supabase.from('schedule_exceptions').upsert({
-        advisor_id: advisorId, exception_date: dateISO, structure: workStructure, reason: reason
-    }, { onConflict: 'advisor_id, exception_date' });
+        // C. Apply Injections (The Meetings) - CARVE LOGIC
+        window.directorPendingInjections.forEach(inj => {
+            const injStart = hhmmToMinutes(inj.start);
+            const injEnd = injStart + inj.dur;
+            const injId = getCompId(inj.type);
 
-    if (error) { 
-        alert("Error: " + error.message); 
-        saveBtn.textContent = "Update Schedule"; saveBtn.disabled = false;
-    } else {
-        // Send Signal
-        if (STATE.rotaRealtimeChannel) STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: advisorId, date: dateISO } });
+            if (injId) {
+                let carvedStructure = [];
+                let inserted = false;
+                
+                workStructure.forEach(seg => {
+                    // 1. Segment is BEFORE injection
+                    if (seg.end_min <= injStart) {
+                        carvedStructure.push(seg);
+                    }
+                    // 2. Segment is AFTER injection
+                    else if (seg.start_min >= injEnd) {
+                        if (!inserted) {
+                            carvedStructure.push({ component_id: injId, start_min: injStart, end_min: injEnd });
+                            inserted = true;
+                        }
+                        carvedStructure.push(seg);
+                    }
+                    // 3. Overlap: Split the segment
+                    else {
+                        // Part Before
+                        if (seg.start_min < injStart) {
+                            carvedStructure.push({ component_id: seg.component_id, start_min: seg.start_min, end_min: injStart });
+                        }
+                        // The Injection (Once)
+                        if (!inserted) {
+                            carvedStructure.push({ component_id: injId, start_min: injStart, end_min: injEnd });
+                            inserted = true;
+                        }
+                        // Part After
+                        if (seg.end_min > injEnd) {
+                            carvedStructure.push({ component_id: seg.component_id, start_min: injEnd, end_min: seg.end_min });
+                        }
+                    }
+                });
+
+                // If injection is past everything, append it
+                if (!inserted) {
+                     carvedStructure.push({ component_id: injId, start_min: injStart, end_min: injEnd });
+                }
+
+                workStructure = carvedStructure;
+                reason += ` [+${inj.type}]`;
+            }
+        });
+
+        // Sort
+        workStructure.sort((a, b) => a.start_min - b.start_min);
+
+        // D. Save to Supabase
+        saveBtn.textContent = "Saving to Database...";
+        
+        const { error } = await supabase.from('schedule_exceptions').upsert({
+            advisor_id: advisorId, 
+            exception_date: dateISO, 
+            structure: workStructure, 
+            reason: reason
+        }, { onConflict: 'advisor_id, exception_date' });
+
+        if (error) throw error;
+
+        // Success
+        if (STATE.rotaRealtimeChannel) {
+            STATE.rotaRealtimeChannel.send({ 
+                type: 'broadcast', 
+                event: 'schedule_update', 
+                payload: { advisor_id: advisorId, date: dateISO } 
+            });
+        }
         
         await loadAndRender(); // Immediate refresh
         
         // UI Feedback
-        saveBtn.textContent = "Saved!";
+        saveBtn.textContent = "Saved Successfully!";
+        saveBtn.style.backgroundColor = "#10B981"; // Green
+        
         setTimeout(() => {
             closeDirectorEditor(); 
-            saveBtn.textContent = "Update Schedule"; saveBtn.disabled = false;
-        }, 500);
+            saveBtn.textContent = "Update Schedule"; 
+            saveBtn.style.backgroundColor = "#2563EB"; // Blue
+            saveBtn.disabled = false;
+        }, 800);
+
+    } catch (err) {
+        console.error("Director Save Error:", err);
+        alert("Failed to update schedule: " + err.message);
+        saveBtn.textContent = "Update Schedule";
+        saveBtn.disabled = false;
     }
 };
 
