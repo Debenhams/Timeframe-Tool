@@ -859,15 +859,30 @@ display: flex;
     user-select: none;
     z-index: 0;
 }
-/* === DIRECTOR COMMAND CENTER (Quarantined Styles) === */
+/* === DIRECTOR COMMAND CENTER (Premium Glass & Neon) === */
     
     .dir-dashboard {
         display: flex;
         flex-direction: column;
         gap: 24px;
-        padding: 8px;
+        padding: 24px; /* Increased padding */
         height: 100%;
         overflow-y: auto;
+        
+        /* THE AURORA MESH BACKGROUND */
+        background-color: #F8FAFC; /* Fallback */
+        background-image: 
+            radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.05) 0px, transparent 50%),
+            radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
+        background-size: 150% 150%;
+        animation: auroraMove 15s ease-in-out infinite alternate;
+    }
+
+    @keyframes auroraMove {
+        0% { background-position: 0% 0%; }
+        100% { background-position: 100% 100%; }
     }
 
     /* Top Row: Pulse Cards */
@@ -878,31 +893,107 @@ display: flex;
         flex-shrink: 0;
     }
 
+    /* === NEW PREMIUM CARD STYLES === */
     .dir-card {
-        background: rgba(255, 255, 255, 0.8);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.6);
-        border-radius: 16px;
-        padding: 20px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+        background: rgba(255, 255, 255, 0.65);
+        -webkit-backdrop-filter: blur(16px);
+        backdrop-filter: blur(16px); /* Standard property added */
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04), 
+                    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        transition: transform 0.2s;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        overflow: hidden;
     }
-    .dir-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08); }
+    
+    .dir-card:hover { 
+        transform: translateY(-4px); 
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+        background: rgba(255, 255, 255, 0.85);
+    }
 
-    .dir-card-title { font-size: 13px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
-    .dir-metric-value { font-size: 36px; font-weight: 800; color: #1E293B; line-height: 1; }
-    .dir-metric-sub { font-size: 12px; color: #10B981; font-weight: 600; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+    /* Subtle sheen animation on hover */
+    .dir-card::after {
+        content: '';
+        position: absolute;
+        top: 0; left: -100%;
+        width: 50%; height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+        transform: skewX(-25deg);
+        transition: 0.5s;
+    }
+    .dir-card:hover::after { left: 150%; transition: 0.7s ease-in-out; }
+
+    .dir-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+    
+    .dir-card-title { 
+        font-size: 12px; 
+        font-weight: 700; 
+        color: #64748B; 
+        text-transform: uppercase; 
+        letter-spacing: 1.5px; 
+    }
+
+    /* The "Live" pulsing dot */
+    .live-dot {
+        width: 8px; height: 8px;
+        background-color: #10B981;
+        border-radius: 50%;
+        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+        animation: pulse-green 2s infinite;
+    }
+    .live-dot.red { background-color: #EF4444; animation: pulse-red 2s infinite; }
+    
+    @keyframes pulse-green {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    @keyframes pulse-red {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    .dir-metric-value { 
+        font-size: 42px; 
+        font-weight: 800; 
+        color: #1E293B; 
+        line-height: 1;
+        letter-spacing: -1px;
+        /* FIX: Added standard property definitions below */
+        background: -webkit-linear-gradient(45deg, #1E293B, #475569);
+        background: linear-gradient(45deg, #1E293B, #475569);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    .dir-metric-sub { 
+        font-size: 12px; 
+        color: #64748B; 
+        font-weight: 600; 
+        margin-top: 8px; 
+        display: flex; 
+        align-items: center; 
+        gap: 6px; 
+        padding-top: 8px;
+        border-top: 1px solid rgba(0,0,0,0.05);
+    }
     .dir-metric-sub.down { color: #EF4444; }
 
     /* Middle Section: Brand Health Grid */
-    .dir-section-title { font-size: 18px; font-weight: 700; color: #334155; margin-bottom: 16px; margin-top: 8px; }
+    .dir-section-title { 
+        font-size: 20px;
+        font-weight: 700; color: #334155; margin-bottom: 16px; margin-top: 8px; display: flex; align-items: center; gap: 12px; }
     
     .dir-brand-grid {
         display: grid;
-        /* Changed to auto-FIT and added !important to force horizontal layout */
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
         gap: 24px;
         width: 100% !important;
@@ -922,21 +1013,31 @@ display: flex;
         flex-direction: column;
         gap: 12px;
     }
-    .dir-brand-card:hover { border-color: var(--brand-primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+    .dir-brand-card:hover { border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
 
-    .dir-brand-header { display: flex; justify-content: space-between; align-items: center; }
-    .dir-brand-name { font-weight: 700; font-size: 16px; color: #0F172A; }
+    .dir-brand-header { display: flex; justify-content: space-between;
+        align-items: center; }
+    .dir-brand-name { font-weight: 700; font-size: 16px; color: #0F172A;
+    }
     
     /* Status Lights */
-    .dir-status-light { height: 10px; width: 10px; border-radius: 50%; background: #CBD5E1; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
-    .dir-status-light.green { background: #10B981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
-    .dir-status-light.amber { background: #F59E0B; box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
-    .dir-status-light.red { background: #EF4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+    .dir-status-light { height: 10px;
+        width: 10px; border-radius: 50%; background: #CBD5E1; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
+    .dir-status-light.green { background: #10B981;
+        box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+    .dir-status-light.amber { background: #F59E0B;
+        box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
+    .dir-status-light.red { background: #EF4444;
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
 
-    .dir-progress-bar { height: 6px; width: 100%; background: #F1F5F9; border-radius: 3px; overflow: hidden; }
-    .dir-progress-fill { height: 100%; background: var(--brand-primary); border-radius: 3px; width: 0%; transition: width 1s ease-out; }
+    .dir-progress-bar { height: 6px; width: 100%; background: #F1F5F9;
+        border-radius: 3px; overflow: hidden; }
+    .dir-progress-fill { height: 100%; background: var(--brand-primary); border-radius: 3px; width: 0%;
+        transition: width 1s ease-out; }
     
-    .dir-stat-row { display: flex; justify-content: space-between; font-size: 12px; color: #64748B; font-weight: 500; }
+    .dir-stat-row { display: flex; justify-content: space-between; font-size: 12px;
+        color: #64748B; font-weight: 500; }
   /* === DIRECTOR GOD MODE MODAL (Fixed Layout) === */
 #directorEditModal {
     display: none; 
@@ -1134,10 +1235,8 @@ display: flex;
         <div class="bar">
           <h1 style="margin: 0; font-size: 20px;" id="viewTitle">My Schedule</h1>
         </div>
-        <div class="bar">
-          <input id="weekStart" type="date" class="form-input" />
-          <button id="prevBtn" class="btn secondary">◀ Prev Week</button>
-          <button id="nextBtn" class="btn secondary">Next Week ▶</button>
+        <div class="bar" style="gap: 8px;"> <button id="prevBtn" class="btn secondary">◀</button> <input id="weekStart" type="date" class="form-input" style="text-align:center;" />
+          <button id="nextBtn" class="btn secondary">▶</button>
         </div>
     </div>
 
@@ -2697,41 +2796,77 @@ function renderDirectorDashboard() {
     }
 
     const dateString = targetDate.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
-
     // 2. Build the HTML Structure
     let html = `
         <div class="dir-dashboard">
             <div class="dir-section-title">
-                Operational Command Center 
-                <span style="font-weight:400; color:#94A3B8; font-size:14px; margin-left:12px;">${dateString}</span>
+                Operational Command <span style="font-weight:300; opacity:0.5;">|</span> 
+                <span style="font-weight:400; color:#64748B; font-size:16px;">${dateString}</span>
+                <span style="margin-left:auto; font-size:11px; font-weight:700; color:#10B981; background:rgba(16,185,129,0.1); padding:4px 10px; border-radius:20px; display:flex; align-items:center; gap:6px;">
+                    <div class="live-dot" style="width:6px; height:6px;"></div> LIVE CONNECTION
+                </span>
             </div>
             
             <div class="dir-pulse-row">
                 <div class="dir-card">
-                    <div class="dir-card-title">Total Headcount</div>
+                    <div class="dir-card-header">
+                        <div class="dir-card-title">Total Headcount</div>
+                        <div class="live-dot"></div>
+                    </div>
                     <div class="dir-metric-value" id="dir-val-headcount">--</div>
-                    <div class="dir-metric-sub">Scheduled on Date</div>
+                    <div class="dir-metric-sub">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        Scheduled Today
+                    </div>
                 </div>
+
                 <div class="dir-card">
-                    <div class="dir-card-title">Shrinkage</div>
+                    <div class="dir-card-header">
+                        <div class="dir-card-title">Live Shrinkage</div>
+                        <div class="live-dot red"></div>
+                    </div>
                     <div class="dir-metric-value" id="dir-val-shrinkage">--%</div>
-                    <div class="dir-metric-sub down">Sickness / Absence</div>
+                    <div class="dir-metric-sub down">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
+                        Sickness / Absence
+                    </div>
                 </div>
+
                 <div class="dir-card">
-                    <div class="dir-card-title">Alerts</div>
+                    <div class="dir-card-header">
+                        <div class="dir-card-title">Pending Actions</div>
+                        <div style="background:#FEF3C7; color:#D97706; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">REQ ATTN</div>
+                    </div>
                     <div class="dir-metric-value" id="dir-val-alerts">0</div>
-                    <div class="dir-metric-sub">Pending Actions</div>
+                    <div class="dir-metric-sub">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        System Alerts
+                    </div>
                 </div>
+
                 <div class="dir-card">
-                    <div class="dir-card-title">Live Coverage</div>
+                    <div class="dir-card-header">
+                        <div class="dir-card-title">Live Coverage</div>
+                        <div class="live-dot"></div>
+                    </div>
                     <div class="dir-metric-value" id="dir-val-coverage">--%</div>
-                    <div class="dir-metric-sub">Vs. Requirement</div>
+                    <div class="dir-metric-sub" style="color:#10B981;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
+                        Vs. Requirement
+                    </div>
                 </div>
             </div>
 
-            <div class="dir-section-title">Site Performance Status</div>
+            <div class="dir-section-title">
+                Site Performance 
+                <span style="font-size:12px; color:#94A3B8; font-weight:400; background:white; padding:2px 8px; border-radius:12px; border:1px solid #E2E8F0;">Real-time</span>
+            </div>
+            
             <div class="dir-brand-grid" id="dir-brand-grid">
-                <div style="grid-column:1/-1; padding:40px; color:#94A3B8; text-align:center;">Calculating historic/live data...</div>
+                <div style="grid-column:1/-1; padding:60px; color:#94A3B8; text-align:center; font-style:italic; background:rgba(255,255,255,0.5); border-radius:16px;">
+                    <div class="live-dot" style="margin:0 auto 12px auto; background:#CBD5E1; animation:none;"></div>
+                    Connecting to live feeds...
+                </div>
             </div>
         </div>
     `;
