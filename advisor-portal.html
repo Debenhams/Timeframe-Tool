@@ -859,30 +859,15 @@ display: flex;
     user-select: none;
     z-index: 0;
 }
-/* === DIRECTOR COMMAND CENTER (Premium Glass & Neon) === */
+/* === DIRECTOR COMMAND CENTER (Quarantined Styles) === */
     
     .dir-dashboard {
         display: flex;
         flex-direction: column;
         gap: 24px;
-        padding: 24px; /* Increased padding */
+        padding: 8px;
         height: 100%;
         overflow-y: auto;
-        
-        /* THE AURORA MESH BACKGROUND */
-        background-color: #F8FAFC; /* Fallback */
-        background-image: 
-            radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
-            radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.15) 0px, transparent 50%),
-            radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.05) 0px, transparent 50%),
-            radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
-        background-size: 150% 150%;
-        animation: auroraMove 15s ease-in-out infinite alternate;
-    }
-
-    @keyframes auroraMove {
-        0% { background-position: 0% 0%; }
-        100% { background-position: 100% 100%; }
     }
 
     /* Top Row: Pulse Cards */
@@ -893,107 +878,31 @@ display: flex;
         flex-shrink: 0;
     }
 
-    /* === NEW PREMIUM CARD STYLES === */
     .dir-card {
-        background: rgba(255, 255, 255, 0.65);
-        -webkit-backdrop-filter: blur(16px);
-        backdrop-filter: blur(16px); /* Standard property added */
-        border: 1px solid rgba(255, 255, 255, 0.9);
-        border-radius: 20px;
-        padding: 24px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04), 
-                    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        overflow: hidden;
+        transition: transform 0.2s;
     }
-    
-    .dir-card:hover { 
-        transform: translateY(-4px); 
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
-        background: rgba(255, 255, 255, 0.85);
-    }
+    .dir-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08); }
 
-    /* Subtle sheen animation on hover */
-    .dir-card::after {
-        content: '';
-        position: absolute;
-        top: 0; left: -100%;
-        width: 50%; height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-        transform: skewX(-25deg);
-        transition: 0.5s;
-    }
-    .dir-card:hover::after { left: 150%; transition: 0.7s ease-in-out; }
-
-    .dir-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-    
-    .dir-card-title { 
-        font-size: 12px; 
-        font-weight: 700; 
-        color: #64748B; 
-        text-transform: uppercase; 
-        letter-spacing: 1.5px; 
-    }
-
-    /* The "Live" pulsing dot */
-    .live-dot {
-        width: 8px; height: 8px;
-        background-color: #10B981;
-        border-radius: 50%;
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-        animation: pulse-green 2s infinite;
-    }
-    .live-dot.red { background-color: #EF4444; animation: pulse-red 2s infinite; }
-    
-    @keyframes pulse-green {
-        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-    }
-    @keyframes pulse-red {
-        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
-        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-    }
-
-    .dir-metric-value { 
-        font-size: 42px; 
-        font-weight: 800; 
-        color: #1E293B; 
-        line-height: 1;
-        letter-spacing: -1px;
-        /* FIX: Added standard property definitions below */
-        background: -webkit-linear-gradient(45deg, #1E293B, #475569);
-        background: linear-gradient(45deg, #1E293B, #475569);
-        -webkit-background-clip: text;
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    
-    .dir-metric-sub { 
-        font-size: 12px; 
-        color: #64748B; 
-        font-weight: 600; 
-        margin-top: 8px; 
-        display: flex; 
-        align-items: center; 
-        gap: 6px; 
-        padding-top: 8px;
-        border-top: 1px solid rgba(0,0,0,0.05);
-    }
+    .dir-card-title { font-size: 13px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .dir-metric-value { font-size: 36px; font-weight: 800; color: #1E293B; line-height: 1; }
+    .dir-metric-sub { font-size: 12px; color: #10B981; font-weight: 600; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
     .dir-metric-sub.down { color: #EF4444; }
 
     /* Middle Section: Brand Health Grid */
-    .dir-section-title { 
-        font-size: 20px;
-        font-weight: 700; color: #334155; margin-bottom: 16px; margin-top: 8px; display: flex; align-items: center; gap: 12px; }
+    .dir-section-title { font-size: 18px; font-weight: 700; color: #334155; margin-bottom: 16px; margin-top: 8px; }
     
     .dir-brand-grid {
         display: grid;
+        /* Changed to auto-FIT and added !important to force horizontal layout */
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
         gap: 24px;
         width: 100% !important;
@@ -1013,70 +922,21 @@ display: flex;
         flex-direction: column;
         gap: 12px;
     }
-    .dir-brand-card:hover { border-color: var(--brand-primary);
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+    .dir-brand-card:hover { border-color: var(--brand-primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
 
-    .dir-brand-header { display: flex; justify-content: space-between;
-        align-items: center; }
-    .dir-brand-name { font-weight: 700; font-size: 16px; color: #0F172A;
-    }
+    .dir-brand-header { display: flex; justify-content: space-between; align-items: center; }
+    .dir-brand-name { font-weight: 700; font-size: 16px; color: #0F172A; }
     
     /* Status Lights */
-    .dir-status-light { height: 10px;
-        width: 10px; border-radius: 50%; background: #CBD5E1; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
-    .dir-status-light.green { background: #10B981;
-        box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
-    .dir-status-light.amber { background: #F59E0B;
-        box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
-    .dir-status-light.red { background: #EF4444;
-        box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+    .dir-status-light { height: 10px; width: 10px; border-radius: 50%; background: #CBD5E1; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
+    .dir-status-light.green { background: #10B981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+    .dir-status-light.amber { background: #F59E0B; box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
+    .dir-status-light.red { background: #EF4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
 
-    .dir-progress-bar { height: 6px; width: 100%; background: #F1F5F9;
-        border-radius: 3px; overflow: hidden; }
-    .dir-progress-fill { height: 100%; background: var(--brand-primary); border-radius: 3px; width: 0%;
-        transition: width 1s ease-out; }
+    .dir-progress-bar { height: 6px; width: 100%; background: #F1F5F9; border-radius: 3px; overflow: hidden; }
+    .dir-progress-fill { height: 100%; background: var(--brand-primary); border-radius: 3px; width: 0%; transition: width 1s ease-out; }
     
-    .dir-stat-row { display: flex; justify-content: space-between; font-size: 12px;
-        color: #64748B; font-weight: 500; }
-  /* === DIRECTOR GOD MODE MODAL (Fixed Layout) === */
-#directorEditModal {
-    display: none; 
-    align-items: center; 
-    justify-content: center; 
-    backdrop-filter: blur(4px);
-    z-index: 10000;
-}
-
-#directorEditModal .modal-content {
-    margin: auto;
-    background: white;
-    width: 400px; /* Fixed neat width */
-    border-radius: 20px; /* Apple-style corners */
-    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-    padding: 0;
-    overflow: hidden;
-    position: relative;
-    top: auto; /* Reset position */
-    right: auto; /* Reset position */
-    height: auto; /* Reset height */
-    border: 1px solid rgba(0,0,0,0.1);
-    animation: popIn 0.2s ease-out;
-}
-
-@keyframes popIn {
-    from { transform: scale(0.95); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-}
-
-#directorEditModal .modal-header {
-    background: #F8FAFC;
-    padding: 16px 24px;
-    border-bottom: 1px solid #E2E8F0;
-}
-
-#directorEditModal .modal-body {
-    padding: 24px;
-}
+    .dir-stat-row { display: flex; justify-content: space-between; font-size: 12px; color: #64748B; font-weight: 500; }
   </style>
 </head>
 <body>
@@ -1235,8 +1095,10 @@ display: flex;
         <div class="bar">
           <h1 style="margin: 0; font-size: 20px;" id="viewTitle">My Schedule</h1>
         </div>
-        <div class="bar" style="gap: 8px;"> <button id="prevBtn" class="btn secondary">◀</button> <input id="weekStart" type="date" class="form-input" style="text-align:center;" />
-          <button id="nextBtn" class="btn secondary">▶</button>
+        <div class="bar">
+          <input id="weekStart" type="date" class="form-input" />
+          <button id="prevBtn" class="btn secondary">◀ Prev Week</button>
+          <button id="nextBtn" class="btn secondary">Next Week ▶</button>
         </div>
     </div>
 
@@ -1298,66 +1160,7 @@ display: flex;
       </div>
     </div>
   </main>
-<div class="modal-backdrop" id="directorEditModal" style="display:none;">
-    <div class="modal-content" style="max-width: 400px;">
-      <div class="modal-header">
-        <h2 id="dirEditTitle">Edit Shift</h2>
-        <button class="btn-icon modal-close" onclick="closeDirectorEditor()">
-           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-      </div>
-      <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
-        
-        <input type="hidden" id="dirEditAdvisorId">
-        <input type="hidden" id="dirEditDateISO">
 
-        <div class="form-group">
-            <label style="font-size:12px; font-weight:600; color:#64748B;">Start Time</label>
-            <input type="time" id="dirEditStart" class="form-input" style="font-size:16px; padding:10px;">
-        </div>
-
-        <div class="form-group">
-            <label style="font-size:12px; font-weight:600; color:#64748B;">End Time</label>
-            <input type="time" id="dirEditEnd" class="form-input" style="font-size:16px; padding:10px;">
-        </div>
-
-        <div class="form-group">
-            <label style="font-size:12px; font-weight:600; color:#64748B;">Reason / Auth</label>
-            <input type="text" id="dirEditReason" class="form-input" placeholder="e.g. Authorized by Darren">
-        </div>
-
-        <div style="background:#F8FAFC; padding:12px; border-radius:8px; border:1px solid #E2E8F0; font-size:11px; color:#64748B; line-height:1.4;">
-            <strong>Note:</strong> Changing times will automatically extend or trim the shift. Breaks will be preserved where possible.
-        </div>
-
-        <div style="background:#F1F5F9; padding:12px; border-radius:8px; margin-top:8px; border:1px solid #E2E8F0;">
-            
-            <div style="display:flex; gap:8px; margin-bottom:8px;">
-                <select id="dirAddType" class="form-select" style="flex:2; padding:6px; font-size:12px; height:32px;">
-                    <option value="Meeting">Meeting</option>
-                    <option value="Training">Training</option>
-                    <option value="Admin">Admin</option>
-                    <option value="121">121</option>
-                    <option value="Break">Break</option>
-                </select>
-                <input type="time" id="dirAddStart" class="form-input" style="flex:2; padding:6px; font-size:12px; height:32px;">
-                <input type="number" id="dirAddDur" class="form-input" placeholder="Mins" value="30" style="flex:1; padding:6px; font-size:12px; height:32px;">
-            </div>
-            <button class="btn btn-sm btn-secondary" style="width:100%;" onclick="addDirectorActivityToList()">+ Insert Activity</button>
-            <ul id="dirActivityList" style="list-style:none; padding:0; margin:8px 0 0 0; font-size:12px; color:#0F172A;"></ul>
-        </div>
-
-        <div style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; display:flex; gap:12px;">
-            <button type="button" class="btn btn-secondary" onclick="handleDirectorUndo()" id="btnDirectorUndo" disabled style="flex:1; opacity:0.7;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
-                Undo
-            </button>
-            <button type="button" class="btn" style="flex:2; background-color: #2563EB;" onclick="handleDirectorSave()" id="btnDirectorSave">Update Schedule</button>
-        </div>
-
-      </div>
-    </div>
-  </div>
 <script>
 // --- Configuration ---
 const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
@@ -2734,10 +2537,6 @@ function drawTeamDailyGantt() {
     const dayIndex = STATE.teamViewDayIndex;
     const dayName = DAYS[dayIndex];
     const mondayISO = STATE.currentWeekData.mondayISO;
-    
-    // FIX: Calculate specific date for the selected day view
-    const specificDate = addDays(new Date(mondayISO + "T00:00:00"), dayIndex);
-    const specificDateISO = fmtDateLocal(specificDate);
 
     // Setup the structure for the Gantt chart
     let html = `
@@ -2759,10 +2558,9 @@ function drawTeamDailyGantt() {
 
     // Render the time header (05:00 - 23:00)
     renderGanttTimeHeader(ELS_GANTT.timeHeader);
-
+    
     // Render the rows
     let bodyHtml = '';
-
     STATE.teamMembers.forEach(member => {
         // Calculate segments for the specific day
         const segments = calculateLiveSegments(member.id, dayName, mondayISO);
@@ -2775,7 +2573,7 @@ function drawTeamDailyGantt() {
         <div class="timeline-row" style="${rowStyle}">
             <div class="timeline-name">${member.name} ${isCurrentUser ? '<span class="tag">(You)</span>' : ''}</div>
             <div class="timeline-track">
-                ${renderGanttSegments(segments, member.id, specificDateISO)}
+                ${renderGanttSegments(segments)}
             </div>
         </div>
         `;
@@ -2796,77 +2594,41 @@ function renderDirectorDashboard() {
     }
 
     const dateString = targetDate.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+
     // 2. Build the HTML Structure
     let html = `
         <div class="dir-dashboard">
             <div class="dir-section-title">
-                Operational Command <span style="font-weight:300; opacity:0.5;">|</span> 
-                <span style="font-weight:400; color:#64748B; font-size:16px;">${dateString}</span>
-                <span style="margin-left:auto; font-size:11px; font-weight:700; color:#10B981; background:rgba(16,185,129,0.1); padding:4px 10px; border-radius:20px; display:flex; align-items:center; gap:6px;">
-                    <div class="live-dot" style="width:6px; height:6px;"></div> LIVE CONNECTION
-                </span>
+                Operational Command Center 
+                <span style="font-weight:400; color:#94A3B8; font-size:14px; margin-left:12px;">${dateString}</span>
             </div>
             
             <div class="dir-pulse-row">
                 <div class="dir-card">
-                    <div class="dir-card-header">
-                        <div class="dir-card-title">Total Headcount</div>
-                        <div class="live-dot"></div>
-                    </div>
+                    <div class="dir-card-title">Total Headcount</div>
                     <div class="dir-metric-value" id="dir-val-headcount">--</div>
-                    <div class="dir-metric-sub">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                        Scheduled Today
-                    </div>
+                    <div class="dir-metric-sub">Scheduled on Date</div>
                 </div>
-
                 <div class="dir-card">
-                    <div class="dir-card-header">
-                        <div class="dir-card-title">Live Shrinkage</div>
-                        <div class="live-dot red"></div>
-                    </div>
+                    <div class="dir-card-title">Shrinkage</div>
                     <div class="dir-metric-value" id="dir-val-shrinkage">--%</div>
-                    <div class="dir-metric-sub down">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
-                        Sickness / Absence
-                    </div>
+                    <div class="dir-metric-sub down">Sickness / Absence</div>
                 </div>
-
                 <div class="dir-card">
-                    <div class="dir-card-header">
-                        <div class="dir-card-title">Pending Actions</div>
-                        <div style="background:#FEF3C7; color:#D97706; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">REQ ATTN</div>
-                    </div>
+                    <div class="dir-card-title">Alerts</div>
                     <div class="dir-metric-value" id="dir-val-alerts">0</div>
-                    <div class="dir-metric-sub">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                        System Alerts
-                    </div>
+                    <div class="dir-metric-sub">Pending Actions</div>
                 </div>
-
                 <div class="dir-card">
-                    <div class="dir-card-header">
-                        <div class="dir-card-title">Live Coverage</div>
-                        <div class="live-dot"></div>
-                    </div>
+                    <div class="dir-card-title">Live Coverage</div>
                     <div class="dir-metric-value" id="dir-val-coverage">--%</div>
-                    <div class="dir-metric-sub" style="color:#10B981;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
-                        Vs. Requirement
-                    </div>
+                    <div class="dir-metric-sub">Vs. Requirement</div>
                 </div>
             </div>
 
-            <div class="dir-section-title">
-                Site Performance 
-                <span style="font-size:12px; color:#94A3B8; font-weight:400; background:white; padding:2px 8px; border-radius:12px; border:1px solid #E2E8F0;">Real-time</span>
-            </div>
-            
+            <div class="dir-section-title">Site Performance Status</div>
             <div class="dir-brand-grid" id="dir-brand-grid">
-                <div style="grid-column:1/-1; padding:60px; color:#94A3B8; text-align:center; font-style:italic; background:rgba(255,255,255,0.5); border-radius:16px;">
-                    <div class="live-dot" style="margin:0 auto 12px auto; background:#CBD5E1; animation:none;"></div>
-                    Connecting to live feeds...
-                </div>
+                <div style="grid-column:1/-1; padding:40px; color:#94A3B8; text-align:center;">Calculating historic/live data...</div>
             </div>
         </div>
     `;
@@ -3007,36 +2769,32 @@ function renderGanttTimeHeader(headerElement) {
     headerElement.innerHTML = html;
 }
 
-function renderGanttSegments(segments, advisorId, dateISO) { // <--- UPDATED ARGUMENTS
+function renderGanttSegments(segments) {
     if (!segments || segments.length === 0) {
         return '<div class="timeline-rdo-fill">RDO</div>';
     }
     
     return segments.map(seg => {
+        // Calculate position and width percentage based on Gantt constants
         const startPct = ((seg.startMin - GANTT_START_MIN) / GANTT_DURATION_MIN) * 100;
         const widthPct = ((seg.endMin - seg.startMin) / GANTT_DURATION_MIN) * 100;
         
         const color = seg.color || '#475569';
+        
+        // Calculate contrasting text color
         const textColor = getContrastingTextColor(color);
 
+        // --- NEW LOGIC ---
         let blockClass = 'timeline-bar';
         const lowerCode = seg.code.toLowerCase();
         if (lowerCode.includes('break') || lowerCode.includes('lunch')) {
             blockClass += ' is-simple-block';
         }
+        // --- END NEW LOGIC ---
 
-        // DIRECTOR TRIGGER: Add onclick event
-        let clickAction = '';
-        let cursorStyle = '';
-        
-        if (STATE.isDirector) {
-             // Pass the start/end times to the editor
-             clickAction = `onclick="event.stopPropagation(); openDirectorEditor('${advisorId}', '${dateISO}', '${seg.start}', '${seg.end}')"`;
-             cursorStyle = 'cursor: pointer; pointer-events: auto;';
-        }
-
+        // The 'title' attribute provides the native browser tooltip on hover.
         return `
-        <div class="${blockClass}" ${clickAction} style="left: ${startPct}%; width: ${widthPct}%; background-color: ${color}; color: ${textColor}; ${cursorStyle}" title="${seg.code} (${seg.start} - ${seg.end})">
+        <div class="${blockClass}" style="left: ${startPct}%; width: ${widthPct}%; background-color: ${color}; color: ${textColor};" title="${seg.code} (${seg.start} - ${seg.end})">
             <span>${seg.code}</span>
         </div>
         `;
@@ -3091,40 +2849,44 @@ async function startRealtime() {
         { event: 'schedule_update' },
         (payload) => {
             console.log('Realtime update received:', payload);
+
             if (payload.payload) {
                 const update = payload.payload;
-                console.log("Realtime update received:", update.type);
 
-                // --- DIRECTOR & TEAM ALERTS ---
+                // --- UPDATED LOGIC: SMART NAMED ALERTS ---
+
+                // 1. Check if the update is for the VIEWED TEAM
                 const isForMyTeam = STATE.teamMemberIds.has(update.advisor_id);
+                
+                // 2. Check if the update is for ME
                 const isForMe = update.advisor_id == STATE.advisorId;
 
-                // GATEKEEPER: Director gets EVERYTHING. Leaders get Team + Self.
-                if (STATE.isDirector || isForMyTeam || isForMe) {
-                    console.log("Refreshing data due to relevant update.");
-                    
-                    // 1. SILENT REFRESH (Runs for EVERYONE, including Director)
-                    // This updates the numbers, the grid, and the graphs immediately.
+                // 3. Process if it matches EITHER
+                if (isForMyTeam || isForMe) {
+                    // Reload data (Background refresh)
                     loadAndRender();
 
-                    // 2. POP-UP BLOCKER (Specific to Director)
-                    // If I am the Director, and it's not MY personal schedule, STOP here.
-                    // This ensures the data updated above, but no red banner appears.
-                    if (STATE.isDirector && !isForMe) {
-                        return; 
-                    }
-
-                    // 3. ALERT LOGIC (Only runs for Team Leaders / Advisors / Director's own schedule)
-                    // This code is identical to the original logic for TLs and Advisors.
-                    if (update.date && update.date === TODAY_ISO) {
-                        let msg = isForMe ? 
-                            "Live Update: Your schedule changed." : 
-                            "Live Update: A team member's schedule changed.";
+                    // Check for alert (Only if TODAY)
+                    if (update.date == TODAY_ISO) {
+                        let msg = "";
+                        
+                        if (isForMe) {
+                            msg = "Live Update: <strong>Your</strong> schedule for today has been changed.";
+                        } else {
+                            // Lookup the name from the local state
+                            // (Note: STATE.teamMembers contains the list of people currently being viewed)
+                            const member = STATE.teamMembers.find(m => m.id == update.advisor_id);
+                            const name = member ? member.name : "A Team Member";
+                            msg = `Live Update: <strong>${name}'s</strong> schedule for today has been changed.`;
+                        }
+                        
+                        // Trigger the banner with the specific name
                         showUpdateNotification(msg);
                     }
                 } else {
-                    console.log("Ignoring update (irrelevant to current view).");
+                    console.log("Ignoring update (not for me or my team).");
                 }
+                
             }
         }
     );
@@ -3218,304 +2980,6 @@ window.jumpToSiteSchedule = (siteName) => {
 
     // 5. Trigger the "Change" event to force the grid to reload with new selection
     list.dispatchEvent(new Event('change'));
-};
-// --- DIRECTOR GOD MODE LOGIC (V7: PLANNER-GRADE CARVING) ---
-
-window.directorUndoState = null;
-window.directorPendingInjections = [];
-
-// 1. OPEN THE EDITOR
-window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd) => {
-    if (!STATE.isDirector) return;
-    if (dateISO !== TODAY_ISO) {
-        alert("Director Mode: You can only edit the LIVE schedule (Today).");
-        return;
-    }
-
-    const advisor = STATE.teamMembers.find(m => m.id == advisorId);
-    const name = advisor ? advisor.name : "Advisor";
-
-    // Capture State for Undo
-    document.getElementById('dirEditTitle').textContent = `Loading ${name}...`;
-    
-    const { data: currentState } = await supabase
-        .from('schedule_exceptions')
-        .select('structure, reason')
-        .eq('advisor_id', advisorId)
-        .eq('exception_date', dateISO)
-        .maybeSingle();
-
-    window.directorUndoState = {
-        advisor_id: advisorId,
-        exception_date: dateISO,
-        structure: currentState ? currentState.structure : [],
-        reason: currentState ? currentState.reason : ""
-    };
-
-    // Reset UI
-    window.directorPendingInjections = [];
-    document.getElementById('dirActivityList').innerHTML = ''; 
-    
-    const undoBtn = document.getElementById('btnDirectorUndo');
-    undoBtn.disabled = false;
-    undoBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg> Undo`;
-
-    // Populate Form
-    document.getElementById('dirEditTitle').textContent = `Edit Live: ${name}`;
-    document.getElementById('dirEditAdvisorId').value = advisorId;
-    document.getElementById('dirEditDateISO').value = dateISO;
-    document.getElementById('dirEditStart').value = currentStart;
-    document.getElementById('dirEditEnd').value = currentEnd;
-    document.getElementById('dirEditReason').value = window.directorUndoState.reason || ""; 
-
-    // Default "Add Activity" time
-    const startEl = document.getElementById('dirAddStart');
-    if (startEl) startEl.value = currentStart;
-
-    document.getElementById('directorEditModal').style.display = 'flex';
-};
-
-window.closeDirectorEditor = () => {
-    document.getElementById('directorEditModal').style.display = 'none';
-};
-
-// 2. ADD ACTIVITY TO LIST
-window.addDirectorActivityToList = () => {
-    const type = document.getElementById('dirAddType').value;
-    const start = document.getElementById('dirAddStart').value;
-    const dur = parseInt(document.getElementById('dirAddDur').value);
-
-    if(!start || !dur) return;
-
-    window.directorPendingInjections.push({ type, start, dur });
-
-    const li = document.createElement('li');
-    li.style.marginBottom = '4px';
-    li.style.display = 'flex';
-    li.style.justifyContent = 'space-between';
-    li.innerHTML = `<span><strong>${type}</strong> @ ${start} (${dur}m)</span><span style="color:#EF4444; cursor:pointer;" onclick="this.parentElement.remove(); removeInjection('${start}')">x</span>`;
-    document.getElementById('dirActivityList').appendChild(li);
-};
-
-window.removeInjection = (startVal) => {
-    window.directorPendingInjections = window.directorPendingInjections.filter(i => i.start !== startVal);
-};
-
-// 3. HANDLE UNDO
-window.handleDirectorUndo = async () => {
-    if (!window.directorUndoState) return;
-    if (!confirm("Revert to state before editing?")) return;
-
-    const undoBtn = document.getElementById('btnDirectorUndo');
-    undoBtn.textContent = "Reverting...";
-    
-    const { error } = await supabase.from('schedule_exceptions').upsert({
-        advisor_id: window.directorUndoState.advisor_id,
-        exception_date: window.directorUndoState.exception_date,
-        structure: window.directorUndoState.structure,
-        reason: window.directorUndoState.reason
-    }, { onConflict: 'advisor_id, exception_date' });
-
-    if (!error) {
-        // Trigger update
-        if (STATE.rotaRealtimeChannel) STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: window.directorUndoState.advisor_id, date: window.directorUndoState.exception_date } });
-        await loadAndRender(); 
-        closeDirectorEditor(); 
-    } else {
-        alert("Undo failed: " + error.message);
-    }
-};
-
-// --- PLANNER-GRADE LOGIC HELPERS ---
-
-// 1. Get Safe ID
-function getSafeCompId(name) {
-    if (!name) return null;
-    const clean = String(name).toLowerCase().trim();
-    const comps = Object.values(STATE.components);
-    let match = comps.find(c => (c.name || "").toLowerCase() === clean);
-    if (!match) match = comps.find(c => (c.type || "").toLowerCase() === clean);
-    if (!match) match = comps.find(c => (c.type || "").toLowerCase() === 'activity');
-    if (!match && comps.length > 0) match = comps[0];
-    return match ? match.id : null;
-}
-
-// 2. The "Carve" Logic (Ported from Planner)
-function carveTime(baseStructure, injectStart, injectEnd, injectCompId) {
-    let newStructure = [];
-    
-    // Sort base structure first
-    baseStructure.sort((a, b) => a.start_min - b.start_min);
-
-    baseStructure.forEach(seg => {
-        // Case A: Segment is completely BEFORE injection -> Keep it
-        if (seg.end_min <= injectStart) {
-            newStructure.push(seg);
-        }
-        // Case B: Segment is completely AFTER injection -> Keep it
-        else if (seg.start_min >= injectEnd) {
-            newStructure.push(seg);
-        }
-        // Case C: Segment Overlaps -> Split it
-        else {
-            // 1. Part Before (if any)
-            if (seg.start_min < injectStart) {
-                newStructure.push({ 
-                    component_id: seg.component_id, 
-                    start_min: seg.start_min, 
-                    end_min: injectStart 
-                });
-            }
-            // (The injection itself is handled separately to ensure it's added only once)
-            
-            // 2. Part After (if any)
-            if (seg.end_min > injectEnd) {
-                newStructure.push({ 
-                    component_id: seg.component_id, 
-                    start_min: injectEnd, 
-                    end_min: seg.end_min 
-                });
-            }
-        }
-    });
-
-    // Add the injection itself
-    newStructure.push({ 
-        component_id: injectCompId, 
-        start_min: injectStart, 
-        end_min: injectEnd 
-    });
-
-    return newStructure.sort((a, b) => a.start_min - b.start_min);
-}
-
-// 4. SAVE (V7: FULL PLANNER LOGIC)
-window.handleDirectorSave = async () => {
-    const saveBtn = document.getElementById('btnDirectorSave');
-    
-    try {
-        const advisorId = document.getElementById('dirEditAdvisorId').value;
-        const dateISO = document.getElementById('dirEditDateISO').value;
-        const newStartStr = document.getElementById('dirEditStart').value;
-        const newEndStr = document.getElementById('dirEditEnd').value;
-        let reason = document.getElementById('dirEditReason').value || "Director Override";
-        
-        const targetStart = hhmmToMinutes(newStartStr);
-        const targetEnd = hhmmToMinutes(newEndStr);
-
-        if (!advisorId || !dateISO || isNaN(targetStart) || isNaN(targetEnd)) {
-            alert("Invalid inputs. Check times.");
-            return;
-        }
-
-        saveBtn.textContent = "Processing..."; 
-        saveBtn.disabled = true;
-
-        // 1. Get Current Schedule (The "Raw Material")
-        const dayName = new Date(dateISO).toLocaleDateString('en-US', { weekday: 'long' });
-        const currentSegments = calculateLiveSegments(advisorId, dayName, STATE.currentWeekData.mondayISO);
-
-        // 2. Convert to Structure Format
-        let workStructure = [];
-        if (currentSegments && currentSegments.length > 0) {
-            currentSegments.forEach(seg => {
-                const cId = getSafeCompId(seg.code);
-                if (cId) {
-                    workStructure.push({ 
-                        component_id: cId, 
-                        start_min: seg.startMin, 
-                        end_min: seg.endMin 
-                    });
-                }
-            });
-        } else {
-            // If empty, create a base block of "Activity"
-            const baseId = getSafeCompId('Activity');
-            workStructure.push({ component_id: baseId, start_min: targetStart, end_min: targetEnd });
-        }
-
-        // 3. Clip/Extend to New Start/End Times (Outer Bounds)
-        let boundedStructure = [];
-        // Determine "Base Activity" for filling gaps (find dominant activity)
-        // Default to the first segment's type if available, else generic 'Activity'
-        let baseFillId = workStructure.length > 0 ? workStructure[0].component_id : getSafeCompId('Activity');
-
-        // A. Fill Gap at Start
-        if (workStructure.length > 0 && workStructure[0].start_min > targetStart) {
-            boundedStructure.push({ component_id: baseFillId, start_min: targetStart, end_min: workStructure[0].start_min });
-        }
-
-        // B. Add existing segments (clipped)
-        workStructure.forEach(seg => {
-            let s = Math.max(seg.start_min, targetStart);
-            let e = Math.min(seg.end_min, targetEnd);
-            if (s < e) {
-                boundedStructure.push({ component_id: seg.component_id, start_min: s, end_min: e });
-            }
-        });
-
-        // C. Fill Gap at End
-        if (boundedStructure.length > 0) {
-            const last = boundedStructure[boundedStructure.length - 1];
-            if (last.end_min < targetEnd) {
-                // Try to extend last block if it's same type, else add new
-                if (last.component_id === baseFillId) {
-                    last.end_min = targetEnd;
-                } else {
-                    boundedStructure.push({ component_id: baseFillId, start_min: last.end_min, end_min: targetEnd });
-                }
-            }
-        } else {
-            // If completely empty after clipping, recreate full block
-            boundedStructure.push({ component_id: baseFillId, start_min: targetStart, end_min: targetEnd });
-        }
-
-        // 4. Apply Injections (The "Carving")
-        // We process injections sequentially
-        window.directorPendingInjections.forEach(inj => {
-            const injStart = hhmmToMinutes(inj.start);
-            const injEnd = injStart + inj.dur;
-            const injId = getSafeCompId(inj.type);
-
-            if (injId) {
-                boundedStructure = carveTime(boundedStructure, injStart, injEnd, injId);
-                reason += ` [+${inj.type}]`;
-            }
-        });
-
-        // 5. Save
-        const { error } = await supabase.from('schedule_exceptions').upsert({
-            advisor_id: advisorId, 
-            exception_date: dateISO, 
-            structure: boundedStructure, 
-            reason: reason
-        }, { onConflict: 'advisor_id, exception_date' });
-
-        if (error) throw error;
-
-        // 6. Broadcast
-        if (STATE.rotaRealtimeChannel) {
-            STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: advisorId, date: dateISO } });
-        }
-        
-        await loadAndRender(); 
-        
-        saveBtn.textContent = "Saved!";
-        saveBtn.style.backgroundColor = "#10B981"; 
-        
-        setTimeout(() => {
-            closeDirectorEditor(); 
-            saveBtn.textContent = "Update Schedule"; 
-            saveBtn.style.backgroundColor = "#2563EB"; 
-            saveBtn.disabled = false;
-        }, 800);
-
-    } catch (err) {
-        console.error("Director Save Error:", err);
-        alert("Failed to update: " + err.message);
-        saveBtn.textContent = "Update Schedule";
-        saveBtn.disabled = false;
-    }
 };
 
 // --- Initialization Trigger ---
