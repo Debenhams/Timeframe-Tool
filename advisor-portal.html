@@ -2909,131 +2909,182 @@ function renderGanttSegments(segments, advisorId, dateISO) { // <--- UPDATED ARG
 }
 
 
-// --- Realtime Updates (Director: Silent Updates | Team: Alerts) ---
+// --- Realtime Updates (Ensuring functionality with Debounce) ---
 
-// 1. Show the "sticky" alert (For Advisors/Team Leaders)
+// This is the NEW function that shows the "sticky" alert
 function showUpdateNotification(customMessage) {
     console.log("Showing sticky update notification.");
+    // 1. Show the Favicon Badge
     showFaviconBadge();
+    // 2. Set the HTML to include the dynamic message and "Okay" button
     ELS.realtimeNote.innerHTML = `
         ${customMessage}
         <button id="ackAlertBtn" class="btn secondary" style="margin-left: 16px; padding: 4px 10px;">Okay</button>
     `;
+    // 3. Show the banner
     ELS.realtimeNote.style.display = 'block';
 }
 
-// 2. Acknowledge the alert
+// This is the NEW function that runs when "Okay" is clicked
 function acknowledgeUpdate() {
+    console.log("Alert acknowledged.");
+
+    // 1. Hide the banner
     ELS.realtimeNote.style.display = 'none';
+
+    // 2. Clear the Favicon Badge
     clearFaviconBadge();
+
+    // 3. NOW we reload the schedule to show the change
     loadAndRender();
 }
 
-// 3. The Realtime Listener
+
 async function startRealtime() {
-    if (STATE.rotaRealtimeChannel) return; 
+    if (STATE.rotaRealtimeChannel) {
+        return; // Already started
+    }
 
     console.log("Starting Realtime listener...");
+
+    // 1. Get the "Walkie-Talkie" channel
     STATE.rotaRealtimeChannel = supabase.channel('rota-changes-advisor-portal-v3');
 
+    // 2. Listen for the 'schedule_update' event
     STATE.rotaRealtimeChannel.on(
         'broadcast',
         { event: 'schedule_update' },
         (payload) => {
+            console.log('Realtime update received:', payload);
             if (payload.payload) {
                 const update = payload.payload;
-                
-                // Check relevance
+                console.log("Realtime update received:", update.type);
+
+                // --- DIRECTOR & TEAM ALERTS ---
                 const isForMyTeam = STATE.teamMemberIds.has(update.advisor_id);
                 const isForMe = update.advisor_id == STATE.advisorId;
 
-                // LOGIC: If I am Director OR it's for my team OR it's for me -> REFRESH
+                // GATEKEEPER: Director gets EVERYTHING. Leaders get Team + Self.
                 if (STATE.isDirector || isForMyTeam || isForMe) {
                     console.log("Refreshing data due to relevant update.");
                     
-                    // A. ALWAYS Refresh Data (Silently updates grids/graphs)
+                    // 1. SILENT REFRESH (Runs for EVERYONE, including Director)
+                    // This updates the numbers, the grid, and the graphs immediately.
                     loadAndRender();
 
-                    // B. Decide whether to show the Red Banner
-                    // Directors: Do NOT show banner (unless it's their own schedule)
+                    // 2. POP-UP BLOCKER (Specific to Director)
+                    // If I am the Director, and it's not MY personal schedule, STOP here.
+                    // This ensures the data updated above, but no red banner appears.
                     if (STATE.isDirector && !isForMe) {
-                        return; // Stop here. Data is refreshed, but no popup.
+                        return; 
                     }
 
-                    // Advisors/TLs: Show Banner
+                    // 3. ALERT LOGIC (Only runs for Team Leaders / Advisors / Director's own schedule)
+                    // This code is identical to the original logic for TLs and Advisors.
                     if (update.date && update.date === TODAY_ISO) {
                         let msg = isForMe ? 
                             "Live Update: Your schedule changed." : 
                             "Live Update: A team member's schedule changed.";
                         showUpdateNotification(msg);
                     }
+                } else {
+                    console.log("Ignoring update (irrelevant to current view).");
                 }
             }
         }
     );
 
+    // 3. Subscribe to the channel
     STATE.rotaRealtimeChannel.subscribe((status) => {
-        if (status === 'SUBSCRIBED') console.log('Realtime connected!');
+        if (status === 'SUBSCRIBED') {
+            console.log('Realtime connected!');
+        } else if (status === 'CHANNEL_ERROR') {
+            console.error('Realtime connection error.');
+        }
     });
 }
-
 // --- Favicon Badge Helpers ---
 function showFaviconBadge() {
     try {
         const canvas = document.createElement('canvas');
-        canvas.width = 32; canvas.height = 32;
+        canvas.width = 32;
+        canvas.height = 32;
         const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#EF4444';
-        ctx.beginPath(); ctx.arc(16, 16, 16, 0, 2 * Math.PI); ctx.fill();
+
+        // Draw a red circle
+        ctx.fillStyle = '#EF4444'; // Red color
+        ctx.beginPath();
+        ctx.arc(16, 16, 16, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Draw a white "!"
         ctx.fillStyle = 'white';
-        ctx.font = 'bold 24px Arial';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = 'bold 24px ' + getComputedStyle(document.body).fontFamily;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
         ctx.fillText('!', 16, 17);
+
+        // Set as favicon
         const link = document.querySelector("link[rel*='icon']") || document.createElement('link');
-        link.type = 'image/x-icon'; link.rel = 'shortcut icon';
+        link.type = 'image/x-icon';
+        link.rel = 'shortcut icon';
         link.href = canvas.toDataURL("image/png");
         document.getElementsByTagName('head')[0].appendChild(link);
-    } catch (e) {}
+    } catch (e) {
+        console.warn("Favicon badge not supported or failed to draw.", e);
+    }
 }
 
 function clearFaviconBadge() {
     const link = document.querySelector("link[rel*='icon']");
-    if (link) link.href = 'data:,';
+    if (link) {
+        // Setting to an empty data URL is a common way to "clear" it
+        link.href = 'data:,';
+    }
 }
-
 async function stopRealtime() {
     if (STATE.rotaRealtimeChannel) {
+        console.log("Stopping Realtime listener.");
         await supabase.removeChannel(STATE.rotaRealtimeChannel);
         STATE.rotaRealtimeChannel = null;
     }
 }
-
 // --- DIRECTOR FEATURE: JUMP TO SITE ---
 window.jumpToSiteSchedule = (siteName) => {
+    console.log("Jumping to site:", siteName);
+    
+    // 1. Switch to Team Schedule Tab
     switchTab('tab-team-schedule');
+
+    // 2. Find the Dropdown List
     const list = document.getElementById('teamSelectorList');
     const boxes = list.querySelectorAll('input[type="checkbox"]:not(#selectAllTeams)');
     const selectAll = document.getElementById('selectAllTeams');
-    if (selectAll) selectAll.checked = false;
+    if (selectAll) selectAll.checked = false; // Reset master toggle
 
+    // 3. Loop through all boxes and tick ONLY the ones matching the Site Name
     let count = 0;
     boxes.forEach(box => {
         const label = box.closest('label');
+        // Find the grey tag inside the label
         const tag = label.querySelector('span[style*="background"]');
+        
         if (tag && tag.textContent.trim() === siteName) {
-            box.checked = true; count++;
+            box.checked = true;
+            count++;
         } else {
             box.checked = false;
         }
     });
+
+    // 4. Update the Button Text manually
     const btn = document.getElementById('teamSelectorBtn');
     if (btn) btn.firstElementChild.textContent = `Viewing: ${siteName} (${count} Teams)`;
+
+    // 5. Trigger the "Change" event to force the grid to reload with new selection
     list.dispatchEvent(new Event('change'));
 };
-
-// ==========================================
-// DIRECTOR "GOD MODE" LOGIC (Fixed & Robust)
-// ==========================================
+// --- DIRECTOR GOD MODE LOGIC (V7: PLANNER-GRADE CARVING) ---
 
 window.directorUndoState = null;
 window.directorPendingInjections = [];
@@ -3041,8 +3092,6 @@ window.directorPendingInjections = [];
 // 1. OPEN THE EDITOR
 window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd) => {
     if (!STATE.isDirector) return;
-    
-    // Rule: Directors can only edit TODAY (Live Operations)
     if (dateISO !== TODAY_ISO) {
         alert("Director Mode: You can only edit the LIVE schedule (Today).");
         return;
@@ -3051,9 +3100,9 @@ window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd)
     const advisor = STATE.teamMembers.find(m => m.id == advisorId);
     const name = advisor ? advisor.name : "Advisor";
 
+    // Capture State for Undo
     document.getElementById('dirEditTitle').textContent = `Loading ${name}...`;
     
-    // Fetch current state for Undo
     const { data: currentState } = await supabase
         .from('schedule_exceptions')
         .select('structure, reason')
@@ -3074,18 +3123,19 @@ window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd)
     
     const undoBtn = document.getElementById('btnDirectorUndo');
     undoBtn.disabled = false;
-    undoBtn.innerHTML = `Undo`;
+    undoBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg> Undo`;
 
-    // Populate Modal
+    // Populate Form
     document.getElementById('dirEditTitle').textContent = `Edit Live: ${name}`;
     document.getElementById('dirEditAdvisorId').value = advisorId;
     document.getElementById('dirEditDateISO').value = dateISO;
-    document.getElementById('dirEditStart').value = currentStart && currentStart !== "undefined" ? currentStart : "09:00";
-    document.getElementById('dirEditEnd').value = currentEnd && currentEnd !== "undefined" ? currentEnd : "17:00";
+    document.getElementById('dirEditStart').value = currentStart;
+    document.getElementById('dirEditEnd').value = currentEnd;
     document.getElementById('dirEditReason').value = window.directorUndoState.reason || ""; 
 
+    // Default "Add Activity" time
     const startEl = document.getElementById('dirAddStart');
-    if (startEl) startEl.value = document.getElementById('dirEditStart').value;
+    if (startEl) startEl.value = currentStart;
 
     document.getElementById('directorEditModal').style.display = 'flex';
 };
@@ -3132,6 +3182,7 @@ window.handleDirectorUndo = async () => {
     }, { onConflict: 'advisor_id, exception_date' });
 
     if (!error) {
+        // Trigger update
         if (STATE.rotaRealtimeChannel) STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: window.directorUndoState.advisor_id, date: window.directorUndoState.exception_date } });
         await loadAndRender(); 
         closeDirectorEditor(); 
@@ -3140,55 +3191,70 @@ window.handleDirectorUndo = async () => {
     }
 };
 
-// --- LOGIC HELPERS (Safe ID & Carving) ---
+// --- PLANNER-GRADE LOGIC HELPERS ---
 
+// 1. Get Safe ID
 function getSafeCompId(name) {
     if (!name) return null;
     const clean = String(name).toLowerCase().trim();
     const comps = Object.values(STATE.components);
-    
-    // 1. Try Exact
     let match = comps.find(c => (c.name || "").toLowerCase() === clean);
-    // 2. Try Type
     if (!match) match = comps.find(c => (c.type || "").toLowerCase() === clean);
-    // 3. Fallback to Activity
     if (!match) match = comps.find(c => (c.type || "").toLowerCase() === 'activity');
-    // 4. FAILSAFE: Just grab the first available component so we NEVER return null
     if (!match && comps.length > 0) match = comps[0];
-
     return match ? match.id : null;
 }
 
+// 2. The "Carve" Logic (Ported from Planner)
 function carveTime(baseStructure, injectStart, injectEnd, injectCompId) {
     let newStructure = [];
+    
+    // Sort base structure first
     baseStructure.sort((a, b) => a.start_min - b.start_min);
 
     baseStructure.forEach(seg => {
-        // A. Completely Before
+        // Case A: Segment is completely BEFORE injection -> Keep it
         if (seg.end_min <= injectStart) {
             newStructure.push(seg);
         }
-        // B. Completely After
+        // Case B: Segment is completely AFTER injection -> Keep it
         else if (seg.start_min >= injectEnd) {
             newStructure.push(seg);
         }
-        // C. Overlap -> SPLIT
+        // Case C: Segment Overlaps -> Split it
         else {
+            // 1. Part Before (if any)
             if (seg.start_min < injectStart) {
-                newStructure.push({ component_id: seg.component_id, start_min: seg.start_min, end_min: injectStart });
+                newStructure.push({ 
+                    component_id: seg.component_id, 
+                    start_min: seg.start_min, 
+                    end_min: injectStart 
+                });
             }
+            // (The injection itself is handled separately to ensure it's added only once)
+            
+            // 2. Part After (if any)
             if (seg.end_min > injectEnd) {
-                newStructure.push({ component_id: seg.component_id, start_min: injectEnd, end_min: seg.end_min });
+                newStructure.push({ 
+                    component_id: seg.component_id, 
+                    start_min: injectEnd, 
+                    end_min: seg.end_min 
+                });
             }
         }
     });
 
-    // Add Injection
-    newStructure.push({ component_id: injectCompId, start_min: injectStart, end_min: injectEnd });
+    // Add the injection itself
+    newStructure.push({ 
+        component_id: injectCompId, 
+        start_min: injectStart, 
+        end_min: injectEnd 
+    });
+
     return newStructure.sort((a, b) => a.start_min - b.start_min);
 }
 
-// 4. SAVE LOGIC (Fixes Overwrite Issue)
+// 4. SAVE (V7: FULL PLANNER LOGIC)
 window.handleDirectorSave = async () => {
     const saveBtn = document.getElementById('btnDirectorSave');
     
@@ -3203,80 +3269,105 @@ window.handleDirectorSave = async () => {
         const targetEnd = hhmmToMinutes(newEndStr);
 
         if (!advisorId || !dateISO || isNaN(targetStart) || isNaN(targetEnd)) {
-            alert("Invalid inputs."); return;
+            alert("Invalid inputs. Check times.");
+            return;
         }
 
         saveBtn.textContent = "Processing..."; 
         saveBtn.disabled = true;
 
-        // 1. GET EXISTING SCHEDULE (Don't overwrite it, edit it)
+        // 1. Get Current Schedule (The "Raw Material")
         const dayName = new Date(dateISO).toLocaleDateString('en-US', { weekday: 'long' });
         const currentSegments = calculateLiveSegments(advisorId, dayName, STATE.currentWeekData.mondayISO);
 
-        // 2. Convert visual segments back to DB structure
+        // 2. Convert to Structure Format
         let workStructure = [];
         if (currentSegments && currentSegments.length > 0) {
             currentSegments.forEach(seg => {
-                const cId = getSafeCompId(seg.code); // Uses robust ID finding
+                const cId = getSafeCompId(seg.code);
                 if (cId) {
-                    // Clip to new start/end times
-                    let s = Math.max(seg.startMin, targetStart);
-                    let e = Math.min(seg.endMin, targetEnd);
-                    if (s < e) {
-                        workStructure.push({ component_id: cId, start_min: s, end_min: e });
-                    }
+                    workStructure.push({ 
+                        component_id: cId, 
+                        start_min: seg.startMin, 
+                        end_min: seg.endMin 
+                    });
                 }
             });
         } else {
-            // If empty, fill with default Activity
+            // If empty, create a base block of "Activity"
             const baseId = getSafeCompId('Activity');
             workStructure.push({ component_id: baseId, start_min: targetStart, end_min: targetEnd });
         }
 
-        // 3. FILL GAPS (If shift was extended)
-        if (workStructure.length > 0) {
-            const baseFillId = workStructure[0].component_id; 
-            // Start gap
-            if (workStructure[0].start_min > targetStart) {
-                workStructure.push({ component_id: baseFillId, start_min: targetStart, end_min: workStructure[0].start_min });
-            }
-            // End gap
-            const last = workStructure[workStructure.length-1];
-            if (last.end_min < targetEnd) {
-                workStructure.push({ component_id: baseFillId, start_min: last.end_min, end_min: targetEnd });
-            }
+        // 3. Clip/Extend to New Start/End Times (Outer Bounds)
+        let boundedStructure = [];
+        // Determine "Base Activity" for filling gaps (find dominant activity)
+        // Default to the first segment's type if available, else generic 'Activity'
+        let baseFillId = workStructure.length > 0 ? workStructure[0].component_id : getSafeCompId('Activity');
+
+        // A. Fill Gap at Start
+        if (workStructure.length > 0 && workStructure[0].start_min > targetStart) {
+            boundedStructure.push({ component_id: baseFillId, start_min: targetStart, end_min: workStructure[0].start_min });
         }
 
-        // 4. APPLY INJECTIONS (Carving)
+        // B. Add existing segments (clipped)
+        workStructure.forEach(seg => {
+            let s = Math.max(seg.start_min, targetStart);
+            let e = Math.min(seg.end_min, targetEnd);
+            if (s < e) {
+                boundedStructure.push({ component_id: seg.component_id, start_min: s, end_min: e });
+            }
+        });
+
+        // C. Fill Gap at End
+        if (boundedStructure.length > 0) {
+            const last = boundedStructure[boundedStructure.length - 1];
+            if (last.end_min < targetEnd) {
+                // Try to extend last block if it's same type, else add new
+                if (last.component_id === baseFillId) {
+                    last.end_min = targetEnd;
+                } else {
+                    boundedStructure.push({ component_id: baseFillId, start_min: last.end_min, end_min: targetEnd });
+                }
+            }
+        } else {
+            // If completely empty after clipping, recreate full block
+            boundedStructure.push({ component_id: baseFillId, start_min: targetStart, end_min: targetEnd });
+        }
+
+        // 4. Apply Injections (The "Carving")
+        // We process injections sequentially
         window.directorPendingInjections.forEach(inj => {
             const injStart = hhmmToMinutes(inj.start);
             const injEnd = injStart + inj.dur;
             const injId = getSafeCompId(inj.type);
+
             if (injId) {
-                workStructure = carveTime(workStructure, injStart, injEnd, injId);
+                boundedStructure = carveTime(boundedStructure, injStart, injEnd, injId);
                 reason += ` [+${inj.type}]`;
             }
         });
 
-        // 5. SAVE
+        // 5. Save
         const { error } = await supabase.from('schedule_exceptions').upsert({
             advisor_id: advisorId, 
             exception_date: dateISO, 
-            structure: workStructure, 
+            structure: boundedStructure, 
             reason: reason
         }, { onConflict: 'advisor_id, exception_date' });
 
         if (error) throw error;
 
-        // 6. BROADCAST
+        // 6. Broadcast
         if (STATE.rotaRealtimeChannel) {
             STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: advisorId, date: dateISO } });
         }
         
-        await loadAndRender();
+        await loadAndRender(); 
         
         saveBtn.textContent = "Saved!";
         saveBtn.style.backgroundColor = "#10B981"; 
+        
         setTimeout(() => {
             closeDirectorEditor(); 
             saveBtn.textContent = "Update Schedule"; 
@@ -3285,7 +3376,7 @@ window.handleDirectorSave = async () => {
         }, 800);
 
     } catch (err) {
-        console.error("Save Error:", err);
+        console.error("Director Save Error:", err);
         alert("Failed to update: " + err.message);
         saveBtn.textContent = "Update Schedule";
         saveBtn.disabled = false;
@@ -3294,6 +3385,7 @@ window.handleDirectorSave = async () => {
 
 // --- Initialization Trigger ---
 document.addEventListener("DOMContentLoaded", init);
+
 </script>
 </body>
 </html>
