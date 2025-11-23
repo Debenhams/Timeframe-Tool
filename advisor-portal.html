@@ -2956,7 +2956,6 @@ async function startRealtime() {
         { event: 'schedule_update' },
         (payload) => {
             console.log('Realtime update received:', payload);
-
             if (payload.payload) {
                 const update = payload.payload;
                 console.log("Realtime update received:", update.type);
@@ -2968,13 +2967,20 @@ async function startRealtime() {
                 // GATEKEEPER: Director gets EVERYTHING. Leaders get Team + Self.
                 if (STATE.isDirector || isForMyTeam || isForMe) {
                     console.log("Refreshing data due to relevant update.");
-                    // 1. Silent Refresh (Keeps dashboard/grid live)
+                    
+                    // 1. SILENT REFRESH (Runs for EVERYONE, including Director)
+                    // This updates the numbers, the grid, and the graphs immediately.
                     loadAndRender();
 
-                    // 2. Alerts (Red Banner) - Skip for Director unless it's him
-                    if (STATE.isDirector && !isForMe) return;
+                    // 2. POP-UP BLOCKER (Specific to Director)
+                    // If I am the Director, and it's not MY personal schedule, STOP here.
+                    // This ensures the data updated above, but no red banner appears.
+                    if (STATE.isDirector && !isForMe) {
+                        return; 
+                    }
 
-                    // For others: Check if today
+                    // 3. ALERT LOGIC (Only runs for Team Leaders / Advisors / Director's own schedule)
+                    // This code is identical to the original logic for TLs and Advisors.
                     if (update.date && update.date === TODAY_ISO) {
                         let msg = isForMe ? 
                             "Live Update: Your schedule changed." : 
