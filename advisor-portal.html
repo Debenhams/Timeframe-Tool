@@ -205,9 +205,11 @@
         transition: background-color 0.15s, color 0.15s;
     }
 
-    .nav-link:hover:not(.disabled) {
-        background-color: rgba(255, 255, 255, 0.05);
-        color: var(--sidebar-text-hover);
+    .nav-link.active {
+        background: linear-gradient(90deg, rgba(59, 130, 246, 0.15), transparent);
+        color: white;
+        border-left: 3px solid #3B82F6; /* The Neon Blue Anchor */
+        padding-left: 13px; /* Compensate for the border width */
     }
 
     .nav-link.active {
@@ -243,25 +245,42 @@
         margin-top: auto;
     }
 
-    /* --- Main Content (Refined) --- */
+    /* --- Main Content (Refined with Aurora Background) --- */
     .app-main-content {
         flex-grow: 1;
         flex-direction: column;
         overflow: hidden;
         height: 100vh;
-        background-color: var(--color-bg);
+        position: relative;
+        
+        /* THE AURORA MESH (Moved to main container) */
+        background-color: #F8FAFC; 
+        background-image: 
+            radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.05) 0px, transparent 50%),
+            radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
+        background-size: 150% 150%;
+        animation: auroraMove 15s ease-in-out infinite alternate;
     }
 
-    /* Top Bar within Main Content (Clean White) */
+    /* Top Bar (Now Frosted Glass) */
     .top-bar {
-        background-color: var(--color-panel-bg);
-        border-bottom: 1px solid var(--color-border);
+        background-color: rgba(255, 255, 255, 0.65); /* Semi-transparent */
+        backdrop-filter: blur(12px); /* Frosted effect */
+        -webkit-backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.3);
         display: flex;
         align-items: center;
         justify-content: space-between;
         padding: 16px 24px;
         flex-shrink: 0;
-        box-shadow: var(--shadow-sm);
+        z-index: 50; /* Ensure it floats above the aurora */
+    }
+
+    @keyframes auroraMove {
+        0% { background-position: 0% 0%; }
+        100% { background-position: 100% 100%; }
     }
 
     /* Content Area (Scrollable) */
@@ -862,27 +881,13 @@ display: flex;
 /* === DIRECTOR COMMAND CENTER (Premium Glass & Neon) === */
     
     .dir-dashboard {
-        display: flex;
+       display: flex;
         flex-direction: column;
         gap: 24px;
-        padding: 24px; /* Increased padding */
+        padding: 24px;
         height: 100%;
         overflow-y: auto;
-        
-        /* THE AURORA MESH BACKGROUND */
-        background-color: #F8FAFC; /* Fallback */
-        background-image: 
-            radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
-            radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.15) 0px, transparent 50%),
-            radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.05) 0px, transparent 50%),
-            radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
-        background-size: 150% 150%;
-        animation: auroraMove 15s ease-in-out infinite alternate;
-    }
-
-    @keyframes auroraMove {
-        0% { background-position: 0% 0%; }
-        100% { background-position: 100% 100%; }
+        background: transparent; /* Transparent so the main Aurora shows through */
     }
 
     /* Top Row: Pulse Cards */
