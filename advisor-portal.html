@@ -761,70 +761,62 @@
 
     .timeline-body { position: relative; padding-top: 8px; }
 
-    /* Floating Spotlight Rows (Comfortable Size) */
+    /* Floating Spotlight Rows */
     .timeline-row {
       display: grid;
       grid-template-columns: var(--timeline-name-col) 1fr;
-      height: 46px; /* Increased for better readability */
-      margin-bottom: 4px; /* Breathing room between advisors */
+      height: 40px; /* Slightly taller for modern look */
+      margin-bottom: 6px; /* Gap between rows */
       align-items: center;
       border-radius: 8px;
       transition: all 0.2s ease;
-      border-bottom: 1px solid rgba(0,0,0,0.03);
     }
 
     /* Alternating colors + Hover Effect */
-    .timeline-row:nth-child(odd) { background-color: rgba(255,255,255,0.6); }
-    .timeline-row:nth-child(even) { background-color: rgba(249, 250, 251, 0.6); }
+    .timeline-row:nth-child(odd) { background-color: rgba(255,255,255,0.4); }
+    .timeline-row:nth-child(even) { background-color: rgba(249, 250, 251, 0.4); }
     
     .timeline-row:hover { 
         background-color: #FFFFFF !important; 
-        transform: scale(1.005); /* Slight pop for focus */
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        transform: scale(1.005); 
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         z-index: 5;
-        border-left: 3px solid var(--brand-primary);
     }
+
 
     /* Floating Row Name */
     .timeline-name { 
         padding: 0 16px;
-        display: flex; align-items: center; 
-        font-size: 14px; /* Larger, readable text */
-        font-weight: 600; color: var(--color-text);
+        /* No border right - using gap */
+        display: flex; align-items: center; font-size: 13px; font-weight: 600; color: var(--color-text);
         position: sticky; left: 0; z-index: 10; 
-        background: inherit; 
-        height: 100%;
+        background: inherit; /* Matches row color */
         border-radius: 8px 0 0 8px;
     }
 
     .timeline-track { position: relative; height: 100%; border-radius: 0 8px 8px 0; }
 
-    /* The "Tape" Bar (Readable & Connected) */
+    /* The Liquid Bar (Horizontal Jelly) */
     .timeline-bar {
         position: absolute;
-        top: 8px; bottom: 8px; /* Thicker bar */
-        height: auto !important; 
+        top: 50%; transform: translateY(-50%); /* Center vertically */
+        height: 28px !important; /* Floating pill height */
         display: flex;
         align-items: center;
         overflow: hidden;
-        border-radius: 4px;
+        border-radius: 6px; /* Soft Pill */
         z-index: 25;
-        font-size: 11px; /* Readable text inside bar */
-        font-weight: 700;
+        font-size: 11px;
+        font-weight: 600;
         padding-left: 8px;
         white-space: nowrap;
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 2px rgba(0,0,0,0.05);
-        border: none;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4); /* Glassy Shine */
+        border: 1px solid rgba(0,0,0,0.05);
         transition: all 0.2s;
     }
-    /* Break Styling */
-    .timeline-bar.is-simple-block {
-        opacity: 0.75;
-        background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.05) 5px, rgba(0,0,0,0.05) 10px);
-        box-shadow: none;
-    }
-    
-    .timeline-bar:hover { z-index: 30; transform: scale(1.02); box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; opacity: 1; }
+    .timeline-bar:hover { z-index: 30; transform: translateY(-50%) scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; }
+
+
     /* === Placeholder Content === */
     .placeholder-content {
         text-align: center;
@@ -877,43 +869,43 @@
         display: none;
     }
 
-/* === MY SCHEDULE: Time Grid Alignment Fix === */
+/* === FIX: Proportional Stack (No Gaps) === */
 
-/* 1. Restore Grid Lines so time is visible */
-#tab-my-schedule .day-column-cell {
-    border-bottom: 1px dotted #E5E7EB; /* Light dotted line for half-hours */
-    box-sizing: border-box;
-}
+/* 1. Remove grid lines as they don't align with stacked view */
+#tab-my-schedule .day-column-cell,
 #tab-my-schedule .day-column-cell.hour-mark {
-    border-bottom: 1px solid #D1D5DB; /* Solid line for hours */
+    border-bottom: none !important;
 }
 
-/* 2. Container for Absolute Positioning (Time Mode) */
+/* 2. Stack items vertically with NO gap at the top */
 #tab-my-schedule .day-column-events {
-    display: block !important; /* Remove Flex/Stack */
-    position: relative;
-    grid-row: 1 / span 100;
+    display: flex !important;
+    flex-direction: column; /* Stack vertically */
+    width: 100%;
     height: 100%;
+    border-right: 1px solid var(--color-border);
+    padding: 0;
+    grid-row: 1 / span 100 !important; /* Override grid positioning */
     pointer-events: none;
-    border-right: 1px solid transparent;
 }
 
 #tab-my-schedule .day-column-events:last-child {
     border-right: none;
 }
 
-/* 3. The Jelly Pill (Absolute Positioned for Exact Time) */
+/* 3. Blocks are "Jelly Pills" (Rounded, Floating, Glossy) */
 #tab-my-schedule .activity-block {
-    position: absolute !important; /* Critical for alignment */
-    left: 4px !important;
-    right: 4px !important;
-    width: auto !important;
-    margin: 0 !important;
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    width: 96% !important; /* Slight gap on sides for floating look */
+    margin: 1px auto !important; /* Tiny gap between blocks */
     
-    /* Visual Style (Kept the Jelly Look) */
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.4);
-    border: 1px solid rgba(0,0,0,0.05);
+    /* The Jelly Look */
+    border-radius: 8px; /* Rounded pill shape */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.4); /* Inner top shine */
+    border: 1px solid rgba(0,0,0,0.05); /* Subtle border */
     
     padding: 2px 4px;
     font-size: 11px;
@@ -925,39 +917,40 @@
     align-items: center;
     justify-content: center;
     text-align: center;
+    flex-shrink: 0;
     box-sizing: border-box;
-    transition: transform 0.1s, z-index 0.1s;
-    z-index: 1;
+    transition: transform 0.1s;
 }
 #tab-my-schedule .activity-block:hover {
-    transform: scale(1.02);
-    z-index: 20;
+    transform: scale(1.02); /* Pop on hover */
+    z-index: 10;
 }
 
 /* Explicit Rest Day Indicator (Striped) */
 .timeline-rdo-fill {
     position: absolute;
-    top: 2px; bottom: 2px; left: 0; width: 100%; /* Add gap for row separation */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     
-    /* Cleaner Diagonal Pattern */
-    background-color: rgba(249, 250, 251, 0.5);
+    /* Diagonal Grey Stripes Pattern */
     background-image: repeating-linear-gradient(
         45deg,
-        rgba(0, 0, 0, 0.04) 0px,
-        rgba(0, 0, 0, 0.04) 1px,
-        transparent 1px,
-        transparent 8px
+        rgba(0, 0, 0, 0.03),
+        rgba(0, 0, 0, 0.03) 10px,
+        rgba(0, 0, 0, 0.06) 10px,
+        rgba(0, 0, 0, 0.06) 20px
     );
     color: #9CA3AF; 
     font-weight: 700; 
-    font-size: 11px; 
-    letter-spacing: 2px;
+    font-size: 12px; 
+    letter-spacing: 1px;
     user-select: none;
     z-index: 0;
-    border-radius: 6px;
 }
 
 /* === INTERACTIVE POLISH === */
@@ -2991,18 +2984,9 @@ function drawTeamDailyGantt() {
         const isCurrentUser = member.id === STATE.advisorId;
         const rowStyle = isCurrentUser ? 'background-color: #E0F2FE !important;' : '';
 
-        // Safety: Handle missing names
-        const safeName = member.name || "Unknown";
-        const initials = safeName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
-
         bodyHtml += `
         <div class="timeline-row" style="${rowStyle}">
-            <div class="timeline-name">
-                <div class="avatar-circle" style="width:32px; height:32px; font-size:11px; margin-right:12px; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.05);">${initials}</div>
-                <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                    ${safeName} ${isCurrentUser ? '<span style="color:var(--brand-primary); font-weight:700; margin-left:6px; font-size:11px;">(You)</span>' : ''}
-                </span>
-            </div>
+            <div class="timeline-name">${member.name} ${isCurrentUser ? '<span class="tag">(You)</span>' : ''}</div>
             <div class="timeline-track">
                 ${renderGanttSegments(segments, member.id, specificDateISO)}
             </div>
@@ -3011,7 +2995,6 @@ function drawTeamDailyGantt() {
     });
     ELS_GANTT.plannerBody.innerHTML = bodyHtml;
 }
-
 // --- DIRECTOR COMMAND CENTER (The UI Structure) ---
 function renderDirectorDashboard() {
     // SMART DATE LOGIC:
