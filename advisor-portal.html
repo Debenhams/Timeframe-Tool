@@ -1255,12 +1255,12 @@ display: flex;
         <div style="display: flex; gap: 16px; margin-bottom: 8px;">
             <div class="form-group" style="flex:1;">
                 <label style="font-size:12px; font-weight:600; color:#64748B;">Shift Start</label>
-                <input type="time" id="dirEditStart" class="form-input" style="font-size:16px; padding:10px;" onchange="handleDirectorTimeChange()">
+                <input type="time" id="dirEditStart" class="form-input" style="font-size:16px; padding:10px;" 
             </div>
 
             <div class="form-group" style="flex:1;">
                 <label style="font-size:12px; font-weight:600; color:#64748B;">Shift End</label>
-                <input type="time" id="dirEditEnd" class="form-input" style="font-size:16px; padding:10px;" onchange="handleDirectorTimeChange()">
+                <input type="time" id="dirEditEnd" class="form-input" style="font-size:16px; padding:10px;" 
             </div>
         </div>
 
@@ -1272,7 +1272,7 @@ display: flex;
                 <input type="time" id="dirAddStart" class="form-input" placeholder="Start Time" style="flex:2; padding:8px; font-size:13px; height:36px;">
                 <input type="number" id="dirAddDur" class="form-input" placeholder="Mins" value="30" min="5" step="5" style="flex:1; padding:8px; font-size:13px; height:36px;">
             </div>
-            <button class="btn btn-sm btn-secondary" style="width:100%;" onclick="insertDirectorActivity()">+ Insert Activity</button>
+            <button class="btn btn-sm btn-secondary" style="width:100%;" onclick="addDirectorActivityToList()">+ Insert Activity</button>
             
             </div>
 
@@ -1378,18 +1378,28 @@ function toMonday(d){
 function fmtDateLocal(d){
   return d.toLocaleDateString('en-CA', {year: 'numeric', month: '2-digit', day: '2-digit'});
 }
+
 function fmtDateFriendly(d) {
     return d.toLocaleDateString("en-GB", { month: "short", day: "numeric" });
 }
 function addDays(d,n){ const x=new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate()+n); return x; }
-function hhmmToMinutes(t){ 
-    if (!t) return 0;
-   const [h,m]=(t.split(":")||["0","0"]).map(Number); 
-    return h*60+m; 
+// Updated hhmmToMinutes (Robust Validation)
+function hhmmToMinutes(t){
+    if (!t) return NaN; // Return NaN for empty input
+    const parts = t.split(":");
+    if (parts.length !== 2) return NaN; // Return NaN for invalid format
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    // Check for invalid numbers or out of range values
+    if (isNaN(h) || isNaN(m) || h < 0 || h > 23 || m < 0 || m > 59) {
+        return NaN;
+    }
+    return h * 60 + m;
 }
 
 // Robust Minutes to Time formatter
 const m2t = (minutes) => {
+
     if (minutes === null || isNaN(minutes)) return "";
     let roundedMinutes = Math.round(minutes);
     // We generally don't wrap around midnight (1440) unless specifically needed for overnight shifts, 
@@ -1531,531 +1541,13 @@ const STATE = {
     rotationPatterns: {}, // Stores rotation_patterns by name
     assignments: new Map(), // Stores assignments by advisor_id
 
-    /* (2 lines before) */
+    
     // New State for Team View
     teamViewMode: 'daily', // 'daily' or 'weekly'
     teamViewDayIndex: 0, // 0=Monday, 6=Sunday
 };
 
-// --- DIRECTOR LIVE EDIT STATE & FUNCTIONS (REPLACEMENT) ---
-const DIRECTOR_EDIT_STATE = {
-    isOpen: false,
-    advisorId: null,
-    dateISO: null,
-    originalSegments: [], // The schedule before edits (display format enhanced with component_id)
-    workingSegments: [], // The schedule during edits
-    history: [],
-    historyIndex: -1,
-    // Mapping activity names used in the modal to component IDs
-    activityComponentMap: new Map(),
-    // Activities considered "Fixed" (cannot be replaced by insertions)
-    // NOTE: This relies on the component names exactly matching in STATE.components.
-    fixedActivities: ["Break", "Lunch"],
-    // The primary activity used to fill gaps or absorb trims
-    // NOTE: Ensure this component exists in your database.
-    primaryFlexibleActivity: "DEB Email", 
-};
 
-/**
- * Initializes the activity map required for the Director Editor.
- * Needs to run after STATE.components is populated.
- */
-function initializeDirectorActivityMap() {
-    if (!STATE.components) return;
-
-    DIRECTOR_EDIT_STATE.activityComponentMap.clear();
-    // Define activities available for insertion in the modal
-    // Add others here if needed (e.g., "Coaching", "Offline")
-    const insertableActivities = ["Meeting", "Training", "Admin", "121"];
-    
-    // Add the primary flexible activity and fixed activities to the map as well
-    const requiredActivities = [
-        ...insertableActivities, 
-        DIRECTOR_EDIT_STATE.primaryFlexibleActivity, 
-        ...DIRECTOR_EDIT_STATE.fixedActivities
-    ];
-    
-    // Populate the map from STATE.components
-    Object.keys(STATE.components).forEach(id => {
-        const comp = STATE.components[id];
-        // Check if the component name matches any of the required activities
-        if (requiredActivities.includes(comp.name)) {
-            // Store the ID (key) associated with the Name
-            DIRECTOR_EDIT_STATE.activityComponentMap.set(comp.name, id);
-        }
-    });
-
-    // Populate the dropdown in the modal
-    const dropdown = document.getElementById('dirAddType');
-    if (dropdown) {
-        let optionsHtml = '';
-        // Populate dropdown only with the activities defined as insertable
-        insertableActivities.forEach(name => {
-            if (DIRECTOR_EDIT_STATE.activityComponentMap.has(name)) {
-                optionsHtml += `<option value="${name}">${name}</option>`;
-            }
-        });
-        dropdown.innerHTML = optionsHtml;
-    }
-}
-
-/**
- * Opens the Director Editor Modal for a specific advisor and date.
- * Exposed globally for onclick handlers.
- */
-window.openDirectorEditor = async function(advisorId, dateISO, advisorName) {
-    // Ensure the activity map is ready (Crucial if components load async)
-    if (DIRECTOR_EDIT_STATE.activityComponentMap.size === 0 || !DIRECTOR_EDIT_STATE.activityComponentMap.has(DIRECTOR_EDIT_STATE.primaryFlexibleActivity)) {
-        initializeDirectorActivityMap();
-        // If still not initialized after attempt, abort.
-        if (!DIRECTOR_EDIT_STATE.activityComponentMap.has(DIRECTOR_EDIT_STATE.primaryFlexibleActivity)) {
-            console.error(`Error: Primary flexible activity (${DIRECTOR_EDIT_STATE.primaryFlexibleActivity}) not found in components.`);
-            alert("Error initializing editor: Required activities not found. Please check component definitions.");
-            return;
-        }
-    }
-
-    // Determine Day/Week context
-    const dateObj = new Date(dateISO + "T00:00:00");
-    const dow = dateObj.getDay();
-    // Adjust DOW: getDay() returns 0=Sun, 1=Mon. DAYS array is 0=Mon, 6=Sun.
-    const dayName = DAYS[dow === 0 ? 6 : dow - 1];
-    const weekStartISO = fmtDateLocal(toMonday(dateObj));
-
-    // 1. Calculate the current live segments
-    // calculateLiveSegments returns display format: { code, start, end, startMin, endMin, color }
-    const segments = calculateLiveSegments(advisorId, dayName, weekStartISO);
-
-    if (!segments || segments.length === 0) {
-        alert("Editing RDO (Rest Day Off) or empty schedule days is not supported in this version.");
-        return;
-    }
-
-    // 2. Enhance segments with component_id (required for editing logic)
-    const enhancedSegments = segments.map(seg => {
-        // First try the optimized map
-        const componentId = DIRECTOR_EDIT_STATE.activityComponentMap.get(seg.code);
-        if (componentId) {
-            return { ...seg, component_id: componentId };
-        } else {
-            // Fallback search through all components if not in the predefined map (e.g., "Phones")
-            for (const id in STATE.components) {
-                if (STATE.components[id].name === seg.code) {
-                    return { ...seg, component_id: id };
-                }
-            }
-            console.warn("Could not find component ID for segment during editor load:", seg.code);
-            return { ...seg, component_id: null }; // Should ideally not happen
-        }
-    });
-
-    // 3. Initialize State
-    DIRECTOR_EDIT_STATE.isOpen = true;
-    DIRECTOR_EDIT_STATE.advisorId = advisorId;
-    DIRECTOR_EDIT_STATE.dateISO = dateISO;
-    // Deep copy segments for editing
-    DIRECTOR_EDIT_STATE.originalSegments = JSON.parse(JSON.stringify(enhancedSegments));
-    DIRECTOR_EDIT_STATE.workingSegments = JSON.parse(JSON.stringify(enhancedSegments));
-    DIRECTOR_EDIT_STATE.history = [JSON.parse(JSON.stringify(enhancedSegments))];
-    DIRECTOR_EDIT_STATE.historyIndex = 0;
-
-    // 4. Update Modal UI
-    document.getElementById('dirEditTitle').textContent = `Edit: ${advisorName} (${dayName})`;
-    document.getElementById('dirEditAdvisorId').value = advisorId;
-    document.getElementById('dirEditDateISO').value = dateISO;
-    document.getElementById('dirEditReason').value = ''; // Clear previous reason
-
-    updateDirectorEditorUI();
-    document.getElementById('directorEditModal').style.display = 'flex';
-}
-
-window.closeDirectorEditor = function() {
-    DIRECTOR_EDIT_STATE.isOpen = false;
-    document.getElementById('directorEditModal').style.display = 'none';
-}
-
-/**
- * Updates the UI elements (Start/End times, Activity List Visualization) based on workingSegments.
- */
-function updateDirectorEditorUI() {
-    const segments = DIRECTOR_EDIT_STATE.workingSegments;
-    if (segments.length === 0) return;
-
-    const startTime = segments[0].start;
-    const endTime = segments[segments.length - 1].end;
-
-    document.getElementById('dirEditStart').value = startTime;
-    document.getElementById('dirEditEnd').value = endTime;
-
-    renderDirectorActivityList();
-    updateDirectorUndoButton();
-}
-
-/**
- * Renders the visualization (Timeline) of the current working schedule within the modal.
- */
-function renderDirectorActivityList() {
-    const listEl = document.getElementById('dirActivityList');
-    let html = '';
-    // Calculate total duration based on actual start/end times of the shift
-    const startMin = DIRECTOR_EDIT_STATE.workingSegments[0].startMin;
-    const endMin = DIRECTOR_EDIT_STATE.workingSegments[DIRECTOR_EDIT_STATE.workingSegments.length - 1].endMin;
-    const totalDuration = endMin - startMin;
-
-    if (totalDuration <= 0) {
-        listEl.innerHTML = '';
-        return;
-    }
-
-    DIRECTOR_EDIT_STATE.workingSegments.forEach((seg) => {
-        const duration = seg.endMin - seg.startMin;
-        const widthPct = (duration / totalDuration) * 100;
-        // Ensure we use the component color if seg.color is missing (happens during rebuilds)
-        const component = STATE.components[seg.component_id];
-        const color = seg.color || component?.color || '#475569';
-        const textColor = getContrastingTextColor(color);
-        const code = component?.name || seg.code || 'Unknown';
-
-        html += `
-            <div class="dir-activity-item" style="background-color: ${color}; color: ${textColor}; width: ${widthPct}%;" title="${code} (${seg.start}-${seg.end} | ${duration}m)">
-                ${code}
-            </div>
-        `;
-    });
-    listEl.innerHTML = html;
-}
-
-/**
- * CORE LOGIC 1: Handles changes to the Start or End time inputs.
- * Adjusts flexible time (e.g., DEB Email) to accommodate changes, preserving fixed time (e.g., Breaks).
- */
-window.handleDirectorTimeChange = function() {
-    const newStartStr = document.getElementById('dirEditStart').value;
-    const newEndStr = document.getElementById('dirEditEnd').value;
-
-    const newStartMin = hhmmToMinutes(newStartStr);
-    const newEndMin = hhmmToMinutes(newEndStr);
-
-    if (newEndMin <= newStartMin) {
-        alert("End time must be after start time.");
-        updateDirectorEditorUI(); // Revert UI to state
-        return;
-    }
-
-    const newDuration = newEndMin - newStartMin;
-    let segments = JSON.parse(JSON.stringify(DIRECTOR_EDIT_STATE.workingSegments));
-    const originalStartMin = segments[0].startMin;
-    // Calculate original duration from the segments themselves
-    const originalDuration = segments.reduce((sum, s) => sum + (s.endMin - s.startMin), 0);
-
-    const primaryActivityId = DIRECTOR_EDIT_STATE.activityComponentMap.get(DIRECTOR_EDIT_STATE.primaryFlexibleActivity); 
-
-    // 1. Handle Start Time Change (Shift the whole block temporally)
-    const startDiff = newStartMin - originalStartMin;
-    segments.forEach(seg => {
-        seg.startMin += startDiff;
-        seg.endMin += startDiff;
-    });
-
-    // 2. Handle Duration Change (Adjust the flexible activities)
-    const durationDiff = newDuration - originalDuration;
-
-    if (durationDiff > 0) {
-        // Extend: Add difference to the end using primary activity.
-        const lastSeg = segments[segments.length - 1];
-        if (lastSeg.component_id === primaryActivityId) {
-             // If the last segment is already flexible, just extend it.
-             lastSeg.endMin += durationDiff;
-        } else {
-            // Otherwise, add a new flexible segment at the end.
-            const newSeg = {
-                component_id: primaryActivityId,
-                code: DIRECTOR_EDIT_STATE.primaryFlexibleActivity,
-                startMin: lastSeg.endMin,
-                endMin: lastSeg.endMin + durationDiff,
-            };
-            segments.push(newSeg);
-        }
-    } else if (durationDiff < 0) {
-        // Trim: Remove difference from flexible activities, starting from the end.
-        let needed = Math.abs(durationDiff);
-        // Iterate backwards through the segments
-        for (let i = segments.length - 1; i >= 0 && needed > 0; i--) {
-            const seg = segments[i];
-            // Only trim from flexible activities (ID matches primary flexible)
-            if (seg.component_id === primaryActivityId) {
-                const segDuration = seg.endMin - seg.startMin;
-                if (segDuration > needed) {
-                    // Segment is long enough, just shorten it.
-                    seg.endMin -= needed;
-                    needed = 0;
-                } else {
-                    // Segment is too short, remove it entirely and continue trimming.
-                    needed -= segDuration;
-                    segments.splice(i, 1);
-                }
-            }
-        }
-        // If we still needed to trim time but ran out of flexible activities:
-        if (needed > 0) {
-            alert("Could not trim enough time without affecting fixed activities (Breaks/Lunch). Please review the schedule.");
-            // We must revert the UI to the previous state because the change failed validation
-            updateDirectorEditorUI(); 
-            return;
-        }
-    }
-
-    // Finalize segments (Update display strings and fuse)
-    DIRECTOR_EDIT_STATE.workingSegments = fuseAndFinalizeSegments(segments);
-    saveDirectorHistory();
-    updateDirectorEditorUI();
-}
-
-
-/**
- * CORE LOGIC 2: Inserts a new activity into the working schedule (Carve-Out).
- * This is the main fix for the overwrite issue.
- */
-window.insertDirectorActivity = function() {
-    const type = document.getElementById('dirAddType').value;
-    const startStr = document.getElementById('dirAddStart').value;
-    const duration = parseInt(document.getElementById('dirAddDur').value, 10);
-
-    if (!type || !startStr || isNaN(duration) || duration <= 0) {
-        alert("Please fill in all fields correctly (Type, Start Time, Duration > 0).");
-        return;
-    }
-
-    const insertStartMin = hhmmToMinutes(startStr);
-    const insertEndMin = insertStartMin + duration;
-
-    const componentId = DIRECTOR_EDIT_STATE.activityComponentMap.get(type);
-    if (!componentId) {
-        alert(`Component definition for ${type} not found.`);
-        return;
-    }
-
-    let segments = JSON.parse(JSON.stringify(DIRECTOR_EDIT_STATE.workingSegments));
-    
-    // Check boundaries
-    if (segments.length === 0) return;
-    const shiftStart = segments[0].startMin;
-    const shiftEnd = segments[segments.length - 1].endMin;
-
-    if (insertStartMin < shiftStart || insertEndMin > shiftEnd) {
-        alert("Activity is outside the current shift boundaries. Adjust shift times first.");
-        return;
-    }
-
-    // Check for overlap with Fixed activities
-    const fixedActivityIds = DIRECTOR_EDIT_STATE.fixedActivities.map(name => DIRECTOR_EDIT_STATE.activityComponentMap.get(name));
-
-    for (const seg of segments) {
-        // Check if the segment ID is in the list of fixed IDs
-        if (fixedActivityIds.includes(seg.component_id)) {
-            // Check if the insertion overlaps this fixed segment
-            // Overlap exists if Max(StartA, StartB) < Min(EndA, EndB)
-            const overlapStart = Math.max(seg.startMin, insertStartMin);
-            const overlapEnd = Math.min(seg.endMin, insertEndMin);
-            
-            if (overlapEnd > overlapStart) {
-                alert(`Insertion overlaps with a fixed activity (${seg.code}). Cannot insert here.`);
-                return;
-            }
-        }
-    }
-
-    // Rebuild the schedule by splitting segments around the insertion (Carve-out)
-    const newSegments = [];
-    let inserted = false;
-
-    for (const seg of segments) {
-        const segStart = seg.startMin;
-        const segEnd = seg.endMin;
-
-        // Case 1: Segment is completely before or after the insertion
-        if (segEnd <= insertStartMin || segStart >= insertEndMin) {
-            newSegments.push(seg);
-            continue;
-        }
-
-        // Case 2: Overlap occurs. (We already verified it's not overlapping a fixed activity)
-
-        // Add the part of the segment BEFORE the insertion start
-        if (segStart < insertStartMin) {
-            // Create a copy of the segment and shorten its end time
-            newSegments.push({...seg, endMin: insertStartMin});
-        }
-
-        // Add the inserted activity itself (only once at the starting point of the insertion)
-        if (!inserted) {
-            const insertedSeg = {
-                component_id: componentId,
-                code: type, // Code is helpful for debugging/display before finalization
-                startMin: insertStartMin,
-                endMin: insertEndMin,
-            };
-            newSegments.push(insertedSeg);
-            inserted = true;
-        }
-
-        // Add the part of the segment AFTER the insertion end
-        if (segEnd > insertEndMin) {
-            // Create a copy of the segment and advance its start time
-            newSegments.push({...seg, startMin: insertEndMin});
-        }
-    }
-
-    // Finalize segments (Fuse adjacent segments and update display strings)
-    DIRECTOR_EDIT_STATE.workingSegments = fuseAndFinalizeSegments(newSegments);
-    
-    // History and UI Update
-    saveDirectorHistory();
-    updateDirectorEditorUI();
-
-    // Clear inputs
-    document.getElementById('dirAddStart').value = '';
-}
-
-/**
- * Helper to fuse adjacent segments of the same type and update display strings/colors.
- */
-function fuseAndFinalizeSegments(segments) {
-    const fusedSegments = [];
-    if (segments.length === 0) return fusedSegments;
-
-    // Start with the first segment (ensure it's a deep copy)
-    let current = JSON.parse(JSON.stringify(segments[0]));
-
-    for (let i = 1; i < segments.length; i++) {
-        const next = JSON.parse(JSON.stringify(segments[i]));
-        // Check if they are the same component AND the end of current meets the start of next
-        if (current.component_id === next.component_id && current.endMin === next.startMin) {
-            // Fuse them by extending the end time
-            current.endMin = next.endMin;
-        } else {
-            // They are different, push current and move to next
-            fusedSegments.push(current);
-            current = next;
-        }
-    }
-    fusedSegments.push(current);
-
-    // Update display properties (start/end strings, color, code) for all segments
-    fusedSegments.forEach(seg => {
-        // Ensure component details are up-to-date from the global state
-        const component = STATE.components[seg.component_id];
-        seg.start = m2t(seg.startMin);
-        seg.end = m2t(seg.endMin);
-        seg.color = component?.color || '#475569';
-        seg.code = component?.name || 'Unknown';
-    });
-
-    return fusedSegments;
-}
-
-
-// History Management
-function saveDirectorHistory() {
-    // Trim future history if we branched off
-    if (DIRECTOR_EDIT_STATE.historyIndex < DIRECTOR_EDIT_STATE.history.length - 1) {
-        DIRECTOR_EDIT_STATE.history = DIRECTOR_EDIT_STATE.history.slice(0, DIRECTOR_EDIT_STATE.historyIndex + 1);
-    }
-    // Push a deep copy of the current working segments
-    DIRECTOR_EDIT_STATE.history.push(JSON.parse(JSON.stringify(DIRECTOR_EDIT_STATE.workingSegments)));
-    DIRECTOR_EDIT_STATE.historyIndex++;
-    updateDirectorUndoButton();
-}
-
-function updateDirectorUndoButton() {
-    const btn = document.getElementById('btnDirectorUndo');
-    if (btn) {
-        const disabled = DIRECTOR_EDIT_STATE.historyIndex <= 0;
-        btn.disabled = disabled;
-        // Adjust opacity based on disabled state (matches the style in the HTML)
-        btn.style.opacity = disabled ? 0.7 : 1;
-    }
-}
-
-window.handleDirectorUndo = function() {
-    if (DIRECTOR_EDIT_STATE.historyIndex > 0) {
-        DIRECTOR_EDIT_STATE.historyIndex--;
-        // Restore the working segments from the history snapshot
-        DIRECTOR_EDIT_STATE.workingSegments = JSON.parse(JSON.stringify(DIRECTOR_EDIT_STATE.history[DIRECTOR_EDIT_STATE.historyIndex]));
-        updateDirectorEditorUI();
-    }
-}
-
-/**
- * Saves the working schedule as a schedule exception.
- */
-window.handleDirectorSave = async function() {
-    const { advisorId, dateISO, workingSegments } = DIRECTOR_EDIT_STATE;
-    const reason = document.getElementById('dirEditReason').value.trim();
-
-    if (!reason) {
-        alert("A reason or authorization name is required to save changes.");
-        return;
-    }
-
-    if (workingSegments.length === 0) {
-        alert("Cannot save an empty schedule.");
-        return;
-    }
-
-    // Convert working segments into the required structure format for Supabase
-    // Structure format: { component_id, start_min, end_min }
-    const structure = workingSegments.map(seg => ({
-        component_id: seg.component_id,
-        start_min: seg.startMin,
-        end_min: seg.endMin
-    }));
-
-    const exceptionRecord = {
-        advisor_id: advisorId,
-        exception_date: dateISO,
-        structure: structure,
-        reason: reason
-    };
-
-    // Disable save button during save operation
-    const saveBtn = document.getElementById('btnDirectorSave');
-    if (saveBtn) saveBtn.disabled = true;
-
-    // Save the exception using Upsert
-    const { data, error } = await supabase
-        .from("schedule_exceptions")
-        .upsert(exceptionRecord, { onConflict: 'advisor_id, exception_date' })
-        .select()
-        .maybeSingle();
-
-    if (saveBtn) saveBtn.disabled = false;
-
-    if (error) {
-        console.error("Error saving exception:", error);
-        alert("Error saving schedule update. Check console for details.");
-    } else {
-        // Update local STATE.exceptions immediately so the main UI reflects the change
-        if (data) {
-            const existingIndex = STATE.exceptions.findIndex(e => e.advisor_id === advisorId && e.exception_date === dateISO);
-            if (existingIndex > -1) {
-                STATE.exceptions[existingIndex] = data;
-            } else {
-                STATE.exceptions.push(data);
-            }
-        }
-        
-        // Re-render the main views
-        renderViews();
-        showInfoNote("Schedule updated successfully.", 3000);
-        closeDirectorEditor();
-    }
-}
-
-// --- END DIRECTOR LIVE EDIT FUNCTIONS ---
-
-/* ---- Live Schedule Calculation ---- */
-/* (2 lines after) */
 
 // Converts planner-style structures (using component_id) into display format
 function structureToSegments(structure) {
@@ -2668,7 +2160,9 @@ ELS.realtimeNote.addEventListener('click', (e) => {
         if (advisorId && dateISO && advisorName) {
             // Call the globally exposed function to open the editor
             if (window.openDirectorEditor) {
-                window.openDirectorEditor(advisorId, dateISO, advisorName);
+                // Fix: Pass default times (09:00 - 17:00) because the weekly grid cell doesn't know the exact shift times yet.
+                // This prevents the "Name in the Time Box" error.
+                window.openDirectorEditor(advisorId, dateISO, "09:00", "17:00");
             }
         }
     });
@@ -3224,18 +2718,51 @@ function drawTeamScheduleGrid() {
     ELS.teamScheduleContainer.innerHTML = html;
 }
 
-function renderTeamGridCell(segments) {
-    if (segments.length === 0) {
-        return `<span class="weekly-rdo">RDO</span>`;
-    }
-
-    const start = segments[0].start;
-    const end = segments[segments.length - 1].end;
+// Renders the Team Schedule in a Weekly Grid format
+function renderTeamWeeklyGrid() {
+    let html = '<table class="team-grid"><thead><tr><th>Advisor</th>';
     
-    // Modified to show ONLY the time (Activity removed)
-    return `
-        <span class="weekly-shift-time">${start} - ${end}</span>
-    `;
+    // Headers
+    for (let i = 0; i < 7; i++) {
+        const dayDate = addDays(STATE.monday, i);
+        html += `<th>${DAYS[i]} (${fmtDateFriendly(dayDate)})</th>`;
+    }
+    html += '</tr></thead><tbody>';
+    
+    // Loop through advisors
+    (STATE.teamMembers || []).forEach(adv => {
+        html += `<tr data-advisor-id="${adv.id}"><td>${adv.name}</td>`;
+
+        // Loop through days of the week
+        for (let i = 0; i < 7; i++) {
+            const dayName = DAYS[i];
+            // Calculate the specific date for this cell (NEW)
+            const cellDateISO = fmtDateLocal(addDays(STATE.monday, i)); 
+            const segments = calculateLiveSegments(adv.id, dayName, fmtDateLocal(STATE.monday));
+
+            // Add class="weekly-cell" and data attributes (UPDATED)
+            // This enables the Director click listener to identify the cell.
+            html += `<td class="weekly-cell" data-advisor-id="${adv.id}" data-date-iso="${cellDateISO}">`;
+
+            if (segments && segments.length > 0) {
+                // Display summary (Start - End)
+                html += `<span class="weekly-shift-time">${segments[0].start} - ${segments[segments.length-1].end}</span>`;
+                
+                // Display details (Activities)
+                // const details = segments.map(s => s.code).join(', ');
+                // Basic implementation for details, can be enhanced
+                // html += `<span class="weekly-shift-details">${details}</span>`;
+
+            } else {
+                html += `<span class="weekly-rdo">RDO</span>`;
+            }
+            html += `</td>`; // Close the <td> (UPDATED)
+        }
+        html += `</tr>`;
+    });
+
+    html += '</tbody></table>';
+    ELS.teamScheduleContainer.innerHTML = html;
 }
 
 // --- Team Schedule (Daily Gantt View) Rendering (NEW FEATURE) ---
