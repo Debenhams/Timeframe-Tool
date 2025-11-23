@@ -2825,20 +2825,26 @@ function drawMyRotaCalendar(){
             const textColor = getContrastingTextColor(color);
             const tooltip = `${seg.code}: ${seg.start} - ${seg.end}`;
 
-            // --- CALCULATE EXACT HEIGHT ONLY ---
+            // FIX: Calculate Exact Position & Height
             const duration = seg.endMin - seg.startMin;
             const heightPx = duration * pixelsPerMinute; 
+            
+            // Calculate Top Position (Minutes from 08:00 start)
+            const minutesFromStart = seg.startMin - (TIMEGRID_START_H * 60);
+            const topPx = minutesFromStart * pixelsPerMinute;
 
             let blockClass = 'activity-block';
             const lowerCode = seg.code.toLowerCase();
             if (lowerCode.includes('break') || lowerCode.includes('lunch')) {
-                blockClass += ' is-simple-block';
+               blockClass += ' is-simple-block';
             }
 
-            // Render with EXACT HEIGHT, but NO 'top' position (CSS stacks it)
-            // UPDATED: Uses data-tooltip for Glass Hover Effect
-            html += `<div class="${blockClass}" data-tooltip="${tooltip}" style="height: ${heightPx}px; background-color: ${color};
-color: ${textColor};">
+            // Render with Top Position (Time Alignment)
+            html += `<div class="${blockClass}" data-tooltip="${tooltip}" style="
+                        height: ${heightPx}px; 
+                        top: ${topPx}px; 
+                        background-color: ${color};
+                        color: ${textColor};">
                         <span class="activity-title">${seg.code}</span>
                         <span class="activity-time">${seg.start} - ${seg.end}</span>
                      </div>`;
