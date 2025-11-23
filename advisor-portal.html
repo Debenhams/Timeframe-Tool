@@ -875,42 +875,47 @@
         display: none;
     }
 
-/* === MY SCHEDULE: Swim Lanes & Structure Fix === */
+/* === MY SCHEDULE: Stacked View with Grid Lines (Photo 1 Style) === */
 
-/* 1. The Swim Lanes (Vertical Separators) */
+/* 1. Restore Clear Grid Lines */
+#tab-my-schedule .day-column-cell {
+    border-bottom: 1px dotted #E5E7EB !important; /* Visible dotted line for half-hours */
+    height: var(--timegrid-row-height);
+    box-sizing: border-box;
+}
+#tab-my-schedule .day-column-cell.hour-mark {
+    border-bottom: 1px solid #D1D5DB !important; /* Stronger solid line for hours */
+}
+
+/* 2. Container for Stacked Positioning (Flex Column) */
 #tab-my-schedule .day-column-events {
-    display: block !important; /* Absolute Mode */
+    display: flex !important; /* Enable Flexbox */
+    flex-direction: column !important; /* Stack vertically */
+    justify-content: flex-start; /* Start from the top */
+    gap: 4px; /* Small gap between stacked blocks */
+    
     position: relative;
-    grid-row: 1 / span 100;
-    height: 100%;
+    grid-row: 1 / span 100; /* Span the whole grid area */
+    height: auto !important; /* Let height be defined by content */
+    min-height: 100%;
     pointer-events: none;
-    /* The Swim Line */
-    border-right: 1px solid #E2E8F0; 
-    padding: 0;
+    border-right: 1px solid #E5E7EB; /* Vertical Swim Lane divider */
+    padding: 4px; /* Padding inside the column */
+    background: transparent; /* Ensure grid lines show through */
 }
 
 #tab-my-schedule .day-column-events:last-child {
     border-right: none;
 }
 
-/* 2. Ghost Guides (Faint horizontal lines to explain the gap) */
-#tab-my-schedule .day-column-cell {
-    height: var(--timegrid-row-height);
-    box-sizing: border-box;
-    /* Very faint dots for half-hours */
-    border-bottom: 1px dotted rgba(0,0,0,0.05) !important;
-}
-#tab-my-schedule .day-column-cell.hour-mark {
-    /* Slightly visible line for Hours so the gap looks like a grid */
-    border-bottom: 1px solid rgba(0,0,0,0.08) !important;
-}
-
-/* 3. The Jelly Pill (Positioned Correctly) */
+/* 3. The Jelly Pill (Relative Positioned for Stacking) */
 #tab-my-schedule .activity-block {
-    position: absolute !important; 
-    left: 4px !important;
-    right: 4px !important;
-    width: auto !important;
+    position: relative !important; /* Stack, don't float */
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    width: 100% !important; /* Fill the column width */
+    height: auto !important; /* Let content define height */
     margin: 0 !important;
     
     /* Visual Style */
@@ -918,10 +923,10 @@
     box-shadow: 0 2px 4px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.4);
     border: 1px solid rgba(0,0,0,0.05);
     
-    padding: 2px 4px;
+    padding: 6px 4px; /* A bit more padding for content */
     font-size: 11px;
     overflow: hidden;
-    line-height: 1.1;
+    line-height: 1.2;
     pointer-events: auto;
     display: flex;
     flex-direction: column;
@@ -930,12 +935,13 @@
     text-align: center;
     box-sizing: border-box;
     transition: transform 0.1s, z-index 0.1s;
-    z-index: 10;
+    z-index: 1;
+    flex-shrink: 0; /* prevent squishing */
 }
 #tab-my-schedule .activity-block:hover {
-    transform: scale(1.05);
-    z-index: 50;
-    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    transform: scale(1.02);
+    z-index: 20;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 /* Explicit Rest Day Indicator (Striped) */
@@ -2828,24 +2834,17 @@ function drawMyRotaCalendar(){
             const textColor = getContrastingTextColor(color);
             const tooltip = `${seg.code}: ${seg.start} - ${seg.end}`;
 
-            // FIX: Calculate Exact Position & Height
-            const duration = seg.endMin - seg.startMin;
-            const heightPx = duration * pixelsPerMinute; 
+            // FIX: Revert to Stacked Layout (No pixel calculations)
+            // The CSS will handle the stacking and sizing.
             
-            // Calculate Top Position (Minutes from 08:00 start)
-            const minutesFromStart = seg.startMin - (TIMEGRID_START_H * 60);
-            const topPx = minutesFromStart * pixelsPerMinute;
-
             let blockClass = 'activity-block';
             const lowerCode = seg.code.toLowerCase();
             if (lowerCode.includes('break') || lowerCode.includes('lunch')) {
                blockClass += ' is-simple-block';
             }
 
-            // Render with Top Position (Time Alignment)
+            // Render without explicit height/top. CSS stacks them.
             html += `<div class="${blockClass}" data-tooltip="${tooltip}" style="
-                        height: ${heightPx}px; 
-                        top: ${topPx}px; 
                         background-color: ${color};
                         color: ${textColor};">
                         <span class="activity-title">${seg.code}</span>
