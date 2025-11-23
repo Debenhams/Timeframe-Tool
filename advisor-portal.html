@@ -761,68 +761,70 @@
 
     .timeline-body { position: relative; padding-top: 8px; }
 
-    /* Floating Spotlight Rows (Compact Mode) */
+    /* Floating Spotlight Rows (Comfortable Size) */
     .timeline-row {
       display: grid;
       grid-template-columns: var(--timeline-name-col) 1fr;
-      height: 34px; /* Reduced height for tighter density */
-      margin-bottom: 2px; /* Reduced gap between advisors */
+      height: 46px; /* Increased for better readability */
+      margin-bottom: 4px; /* Breathing room between advisors */
       align-items: center;
-      border-radius: 6px;
+      border-radius: 8px;
       transition: all 0.2s ease;
-      border-bottom: 1px solid rgba(0,0,0,0.02); /* Subtle divider */
+      border-bottom: 1px solid rgba(0,0,0,0.03);
     }
 
     /* Alternating colors + Hover Effect */
-    .timeline-row:nth-child(odd) { background-color: rgba(255,255,255,0.4); }
-    .timeline-row:nth-child(even) { background-color: rgba(249, 250, 251, 0.4); }
+    .timeline-row:nth-child(odd) { background-color: rgba(255,255,255,0.6); }
+    .timeline-row:nth-child(even) { background-color: rgba(249, 250, 251, 0.6); }
     
     .timeline-row:hover { 
         background-color: #FFFFFF !important; 
-        transform: none; /* Keep grid neat */
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        transform: scale(1.005); /* Slight pop for focus */
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         z-index: 5;
-        border-left: 3px solid var(--brand-primary); /* Highlight indicator */
+        border-left: 3px solid var(--brand-primary);
     }
 
     /* Floating Row Name */
     .timeline-name { 
-        padding: 0 12px;
-        display: flex; align-items: center; font-size: 12px; font-weight: 600; color: var(--color-text);
+        padding: 0 16px;
+        display: flex; align-items: center; 
+        font-size: 14px; /* Larger, readable text */
+        font-weight: 600; color: var(--color-text);
         position: sticky; left: 0; z-index: 10; 
         background: inherit; 
         height: 100%;
+        border-radius: 8px 0 0 8px;
     }
 
-    .timeline-track { position: relative; height: 100%; }
+    .timeline-track { position: relative; height: 100%; border-radius: 0 8px 8px 0; }
 
-    /* The "Tape" Bar (Flatter, Connected Look) */
+    /* The "Tape" Bar (Readable & Connected) */
     .timeline-bar {
         position: absolute;
-        top: 4px; bottom: 4px; /* Stretches to fill row mostly */
-        height: auto !important; /* Override JS height */
+        top: 8px; bottom: 8px; /* Thicker bar */
+        height: auto !important; 
         display: flex;
         align-items: center;
         overflow: hidden;
-        border-radius: 3px; /* Sharper corners = Connected look */
+        border-radius: 4px;
         z-index: 25;
-        font-size: 10px;
+        font-size: 11px; /* Readable text inside bar */
         font-weight: 700;
-        padding-left: 6px;
+        padding-left: 8px;
         white-space: nowrap;
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), 0 1px 2px rgba(0,0,0,0.05);
         border: none;
         transition: all 0.2s;
     }
-    /* Differentiate Breaks visually to break up the "Wall of Color" */
+    /* Break Styling */
     .timeline-bar.is-simple-block {
-        opacity: 0.6; /* Breaks recede visually */
+        opacity: 0.75;
         background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.05) 5px, rgba(0,0,0,0.05) 10px);
         box-shadow: none;
     }
     
     .timeline-bar:hover { z-index: 30; transform: scale(1.02); box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; opacity: 1; }
-
     /* === Placeholder Content === */
     .placeholder-content {
         text-align: center;
@@ -2996,9 +2998,9 @@ function drawTeamDailyGantt() {
         bodyHtml += `
         <div class="timeline-row" style="${rowStyle}">
             <div class="timeline-name">
-                <div class="avatar-circle" style="width:24px; height:24px; font-size:9px; margin-right:8px; border:1px solid white;">${initials}</div>
+                <div class="avatar-circle" style="width:32px; height:32px; font-size:11px; margin-right:12px; border:2px solid white; box-shadow:0 2px 4px rgba(0,0,0,0.05);">${initials}</div>
                 <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                    ${safeName} ${isCurrentUser ? '<span style="color:var(--brand-primary); font-weight:600; margin-left:4px;">(You)</span>' : ''}
+                    ${safeName} ${isCurrentUser ? '<span style="color:var(--brand-primary); font-weight:700; margin-left:6px; font-size:11px;">(You)</span>' : ''}
                 </span>
             </div>
             <div class="timeline-track">
@@ -3009,6 +3011,7 @@ function drawTeamDailyGantt() {
     });
     ELS_GANTT.plannerBody.innerHTML = bodyHtml;
 }
+
 // --- DIRECTOR COMMAND CENTER (The UI Structure) ---
 function renderDirectorDashboard() {
     // SMART DATE LOGIC:
