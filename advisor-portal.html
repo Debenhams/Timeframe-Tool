@@ -3078,7 +3078,7 @@ window.jumpToSiteSchedule = (siteName) => {
     // 5. Trigger the "Change" event to force the grid to reload with new selection
     list.dispatchEvent(new Event('change'));
 };
-// --- DIRECTOR GOD MODE LOGIC (V6: SAFETY PATCHED) ---
+// --- DIRECTOR GOD MODE LOGIC (V7: PLANNER-GRADE CARVING) ---
 
 window.directorUndoState = null;
 window.directorPendingInjections = [];
@@ -3178,14 +3178,77 @@ window.handleDirectorUndo = async () => {
     if (!error) {
         // Trigger update
         if (STATE.rotaRealtimeChannel) STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: window.directorUndoState.advisor_id, date: window.directorUndoState.exception_date } });
-        await loadAndRender(); // Refresh Grid
-        closeDirectorEditor(); // Close box
+        await loadAndRender(); 
+        closeDirectorEditor(); 
     } else {
         alert("Undo failed: " + error.message);
     }
 };
 
-// 4. SAVE (V6: SAFETY PATCHED - NO CRASHES)
+// --- PLANNER-GRADE LOGIC HELPERS ---
+
+// 1. Get Safe ID
+function getSafeCompId(name) {
+    if (!name) return null;
+    const clean = String(name).toLowerCase().trim();
+    const comps = Object.values(STATE.components);
+    let match = comps.find(c => (c.name || "").toLowerCase() === clean);
+    if (!match) match = comps.find(c => (c.type || "").toLowerCase() === clean);
+    if (!match) match = comps.find(c => (c.type || "").toLowerCase() === 'activity');
+    if (!match && comps.length > 0) match = comps[0];
+    return match ? match.id : null;
+}
+
+// 2. The "Carve" Logic (Ported from Planner)
+function carveTime(baseStructure, injectStart, injectEnd, injectCompId) {
+    let newStructure = [];
+    
+    // Sort base structure first
+    baseStructure.sort((a, b) => a.start_min - b.start_min);
+
+    baseStructure.forEach(seg => {
+        // Case A: Segment is completely BEFORE injection -> Keep it
+        if (seg.end_min <= injectStart) {
+            newStructure.push(seg);
+        }
+        // Case B: Segment is completely AFTER injection -> Keep it
+        else if (seg.start_min >= injectEnd) {
+            newStructure.push(seg);
+        }
+        // Case C: Segment Overlaps -> Split it
+        else {
+            // 1. Part Before (if any)
+            if (seg.start_min < injectStart) {
+                newStructure.push({ 
+                    component_id: seg.component_id, 
+                    start_min: seg.start_min, 
+                    end_min: injectStart 
+                });
+            }
+            // (The injection itself is handled separately to ensure it's added only once)
+            
+            // 2. Part After (if any)
+            if (seg.end_min > injectEnd) {
+                newStructure.push({ 
+                    component_id: seg.component_id, 
+                    start_min: injectEnd, 
+                    end_min: seg.end_min 
+                });
+            }
+        }
+    });
+
+    // Add the injection itself
+    newStructure.push({ 
+        component_id: injectCompId, 
+        start_min: injectStart, 
+        end_min: injectEnd 
+    });
+
+    return newStructure.sort((a, b) => a.start_min - b.start_min);
+}
+
+// 4. SAVE (V7: FULL PLANNER LOGIC)
 window.handleDirectorSave = async () => {
     const saveBtn = document.getElementById('btnDirectorSave');
     
@@ -3199,192 +3262,116 @@ window.handleDirectorSave = async () => {
         const targetStart = hhmmToMinutes(newStartStr);
         const targetEnd = hhmmToMinutes(newEndStr);
 
-        // Validate inputs
         if (!advisorId || !dateISO || isNaN(targetStart) || isNaN(targetEnd)) {
-            alert("Invalid inputs. Please check start/end times.");
+            alert("Invalid inputs. Check times.");
             return;
         }
 
         saveBtn.textContent = "Processing..."; 
         saveBtn.disabled = true;
 
-        // Get Current Segments (The existing schedule for the day)
+        // 1. Get Current Schedule (The "Raw Material")
         const dayName = new Date(dateISO).toLocaleDateString('en-US', { weekday: 'long' });
         const currentSegments = calculateLiveSegments(advisorId, dayName, STATE.currentWeekData.mondayISO);
 
-        // --- Helper: Robust ID Finder (Safe Mode) ---
-        const comps = Object.values(STATE.components);
-        const getCompId = (name) => {
-            if (!name) return null;
-            const clean = String(name).toLowerCase().trim(); // Force string conversion
-            
-            // Priority 1: Exact Name (Safe Check)
-            let match = comps.find(c => (c.name || "").toLowerCase() === clean);
-            // Priority 2: Type Match (Safe Check)
-            if (!match) match = comps.find(c => (c.type || "").toLowerCase() === clean);
-            // Priority 3: Fallback to 'Activity' if undefined
-            if (!match) match = comps.find(c => (c.type || "").toLowerCase() === 'activity');
-            // Priority 4: Absolute Fail-safe (First available component)
-            if (!match && comps.length > 0) match = comps[0];
-
-            return match ? match.id : null;
-        };
-
-        // Detect "Base Activity" (To fill gaps if we extend the shift)
-        let baseCompId = null;
-        let maxDur = 0;
-        
-        // Find the dominant activity in the current schedule
+        // 2. Convert to Structure Format
+        let workStructure = [];
         if (currentSegments && currentSegments.length > 0) {
             currentSegments.forEach(seg => {
-                // Safe check: ensure code exists before checking
-                const c = (seg.code || "").toLowerCase();
-                if (!c.includes('break') && !c.includes('lunch') && seg.duration_min > maxDur) {
-                    maxDur = seg.duration_min;
-                    baseCompId = getCompId(seg.code);
+                const cId = getSafeCompId(seg.code);
+                if (cId) {
+                    workStructure.push({ 
+                        component_id: cId, 
+                        start_min: seg.startMin, 
+                        end_min: seg.endMin 
+                    });
                 }
             });
-        }
-        
-        // Fallback if schedule was empty
-        if (!baseCompId) baseCompId = getCompId('Phones') || getCompId('Activity');
-        
-        if (!baseCompId) {
-            throw new Error("Configuration Error: No 'Activity' or 'Phones' component found in database.");
+        } else {
+            // If empty, create a base block of "Activity"
+            const baseId = getSafeCompId('Activity');
+            workStructure.push({ component_id: baseId, start_min: targetStart, end_min: targetEnd });
         }
 
-        // A. Build "Canvas" (Clip current schedule to new Start/End)
-        let workStructure = [];
-        
-        if (currentSegments && currentSegments.length > 0) {
-            currentSegments.forEach(seg => {
-                const cId = getCompId(seg.code);
-                if (!cId) return; 
-                
-                let s = seg.startMin, e = seg.endMin;
-                
-                // Clip to new bounds
-                if (e <= targetStart || s >= targetEnd) return; // Completely outside
-                if (s < targetStart) s = targetStart; 
-                if (e > targetEnd) e = targetEnd; 
-                
-                workStructure.push({ component_id: cId, start_min: s, end_min: e });
-            });
+        // 3. Clip/Extend to New Start/End Times (Outer Bounds)
+        let boundedStructure = [];
+        // Determine "Base Activity" for filling gaps (find dominant activity)
+        // Default to the first segment's type if available, else generic 'Activity'
+        let baseFillId = workStructure.length > 0 ? workStructure[0].component_id : getSafeCompId('Activity');
+
+        // A. Fill Gap at Start
+        if (workStructure.length > 0 && workStructure[0].start_min > targetStart) {
+            boundedStructure.push({ component_id: baseFillId, start_min: targetStart, end_min: workStructure[0].start_min });
         }
 
-        // B. Fill Edges (If extended) using Base Activity
-        if (workStructure.length > 0) {
-            // Fill gap at start
-            if (workStructure[0].start_min > targetStart) {
-                workStructure.unshift({ component_id: baseCompId, start_min: targetStart, end_min: workStructure[0].start_min });
+        // B. Add existing segments (clipped)
+        workStructure.forEach(seg => {
+            let s = Math.max(seg.start_min, targetStart);
+            let e = Math.min(seg.end_min, targetEnd);
+            if (s < e) {
+                boundedStructure.push({ component_id: seg.component_id, start_min: s, end_min: e });
             }
-            // Fill gap at end
-            const last = workStructure[workStructure.length - 1];
+        });
+
+        // C. Fill Gap at End
+        if (boundedStructure.length > 0) {
+            const last = boundedStructure[boundedStructure.length - 1];
             if (last.end_min < targetEnd) {
-                // Try to extend the last block if it's work
-                const lastComp = STATE.components[last.component_id];
-                if (lastComp && (lastComp.type || "").toLowerCase() === 'activity') {
+                // Try to extend last block if it's same type, else add new
+                if (last.component_id === baseFillId) {
                     last.end_min = targetEnd;
                 } else {
-                    workStructure.push({ component_id: baseCompId, start_min: last.end_min, end_min: targetEnd });
+                    boundedStructure.push({ component_id: baseFillId, start_min: last.end_min, end_min: targetEnd });
                 }
             }
         } else {
-            // Brand new block if schedule was empty or fully cropped
-            workStructure.push({ component_id: baseCompId, start_min: targetStart, end_min: targetEnd });
+            // If completely empty after clipping, recreate full block
+            boundedStructure.push({ component_id: baseFillId, start_min: targetStart, end_min: targetEnd });
         }
 
-        // C. Apply Injections (The Meetings) - CARVE LOGIC
+        // 4. Apply Injections (The "Carving")
+        // We process injections sequentially
         window.directorPendingInjections.forEach(inj => {
             const injStart = hhmmToMinutes(inj.start);
             const injEnd = injStart + inj.dur;
-            const injId = getCompId(inj.type);
+            const injId = getSafeCompId(inj.type);
 
             if (injId) {
-                let carvedStructure = [];
-                let inserted = false;
-                
-                workStructure.forEach(seg => {
-                    // 1. Segment is BEFORE injection
-                    if (seg.end_min <= injStart) {
-                        carvedStructure.push(seg);
-                    }
-                    // 2. Segment is AFTER injection
-                    else if (seg.start_min >= injEnd) {
-                        if (!inserted) {
-                            carvedStructure.push({ component_id: injId, start_min: injStart, end_min: injEnd });
-                            inserted = true;
-                        }
-                        carvedStructure.push(seg);
-                    }
-                    // 3. Overlap: Split the segment
-                    else {
-                        // Part Before
-                        if (seg.start_min < injStart) {
-                            carvedStructure.push({ component_id: seg.component_id, start_min: seg.start_min, end_min: injStart });
-                        }
-                        // The Injection (Once)
-                        if (!inserted) {
-                            carvedStructure.push({ component_id: injId, start_min: injStart, end_min: injEnd });
-                            inserted = true;
-                        }
-                        // Part After
-                        if (seg.end_min > injEnd) {
-                            carvedStructure.push({ component_id: seg.component_id, start_min: injEnd, end_min: seg.end_min });
-                        }
-                    }
-                });
-
-                // If injection is past everything, append it
-                if (!inserted) {
-                     carvedStructure.push({ component_id: injId, start_min: injStart, end_min: injEnd });
-                }
-
-                workStructure = carvedStructure;
+                boundedStructure = carveTime(boundedStructure, injStart, injEnd, injId);
                 reason += ` [+${inj.type}]`;
             }
         });
 
-        // Sort
-        workStructure.sort((a, b) => a.start_min - b.start_min);
-
-        // D. Save to Supabase
-        saveBtn.textContent = "Saving to Database...";
-        
+        // 5. Save
         const { error } = await supabase.from('schedule_exceptions').upsert({
             advisor_id: advisorId, 
             exception_date: dateISO, 
-            structure: workStructure, 
+            structure: boundedStructure, 
             reason: reason
         }, { onConflict: 'advisor_id, exception_date' });
 
         if (error) throw error;
 
-        // Success
+        // 6. Broadcast
         if (STATE.rotaRealtimeChannel) {
-            STATE.rotaRealtimeChannel.send({ 
-                type: 'broadcast', 
-                event: 'schedule_update', 
-                payload: { advisor_id: advisorId, date: dateISO } 
-            });
+            STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: advisorId, date: dateISO } });
         }
         
-        await loadAndRender(); // Immediate refresh
+        await loadAndRender(); 
         
-        // UI Feedback
-        saveBtn.textContent = "Saved Successfully!";
-        saveBtn.style.backgroundColor = "#10B981"; // Green
+        saveBtn.textContent = "Saved!";
+        saveBtn.style.backgroundColor = "#10B981"; 
         
         setTimeout(() => {
             closeDirectorEditor(); 
             saveBtn.textContent = "Update Schedule"; 
-            saveBtn.style.backgroundColor = "#2563EB"; // Blue
+            saveBtn.style.backgroundColor = "#2563EB"; 
             saveBtn.disabled = false;
         }, 800);
 
     } catch (err) {
         console.error("Director Save Error:", err);
-        alert("Failed to update schedule: " + err.message);
+        alert("Failed to update: " + err.message);
         saveBtn.textContent = "Update Schedule";
         saveBtn.disabled = false;
     }
