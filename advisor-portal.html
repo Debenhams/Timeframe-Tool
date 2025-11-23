@@ -2843,7 +2843,8 @@ function drawMyRotaCalendar(){
                blockClass += ' is-simple-block';
             }
 
-            // Render without explicit height/top. CSS stacks them.
+            // FIX: Stack Mode (Photo 1 Layout) - Removed 'top' style
+            // This allows blocks to stack immediately at the top of the column
             html += `<div class="${blockClass}" data-tooltip="${tooltip}" style="
                         background-color: ${color};
                         color: ${textColor};">
