@@ -761,15 +761,16 @@
 
     .timeline-body { position: relative; padding-top: 8px; }
 
-    /* Floating Spotlight Rows */
+    /* Floating Spotlight Rows (Compact Mode) */
     .timeline-row {
       display: grid;
       grid-template-columns: var(--timeline-name-col) 1fr;
-      height: 40px; /* Slightly taller for modern look */
-      margin-bottom: 6px; /* Gap between rows */
+      height: 34px; /* Reduced height for tighter density */
+      margin-bottom: 2px; /* Reduced gap between advisors */
       align-items: center;
-      border-radius: 8px;
+      border-radius: 6px;
       transition: all 0.2s ease;
+      border-bottom: 1px solid rgba(0,0,0,0.02); /* Subtle divider */
     }
 
     /* Alternating colors + Hover Effect */
@@ -778,44 +779,49 @@
     
     .timeline-row:hover { 
         background-color: #FFFFFF !important; 
-        transform: scale(1.005); 
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        transform: none; /* Keep grid neat */
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         z-index: 5;
+        border-left: 3px solid var(--brand-primary); /* Highlight indicator */
     }
-
 
     /* Floating Row Name */
     .timeline-name { 
-        padding: 0 16px;
-        /* No border right - using gap */
-        display: flex; align-items: center; font-size: 13px; font-weight: 600; color: var(--color-text);
+        padding: 0 12px;
+        display: flex; align-items: center; font-size: 12px; font-weight: 600; color: var(--color-text);
         position: sticky; left: 0; z-index: 10; 
-        background: inherit; /* Matches row color */
-        border-radius: 8px 0 0 8px;
+        background: inherit; 
+        height: 100%;
     }
 
-    .timeline-track { position: relative; height: 100%; border-radius: 0 8px 8px 0; }
+    .timeline-track { position: relative; height: 100%; }
 
-    /* The Liquid Bar (Horizontal Jelly) */
+    /* The "Tape" Bar (Flatter, Connected Look) */
     .timeline-bar {
         position: absolute;
-        top: 50%; transform: translateY(-50%); /* Center vertically */
-        height: 28px !important; /* Floating pill height */
+        top: 4px; bottom: 4px; /* Stretches to fill row mostly */
+        height: auto !important; /* Override JS height */
         display: flex;
         align-items: center;
         overflow: hidden;
-        border-radius: 6px; /* Soft Pill */
+        border-radius: 3px; /* Sharper corners = Connected look */
         z-index: 25;
-        font-size: 11px;
-        font-weight: 600;
-        padding-left: 8px;
+        font-size: 10px;
+        font-weight: 700;
+        padding-left: 6px;
         white-space: nowrap;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.4); /* Glassy Shine */
-        border: 1px solid rgba(0,0,0,0.05);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+        border: none;
         transition: all 0.2s;
     }
-    .timeline-bar:hover { z-index: 30; transform: translateY(-50%) scale(1.05); box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; }
-
+    /* Differentiate Breaks visually to break up the "Wall of Color" */
+    .timeline-bar.is-simple-block {
+        opacity: 0.6; /* Breaks recede visually */
+        background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.05) 5px, rgba(0,0,0,0.05) 10px);
+        box-shadow: none;
+    }
+    
+    .timeline-bar:hover { z-index: 30; transform: scale(1.02); box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; opacity: 1; }
 
     /* === Placeholder Content === */
     .placeholder-content {
@@ -929,28 +935,27 @@
 /* Explicit Rest Day Indicator (Striped) */
 .timeline-rdo-fill {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    top: 2px; bottom: 2px; left: 0; width: 100%; /* Add gap for row separation */
     display: flex;
     align-items: center;
     justify-content: center;
     
-    /* Diagonal Grey Stripes Pattern */
+    /* Cleaner Diagonal Pattern */
+    background-color: rgba(249, 250, 251, 0.5);
     background-image: repeating-linear-gradient(
         45deg,
-        rgba(0, 0, 0, 0.03),
-        rgba(0, 0, 0, 0.03) 10px,
-        rgba(0, 0, 0, 0.06) 10px,
-        rgba(0, 0, 0, 0.06) 20px
+        rgba(0, 0, 0, 0.04) 0px,
+        rgba(0, 0, 0, 0.04) 1px,
+        transparent 1px,
+        transparent 8px
     );
     color: #9CA3AF; 
     font-weight: 700; 
-    font-size: 12px; 
-    letter-spacing: 1px;
+    font-size: 11px; 
+    letter-spacing: 2px;
     user-select: none;
     z-index: 0;
+    border-radius: 6px;
 }
 
 /* === INTERACTIVE POLISH === */
@@ -2978,15 +2983,24 @@ function drawTeamDailyGantt() {
 
     STATE.teamMembers.forEach(member => {
         // Calculate segments for the specific day
-        const segments = calculateLiveSegments(member.id, dayName, mondayISO);
+      const segments = calculateLiveSegments(member.id, dayName, mondayISO);
         
         // Highlight the current user's row
         const isCurrentUser = member.id === STATE.advisorId;
         const rowStyle = isCurrentUser ? 'background-color: #E0F2FE !important;' : '';
 
+        // Safety: Handle missing names
+        const safeName = member.name || "Unknown";
+        const initials = safeName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+
         bodyHtml += `
         <div class="timeline-row" style="${rowStyle}">
-            <div class="timeline-name">${member.name} ${isCurrentUser ? '<span class="tag">(You)</span>' : ''}</div>
+            <div class="timeline-name">
+                <div class="avatar-circle" style="width:24px; height:24px; font-size:9px; margin-right:8px; border:1px solid white;">${initials}</div>
+                <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    ${safeName} ${isCurrentUser ? '<span style="color:var(--brand-primary); font-weight:600; margin-left:4px;">(You)</span>' : ''}
+                </span>
+            </div>
             <div class="timeline-track">
                 ${renderGanttSegments(segments, member.id, specificDateISO)}
             </div>
