@@ -865,12 +865,24 @@ display: flex;
         display: flex;
         flex-direction: column;
         gap: 24px;
-        padding: 8px;
+        padding: 24px; /* Increased padding */
         height: 100%;
         overflow-y: auto;
-        /* NEW: Subtle gradient background */
-        background: radial-gradient(circle at top right, #E0F2FE 0%, transparent 40%),
-                    radial-gradient(circle at bottom left, #F0FDF4 0%, transparent 40%);
+        
+        /* THE AURORA MESH BACKGROUND */
+        background-color: #F8FAFC; /* Fallback */
+        background-image: 
+            radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.05) 0px, transparent 50%),
+            radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
+        background-size: 150% 150%;
+        animation: auroraMove 15s ease-in-out infinite alternate;
+    }
+
+    @keyframes auroraMove {
+        0% { background-position: 0% 0%; }
+        100% { background-position: 100% 100%; }
     }
 
     /* Top Row: Pulse Cards */
@@ -1223,10 +1235,8 @@ display: flex;
         <div class="bar">
           <h1 style="margin: 0; font-size: 20px;" id="viewTitle">My Schedule</h1>
         </div>
-        <div class="bar">
-          <input id="weekStart" type="date" class="form-input" />
-          <button id="prevBtn" class="btn secondary">◀ Prev Week</button>
-          <button id="nextBtn" class="btn secondary">Next Week ▶</button>
+        <div class="bar" style="gap: 8px;"> <button id="prevBtn" class="btn secondary">◀</button> <input id="weekStart" type="date" class="form-input" style="text-align:center;" />
+          <button id="nextBtn" class="btn secondary">▶</button>
         </div>
     </div>
 
