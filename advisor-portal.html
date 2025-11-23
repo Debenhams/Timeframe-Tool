@@ -875,26 +875,26 @@
         display: none;
     }
 
-/* === MY SCHEDULE: Time Grid Alignment Fix === */
+/* === MY SCHEDULE: Clean Vertical Columns (Time Mode) === */
 
-/* 1. Restore Grid Lines so time is visible */
+/* 1. Hide Horizontal Lines (Cleaner Look) */
 #tab-my-schedule .day-column-cell {
-    border-bottom: 1px dotted #E5E7EB !important; /* Light dotted line for half-hours */
+    border-bottom: none !important; /* Removes horizontal clutter */
     height: var(--timegrid-row-height);
     box-sizing: border-box;
 }
 #tab-my-schedule .day-column-cell.hour-mark {
-    border-bottom: 1px solid #D1D5DB !important; /* Solid line for hours */
+    border-bottom: none !important; /* Removes hour lines too */
 }
 
-/* 2. Reset Container for Absolute Positioning */
+/* 2. Vertical Borders for Day Separation */
 #tab-my-schedule .day-column-events {
-    display: block !important; /* Remove Flex/Stack */
+    display: block !important; /* Absolute Positioning Mode */
     position: relative;
     grid-row: 1 / span 100;
     height: 100%;
     pointer-events: none;
-    border-right: 1px solid var(--color-border);
+    border-right: 1px solid #E5E7EB; /* Distinct vertical divider */
     padding: 0;
 }
 
@@ -902,15 +902,15 @@
     border-right: none;
 }
 
-/* 3. The Jelly Pill (Absolute Positioned for Exact Time) */
+/* 3. The Jelly Pill (Absolute Positioned) */
 #tab-my-schedule .activity-block {
-    position: absolute !important; /* Critical for alignment */
+    position: absolute !important; 
     left: 2px !important;
     right: 2px !important;
     width: auto !important;
     margin: 0 !important;
     
-    /* Visual Style (Kept the Jelly Look) */
+    /* Jelly Look */
     border-radius: 6px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.4);
     border: 1px solid rgba(0,0,0,0.05);
