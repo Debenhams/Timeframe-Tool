@@ -3078,7 +3078,7 @@ window.jumpToSiteSchedule = (siteName) => {
     // 5. Trigger the "Change" event to force the grid to reload with new selection
     list.dispatchEvent(new Event('change'));
 };
-// --- DIRECTOR GOD MODE LOGIC (V5: FIXED & ROBUST) ---
+// --- DIRECTOR GOD MODE LOGIC (V6: SAFETY PATCHED) ---
 
 window.directorUndoState = null;
 window.directorPendingInjections = [];
@@ -3185,7 +3185,7 @@ window.handleDirectorUndo = async () => {
     }
 };
 
-// 4. SAVE (CRITICAL FIX: PREVENTS DATA LOSS)
+// 4. SAVE (V6: SAFETY PATCHED - NO CRASHES)
 window.handleDirectorSave = async () => {
     const saveBtn = document.getElementById('btnDirectorSave');
     
@@ -3212,18 +3212,18 @@ window.handleDirectorSave = async () => {
         const dayName = new Date(dateISO).toLocaleDateString('en-US', { weekday: 'long' });
         const currentSegments = calculateLiveSegments(advisorId, dayName, STATE.currentWeekData.mondayISO);
 
-        // --- Helper: Robust ID Finder ---
+        // --- Helper: Robust ID Finder (Safe Mode) ---
         const comps = Object.values(STATE.components);
         const getCompId = (name) => {
             if (!name) return null;
-            const clean = name.toLowerCase().trim();
+            const clean = String(name).toLowerCase().trim(); // Force string conversion
             
-            // Priority 1: Exact Name
-            let match = comps.find(c => c.name.toLowerCase() === clean);
-            // Priority 2: Type Match
-            if (!match) match = comps.find(c => c.type.toLowerCase() === clean);
+            // Priority 1: Exact Name (Safe Check)
+            let match = comps.find(c => (c.name || "").toLowerCase() === clean);
+            // Priority 2: Type Match (Safe Check)
+            if (!match) match = comps.find(c => (c.type || "").toLowerCase() === clean);
             // Priority 3: Fallback to 'Activity' if undefined
-            if (!match) match = comps.find(c => c.type === 'Activity');
+            if (!match) match = comps.find(c => (c.type || "").toLowerCase() === 'activity');
             // Priority 4: Absolute Fail-safe (First available component)
             if (!match && comps.length > 0) match = comps[0];
 
@@ -3237,7 +3237,8 @@ window.handleDirectorSave = async () => {
         // Find the dominant activity in the current schedule
         if (currentSegments && currentSegments.length > 0) {
             currentSegments.forEach(seg => {
-                const c = seg.code.toLowerCase();
+                // Safe check: ensure code exists before checking
+                const c = (seg.code || "").toLowerCase();
                 if (!c.includes('break') && !c.includes('lunch') && seg.duration_min > maxDur) {
                     maxDur = seg.duration_min;
                     baseCompId = getCompId(seg.code);
@@ -3257,9 +3258,8 @@ window.handleDirectorSave = async () => {
         
         if (currentSegments && currentSegments.length > 0) {
             currentSegments.forEach(seg => {
-                // CRITICAL FIX: use the robust getCompId so we don't drop segments
                 const cId = getCompId(seg.code);
-                if (!cId) return; // Should theoretically never happen with fix
+                if (!cId) return; 
                 
                 let s = seg.startMin, e = seg.endMin;
                 
@@ -3283,7 +3283,7 @@ window.handleDirectorSave = async () => {
             if (last.end_min < targetEnd) {
                 // Try to extend the last block if it's work
                 const lastComp = STATE.components[last.component_id];
-                if (lastComp && lastComp.type === 'Activity') {
+                if (lastComp && (lastComp.type || "").toLowerCase() === 'activity') {
                     last.end_min = targetEnd;
                 } else {
                     workStructure.push({ component_id: baseCompId, start_min: last.end_min, end_min: targetEnd });
