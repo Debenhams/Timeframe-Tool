@@ -2843,9 +2843,14 @@ function drawMyRotaCalendar(){
                blockClass += ' is-simple-block';
             }
 
-            // FIX: Stack Mode (Photo 1 Layout) - Removed 'top' style
-            // This allows blocks to stack immediately at the top of the column
+           // FIX: Stack Mode with Accurate Heights
+            // 1. Calculate Height based on duration (so breaks are thin)
+            const duration = seg.endMin - seg.startMin;
+            const heightPx = duration * pixelsPerMinute; 
+
+            // 2. Render with Height but NO Top (Stacks at the top)
             html += `<div class="${blockClass}" data-tooltip="${tooltip}" style="
+                        height: ${heightPx}px; 
                         background-color: ${color};
                         color: ${textColor};">
                         <span class="activity-title">${seg.code}</span>
