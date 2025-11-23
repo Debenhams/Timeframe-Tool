@@ -875,26 +875,17 @@
         display: none;
     }
 
-/* === MY SCHEDULE: Clean Vertical Columns (Time Mode) === */
+/* === MY SCHEDULE: Swim Lanes & Structure Fix === */
 
-/* 1. Hide Horizontal Lines (Cleaner Look) */
-#tab-my-schedule .day-column-cell {
-    border-bottom: none !important; /* Removes horizontal clutter */
-    height: var(--timegrid-row-height);
-    box-sizing: border-box;
-}
-#tab-my-schedule .day-column-cell.hour-mark {
-    border-bottom: none !important; /* Removes hour lines too */
-}
-
-/* 2. Vertical Borders for Day Separation */
+/* 1. The Swim Lanes (Vertical Separators) */
 #tab-my-schedule .day-column-events {
-    display: block !important; /* Absolute Positioning Mode */
+    display: block !important; /* Absolute Mode */
     position: relative;
     grid-row: 1 / span 100;
     height: 100%;
     pointer-events: none;
-    border-right: 1px solid #E5E7EB; /* Distinct vertical divider */
+    /* The Swim Line */
+    border-right: 1px solid #E2E8F0; 
     padding: 0;
 }
 
@@ -902,15 +893,27 @@
     border-right: none;
 }
 
-/* 3. The Jelly Pill (Absolute Positioned) */
+/* 2. Ghost Guides (Faint horizontal lines to explain the gap) */
+#tab-my-schedule .day-column-cell {
+    height: var(--timegrid-row-height);
+    box-sizing: border-box;
+    /* Very faint dots for half-hours */
+    border-bottom: 1px dotted rgba(0,0,0,0.05) !important;
+}
+#tab-my-schedule .day-column-cell.hour-mark {
+    /* Slightly visible line for Hours so the gap looks like a grid */
+    border-bottom: 1px solid rgba(0,0,0,0.08) !important;
+}
+
+/* 3. The Jelly Pill (Positioned Correctly) */
 #tab-my-schedule .activity-block {
     position: absolute !important; 
-    left: 2px !important;
-    right: 2px !important;
+    left: 4px !important;
+    right: 4px !important;
     width: auto !important;
     margin: 0 !important;
     
-    /* Jelly Look */
+    /* Visual Style */
     border-radius: 6px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.4);
     border: 1px solid rgba(0,0,0,0.05);
@@ -927,11 +930,11 @@
     text-align: center;
     box-sizing: border-box;
     transition: transform 0.1s, z-index 0.1s;
-    z-index: 1;
+    z-index: 10;
 }
 #tab-my-schedule .activity-block:hover {
     transform: scale(1.05);
-    z-index: 20;
+    z-index: 50;
     box-shadow: 0 8px 16px rgba(0,0,0,0.15);
 }
 
