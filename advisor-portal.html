@@ -406,12 +406,15 @@
     /* 1. Top Summary Section */
     .summary-grid {
         display: grid;
-        /* REMOVED 80px column */
         grid-template-columns: repeat(7, 1fr); 
         border-bottom: 2px solid var(--color-border);
- flex-shrink: 0; /* Prevent summary from shrinking */
-        padding-right: 17px;
- /* Compensate for the scrollbar on the grid below */
+        flex-shrink: 0; /* Prevent summary from shrinking */
+        
+        /* CRITICAL FIX: Match padding to the custom scrollbar width (8px) */
+        /* Old value was 17px (Windows default), causing the drift */
+        padding-right: 8px; 
+        
+        background: rgba(255,255,255,0.3);
     }
 
     .summary-header {
