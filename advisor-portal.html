@@ -899,20 +899,39 @@
     border-right: none;
 }
 
-/* 3. Blocks are "Jelly Pills" (Rounded, Floating, Glossy) */
+/* 3. Blocks (Stacked, Alignment Fixed) - Replaces "Jelly Pills" look */
 #tab-my-schedule .activity-block {
+    /* Positioning overrides (Kept as is) */
     position: relative !important;
     left: auto !important;
     right: auto !important;
     top: auto !important;
-    width: 96% !important; /* Slight gap on sides for floating look */
-    margin: 1px auto !important; /* Tiny gap between blocks */
+
+    /* Layout and Alignment Fixes */
+    width: 100% !important; /* Changed from 96% for flush stacking as per instructions */
+     
+    /* FIX: Remove margins to prevent "drift" */
+    margin: 0 !important;
+
+    /* FIX: Ensure padding/border doesn't add to the calculated height (Crucial) */
+    box-sizing: border-box; 
+
+    /* Visual Style (Stacked Look as per instructions) */
+    /* Add a tiny border-bottom to act as the separator instead of margin */
+    border-bottom: 1px solid rgba(255,255,255,0.5); 
     
-    /* The Jelly Look */
-    border-radius: 8px; /* Rounded pill shape */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.4); /* Inner top shine */
-    border: 1px solid rgba(0,0,0,0.05); /* Subtle border */
+    /* Remove styles associated with the separated "Jelly Pill" look */
+    box-shadow: none; /* Shadow adds size in some browsers, remove it for precision */
     
+    /* We use border-bottom for separation, remove others */
+    border-top: none;
+    border-left: none;
+    border-right: none;
+
+    /* Use the radius specified in the instructions provided */
+    border-radius: 4px;
+
+    /* Content Alignment (Kept from previous style) */
     padding: 2px 4px;
     font-size: 11px;
     overflow: hidden;
@@ -924,11 +943,13 @@
     justify-content: center;
     text-align: center;
     flex-shrink: 0;
-    box-sizing: border-box;
-    transition: transform 0.1s;
+    transition: opacity 0.1s; /* Use opacity transition instead of transform */
 }
+
+/* Adjust the hover style, as the previous 'scale' transform is removed */
 #tab-my-schedule .activity-block:hover {
-    transform: scale(1.02); /* Pop on hover */
+    transform: none; /* Remove the scale effect */
+    opacity: 0.85; /* Simple hover effect */
     z-index: 10;
 }
 
