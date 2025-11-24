@@ -918,17 +918,27 @@
     left: auto !important;
     right: auto !important;
     top: auto !important;
-    width: 96% !important; /* Slight gap on sides for floating look */
-    margin: 1px auto !important; /* Tiny gap between blocks */
+    width: 100% !important;
     
-    /* The Jelly Look */
-    border-radius: 8px; /* Rounded pill shape */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.4); /* Inner top shine */
-    border: 1px solid rgba(0,0,0,0.05); /* Subtle border */
+    /* CRITICAL FIX: NO MARGINS. Margin causes the drift. */
+    margin: 0 !important;
+    
+    /* Use an internal border for the separator line instead */
+    border-bottom: 1px solid rgba(255,255,255,0.5) !important;
     
     padding: 2px 4px;
     font-size: 11px;
     overflow: hidden;
+    border-radius: 0; /* Square corners stack perfectly */
+    
+    /* We can keep slight rounding if preferred, but 0 is mathematically safest */
+    border-radius: 4px;
+
+    box-shadow: none; 
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    
     line-height: 1.1;
     pointer-events: auto;
     display: flex;
@@ -937,8 +947,9 @@
     justify-content: center;
     text-align: center;
     flex-shrink: 0;
+    
+    /* CRITICAL FIX: Include padding/border in the height calculation */
     box-sizing: border-box;
-    transition: transform 0.1s;
 }
 #tab-my-schedule .activity-block:hover {
     transform: scale(1.02); /* Pop on hover */
