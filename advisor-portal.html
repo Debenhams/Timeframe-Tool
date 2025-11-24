@@ -2983,7 +2983,7 @@ function drawTeamDailyGantt() {
 
     STATE.teamMembers.forEach(member => {
         // Calculate segments for the specific day
-        const segments = calculateLiveSegments(member.id, dayName, mondayISO);
+      const segments = calculateLiveSegments(member.id, dayName, mondayISO);
         
         // Highlight the current user's row
         const isCurrentUser = member.id === STATE.advisorId;
