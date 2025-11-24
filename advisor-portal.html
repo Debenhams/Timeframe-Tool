@@ -525,39 +525,26 @@
     /* === MY SCHEDULE: Activity Blocks (Positioned Events) === */
     /* This rule applies to ALL blocks ONLY in the My Schedule tab */
     #tab-my-schedule .activity-block {
-        position: relative !important;
-        left: auto !important;
-        right: auto !important;
-        top: auto !important;
-        width: 100% !important;
-        
-        /* FIX: Remove margins to prevent "drift" */
-        margin: 0 !important;
-        /* Add a tiny border-bottom to act as the separator instead of margin */
-        border-bottom: 1px solid rgba(255,255,255,0.5); 
-        
-        padding: 2px 4px;
+        position: absolute;
+        left: 2px;
+        right: 2px; 
+        padding: 3px 6px;
         font-size: 11px;
         overflow: hidden;
-        border-radius: 0; /* Square edges stack better */
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid rgba(0,0,0,0.1);
+        line-height: 1.2;
         
-        /* First and Last block rounded corners logic handled by JS if needed, or keep generic radius: */
-        border-radius: 4px;
-
-        box-shadow: none; /* Shadow adds size in some browsers, remove it for precision */
-        border: none; /* We use border-bottom for separation */
+        /* FIX 1: This enables the mouse hover for the tooltip */
+        pointer-events: auto; 
         
-        line-height: 1.1;
-        pointer-events: auto;
+        /* FIX 2: This centers ALL text (DEB Email, Break, etc.) */
         display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
+        flex-direction: column; /* Stacks title/time vertically */
+        align-items: center;     /* Horizontal center */
+        justify-content: center;  /* Vertical center */
         text-align: center;
-        flex-shrink: 0;
-        
-        /* FIX: Ensure padding doesn't add to the calculated height */
-        box-sizing: border-box;
     }
 
     /* This rule applies to ALL titles (DEB Email, Break...) */
@@ -918,27 +905,17 @@
     left: auto !important;
     right: auto !important;
     top: auto !important;
-    width: 100% !important;
+    width: 96% !important; /* Slight gap on sides for floating look */
+    margin: 1px auto !important; /* Tiny gap between blocks */
     
-    /* CRITICAL FIX: NO MARGINS. Margin causes the drift. */
-    margin: 0 !important;
-    
-    /* Use an internal border for the separator line instead */
-    border-bottom: 1px solid rgba(255,255,255,0.5) !important;
+    /* The Jelly Look */
+    border-radius: 8px; /* Rounded pill shape */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.4); /* Inner top shine */
+    border: 1px solid rgba(0,0,0,0.05); /* Subtle border */
     
     padding: 2px 4px;
     font-size: 11px;
     overflow: hidden;
-    border-radius: 0; /* Square corners stack perfectly */
-    
-    /* We can keep slight rounding if preferred, but 0 is mathematically safest */
-    border-radius: 4px;
-
-    box-shadow: none; 
-    border-top: none;
-    border-left: none;
-    border-right: none;
-    
     line-height: 1.1;
     pointer-events: auto;
     display: flex;
@@ -947,9 +924,8 @@
     justify-content: center;
     text-align: center;
     flex-shrink: 0;
-    
-    /* CRITICAL FIX: Include padding/border in the height calculation */
     box-sizing: border-box;
+    transition: transform 0.1s;
 }
 #tab-my-schedule .activity-block:hover {
     transform: scale(1.02); /* Pop on hover */
@@ -3007,7 +2983,7 @@ function drawTeamDailyGantt() {
 
     STATE.teamMembers.forEach(member => {
         // Calculate segments for the specific day
-      const segments = calculateLiveSegments(member.id, dayName, mondayISO);
+        const segments = calculateLiveSegments(member.id, dayName, mondayISO);
         
         // Highlight the current user's row
         const isCurrentUser = member.id === STATE.advisorId;
