@@ -901,33 +901,21 @@
 
 /* 3. Blocks are "Jelly Pills" (Rounded, Floating, Glossy) */
 #tab-my-schedule .activity-block {
-   position: relative !important;
+    position: relative !important;
     left: auto !important;
     right: auto !important;
     top: auto !important;
+    width: 96% !important; /* Slight gap on sides for floating look */
+    margin: 1px auto !important; /* Tiny gap between blocks */
     
-    /* CRITICAL FIX: Full Width to match grid lines */
-    width: 100% !important;
-    
-    /* CRITICAL FIX: Zero Margin to prevent vertical drift */
-    margin: 0 !important;
-    
-    /* Use an internal border to create the white line separator */
-    border-bottom: 1px solid rgba(255,255,255,0.5) !important;
+    /* The Jelly Look */
+    border-radius: 8px; /* Rounded pill shape */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.4); /* Inner top shine */
+    border: 1px solid rgba(0,0,0,0.05); /* Subtle border */
     
     padding: 2px 4px;
     font-size: 11px;
     overflow: hidden;
-    
-    /* Square corners allow perfect stacking */
-    border-radius: 0; 
-    /* Optional: Add slight radius to outer corners if desired, but 0 is safest for alignment */
-    
-    box-shadow: none; 
-    border-top: none;
-    border-left: none;
-    border-right: none;
-    
     line-height: 1.1;
     pointer-events: auto;
     display: flex;
@@ -936,9 +924,8 @@
     justify-content: center;
     text-align: center;
     flex-shrink: 0;
-    
-    /* CRITICAL FIX: Ensure padding/border is included in the JS height calculation */
     box-sizing: border-box;
+    transition: transform 0.1s;
 }
 #tab-my-schedule .activity-block:hover {
     transform: scale(1.02); /* Pop on hover */
