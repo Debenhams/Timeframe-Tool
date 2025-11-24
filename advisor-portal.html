@@ -60,13 +60,6 @@
     }
 
     /* === BASE STYLES & LAYOUT === */
-    
-    /* Modern Slim Scrollbar (App Feel) */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgba(156, 163, 175, 0.5); border-radius: 10px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgba(107, 114, 128, 0.8); }
-
     html, body {
         height: 100%;
         margin: 0;
@@ -159,12 +152,7 @@
         color: var(--sidebar-text);
         flex-direction: column;
         flex-shrink: 0;
-        
-        /* GLOW UPGRADE: Blue border and soft shadow */
-        border-right: 1px solid rgba(59, 130, 246, 0.3);
-        box-shadow: 5px 0 25px rgba(37, 99, 235, 0.15); 
-        z-index: 20;
-        
+        border-right: 1px solid var(--sidebar-border);
         height: 100vh;
         overflow-y: auto;
     }
@@ -255,14 +243,13 @@
         margin-top: auto;
     }
 
-    /* --- Main Content (Advisor "Morning Mist" Look) --- */
+    /* --- Main Content (Refined) --- */
     .app-main-content {
         flex-grow: 1;
         flex-direction: column;
         overflow: hidden;
         height: 100vh;
-        /* Subtle "Morning Mist" Gradient: White to Pale Blue */
-        background: linear-gradient(to bottom right, #F9FAFB, #F0F9FF); 
+        background-color: var(--color-bg);
     }
 
     /* Top Bar within Main Content (Clean White) */
@@ -337,19 +324,8 @@
     .btn:hover{background: #2563EB;}
     .btn:disabled{opacity: 0.6; cursor: not-allowed;}
     
-    /* Glassy Secondary Button (Prev/Next) */
-    .btn.secondary {
-        background: rgba(255, 255, 255, 0.5); /* See-through */
-        color: var(--color-text);
-        border: 1px solid rgba(255, 255, 255, 0.6); /* Subtle rim */
-        backdrop-filter: blur(4px);
-        transition: all 0.2s ease;
-    }
-    .btn.secondary:hover {
-        background: rgba(255, 255, 255, 0.95); /* Opaque on hover */
-        transform: translateY(-2px); /* Lift */
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    }
+    .btn.secondary{background:#FFFFFF;color:var(--color-text); border: 1px solid var(--color-border);}
+    .btn.secondary:hover{background: var(--color-hover-bg);}
     
     /* Sidebar Ghost Button (Kept unchanged) */
     .btn.ghost{background:transparent;color:var(--sidebar-text);border:1px solid var(--sidebar-border); box-shadow: none;}
@@ -394,20 +370,10 @@
     .schedule-container {
         display: flex;
         flex-direction: column;
-        
-        /* GRADIENT UPGRADE: Subtle "Morning Mist" fade */
-        background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(240, 249, 255, 0.9));
-        
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.6);
-        
-        /* Smooth corners and float */
-        border-radius: 16px;
-        box-shadow: 0 10px 40px -10px rgba(0,0,0,0.1);
-        overflow: hidden;
-        
+        /* Border/Shadow handled by the tab container now */
+        /* Ensure it takes available height */
         flex-grow: 1;
+        /* Ensure minimum width for the grid */
         min-width: 900px;
         height: 100%;
     }
@@ -418,10 +384,9 @@
         /* REMOVED 80px column */
         grid-template-columns: repeat(7, 1fr); 
         border-bottom: 2px solid var(--color-border);
-        flex-shrink: 0; /* Prevent summary from shrinking */
-        
-        /* CRITICAL FIX: Match padding to the custom scrollbar width (8px) */
-        padding-right: 8px;
+ flex-shrink: 0; /* Prevent summary from shrinking */
+        padding-right: 17px;
+ /* Compensate for the scrollbar on the grid below */
     }
 
     .summary-header {
@@ -456,29 +421,22 @@
         margin-bottom: 10px;
     }
 
-    /* Glassy Summary Tile */
     .summary-block {
-        background: linear-gradient(135deg, #10B981, #059669); /* Rich Green Gradient */
+        background-color: var(--color-shift-summary);
         color: white;
-        padding: 10px 8px;
+        padding: 10px 5px;
         font-size: 13px;
-        font-weight: 600;
+        font-weight: 500;
         flex-grow: 1;
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 12px; /* Soft corners */
-        box-shadow: 0 4px 6px rgba(16, 185, 129, 0.25), inset 0 1px 0 rgba(255,255,255,0.3); /* Depth */
+        border-radius: var(--border-radius);
         line-height: 1.3;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
-        border: 1px solid rgba(255,255,255,0.1);
-        cursor: default;
     }
-    .summary-block:hover { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(16, 185, 129, 0.3); }
 
-    /* Etched Glass RDO */
     .summary-rdo {
-        background-color: rgba(243, 244, 246, 0.5); /* Semi-transparent */
+        background-color: var(--color-bg);
         color: var(--color-text-muted);
         padding: 10px 5px;
         font-size: 13px;
@@ -486,10 +444,8 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 12px;
+        border-radius: var(--border-radius);
         border: 1px dashed var(--color-border);
-        /* Striped Texture */
-        background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.02) 5px, rgba(0,0,0,0.02) 10px);
     }
 
     /* 2. Detailed Time Grid Section */
@@ -535,38 +491,26 @@
     /* === MY SCHEDULE: Activity Blocks (Positioned Events) === */
     /* This rule applies to ALL blocks ONLY in the My Schedule tab */
     #tab-my-schedule .activity-block {
-        position: relative !important;
-        left: auto !important;
-        right: auto !important;
-        top: auto !important;
-        width: 100% !important;
-        margin: 0 !important;
-        
-        /* Separator line */
-        border-bottom: 1px solid rgba(255,255,255,0.4) !important;
-        
-        /* UPGRADE: Inner Shine (Gel Effect) */
-        background-image: linear-gradient(to bottom, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 100%);
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
-        
-        padding: 0 4px;
+        position: absolute;
+        left: 2px;
+        right: 2px; 
+        padding: 3px 6px;
         font-size: 11px;
         overflow: hidden;
-        border-radius: 0;
-        border-top: none;
-        border-left: none;
-        border-right: none;
+        border-radius: var(--border-radius);
+        box-shadow: var(--shadow-sm);
+        border: 1px solid rgba(0,0,0,0.1);
+        line-height: 1.2;
         
-        line-height: 1.1;
-        pointer-events: auto;
+        /* FIX 1: This enables the mouse hover for the tooltip */
+        pointer-events: auto; 
+        
+        /* FIX 2: This centers ALL text (DEB Email, Break, etc.) */
         display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
+        flex-direction: column; /* Stacks title/time vertically */
+        align-items: center;     /* Horizontal center */
+        justify-content: center;  /* Vertical center */
         text-align: center;
-        flex-shrink: 0;
-        
-        box-sizing: border-box;
     }
 
     /* This rule applies to ALL titles (DEB Email, Break...) */
@@ -631,62 +575,26 @@
         flex-grow: 1;
     }
 
-    /* --- Weekly Grid View (Premium Floating Rows) --- */
+    /* --- Weekly Grid View --- */
     .team-grid {
         width: 100%;
-        border-collapse: separate; /* Essential for rounded rows */
-        border-spacing: 0 6px; /* Space between advisor rows */
-        padding-right: 12px;
+        border-collapse: collapse;
     }
-    
-    /* Glassy Header */
-    .team-grid th {
+    .team-grid th, .team-grid td {
         padding: 16px;
-        text-align: center; /* Centered Dates */
-        font-weight: 700;
+        text-align: left;
+        border-bottom: 1px solid var(--color-border);
+        border-right: 1px solid var(--color-border);
+        min-width: 160px;
+        vertical-align: top;
+    }
+    .team-grid th {
+        background-color: var(--color-hover-bg);
+        font-weight: 600;
         color: var(--color-text-muted);
         position: sticky;
         top: 0;
         z-index: 15;
-        background: rgba(249, 250, 251, 0.9);
-        backdrop-filter: blur(8px);
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-        border-right: 1px solid rgba(0,0,0,0.03); /* Header Divider */
-    }
-    .team-grid th:first-child { text-align: left; z-index: 20; } /* Keep name header left */
-
-    /* Floating Rows with Vertical Lines */
-    .team-grid td {
-        padding: 14px 8px; /* Slightly tighter padding */
-        border: none;
-        border-right: 1px solid rgba(0,0,0,0.06); /* Vertical Grid Line */
-        background: rgba(255,255,255,0.4);
-        border-bottom: 1px solid rgba(0,0,0,0.02);
-        transition: all 0.2s ease;
-        vertical-align: middle;
-        text-align: center; /* Center Shifts/RDOs */
-    }
-    /* Rounded ends for the rows + Stronger Name Divider */
-    .team-grid td:first-child { 
-        border-radius: 10px 0 0 10px; 
-        background: rgba(255,255,255,0.6); 
-        font-weight: 600; 
-        text-align: left; 
-        padding-left: 16px;
-        border-right: 2px solid rgba(0,0,0,0.08); /* Stronger divider after name */
-    }
-    .team-grid td:last-child { 
-        border-radius: 0 10px 10px 0; 
-        border-right: none; /* No border on the far right */
-    }
-
-    /* Hover Spotlight */
-    .team-grid tbody tr:hover td {
-        background-color: #FFFFFF !important;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.06);
-        transform: scale(1.005);
-        cursor: default;
-        border-right-color: rgba(0,0,0,0.03); /* Faint lines on hover */
     }
     
     /* Sticky Name Column for Weekly Grid */
@@ -715,135 +623,101 @@
         font-size: 13px;
         color: var(--color-text-muted);
     }
-    /* RDO Pill (Structured "Ghost" Look) */
     .weekly-rdo {
-        display: inline-block;
-        padding: 6px 12px;
-        border-radius: 8px;
-        font-size: 11px;
-        font-weight: 700;
+        font-size: 14px;
         color: #9CA3AF;
-        background: rgba(243, 244, 246, 0.6); /* Light Grey */
-        border: 1px dashed #D1D5DB; /* Dashed border for "Off" status */
-        min-width: 80px; /* Consistent width matching shifts */
-        text-align: center;
-        box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+        font-weight: 500;
     }
 
-    /* --- Daily Gantt View (Liquid Timeline) --- */
-    .timeline-container { position: relative; min-width: 1200px; padding-bottom: 20px; }
-
-    /* Sticky Glass Header */
+    /* --- Daily Gantt View (New) --- */
+    .timeline-container { position: relative; min-width: 1200px; }
     .timeline-header {
       display: grid;
       grid-template-columns: var(--timeline-name-col) 1fr;
-      background: rgba(249, 250, 251, 0.9); /* Frosted Glass */
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
-      border-bottom: 1px solid rgba(0,0,0,0.05);
+      background-color: var(--color-hover-bg);
+      border-bottom: 1px solid var(--color-border);
       position: sticky;
       top: 0;
       z-index: 15;
     }
 
     .header-name { 
-        padding: 12px 20px;
+        padding: 12px 20px; 
         border-right: 1px solid var(--color-border);
         font-weight: 600;
         position: sticky;
         left: 0;
-        background: inherit; /* Inherit glass effect */
+        background-color: var(--color-hover-bg);
         z-index: 20;
     }
 
-    .header-timeline { position: relative; height: 48px; background: transparent; }
+    .header-timeline { position: relative; height: 48px; background-color: var(--color-hover-bg); }
 
     .time-tick {
       position: absolute;
-      font-size: 11px;
+      font-size: 12px;
       font-weight: 600;
-      color: #9CA3AF;
+      color: #4B5563;
       user-select: none;
       height: 100%;
       padding-left: 6px;
       display: flex;
       align-items: center;
       top: 0;
-      background: transparent;
+      background-color: var(--color-hover-bg);
+      padding-right: 6px;
     }
 
-    /* Subtle vertical grid lines */
+    /* Vertical lines extending down from the header */
     .time-tick::after {
         content: '';
-        position: absolute;
-        left: 0; top: 48px; height: 5000px; width: 1px;
-        background-color: rgba(0,0,0,0.03); /* Very faint lines */
-        z-index: -1;
+position: absolute;
+        left: 0; top: 0; height: 5000px; width: 1px;
+        background-color: var(--color-border);
+        z-index: -1; 
+}
+
+    .timeline-body {
+        position: relative;
     }
 
-    .timeline-body { position: relative; padding-top: 8px; }
-
-    /* Floating Spotlight Rows (Compact Mode) */
     .timeline-row {
       display: grid;
       grid-template-columns: var(--timeline-name-col) 1fr;
-      height: 34px; /* Reduced height for tighter density */
-      margin-bottom: 2px; /* Reduced gap between advisors */
-      align-items: center;
-      border-radius: 6px;
-      transition: all 0.2s ease;
-      border-bottom: 1px solid rgba(0,0,0,0.02); /* Subtle divider */
-    }
+      height: var(--timeline-row-height);
+      margin-bottom: 4px; /* <-- ADD THIS LINE BACK */
+}
 
-    /* Alternating colors + Hover Effect */
-    .timeline-row:nth-child(odd) { background-color: rgba(255,255,255,0.4); }
-    .timeline-row:nth-child(even) { background-color: rgba(249, 250, 251, 0.4); }
-    
-    .timeline-row:hover { 
-        background-color: #FFFFFF !important; 
-        transform: none; /* Keep grid neat */
-        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        z-index: 5;
-        border-left: 3px solid var(--brand-primary); /* Highlight indicator */
-    }
+    /* Alternating row colors for clarity */
+    .timeline-row:nth-child(odd) { background-color: #FFFFFF; }
+    .timeline-row:nth-child(even) { background-color: #F9FAFB; }
+    .timeline-row:hover { background-color: #F3F4F6 !important; }
 
-    /* Floating Row Name */
+
     .timeline-name { 
-        padding: 0 12px;
-        display: flex; align-items: center; font-size: 12px; font-weight: 600; color: var(--color-text);
-        position: sticky; left: 0; z-index: 10; 
-        background: inherit; 
-        height: 100%;
+        padding: 0 20px; border-right: 1px solid var(--color-border); 
+        display: flex; align-items: center; font-size: 14px;
+        position: sticky; left: 0; z-index: 10; background-color: inherit;
     }
 
     .timeline-track { position: relative; height: 100%; }
 
-    /* The "Tape" Bar (Flatter, Connected Look) */
-    .timeline-bar {
-        position: absolute;
-        top: 4px; bottom: 4px; /* Stretches to fill row mostly */
-        height: auto !important; /* Override JS height */
-        display: flex;
-        align-items: center;
-        overflow: hidden;
-        border-radius: 3px; /* Sharper corners = Connected look */
-        z-index: 25;
-        font-size: 10px;
-        font-weight: 700;
-        padding-left: 6px;
-        white-space: nowrap;
-        box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
-        border: none;
-        transition: all 0.2s;
+.timeline-bar {
+      position: absolute;
+      top: 0;
+      height: 100%;
+display: flex;
+      align-items: center;
+      overflow: hidden;
+      border-radius: 0;
+      z-index: 25; /* <-- THIS IS THE FIX */
+      font-size: 12px;
+      font-weight: 500;
+      padding-left: 6px;
+      white-space: nowrap;
+      box-shadow: var(--shadow-sm);
     }
-    /* Differentiate Breaks visually to break up the "Wall of Color" */
-    .timeline-bar.is-simple-block {
-        opacity: 0.6; /* Breaks recede visually */
-        background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.05) 5px, rgba(0,0,0,0.05) 10px);
-        box-shadow: none;
-    }
-    
-    .timeline-bar:hover { z-index: 30; transform: scale(1.02); box-shadow: 0 4px 12px rgba(0,0,0,0.15); cursor: pointer; opacity: 1; }
+
 
     /* === Placeholder Content === */
     .placeholder-content {
@@ -921,23 +795,30 @@
     border-right: none;
 }
 
-/* 3. Blocks are "Jelly Pills" (Rounded, Floating, Glossy) */
+/* 3. Blocks are Relative (Stacking) but Height is set by JS */
 #tab-my-schedule .activity-block {
     position: relative !important;
     left: auto !important;
     right: auto !important;
     top: auto !important;
-    width: 96% !important; /* Slight gap on sides for floating look */
-    margin: 1px auto !important; /* Tiny gap between blocks */
+    width: 100% !important;
     
-    /* The Jelly Look */
-    border-radius: 8px; /* Rounded pill shape */
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.4); /* Inner top shine */
-    border: 1px solid rgba(0,0,0,0.05); /* Subtle border */
+    /* FIX: Remove margins to prevent "drift" */
+    margin: 0 !important;
+    /* Add a tiny border-bottom to act as the separator instead of margin */
+    border-bottom: 1px solid rgba(255,255,255,0.5); 
     
     padding: 2px 4px;
     font-size: 11px;
     overflow: hidden;
+    border-radius: 0; /* Square edges stack better */
+    
+    /* First and Last block rounded corners logic handled by JS if needed, or keep generic radius: */
+    border-radius: 4px;
+
+    box-shadow: none; /* Shadow adds size in some browsers, remove it for precision */
+    border: none; /* We use border-bottom for separation */
+    
     line-height: 1.1;
     pointer-events: auto;
     display: flex;
@@ -946,95 +827,47 @@
     justify-content: center;
     text-align: center;
     flex-shrink: 0;
-    box-sizing: border-box;
-    transition: transform 0.1s;
+    
+    /* FIX: Ensure padding doesn't add to the calculated height */
+    box-sizing: border-box; 
 }
-#tab-my-schedule .activity-block:hover {
-    transform: scale(1.02); /* Pop on hover */
-    z-index: 10;
-}
-
+/* === END FIX === */
 /* Explicit Rest Day Indicator (Striped) */
 .timeline-rdo-fill {
     position: absolute;
-    top: 2px; bottom: 2px; left: 0; width: 100%; /* Add gap for row separation */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     
-    /* Cleaner Diagonal Pattern */
-    background-color: rgba(249, 250, 251, 0.5);
+    /* Diagonal Grey Stripes Pattern */
     background-image: repeating-linear-gradient(
         45deg,
-        rgba(0, 0, 0, 0.04) 0px,
-        rgba(0, 0, 0, 0.04) 1px,
-        transparent 1px,
-        transparent 8px
+        rgba(0, 0, 0, 0.03),
+        rgba(0, 0, 0, 0.03) 10px,
+        rgba(0, 0, 0, 0.06) 10px,
+        rgba(0, 0, 0, 0.06) 20px
     );
+    
     color: #9CA3AF; 
     font-weight: 700; 
-    font-size: 11px; 
-    letter-spacing: 2px;
+    font-size: 12px; 
+    letter-spacing: 1px;
     user-select: none;
     z-index: 0;
-    border-radius: 6px;
 }
-
-/* === INTERACTIVE POLISH === */
-
-/* Glass Tooltip (Replaces Browser Default) */
-[data-tooltip] { position: relative; }
-
-[data-tooltip]:hover::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    bottom: 100%; 
-    left: 50%;
-    transform: translate(-50%, -8px); /* Float above */
-    background: rgba(15, 23, 42, 0.9); /* Dark Glass */
-    backdrop-filter: blur(4px);
-    color: white;
-    padding: 6px 10px;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 500;
-    white-space: nowrap;
-    z-index: 100;
-    pointer-events: none;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    border: 1px solid rgba(255,255,255,0.1);
-    animation: tooltipPop 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-@keyframes tooltipPop {
-    from { opacity: 0; transform: translate(-50%, 0); }
-    to { opacity: 1; transform: translate(-50%, -8px); }
-}
-
-/* === DIRECTOR COMMAND CENTER (Premium Glass & Neon) === */
+/* === DIRECTOR COMMAND CENTER (Quarantined Styles) === */
     
     .dir-dashboard {
         display: flex;
         flex-direction: column;
         gap: 24px;
-        padding: 24px; /* Increased padding */
+        padding: 8px;
         height: 100%;
         overflow-y: auto;
-        
-        /* THE AURORA MESH BACKGROUND */
-        background-color: #F8FAFC; /* Fallback */
-        background-image: 
-            radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
-            radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.15) 0px, transparent 50%),
-            radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.05) 0px, transparent 50%),
-            radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
-        background-size: 150% 150%;
-        animation: auroraMove 15s ease-in-out infinite alternate;
-    }
-
-    @keyframes auroraMove {
-        0% { background-position: 0% 0%; }
-        100% { background-position: 100% 100%; }
     }
 
     /* Top Row: Pulse Cards */
@@ -1045,107 +878,31 @@
         flex-shrink: 0;
     }
 
-    /* === NEW PREMIUM CARD STYLES === */
     .dir-card {
-        background: rgba(255, 255, 255, 0.65);
-        -webkit-backdrop-filter: blur(16px);
-        backdrop-filter: blur(16px); /* Standard property added */
-        border: 1px solid rgba(255, 255, 255, 0.9);
-        border-radius: 20px;
-        padding: 24px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04), 
-                    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
         display: flex;
         flex-direction: column;
         justify-content: space-between;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        position: relative;
-        overflow: hidden;
+        transition: transform 0.2s;
     }
-    
-    .dir-card:hover { 
-        transform: translateY(-4px); 
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
-        background: rgba(255, 255, 255, 0.85);
-    }
+    .dir-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08); }
 
-    /* Subtle sheen animation on hover */
-    .dir-card::after {
-        content: '';
-        position: absolute;
-        top: 0; left: -100%;
-        width: 50%; height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-        transform: skewX(-25deg);
-        transition: 0.5s;
-    }
-    .dir-card:hover::after { left: 150%; transition: 0.7s ease-in-out; }
-
-    .dir-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
-    
-    .dir-card-title { 
-        font-size: 12px; 
-        font-weight: 700; 
-        color: #64748B; 
-        text-transform: uppercase; 
-        letter-spacing: 1.5px; 
-    }
-
-    /* The "Live" pulsing dot */
-    .live-dot {
-        width: 8px; height: 8px;
-        background-color: #10B981;
-        border-radius: 50%;
-        box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
-        animation: pulse-green 2s infinite;
-    }
-    .live-dot.red { background-color: #EF4444; animation: pulse-red 2s infinite; }
-    
-    @keyframes pulse-green {
-        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
-        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-    }
-    @keyframes pulse-red {
-        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
-        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
-        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
-    }
-
-    .dir-metric-value { 
-        font-size: 42px; 
-        font-weight: 800; 
-        color: #1E293B; 
-        line-height: 1;
-        letter-spacing: -1px;
-        /* FIX: Added standard property definitions below */
-        background: -webkit-linear-gradient(45deg, #1E293B, #475569);
-        background: linear-gradient(45deg, #1E293B, #475569);
-        -webkit-background-clip: text;
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    
-    .dir-metric-sub { 
-        font-size: 12px; 
-        color: #64748B; 
-        font-weight: 600; 
-        margin-top: 8px; 
-        display: flex; 
-        align-items: center; 
-        gap: 6px; 
-        padding-top: 8px;
-        border-top: 1px solid rgba(0,0,0,0.05);
-    }
+    .dir-card-title { font-size: 13px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .dir-metric-value { font-size: 36px; font-weight: 800; color: #1E293B; line-height: 1; }
+    .dir-metric-sub { font-size: 12px; color: #10B981; font-weight: 600; margin-top: 4px; display: flex; align-items: center; gap: 4px; }
     .dir-metric-sub.down { color: #EF4444; }
 
     /* Middle Section: Brand Health Grid */
-    .dir-section-title { 
-        font-size: 20px;
-        font-weight: 700; color: #334155; margin-bottom: 16px; margin-top: 8px; display: flex; align-items: center; gap: 12px; }
+    .dir-section-title { font-size: 18px; font-weight: 700; color: #334155; margin-bottom: 16px; margin-top: 8px; }
     
     .dir-brand-grid {
         display: grid;
+        /* Changed to auto-FIT and added !important to force horizontal layout */
         grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
         gap: 24px;
         width: 100% !important;
@@ -1165,116 +922,21 @@
         flex-direction: column;
         gap: 12px;
     }
-    .dir-brand-card:hover { border-color: var(--brand-primary);
-        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+    .dir-brand-card:hover { border-color: var(--brand-primary); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
 
-    .dir-brand-header { display: flex; justify-content: space-between;
-        align-items: center; }
-    .dir-brand-name { font-weight: 700; font-size: 16px; color: #0F172A;
-    }
+    .dir-brand-header { display: flex; justify-content: space-between; align-items: center; }
+    .dir-brand-name { font-weight: 700; font-size: 16px; color: #0F172A; }
     
     /* Status Lights */
-    .dir-status-light { height: 10px;
-        width: 10px; border-radius: 50%; background: #CBD5E1; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
-    .dir-status-light.green { background: #10B981;
-        box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
-    .dir-status-light.amber { background: #F59E0B;
-        box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
-    .dir-status-light.red { background: #EF4444;
-        box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+    .dir-status-light { height: 10px; width: 10px; border-radius: 50%; background: #CBD5E1; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
+    .dir-status-light.green { background: #10B981; box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
+    .dir-status-light.amber { background: #F59E0B; box-shadow: 0 0 8px rgba(245, 158, 11, 0.4); }
+    .dir-status-light.red { background: #EF4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
 
-    .dir-progress-bar { height: 6px; width: 100%; background: #F1F5F9;
-        border-radius: 3px; overflow: hidden; }
-    .dir-progress-fill { height: 100%; background: var(--brand-primary); border-radius: 3px; width: 0%;
-        transition: width 1s ease-out; }
+    .dir-progress-bar { height: 6px; width: 100%; background: #F1F5F9; border-radius: 3px; overflow: hidden; }
+    .dir-progress-fill { height: 100%; background: var(--brand-primary); border-radius: 3px; width: 0%; transition: width 1s ease-out; }
     
-    .dir-stat-row { display: flex; justify-content: space-between; font-size: 12px;
-        color: #64748B; font-weight: 500; }
-  /* === DIRECTOR GOD MODE MODAL (Fixed Layout) === */
-#directorEditModal {
-    display: none; 
-    align-items: center; 
-    justify-content: center; 
-    backdrop-filter: blur(4px);
-    z-index: 10000;
-}
-
-#directorEditModal .modal-content {
-    margin: auto;
-    background: white;
-    width: 400px; /* Fixed neat width */
-    border-radius: 20px; /* Apple-style corners */
-    box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-    padding: 0;
-    overflow: hidden;
-    position: relative;
-    top: auto; /* Reset position */
-    right: auto; /* Reset position */
-    height: auto; /* Reset height */
-    border: 1px solid rgba(0,0,0,0.1);
-    animation: popIn 0.2s ease-out;
-}
-
-@keyframes popIn {
-    from { transform: scale(0.95); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-}
-
-#directorEditModal .modal-header {
-    background: #F8FAFC;
-    padding: 16px 24px;
-    border-bottom: 1px solid #E2E8F0;
-}
-
-#directorEditModal .modal-body {
-    padding: 24px;
-}
-/* The "Now" Laser Indicator */
-    .now-line {
-        position: absolute;
-        left: 0; 
-        width: 100%; 
-        border-top: 2px solid #EF4444; /* Red Laser */
-        box-shadow: 0 0 8px rgba(239, 68, 68, 0.6); /* Glow */
-        z-index: 50;
-        pointer-events: none;
-    }
-    /* "NOW" Label */
-    .now-line::after {
-        content: 'NOW';
-        position: absolute;
-        left: -35px; top: -10px;
-        background: #EF4444; color: white;
-        font-size: 10px; font-weight: 700;
-        padding: 2px 6px; border-radius: 4px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    /* Team Grid Avatar (Initials Circle) */
-    .avatar-cell { display: flex; align-items: center; }
-    .avatar-circle {
-        width: 32px; height: 32px;
-        background: linear-gradient(135deg, #DBEAFE, #BFDBFE);
-        color: #1E40AF;
-        border-radius: 50%;
-        display: inline-flex; align-items: center; justify-content: center;
-        font-weight: 700; font-size: 11px;
-        margin-right: 12px;
-        border: 2px solid #FFFFFF;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-    }
-
-    /* Team Grid Shift Pill */
-    .grid-shift-pill {
-        background: rgba(255, 255, 255, 0.6);
-        border: 1px solid rgba(0,0,0,0.05);
-        padding: 6px 12px;
-        border-radius: 8px;
-        font-size: 12px;
-        font-weight: 600;
-        display: inline-block;
-        color: var(--color-text);
-        box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-    }
+    .dir-stat-row { display: flex; justify-content: space-between; font-size: 12px; color: #64748B; font-weight: 500; }
   </style>
 </head>
 <body>
@@ -1433,8 +1095,10 @@
         <div class="bar">
           <h1 style="margin: 0; font-size: 20px;" id="viewTitle">My Schedule</h1>
         </div>
-        <div class="bar" style="gap: 8px;"> <button id="prevBtn" class="btn secondary">◀</button> <input id="weekStart" type="date" class="form-input" style="text-align:center;" />
-          <button id="nextBtn" class="btn secondary">▶</button>
+        <div class="bar">
+          <input id="weekStart" type="date" class="form-input" />
+          <button id="prevBtn" class="btn secondary">◀ Prev Week</button>
+          <button id="nextBtn" class="btn secondary">Next Week ▶</button>
         </div>
     </div>
 
@@ -1496,66 +1160,7 @@
       </div>
     </div>
   </main>
-<div class="modal-backdrop" id="directorEditModal" style="display:none;">
-    <div class="modal-content" style="max-width: 400px;">
-      <div class="modal-header">
-        <h2 id="dirEditTitle">Edit Shift</h2>
-        <button class="btn-icon modal-close" onclick="closeDirectorEditor()">
-           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
-      </div>
-      <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
-        
-        <input type="hidden" id="dirEditAdvisorId">
-        <input type="hidden" id="dirEditDateISO">
 
-        <div class="form-group">
-            <label style="font-size:12px; font-weight:600; color:#64748B;">Start Time</label>
-            <input type="time" id="dirEditStart" class="form-input" style="font-size:16px; padding:10px;">
-        </div>
-
-        <div class="form-group">
-            <label style="font-size:12px; font-weight:600; color:#64748B;">End Time</label>
-            <input type="time" id="dirEditEnd" class="form-input" style="font-size:16px; padding:10px;">
-        </div>
-
-        <div class="form-group">
-            <label style="font-size:12px; font-weight:600; color:#64748B;">Reason / Auth</label>
-            <input type="text" id="dirEditReason" class="form-input" placeholder="e.g. Authorized by Darren">
-        </div>
-
-        <div style="background:#F8FAFC; padding:12px; border-radius:8px; border:1px solid #E2E8F0; font-size:11px; color:#64748B; line-height:1.4;">
-            <strong>Note:</strong> Changing times will automatically extend or trim the shift. Breaks will be preserved where possible.
-        </div>
-
-        <div style="background:#F1F5F9; padding:12px; border-radius:8px; margin-top:8px; border:1px solid #E2E8F0;">
-            
-            <div style="display:flex; gap:8px; margin-bottom:8px;">
-                <select id="dirAddType" class="form-select" style="flex:2; padding:6px; font-size:12px; height:32px;">
-                    <option value="Meeting">Meeting</option>
-                    <option value="Training">Training</option>
-                    <option value="Admin">Admin</option>
-                    <option value="121">121</option>
-                    <option value="Break">Break</option>
-                </select>
-                <input type="time" id="dirAddStart" class="form-input" style="flex:2; padding:6px; font-size:12px; height:32px;">
-                <input type="number" id="dirAddDur" class="form-input" placeholder="Mins" value="30" style="flex:1; padding:6px; font-size:12px; height:32px;">
-            </div>
-            <button class="btn btn-sm btn-secondary" style="width:100%;" onclick="addDirectorActivityToList()">+ Insert Activity</button>
-            <ul id="dirActivityList" style="list-style:none; padding:0; margin:8px 0 0 0; font-size:12px; color:#0F172A;"></ul>
-        </div>
-
-        <div style="margin-top:16px; border-top:1px solid #eee; padding-top:16px; display:flex; gap:12px;">
-            <button type="button" class="btn btn-secondary" onclick="handleDirectorUndo()" id="btnDirectorUndo" disabled style="flex:1; opacity:0.7;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg>
-                Undo
-            </button>
-            <button type="button" class="btn" style="flex:2; background-color: #2563EB;" onclick="handleDirectorSave()" id="btnDirectorSave">Update Schedule</button>
-        </div>
-
-      </div>
-    </div>
-  </div>
 <script>
 // --- Configuration ---
 const SUPABASE_URL = "https://oypdnjxhjpgpwmkltzmk.supabase.co";
@@ -2776,21 +2381,8 @@ function drawMyRotaCalendar(){
 
     // 3. Generate Summary Grid (Top Section)
     const monthName = STATE.monday.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
-    
-    // Gamification: Week Progress Calculation (1-7)
-    const prog = Math.min(100, Math.round(((new Date().getDay()||7)/7)*100));
-    
     html += `<div class="summary-grid">
-                <div class="summary-header" style="display:flex; justify-content:space-between; align-items:center;">
-                    <span>${monthName}</span>
-                    <div style="display:flex; align-items:center; gap:8px; opacity:0.8;">
-                        <span style="font-size:10px; font-weight:700; color:var(--brand-primary); letter-spacing:0.5px;">WEEK PROGRESS</span>
-                        <div style="width:100px; height:6px; background:rgba(0,0,0,0.05); border-radius:10px; overflow:hidden;">
-                            <div style="width:${prog}%; height:100%; background:linear-gradient(90deg, #3B82F6, #10B981); border-radius:10px;"></div>
-                        </div>
-                        <span style="font-size:10px; font-weight:600; color:var(--color-text-muted);">${prog}%</span>
-                    </div>
-                </div>`;
+                <div class="summary-header">${monthName}</div>`; 
 
     weekData.forEach(day => {
         html += `<div class="summary-day">
@@ -2855,9 +2447,7 @@ function drawMyRotaCalendar(){
             }
 
             // Render with EXACT HEIGHT, but NO 'top' position (CSS stacks it)
-            // UPDATED: Uses data-tooltip for Glass Hover Effect
-            html += `<div class="${blockClass}" data-tooltip="${tooltip}" style="height: ${heightPx}px; background-color: ${color};
-color: ${textColor};">
+            html += `<div class="${blockClass}" title="${tooltip}" style="height: ${heightPx}px; background-color: ${color}; color: ${textColor};">
                         <span class="activity-title">${seg.code}</span>
                         <span class="activity-time">${seg.start} - ${seg.end}</span>
                      </div>`;
@@ -2865,20 +2455,6 @@ color: ${textColor};">
 
         html += `</div>`; // Close day-column-events
     });
-    // 5. THE NOW LASER: Calculate position
-    const now = new Date();
-    const currentH = now.getHours();
-    const currentM = now.getMinutes();
-    const totalMinutes = (currentH * 60) + currentM;
-    const startGridMinutes = TIMEGRID_START_H * 60; // 08:00 = 480
-    
-    // Only draw if we are currently within the grid's visible hours (08:00 - 21:00)
-    if (totalMinutes >= startGridMinutes && totalMinutes < (TIMEGRID_END_H * 60)) {
-        const minutesSinceStart = totalMinutes - startGridMinutes;
-        const topPx = minutesSinceStart * pixelsPerMinute;
-        html += `<div class="now-line" style="top: ${topPx}px;"></div>`;
-    }
-
     html += `   </div>
             </div>`; // Close time-grid and wrapper
     html += `</div>`; // Close schedule-container
@@ -2924,20 +2500,7 @@ function drawTeamScheduleGrid() {
         // Use a slightly different background color for the current user
         const rowStyle = isCurrentUser ? 'background-color: #E0F2FE !important;' : '';
 
-        // Generate Initials (e.g., "Luke Pashley" -> "LP")
-        const initials = member.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
-        
-        // Render Row with Avatar
-        html += `<tr style="${rowStyle}">
-                    <td>
-                        <div class="avatar-cell">
-                            <div class="avatar-circle">${initials}</div>
-                            <div>
-                                <div>${member.name}</div>
-                                ${isCurrentUser ? '<div style="font-size:10px; color:var(--brand-primary); font-weight:600;">(You)</div>' : ''}
-                            </div>
-                        </div>
-                    </td>`;
+        html += `<tr style="${rowStyle}"><td>${member.name} ${isCurrentUser ? '<span class="tag">(You)</span>' : ''}</td>`;
         
         DAYS.forEach(dayName => {
             // This function returns the final segments
@@ -2959,10 +2522,10 @@ function renderTeamGridCell(segments) {
 
     const start = segments[0].start;
     const end = segments[segments.length - 1].end;
-
-    // Modified to use the new "Grid Shift Pill" style
+    
+    // Modified to show ONLY the time (Activity removed)
     return `
-        <span class="grid-shift-pill">${start} - ${end}</span>
+        <span class="weekly-shift-time">${start} - ${end}</span>
     `;
 }
 
@@ -2974,10 +2537,6 @@ function drawTeamDailyGantt() {
     const dayIndex = STATE.teamViewDayIndex;
     const dayName = DAYS[dayIndex];
     const mondayISO = STATE.currentWeekData.mondayISO;
-    
-    // FIX: Calculate specific date for the selected day view
-    const specificDate = addDays(new Date(mondayISO + "T00:00:00"), dayIndex);
-    const specificDateISO = fmtDateLocal(specificDate);
 
     // Setup the structure for the Gantt chart
     let html = `
@@ -2999,10 +2558,9 @@ function drawTeamDailyGantt() {
 
     // Render the time header (05:00 - 23:00)
     renderGanttTimeHeader(ELS_GANTT.timeHeader);
-
+    
     // Render the rows
     let bodyHtml = '';
-
     STATE.teamMembers.forEach(member => {
         // Calculate segments for the specific day
         const segments = calculateLiveSegments(member.id, dayName, mondayISO);
@@ -3011,20 +2569,11 @@ function drawTeamDailyGantt() {
         const isCurrentUser = member.id === STATE.advisorId;
         const rowStyle = isCurrentUser ? 'background-color: #E0F2FE !important;' : '';
 
-        // Safety: Handle missing names
-        const safeName = member.name || "Unknown";
-        const initials = safeName.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
-
         bodyHtml += `
         <div class="timeline-row" style="${rowStyle}">
-            <div class="timeline-name">
-                <div class="avatar-circle" style="width:24px; height:24px; font-size:9px; margin-right:8px; border:1px solid white;">${initials}</div>
-                <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                    ${safeName} ${isCurrentUser ? '<span style="color:var(--brand-primary); font-weight:600; margin-left:4px;">(You)</span>' : ''}
-                </span>
-            </div>
+            <div class="timeline-name">${member.name} ${isCurrentUser ? '<span class="tag">(You)</span>' : ''}</div>
             <div class="timeline-track">
-                ${renderGanttSegments(segments, member.id, specificDateISO)}
+                ${renderGanttSegments(segments)}
             </div>
         </div>
         `;
@@ -3045,77 +2594,41 @@ function renderDirectorDashboard() {
     }
 
     const dateString = targetDate.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+
     // 2. Build the HTML Structure
     let html = `
         <div class="dir-dashboard">
             <div class="dir-section-title">
-                Operational Command <span style="font-weight:300; opacity:0.5;">|</span> 
-                <span style="font-weight:400; color:#64748B; font-size:16px;">${dateString}</span>
-                <span style="margin-left:auto; font-size:11px; font-weight:700; color:#10B981; background:rgba(16,185,129,0.1); padding:4px 10px; border-radius:20px; display:flex; align-items:center; gap:6px;">
-                    <div class="live-dot" style="width:6px; height:6px;"></div> LIVE CONNECTION
-                </span>
+                Operational Command Center 
+                <span style="font-weight:400; color:#94A3B8; font-size:14px; margin-left:12px;">${dateString}</span>
             </div>
             
             <div class="dir-pulse-row">
                 <div class="dir-card">
-                    <div class="dir-card-header">
-                        <div class="dir-card-title">Total Headcount</div>
-                        <div class="live-dot"></div>
-                    </div>
+                    <div class="dir-card-title">Total Headcount</div>
                     <div class="dir-metric-value" id="dir-val-headcount">--</div>
-                    <div class="dir-metric-sub">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                        Scheduled Today
-                    </div>
+                    <div class="dir-metric-sub">Scheduled on Date</div>
                 </div>
-
                 <div class="dir-card">
-                    <div class="dir-card-header">
-                        <div class="dir-card-title">Live Shrinkage</div>
-                        <div class="live-dot red"></div>
-                    </div>
+                    <div class="dir-card-title">Shrinkage</div>
                     <div class="dir-metric-value" id="dir-val-shrinkage">--%</div>
-                    <div class="dir-metric-sub down">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
-                        Sickness / Absence
-                    </div>
+                    <div class="dir-metric-sub down">Sickness / Absence</div>
                 </div>
-
                 <div class="dir-card">
-                    <div class="dir-card-header">
-                        <div class="dir-card-title">Pending Actions</div>
-                        <div style="background:#FEF3C7; color:#D97706; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">REQ ATTN</div>
-                    </div>
+                    <div class="dir-card-title">Alerts</div>
                     <div class="dir-metric-value" id="dir-val-alerts">0</div>
-                    <div class="dir-metric-sub">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                        System Alerts
-                    </div>
+                    <div class="dir-metric-sub">Pending Actions</div>
                 </div>
-
                 <div class="dir-card">
-                    <div class="dir-card-header">
-                        <div class="dir-card-title">Live Coverage</div>
-                        <div class="live-dot"></div>
-                    </div>
+                    <div class="dir-card-title">Live Coverage</div>
                     <div class="dir-metric-value" id="dir-val-coverage">--%</div>
-                    <div class="dir-metric-sub" style="color:#10B981;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
-                        Vs. Requirement
-                    </div>
+                    <div class="dir-metric-sub">Vs. Requirement</div>
                 </div>
             </div>
 
-            <div class="dir-section-title">
-                Site Performance 
-                <span style="font-size:12px; color:#94A3B8; font-weight:400; background:white; padding:2px 8px; border-radius:12px; border:1px solid #E2E8F0;">Real-time</span>
-            </div>
-            
+            <div class="dir-section-title">Site Performance Status</div>
             <div class="dir-brand-grid" id="dir-brand-grid">
-                <div style="grid-column:1/-1; padding:60px; color:#94A3B8; text-align:center; font-style:italic; background:rgba(255,255,255,0.5); border-radius:16px;">
-                    <div class="live-dot" style="margin:0 auto 12px auto; background:#CBD5E1; animation:none;"></div>
-                    Connecting to live feeds...
-                </div>
+                <div style="grid-column:1/-1; padding:40px; color:#94A3B8; text-align:center;">Calculating historic/live data...</div>
             </div>
         </div>
     `;
@@ -3256,36 +2769,32 @@ function renderGanttTimeHeader(headerElement) {
     headerElement.innerHTML = html;
 }
 
-function renderGanttSegments(segments, advisorId, dateISO) { // <--- UPDATED ARGUMENTS
+function renderGanttSegments(segments) {
     if (!segments || segments.length === 0) {
         return '<div class="timeline-rdo-fill">RDO</div>';
     }
     
     return segments.map(seg => {
+        // Calculate position and width percentage based on Gantt constants
         const startPct = ((seg.startMin - GANTT_START_MIN) / GANTT_DURATION_MIN) * 100;
         const widthPct = ((seg.endMin - seg.startMin) / GANTT_DURATION_MIN) * 100;
         
         const color = seg.color || '#475569';
+        
+        // Calculate contrasting text color
         const textColor = getContrastingTextColor(color);
 
+        // --- NEW LOGIC ---
         let blockClass = 'timeline-bar';
         const lowerCode = seg.code.toLowerCase();
         if (lowerCode.includes('break') || lowerCode.includes('lunch')) {
             blockClass += ' is-simple-block';
         }
+        // --- END NEW LOGIC ---
 
-        // DIRECTOR TRIGGER: Add onclick event
-        let clickAction = '';
-        let cursorStyle = '';
-        
-        if (STATE.isDirector) {
-             // Pass the start/end times to the editor
-             clickAction = `onclick="event.stopPropagation(); openDirectorEditor('${advisorId}', '${dateISO}', '${seg.start}', '${seg.end}')"`;
-             cursorStyle = 'cursor: pointer; pointer-events: auto;';
-        }
-
+        // The 'title' attribute provides the native browser tooltip on hover.
         return `
-        <div class="${blockClass}" ${clickAction} style="left: ${startPct}%; width: ${widthPct}%; background-color: ${color}; color: ${textColor}; ${cursorStyle}" title="${seg.code} (${seg.start} - ${seg.end})">
+        <div class="${blockClass}" style="left: ${startPct}%; width: ${widthPct}%; background-color: ${color}; color: ${textColor};" title="${seg.code} (${seg.start} - ${seg.end})">
             <span>${seg.code}</span>
         </div>
         `;
@@ -3340,40 +2849,44 @@ async function startRealtime() {
         { event: 'schedule_update' },
         (payload) => {
             console.log('Realtime update received:', payload);
+
             if (payload.payload) {
                 const update = payload.payload;
-                console.log("Realtime update received:", update.type);
 
-                // --- DIRECTOR & TEAM ALERTS ---
+                // --- UPDATED LOGIC: SMART NAMED ALERTS ---
+
+                // 1. Check if the update is for the VIEWED TEAM
                 const isForMyTeam = STATE.teamMemberIds.has(update.advisor_id);
+                
+                // 2. Check if the update is for ME
                 const isForMe = update.advisor_id == STATE.advisorId;
 
-                // GATEKEEPER: Director gets EVERYTHING. Leaders get Team + Self.
-                if (STATE.isDirector || isForMyTeam || isForMe) {
-                    console.log("Refreshing data due to relevant update.");
-                    
-                    // 1. SILENT REFRESH (Runs for EVERYONE, including Director)
-                    // This updates the numbers, the grid, and the graphs immediately.
+                // 3. Process if it matches EITHER
+                if (isForMyTeam || isForMe) {
+                    // Reload data (Background refresh)
                     loadAndRender();
 
-                    // 2. POP-UP BLOCKER (Specific to Director)
-                    // If I am the Director, and it's not MY personal schedule, STOP here.
-                    // This ensures the data updated above, but no red banner appears.
-                    if (STATE.isDirector && !isForMe) {
-                        return; 
-                    }
-
-                    // 3. ALERT LOGIC (Only runs for Team Leaders / Advisors / Director's own schedule)
-                    // This code is identical to the original logic for TLs and Advisors.
-                    if (update.date && update.date === TODAY_ISO) {
-                        let msg = isForMe ? 
-                            "Live Update: Your schedule changed." : 
-                            "Live Update: A team member's schedule changed.";
+                    // Check for alert (Only if TODAY)
+                    if (update.date == TODAY_ISO) {
+                        let msg = "";
+                        
+                        if (isForMe) {
+                            msg = "Live Update: <strong>Your</strong> schedule for today has been changed.";
+                        } else {
+                            // Lookup the name from the local state
+                            // (Note: STATE.teamMembers contains the list of people currently being viewed)
+                            const member = STATE.teamMembers.find(m => m.id == update.advisor_id);
+                            const name = member ? member.name : "A Team Member";
+                            msg = `Live Update: <strong>${name}'s</strong> schedule for today has been changed.`;
+                        }
+                        
+                        // Trigger the banner with the specific name
                         showUpdateNotification(msg);
                     }
                 } else {
-                    console.log("Ignoring update (irrelevant to current view).");
+                    console.log("Ignoring update (not for me or my team).");
                 }
+                
             }
         }
     );
@@ -3467,304 +2980,6 @@ window.jumpToSiteSchedule = (siteName) => {
 
     // 5. Trigger the "Change" event to force the grid to reload with new selection
     list.dispatchEvent(new Event('change'));
-};
-// --- DIRECTOR GOD MODE LOGIC (V7: PLANNER-GRADE CARVING) ---
-
-window.directorUndoState = null;
-window.directorPendingInjections = [];
-
-// 1. OPEN THE EDITOR
-window.openDirectorEditor = async (advisorId, dateISO, currentStart, currentEnd) => {
-    if (!STATE.isDirector) return;
-    if (dateISO !== TODAY_ISO) {
-        alert("Director Mode: You can only edit the LIVE schedule (Today).");
-        return;
-    }
-
-    const advisor = STATE.teamMembers.find(m => m.id == advisorId);
-    const name = advisor ? advisor.name : "Advisor";
-
-    // Capture State for Undo
-    document.getElementById('dirEditTitle').textContent = `Loading ${name}...`;
-    
-    const { data: currentState } = await supabase
-        .from('schedule_exceptions')
-        .select('structure, reason')
-        .eq('advisor_id', advisorId)
-        .eq('exception_date', dateISO)
-        .maybeSingle();
-
-    window.directorUndoState = {
-        advisor_id: advisorId,
-        exception_date: dateISO,
-        structure: currentState ? currentState.structure : [],
-        reason: currentState ? currentState.reason : ""
-    };
-
-    // Reset UI
-    window.directorPendingInjections = [];
-    document.getElementById('dirActivityList').innerHTML = ''; 
-    
-    const undoBtn = document.getElementById('btnDirectorUndo');
-    undoBtn.disabled = false;
-    undoBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><path d="M3 7v6h6"></path><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path></svg> Undo`;
-
-    // Populate Form
-    document.getElementById('dirEditTitle').textContent = `Edit Live: ${name}`;
-    document.getElementById('dirEditAdvisorId').value = advisorId;
-    document.getElementById('dirEditDateISO').value = dateISO;
-    document.getElementById('dirEditStart').value = currentStart;
-    document.getElementById('dirEditEnd').value = currentEnd;
-    document.getElementById('dirEditReason').value = window.directorUndoState.reason || ""; 
-
-    // Default "Add Activity" time
-    const startEl = document.getElementById('dirAddStart');
-    if (startEl) startEl.value = currentStart;
-
-    document.getElementById('directorEditModal').style.display = 'flex';
-};
-
-window.closeDirectorEditor = () => {
-    document.getElementById('directorEditModal').style.display = 'none';
-};
-
-// 2. ADD ACTIVITY TO LIST
-window.addDirectorActivityToList = () => {
-    const type = document.getElementById('dirAddType').value;
-    const start = document.getElementById('dirAddStart').value;
-    const dur = parseInt(document.getElementById('dirAddDur').value);
-
-    if(!start || !dur) return;
-
-    window.directorPendingInjections.push({ type, start, dur });
-
-    const li = document.createElement('li');
-    li.style.marginBottom = '4px';
-    li.style.display = 'flex';
-    li.style.justifyContent = 'space-between';
-    li.innerHTML = `<span><strong>${type}</strong> @ ${start} (${dur}m)</span><span style="color:#EF4444; cursor:pointer;" onclick="this.parentElement.remove(); removeInjection('${start}')">x</span>`;
-    document.getElementById('dirActivityList').appendChild(li);
-};
-
-window.removeInjection = (startVal) => {
-    window.directorPendingInjections = window.directorPendingInjections.filter(i => i.start !== startVal);
-};
-
-// 3. HANDLE UNDO
-window.handleDirectorUndo = async () => {
-    if (!window.directorUndoState) return;
-    if (!confirm("Revert to state before editing?")) return;
-
-    const undoBtn = document.getElementById('btnDirectorUndo');
-    undoBtn.textContent = "Reverting...";
-    
-    const { error } = await supabase.from('schedule_exceptions').upsert({
-        advisor_id: window.directorUndoState.advisor_id,
-        exception_date: window.directorUndoState.exception_date,
-        structure: window.directorUndoState.structure,
-        reason: window.directorUndoState.reason
-    }, { onConflict: 'advisor_id, exception_date' });
-
-    if (!error) {
-        // Trigger update
-        if (STATE.rotaRealtimeChannel) STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: window.directorUndoState.advisor_id, date: window.directorUndoState.exception_date } });
-        await loadAndRender(); 
-        closeDirectorEditor(); 
-    } else {
-        alert("Undo failed: " + error.message);
-    }
-};
-
-// --- PLANNER-GRADE LOGIC HELPERS ---
-
-// 1. Get Safe ID
-function getSafeCompId(name) {
-    if (!name) return null;
-    const clean = String(name).toLowerCase().trim();
-    const comps = Object.values(STATE.components);
-    let match = comps.find(c => (c.name || "").toLowerCase() === clean);
-    if (!match) match = comps.find(c => (c.type || "").toLowerCase() === clean);
-    if (!match) match = comps.find(c => (c.type || "").toLowerCase() === 'activity');
-    if (!match && comps.length > 0) match = comps[0];
-    return match ? match.id : null;
-}
-
-// 2. The "Carve" Logic (Ported from Planner)
-function carveTime(baseStructure, injectStart, injectEnd, injectCompId) {
-    let newStructure = [];
-    
-    // Sort base structure first
-    baseStructure.sort((a, b) => a.start_min - b.start_min);
-
-    baseStructure.forEach(seg => {
-        // Case A: Segment is completely BEFORE injection -> Keep it
-        if (seg.end_min <= injectStart) {
-            newStructure.push(seg);
-        }
-        // Case B: Segment is completely AFTER injection -> Keep it
-        else if (seg.start_min >= injectEnd) {
-            newStructure.push(seg);
-        }
-        // Case C: Segment Overlaps -> Split it
-        else {
-            // 1. Part Before (if any)
-            if (seg.start_min < injectStart) {
-                newStructure.push({ 
-                    component_id: seg.component_id, 
-                    start_min: seg.start_min, 
-                    end_min: injectStart 
-                });
-            }
-            // (The injection itself is handled separately to ensure it's added only once)
-            
-            // 2. Part After (if any)
-            if (seg.end_min > injectEnd) {
-                newStructure.push({ 
-                    component_id: seg.component_id, 
-                    start_min: injectEnd, 
-                    end_min: seg.end_min 
-                });
-            }
-        }
-    });
-
-    // Add the injection itself
-    newStructure.push({ 
-        component_id: injectCompId, 
-        start_min: injectStart, 
-        end_min: injectEnd 
-    });
-
-    return newStructure.sort((a, b) => a.start_min - b.start_min);
-}
-
-// 4. SAVE (V7: FULL PLANNER LOGIC)
-window.handleDirectorSave = async () => {
-    const saveBtn = document.getElementById('btnDirectorSave');
-    
-    try {
-        const advisorId = document.getElementById('dirEditAdvisorId').value;
-        const dateISO = document.getElementById('dirEditDateISO').value;
-        const newStartStr = document.getElementById('dirEditStart').value;
-        const newEndStr = document.getElementById('dirEditEnd').value;
-        let reason = document.getElementById('dirEditReason').value || "Director Override";
-        
-        const targetStart = hhmmToMinutes(newStartStr);
-        const targetEnd = hhmmToMinutes(newEndStr);
-
-        if (!advisorId || !dateISO || isNaN(targetStart) || isNaN(targetEnd)) {
-            alert("Invalid inputs. Check times.");
-            return;
-        }
-
-        saveBtn.textContent = "Processing..."; 
-        saveBtn.disabled = true;
-
-        // 1. Get Current Schedule (The "Raw Material")
-        const dayName = new Date(dateISO).toLocaleDateString('en-US', { weekday: 'long' });
-        const currentSegments = calculateLiveSegments(advisorId, dayName, STATE.currentWeekData.mondayISO);
-
-        // 2. Convert to Structure Format
-        let workStructure = [];
-        if (currentSegments && currentSegments.length > 0) {
-            currentSegments.forEach(seg => {
-                const cId = getSafeCompId(seg.code);
-                if (cId) {
-                    workStructure.push({ 
-                        component_id: cId, 
-                        start_min: seg.startMin, 
-                        end_min: seg.endMin 
-                    });
-                }
-            });
-        } else {
-            // If empty, create a base block of "Activity"
-            const baseId = getSafeCompId('Activity');
-            workStructure.push({ component_id: baseId, start_min: targetStart, end_min: targetEnd });
-        }
-
-        // 3. Clip/Extend to New Start/End Times (Outer Bounds)
-        let boundedStructure = [];
-        // Determine "Base Activity" for filling gaps (find dominant activity)
-        // Default to the first segment's type if available, else generic 'Activity'
-        let baseFillId = workStructure.length > 0 ? workStructure[0].component_id : getSafeCompId('Activity');
-
-        // A. Fill Gap at Start
-        if (workStructure.length > 0 && workStructure[0].start_min > targetStart) {
-            boundedStructure.push({ component_id: baseFillId, start_min: targetStart, end_min: workStructure[0].start_min });
-        }
-
-        // B. Add existing segments (clipped)
-        workStructure.forEach(seg => {
-            let s = Math.max(seg.start_min, targetStart);
-            let e = Math.min(seg.end_min, targetEnd);
-            if (s < e) {
-                boundedStructure.push({ component_id: seg.component_id, start_min: s, end_min: e });
-            }
-        });
-
-        // C. Fill Gap at End
-        if (boundedStructure.length > 0) {
-            const last = boundedStructure[boundedStructure.length - 1];
-            if (last.end_min < targetEnd) {
-                // Try to extend last block if it's same type, else add new
-                if (last.component_id === baseFillId) {
-                    last.end_min = targetEnd;
-                } else {
-                    boundedStructure.push({ component_id: baseFillId, start_min: last.end_min, end_min: targetEnd });
-                }
-            }
-        } else {
-            // If completely empty after clipping, recreate full block
-            boundedStructure.push({ component_id: baseFillId, start_min: targetStart, end_min: targetEnd });
-        }
-
-        // 4. Apply Injections (The "Carving")
-        // We process injections sequentially
-        window.directorPendingInjections.forEach(inj => {
-            const injStart = hhmmToMinutes(inj.start);
-            const injEnd = injStart + inj.dur;
-            const injId = getSafeCompId(inj.type);
-
-            if (injId) {
-                boundedStructure = carveTime(boundedStructure, injStart, injEnd, injId);
-                reason += ` [+${inj.type}]`;
-            }
-        });
-
-        // 5. Save
-        const { error } = await supabase.from('schedule_exceptions').upsert({
-            advisor_id: advisorId, 
-            exception_date: dateISO, 
-            structure: boundedStructure, 
-            reason: reason
-        }, { onConflict: 'advisor_id, exception_date' });
-
-        if (error) throw error;
-
-        // 6. Broadcast
-        if (STATE.rotaRealtimeChannel) {
-            STATE.rotaRealtimeChannel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: advisorId, date: dateISO } });
-        }
-        
-        await loadAndRender(); 
-        
-        saveBtn.textContent = "Saved!";
-        saveBtn.style.backgroundColor = "#10B981"; 
-        
-        setTimeout(() => {
-            closeDirectorEditor(); 
-            saveBtn.textContent = "Update Schedule"; 
-            saveBtn.style.backgroundColor = "#2563EB"; 
-            saveBtn.disabled = false;
-        }, 800);
-
-    } catch (err) {
-        console.error("Director Save Error:", err);
-        alert("Failed to update: " + err.message);
-        saveBtn.textContent = "Update Schedule";
-        saveBtn.disabled = false;
-    }
 };
 
 // --- Initialization Trigger ---
