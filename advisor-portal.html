@@ -1251,6 +1251,51 @@
         color: var(--color-text);
         box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
+    /* === DIRECTOR PORTAL UPGRADE (Interactive & Graph) === */
+    .dir-dashboard {
+        display: flex; flex-direction: column; gap: 24px; padding: 24px; height: 100%; overflow-y: auto;
+        /* Aurora Background Animation */
+        background-color: #F8FAFC;
+        background-image: 
+            radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.15) 0px, transparent 50%),
+            radial-gradient(at 100% 100%, rgba(236, 72, 153, 0.05) 0px, transparent 50%),
+            radial-gradient(at 0% 100%, rgba(59, 130, 246, 0.1) 0px, transparent 50%);
+        background-size: 150% 150%;
+        animation: auroraMove 15s ease-in-out infinite alternate;
+    }
+    @keyframes auroraMove { 0% { background-position: 0% 0%; } 100% { background-position: 100% 100%; } }
+
+    /* Interactive Cards */
+    .dir-card {
+        cursor: pointer; transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+    }
+    .dir-card:hover {
+        transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08); background: rgba(255, 255, 255, 0.95);
+    }
+
+    /* Professional Graph Container */
+    .dir-chart-section {
+        background: rgba(255, 255, 255, 0.65);
+        backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.9);
+        border-radius: 20px;
+        padding: 24px; margin-bottom: 24px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
+        position: relative; height: 320px; display: flex; flex-direction: column;
+    }
+    .dir-chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .dir-chart-legend { display: flex; gap: 16px; font-size: 11px; font-weight: 600; color: #64748B; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* SVG Graph Lines */
+    .trend-chart { width: 100%; height: 100%; overflow: visible; }
+    .chart-line { fill: none; stroke-width: 3px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+    .chart-line.planned { stroke: #CBD5E1; stroke-dasharray: 6, 6; }
+    .chart-line.actual { stroke: #3B82F6; filter: drop-shadow(0 4px 6px rgba(59, 130, 246, 0.3)); }
+    .chart-axis-text { font-size: 10px; fill: #94A3B8; font-family: var(--font-family); font-weight: 600; }
+    .chart-grid-line { stroke: rgba(0,0,0,0.04); stroke-width: 1px; }
   </style>
 </head>
 <body>
@@ -3033,53 +3078,38 @@ function renderDirectorDashboard() {
             </div>
             
             <div class="dir-pulse-row">
-                <div class="dir-card">
-                    <div class="dir-card-header">
-                        <div class="dir-card-title">Total Headcount</div>
-                        <div class="live-dot"></div>
-                    </div>
+                <div class="dir-card" onclick="window.handleCardClick('headcount')">
+                    <div class="dir-card-header"><div class="dir-card-title">Total Headcount</div><div class="live-dot"></div></div>
                     <div class="dir-metric-value" id="dir-val-headcount">--</div>
-                    <div class="dir-metric-sub">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                        Scheduled Today
-                    </div>
+                    <div class="dir-metric-sub">Scheduled Today <span style="margin-left:auto; font-size:10px; background:#F1F5F9; padding:2px 6px; border-radius:4px;">Click to view</span></div>
                 </div>
-
-                <div class="dir-card">
-                    <div class="dir-card-header">
-                        <div class="dir-card-title">Live Shrinkage</div>
-                        <div class="live-dot red"></div>
-                    </div>
+                <div class="dir-card" onclick="window.handleCardClick('shrinkage')">
+                    <div class="dir-card-header"><div class="dir-card-title">Live Shrinkage</div><div class="live-dot red"></div></div>
                     <div class="dir-metric-value" id="dir-val-shrinkage">--%</div>
-                    <div class="dir-metric-sub down">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
-                        Sickness / Absence
-                    </div>
+                    <div class="dir-metric-sub down">Sickness / Absence <span style="margin-left:auto; font-size:10px; background:#FEE2E2; color:#991B1B; padding:2px 6px; border-radius:4px;">Action Req</span></div>
                 </div>
-
-                <div class="dir-card">
-                    <div class="dir-card-header">
-                        <div class="dir-card-title">Pending Actions</div>
-                        <div style="background:#FEF3C7; color:#D97706; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">REQ ATTN</div>
-                    </div>
-                    <div class="dir-metric-value" id="dir-val-alerts">0</div>
-                    <div class="dir-metric-sub">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                        System Alerts
-                    </div>
+                <div class="dir-card" onclick="window.handleCardClick('alerts')">
+                    <div class="dir-card-header"><div class="dir-card-title">Pending Actions</div><div style="background:#FEF3C7; color:#D97706; font-size:10px; padding:2px 6px; border-radius:4px; font-weight:700;">3 REQ</div></div>
+                    <div class="dir-metric-value" id="dir-val-alerts">3</div>
+                    <div class="dir-metric-sub">Approvals Queue</div>
                 </div>
-
-                <div class="dir-card">
-                    <div class="dir-card-header">
-                        <div class="dir-card-title">Live Coverage</div>
-                        <div class="live-dot"></div>
-                    </div>
+                <div class="dir-card" onclick="window.handleCardClick('coverage')">
+                    <div class="dir-card-header"><div class="dir-card-title">Live Coverage</div><div class="live-dot"></div></div>
                     <div class="dir-metric-value" id="dir-val-coverage">--%</div>
-                    <div class="dir-metric-sub" style="color:#10B981;">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>
-                        Vs. Requirement
+                    <div class="dir-metric-sub" style="color:#10B981;">Vs. Requirement</div>
+                </div>
+            </div>
+
+            <div class="dir-section-title" style="margin-top: 32px;">Intraday Performance Trend</div>
+            <div class="dir-chart-section">
+                <div class="dir-chart-header">
+                    <div style="font-size:14px; font-weight:700; color:#334155;">Staffing vs. Requirement (08:00 - 20:00)</div>
+                    <div class="dir-chart-legend">
+                        <div class="legend-item"><div class="legend-dot" style="background:#CBD5E1;"></div> Planned</div>
+                        <div class="legend-item"><div class="legend-dot" style="background:#3B82F6;"></div> Actual Live</div>
                     </div>
                 </div>
+                <div id="dir-trend-chart-container" style="flex-grow:1; position:relative;"></div>
             </div>
 
             <div class="dir-section-title">
@@ -3095,8 +3125,10 @@ function renderDirectorDashboard() {
             </div>
         </div>
     `;
-
     ELS.myRotaGrid.innerHTML = html;
+    
+    // Render the Graph
+    setTimeout(() => window.renderTrendGraph('dir-trend-chart-container'), 50);
 }
 
 // --- DIRECTOR LOGIC: THE CALCULATOR ---
@@ -3742,7 +3774,95 @@ window.handleDirectorSave = async () => {
         saveBtn.disabled = false;
     }
 };
+// --- DIRECTOR FEATURES: GRAPH RENDERER & INTERACTIVE CARDS ---
 
+// 1. Render the SVG Trend Graph
+window.renderTrendGraph = (containerId) => {
+    const el = document.getElementById(containerId);
+    if(!el) return;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const pad = 30;
+
+    // Data Points (08:00 - 20:00) - In production, calculate these from arrays
+    const labels = ["08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"];
+    const planned = [20, 35, 45, 50, 48, 45, 50, 50, 45, 40, 30, 20, 10]; 
+    const actual =  [18, 32, 44, 42, 40, 41, 48, 49, 44, 38, 28, 19, 10]; 
+
+    const maxVal = 60; // Y Scale Max
+    
+    // Helper: Map data to SVG coordinates
+    const getX = (i) => pad + (i / (labels.length - 1)) * (w - pad * 2);
+    const getY = (v) => h - pad - (v / maxVal) * (h - pad * 2);
+
+    // Helper: Generate Smooth Bezier Path
+    const makePath = (data) => {
+        let d = `M ${getX(0)} ${getY(data[0])}`;
+        for (let i = 1; i < data.length; i++) {
+            const x_mid = (getX(i) + getX(i - 1)) / 2;
+            const y_mid = (getY(data[i]) + getY(data[i - 1])) / 2;
+            const cp_x1 = (x_mid + getX(i - 1)) / 2;
+            const cp_x2 = (x_mid + getX(i)) / 2;
+            d += ` Q ${cp_x1} ${getY(data[i-1])}, ${x_mid} ${y_mid} T ${getX(i)} ${getY(data[i])}`;
+        }
+        return d;
+    };
+
+    // Build SVG String
+    const xAxis = labels.map((l, i) => `<text x="${getX(i)}" y="${h - 5}" text-anchor="middle" class="chart-axis-text">${l}:00</text>`).join('');
+    const grid = [0, 0.25, 0.5, 0.75, 1].map(p => {
+        const y = getY(maxVal * p);
+        return `<line x1="${pad}" y1="${y}" x2="${w-pad}" y2="${y}" class="chart-grid-line" />`;
+    }).join('');
+
+    el.innerHTML = `
+    <svg class="trend-chart" viewBox="0 0 ${w} ${h}">
+        ${grid}
+        <path d="${makePath(planned)}" class="chart-line planned" />
+        <path d="${makePath(actual)}" class="chart-line actual" />
+        ${xAxis}
+    </svg>`;
+};
+
+// 2. Handle Flash Card Clicks (Drill Down)
+window.handleCardClick = (type) => {
+    let title = "Detail View";
+    let content = "";
+
+    if (type === 'shrinkage') {
+        title = "The Absence Ledger (Live)";
+        content = `
+            <div style="padding:0;">
+                <table style="width:100%; border-collapse:collapse;">
+                    <thead style="background:#F1F5F9; font-size:12px; text-transform:uppercase; color:#64748B;">
+                        <tr><th style="padding:12px; text-align:left;">Advisor</th><th style="padding:12px; text-align:left;">Reason</th><th style="padding:12px; text-align:left;">Team Leader</th><th style="padding:12px; text-align:right;">Action</th></tr>
+                    </thead>
+                    <tbody style="font-size:13px;">
+                        <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:12px; font-weight:600;">Sarah Jenkins</td><td style="padding:12px;"><span style="background:#FEE2E2; color:#991B1B; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">Sickness</span></td><td style="padding:12px;">Mike Ross</td><td style="padding:12px; text-align:right;"><button class="btn btn-sm btn-secondary">Contact TL</button></td></tr>
+                        <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:12px; font-weight:600;">Tom Hardy</td><td style="padding:12px;"><span style="background:#FEF3C7; color:#92400E; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">Late (30m)</span></td><td style="padding:12px;">Rachel Zane</td><td style="padding:12px; text-align:right;"><button class="btn btn-sm btn-secondary">Log</button></td></tr>
+                    </tbody>
+                </table>
+            </div>`;
+    } else if (type === 'headcount') {
+        title = "The Muster List";
+        content = `<div style="padding:24px; text-align:center; color:#64748B;">42 Advisors currently clocked in across 3 sites.</div>`;
+    } else if (type === 'alerts') {
+        title = "Approval Queue";
+        content = `<div style="padding:24px; text-align:center; color:#64748B;">3 Overtime requests pending > 15 mins.</div>`;
+    } else {
+        title = "Department Drill-Down";
+        content = `<div style="padding:24px; text-align:center; color:#64748B;">Sales: 100% | Service: 88% | Retentions: 95%</div>`;
+    }
+
+    // Reuse the existing Director Edit Modal for simplicity
+    const modal = document.getElementById('directorEditModal');
+    if(modal) {
+        document.getElementById('dirEditTitle').textContent = title;
+        const originalBody = modal.querySelector('.modal-body').innerHTML;
+        modal.querySelector('.modal-body').innerHTML = content + `<div style="margin-top:20px; text-align:right;"><button class="btn" onclick="document.getElementById('directorEditModal').style.display='none'; location.reload();">Close</button></div>`;
+        modal.style.display = 'flex';
+    }
+};
 // --- Initialization Trigger ---
 document.addEventListener("DOMContentLoaded", init);
 
