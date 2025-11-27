@@ -3131,48 +3131,47 @@ function renderDirectorDashboard() {
     setTimeout(() => window.renderTrendGraph('dir-trend-chart-container'), 50);
 }
 
-// --- DIRECTOR LOGIC: THE CALCULATOR ---
+// --- DIRECTOR LOGIC: THE CALCULATOR (REAL DATA) ---
 async function calculateDirectorStats() {
     
-    // SMART DATE LOGIC (Must match UI)
+    // SMART DATE LOGIC
     let targetDate = STATE.monday;
     const today = new Date();
     today.setHours(0,0,0,0);
     const endOfWeek = addDays(STATE.monday, 6);
+    if (today >= STATE.monday && today <= endOfWeek) targetDate = today;
+    const targetISO = fmtDateLocal(targetDate);
+    const dayName = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
 
-    if (today >= STATE.monday && today <= endOfWeek) {
-        targetDate = today;
-    }
-    
-    const targetISO = fmtDateLocal(targetDate); 
-
-    // 1. Fetch Hierarchy Map
+    // 1. Fetch Hierarchy Map (Real Advisors)
     const { data: hierarchy } = await supabase
         .from('advisors')
         .select(`id, leader_id, leaders ( site_id, sites (name) )`);
-    
     if (!hierarchy) return;
 
-    // Data Buckets
+    // Metrics
     let totalStaff = 0;
     let activeHeadcount = 0;
     let shrinkageCount = 0;
     let siteStats = {}; 
+
+    // GRAPH ARRAYS (08:00 to 20:00) -> 13 Slots
+    const graphHours = [8,9,10,11,12,13,14,15,16,17,18,19,20];
+    let graphPlanned = new Array(13).fill(0);
+    let graphActual = new Array(13).fill(0);
 
     // 2. Loop through EVERY advisor
     hierarchy.forEach(adv => {
         const advId = adv.id;
         let siteName = "Unassigned";
         if (adv.leaders && adv.leaders.sites) siteName = adv.leaders.sites.name;
-
         if (!siteStats[siteName]) siteStats[siteName] = { total: 0, active: 0, shrinkage: 0 };
 
-        // A. Check Rotation
-        const dayName = targetDate.toLocaleDateString('en-US', { weekday: 'long' });
+        // A. Get Schedule Segments (The "Source of Truth")
         const segments = calculateLiveSegments(advId, dayName, STATE.currentWeekData.mondayISO);
         const isScheduled = segments.length > 0;
         
-        // B. Check Exceptions
+        // B. Check for Sickness (Shrinkage)
         const exception = STATE.exceptions.find(e => e.advisor_id === advId && e.exception_date === targetISO);
         let isSick = false;
         if (exception && exception.structure.length > 0) {
@@ -3181,7 +3180,24 @@ async function calculateDirectorStats() {
             if (comp && (comp.type === 'Absence' || comp.name.toLowerCase().includes('sick'))) isSick = true;
         }
 
-        // C. Tally Up
+        // C. Populate Intraday Graph Data
+        if (isScheduled) {
+            graphHours.forEach((h, index) => {
+                const minute = h * 60;
+                // Is this person working at this hour? (Start <= Hour AND End > Hour)
+                // Also ignore Breaks for "Net" headcount
+                const activeSegment = segments.find(s => s.startMin <= minute && s.endMin > minute && !s.code.toLowerCase().includes('break'));
+                
+                if (activeSegment) {
+                    graphPlanned[index]++; // They were planned to be here
+                    if (!isSick) {
+                        graphActual[index]++; // They are actually here (not sick)
+                    }
+                }
+            });
+        }
+
+        // D. Tally Totals
         if (isScheduled) {
             totalStaff++;
             siteStats[siteName].total++;
@@ -3211,16 +3227,19 @@ async function calculateDirectorStats() {
     const covEl = document.getElementById('dir-val-coverage');
     if(covEl) covEl.textContent = `${coveragePct}%`;
 
-    // 4. Build Brand Grid (FIXED: No Double Divs)
+    // 4. DRAW THE GRAPH (REAL DATA)
+    if (window.renderTrendGraph) {
+        window.renderTrendGraph('dir-trend-chart-container', graphPlanned, graphActual);
+    }
+
+    // 5. Build Brand Grid
     const gridEl = document.getElementById('dir-brand-grid');
     let gridHtml = '';
-
     Object.keys(siteStats).sort().forEach(site => {
         const stats = siteStats[site];
         if (stats.total === 0) return; 
 
         const siteCoverage = Math.round((stats.active / stats.total) * 100);
-        
         let statusClass = 'green';
         if (siteCoverage < 85) statusClass = 'amber';
         if (siteCoverage < 70) statusClass = 'red';
@@ -3235,15 +3254,12 @@ async function calculateDirectorStats() {
                     <div class="dir-progress-fill" style="width: ${siteCoverage}%; background-color: ${statusClass === 'red' ? '#EF4444' : (statusClass === 'amber' ? '#F59E0B' : '#10B981')}"></div>
                 </div>
                 <div class="dir-stat-row">
-                    <span>Headcount</span>
-                    <strong>${stats.active} / ${stats.total}</strong>
+                    <span>Headcount</span><strong>${stats.active} / ${stats.total}</strong>
                 </div>
                 <div class="dir-stat-row">
-                    <span>Shrinkage</span>
-                    <span>${stats.shrinkage} staff</span>
+                    <span>Shrinkage</span><span>${stats.shrinkage} staff</span>
                 </div>
-            </div>
-        `;
+            </div>`;
     });
 
     if(gridEl) gridEl.innerHTML = gridHtml || '<div style="padding:20px; text-align:center; color:#999;">No scheduled staff found for this date.</div>';
@@ -3774,41 +3790,40 @@ window.handleDirectorSave = async () => {
         saveBtn.disabled = false;
     }
 };
-// --- DIRECTOR FEATURES: GRAPH RENDERER & INTERACTIVE CARDS ---
+// --- DIRECTOR FEATURES: REAL-TIME GRAPH & DRILL-DOWNS ---
 
-// 1. Render the SVG Trend Graph
-window.renderTrendGraph = (containerId) => {
+// 1. Render the SVG Trend Graph (Accepts REAL Data)
+window.renderTrendGraph = (containerId, plannedData, actualData) => {
     const el = document.getElementById(containerId);
     if(!el) return;
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
+    
+    // Clear previous
+    el.innerHTML = '';
+    
+    const w = el.offsetWidth || 800; // Fallback width
+    const h = el.offsetHeight || 300;
     const pad = 30;
 
-    // Data Points (08:00 - 20:00) - In production, calculate these from arrays
+    // Hours 08:00 to 20:00 (13 data points)
     const labels = ["08", "09", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"];
-    const planned = [20, 35, 45, 50, 48, 45, 50, 50, 45, 40, 30, 20, 10]; 
-    const actual =  [18, 32, 44, 42, 40, 41, 48, 49, 44, 38, 28, 19, 10]; 
-
-    const maxVal = 60; // Y Scale Max
     
-    // Helper: Map data to SVG coordinates
+    // Default to 0 arrays if data missing
+    const planned = plannedData || new Array(13).fill(0);
+    const actual = actualData || new Array(13).fill(0);
+
+    // Dynamic Y-Scale (Max value + 10% buffer, minimum 10)
+    const maxVal = Math.max(Math.max(...planned), Math.max(...actual), 10) * 1.1;
+    
     const getX = (i) => pad + (i / (labels.length - 1)) * (w - pad * 2);
     const getY = (v) => h - pad - (v / maxVal) * (h - pad * 2);
 
-    // Helper: Generate Smooth Bezier Path
+    // Linear Path Generator (More accurate for data than smoothed bezier)
     const makePath = (data) => {
-        let d = `M ${getX(0)} ${getY(data[0])}`;
-        for (let i = 1; i < data.length; i++) {
-            const x_mid = (getX(i) + getX(i - 1)) / 2;
-            const y_mid = (getY(data[i]) + getY(data[i - 1])) / 2;
-            const cp_x1 = (x_mid + getX(i - 1)) / 2;
-            const cp_x2 = (x_mid + getX(i)) / 2;
-            d += ` Q ${cp_x1} ${getY(data[i-1])}, ${x_mid} ${y_mid} T ${getX(i)} ${getY(data[i])}`;
-        }
-        return d;
+        return data.map((val, i) => 
+            `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(val)}`
+        ).join(' ');
     };
 
-    // Build SVG String
     const xAxis = labels.map((l, i) => `<text x="${getX(i)}" y="${h - 5}" text-anchor="middle" class="chart-axis-text">${l}:00</text>`).join('');
     const grid = [0, 0.25, 0.5, 0.75, 1].map(p => {
         const y = getY(maxVal * p);
@@ -3816,51 +3831,140 @@ window.renderTrendGraph = (containerId) => {
     }).join('');
 
     el.innerHTML = `
-    <svg class="trend-chart" viewBox="0 0 ${w} ${h}">
+    <svg class="trend-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
         ${grid}
         <path d="${makePath(planned)}" class="chart-line planned" />
         <path d="${makePath(actual)}" class="chart-line actual" />
+        
+        ${actual.map((val, i) => `<circle cx="${getX(i)}" cy="${getY(val)}" r="3" fill="#3B82F6" />`).join('')}
+        
         ${xAxis}
     </svg>`;
 };
 
-// 2. Handle Flash Card Clicks (Drill Down)
-window.handleCardClick = (type) => {
+// 2. Handle Flash Card Clicks (REAL DATA DRILL-DOWN)
+window.handleCardClick = async (type) => {
     let title = "Detail View";
-    let content = "";
+    let content = '<div style="padding:20px; text-align:center;">Loading live data...</div>';
+    
+    // Open Modal First
+    const modal = document.getElementById('directorEditModal');
+    if(modal) {
+        document.getElementById('dirEditTitle').textContent = "Loading...";
+        modal.querySelector('.modal-body').innerHTML = content;
+        modal.style.display = 'flex';
+    }
+
+    // Prepare Data
+    const dateISO = fmtDateLocal(new Date()); // Today
+    const { data: allAdvisors } = await supabase.from('advisors').select('id, name, leader_id');
+    const { data: allLeaders } = await supabase.from('leaders').select('id, name');
+    
+    // Helper to get Leader Name
+    const getLeaderName = (lId) => {
+        const l = allLeaders.find(x => x.id === lId);
+        return l ? l.name : 'Unassigned';
+    };
 
     if (type === 'shrinkage') {
         title = "The Absence Ledger (Live)";
+        
+        // Filter exceptions for TODAY that are "Absence" or "Sick"
+        const sickList = STATE.exceptions.filter(ex => {
+            // Must be today
+            if (ex.exception_date !== dateISO) return false;
+            
+            // Must be an Absence type component
+            // We check the first component of the structure for simplicity, 
+            // or if the reason text contains "Sick"
+            const structure = ex.structure || [];
+            if (structure.length > 0) {
+                const comp = STATE.components[structure[0].component_id];
+                if (comp && (comp.type === 'Absence' || comp.name.includes('Sick'))) return true;
+            }
+            if ((ex.reason || "").toLowerCase().includes('sick')) return true;
+            return false;
+        });
+
+        if (sickList.length === 0) {
+            content = `<div style="padding:40px; text-align:center; color:#10B981; font-weight:600;">No reported sickness today.</div>`;
+        } else {
+            let rows = '';
+            sickList.forEach(ex => {
+                const adv = allAdvisors.find(a => a.id === ex.advisor_id);
+                if (adv) {
+                    rows += `
+                    <tr style="border-bottom:1px solid #E2E8F0;">
+                        <td style="padding:12px; font-weight:600;">${adv.name}</td>
+                        <td style="padding:12px;"><span style="background:#FEE2E2; color:#991B1B; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">${ex.reason || "Absence"}</span></td>
+                        <td style="padding:12px; color:#64748B;">${getLeaderName(adv.leader_id)}</td>
+                    </tr>`;
+                }
+            });
+            content = `
+                <div style="max-height:60vh; overflow-y:auto;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead style="background:#F1F5F9; color:#64748B; font-size:11px; text-transform:uppercase; position:sticky; top:0;">
+                            <tr><th style="padding:12px; text-align:left;">Advisor</th><th style="padding:12px; text-align:left;">Reason</th><th style="padding:12px; text-align:left;">Leader</th></tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>`;
+        }
+
+    } else if (type === 'headcount') {
+        title = "The Muster List (Scheduled Today)";
+        
+        // Identify everyone with a schedule today
+        let activeList = [];
+        allAdvisors.forEach(adv => {
+            const segs = calculateLiveSegments(adv.id, DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1], STATE.currentWeekData.mondayISO);
+            if (segs.length > 0) {
+                // Check if they are actually working NOW (Intraday)
+                const now = new Date();
+                const nowMin = (now.getHours() * 60) + now.getMinutes();
+                const isWorkingNow = segs.some(s => s.startMin <= nowMin && s.endMin > nowMin);
+                
+                activeList.push({ 
+                    name: adv.name, 
+                    leader: getLeaderName(adv.leader_id),
+                    shift: `${segs[0].start} - ${segs[segs.length-1].end}`,
+                    status: isWorkingNow ? 'Active' : 'Scheduled'
+                });
+            }
+        });
+
+        let rows = '';
+        activeList.sort((a,b) => a.name.localeCompare(b.name)).forEach(item => {
+            const statusColor = item.status === 'Active' ? '#10B981' : '#64748B';
+            rows += `
+            <tr style="border-bottom:1px solid #E2E8F0;">
+                <td style="padding:12px; font-weight:600;">${item.name}</td>
+                <td style="padding:12px;">${item.shift}</td>
+                <td style="padding:12px;">${item.leader}</td>
+                <td style="padding:12px; color:${statusColor}; font-weight:700; font-size:11px;">${item.status.toUpperCase()}</td>
+            </tr>`;
+        });
+
         content = `
-            <div style="padding:0;">
-                <table style="width:100%; border-collapse:collapse;">
-                    <thead style="background:#F1F5F9; font-size:12px; text-transform:uppercase; color:#64748B;">
-                        <tr><th style="padding:12px; text-align:left;">Advisor</th><th style="padding:12px; text-align:left;">Reason</th><th style="padding:12px; text-align:left;">Team Leader</th><th style="padding:12px; text-align:right;">Action</th></tr>
+            <div style="max-height:60vh; overflow-y:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                    <thead style="background:#F1F5F9; color:#64748B; font-size:11px; text-transform:uppercase; position:sticky; top:0;">
+                        <tr><th style="padding:12px; text-align:left;">Advisor</th><th style="padding:12px; text-align:left;">Shift</th><th style="padding:12px; text-align:left;">Leader</th><th style="padding:12px; text-align:left;">Status</th></tr>
                     </thead>
-                    <tbody style="font-size:13px;">
-                        <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:12px; font-weight:600;">Sarah Jenkins</td><td style="padding:12px;"><span style="background:#FEE2E2; color:#991B1B; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">Sickness</span></td><td style="padding:12px;">Mike Ross</td><td style="padding:12px; text-align:right;"><button class="btn btn-sm btn-secondary">Contact TL</button></td></tr>
-                        <tr style="border-bottom:1px solid #E2E8F0;"><td style="padding:12px; font-weight:600;">Tom Hardy</td><td style="padding:12px;"><span style="background:#FEF3C7; color:#92400E; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600;">Late (30m)</span></td><td style="padding:12px;">Rachel Zane</td><td style="padding:12px; text-align:right;"><button class="btn btn-sm btn-secondary">Log</button></td></tr>
-                    </tbody>
+                    <tbody>${rows}</tbody>
                 </table>
             </div>`;
-    } else if (type === 'headcount') {
-        title = "The Muster List";
-        content = `<div style="padding:24px; text-align:center; color:#64748B;">42 Advisors currently clocked in across 3 sites.</div>`;
-    } else if (type === 'alerts') {
-        title = "Approval Queue";
-        content = `<div style="padding:24px; text-align:center; color:#64748B;">3 Overtime requests pending > 15 mins.</div>`;
     } else {
-        title = "Department Drill-Down";
-        content = `<div style="padding:24px; text-align:center; color:#64748B;">Sales: 100% | Service: 88% | Retentions: 95%</div>`;
+        title = "Information";
+        content = `<div style="padding:40px; text-align:center;">Drill-down not configured for this metric yet.</div>`;
     }
 
-    // Reuse the existing Director Edit Modal for simplicity
-    const modal = document.getElementById('directorEditModal');
+    // Update Modal Content
     if(modal) {
         document.getElementById('dirEditTitle').textContent = title;
-        const originalBody = modal.querySelector('.modal-body').innerHTML;
-        modal.querySelector('.modal-body').innerHTML = content + `<div style="margin-top:20px; text-align:right;"><button class="btn" onclick="document.getElementById('directorEditModal').style.display='none'; location.reload();">Close</button></div>`;
-        modal.style.display = 'flex';
+        // Inject Close Button
+        modal.querySelector('.modal-body').innerHTML = content + `<div style="margin-top:20px; text-align:right; border-top:1px solid #E2E8F0; padding-top:10px;"><button class="btn" onclick="document.getElementById('directorEditModal').style.display='none';">Close</button></div>`;
     }
 };
 // --- Initialization Trigger ---
