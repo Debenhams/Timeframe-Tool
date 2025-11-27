@@ -3792,7 +3792,7 @@ window.handleDirectorSave = async () => {
 };
 // --- DIRECTOR FEATURES: REAL-TIME GRAPH & DRILL-DOWNS ---
 
-// 1. Render the SVG Trend Graph (Accepts REAL Data)
+// 2. Render Intraday Trend Graph (SVG) - WITH TOOLTIPS
 window.renderTrendGraph = (containerId, plannedData, actualData) => {
     const el = document.getElementById(containerId);
     if(!el) return;
@@ -3800,7 +3800,7 @@ window.renderTrendGraph = (containerId, plannedData, actualData) => {
     // Clear previous
     el.innerHTML = '';
     
-    const w = el.offsetWidth || 800; // Fallback width
+    const w = el.offsetWidth || 800;
     const h = el.offsetHeight || 300;
     const pad = 30;
 
@@ -3817,7 +3817,7 @@ window.renderTrendGraph = (containerId, plannedData, actualData) => {
     const getX = (i) => pad + (i / (labels.length - 1)) * (w - pad * 2);
     const getY = (v) => h - pad - (v / maxVal) * (h - pad * 2);
 
-    // Linear Path Generator (More accurate for data than smoothed bezier)
+    // Linear Path Generator
     const makePath = (data) => {
         return data.map((val, i) => 
             `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(val)}`
@@ -3830,13 +3830,27 @@ window.renderTrendGraph = (containerId, plannedData, actualData) => {
         return `<line x1="${pad}" y1="${y}" x2="${w-pad}" y2="${y}" class="chart-grid-line" />`;
     }).join('');
 
+    // Generate Dots with Tooltips
+    const hoverDots = actual.map((val, i) => {
+        const cx = getX(i);
+        const cy = getY(val);
+        const planVal = planned[i] || 0;
+        return `
+        <g class="chart-point">
+            <circle cx="${cx}" cy="${cy}" r="4" fill="#3B82F6" stroke="white" stroke-width="2" />
+            <circle cx="${cx}" cy="${cy}" r="15" fill="transparent" style="cursor: pointer;">
+                <title>Actual: ${val} | Planned: ${planVal}</title>
+            </circle>
+        </g>`;
+    }).join('');
+
     el.innerHTML = `
     <svg class="trend-chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
         ${grid}
         <path d="${makePath(planned)}" class="chart-line planned" />
         <path d="${makePath(actual)}" class="chart-line actual" />
         
-        ${actual.map((val, i) => `<circle cx="${getX(i)}" cy="${getY(val)}" r="3" fill="#3B82F6" />`).join('')}
+        ${hoverDots}
         
         ${xAxis}
     </svg>`;
