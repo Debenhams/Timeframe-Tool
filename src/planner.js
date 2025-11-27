@@ -3535,15 +3535,13 @@ const handleDeleteRotation = async () => {
 
     const renderDailyPlanner = () => {
         const STATE = APP.StateManager.getState();
-
         // 1. Calculate the specific date for the selected day
-        // This uses the weekStart (e.g., 2023-11-13) and selectedDay (e.g., "Tuesday")
         const dateISO = APP.Utils.getISODateForDayName(STATE.weekStart, STATE.selectedDay);
         const dateFriendly = dateISO ? APP.Utils.convertISOToUKDate(dateISO) : "";
 
-        // 2. Update the Title dynamically (e.g., "Tuesday, 14/11/2023")
+        // 2. Update the Title dynamically
         ELS.scheduleViewTitle.textContent = `Schedule Visualization (${STATE.selectedDay}, ${dateFriendly})`;
-
+        
         // 3. Setup the structure for the Gantt chart
         ELS.visualizationContainer.innerHTML = `
             <div class="timeline-container" id="timelineContainer">
@@ -3575,7 +3573,6 @@ const handleDeleteRotation = async () => {
             const advisorsToRender = STATE.advisors
                 .filter(a => selected.includes(a.id))
                 .sort((a,b) => a.name.localeCompare(b.name));
-
             let html = '';
             advisorsToRender.forEach(adv => {
                 // Use the centralized ScheduleCalculator
@@ -3584,9 +3581,9 @@ const handleDeleteRotation = async () => {
                 // Add exception styling class if source is 'exception'
                 const rowClass = (source === 'exception') ? 'is-exception' : '';
 
-                // Add data-advisor-id for click handling
+                // Add data-advisor-id for click handling AND context menu for shift slide
                 html += `
-                <div class="timeline-row ${rowClass}" data-advisor-id="${adv.id}">
+                <div class="timeline-row ${rowClass}" data-advisor-id="${adv.id}" oncontextmenu="APP.Components.ScheduleViewer.handleRightClick(event, '${adv.id}', '${adv.name}')">
                     <div class="timeline-name">${adv.name}</div>
                     <div class="timeline-track">
                         ${renderSegments(segments)}
@@ -3600,6 +3597,67 @@ const handleDeleteRotation = async () => {
         }
 
         setupIntradayIndicators(ELS_DAILY);
+    };
+
+    // --- NEW: Option 1 Shift Slide Logic ---
+    ScheduleViewer.handleRightClick = async (e, advisorId, advisorName) => {
+        e.preventDefault(); // Block default browser menu
+        
+        // 1. Simple Native Prompt
+        const input = prompt(`Shift Schedule for ${advisorName}?\n\nEnter minutes to shift (e.g. 60 or -30):`, "0");
+        if (!input) return;
+        
+        const offset = parseInt(input, 10);
+        if (isNaN(offset) || offset === 0) return;
+
+        const STATE = APP.StateManager.getState();
+        const weekStart = STATE.weekStart;
+        const dayName = STATE.selectedDay;
+        
+        // 2. Get current segments (Source of Truth)
+        const { segments } = APP.ScheduleCalculator.calculateSegments(advisorId, dayName, weekStart);
+        
+        if (segments.length === 0) {
+            APP.Utils.showToast("Cannot shift an empty schedule (RDO).", "warning");
+            return;
+        }
+
+        // 3. Apply Offset to ALL segments (Moving the whole bar)
+        const newStructure = segments.map(seg => ({
+            component_id: seg.component_id,
+            start_min: seg.start_min + offset,
+            end_min: seg.end_min + offset
+        }));
+
+        // 4. Save as Exception
+        const dateISO = APP.Utils.getISODateForDayName(weekStart, dayName);
+        
+        const record = {
+            advisor_id: advisorId,
+            exception_date: dateISO,
+            structure: newStructure,
+            reason: `Shifted by ${offset} mins (Lateness/Adjustment)`
+        };
+
+        const result = await APP.DataService.saveRecord('schedule_exceptions', record, 'advisor_id, exception_date');
+        
+        if (!result.error) {
+            APP.StateManager.syncRecord('schedule_exceptions', result.data);
+            APP.StateManager.saveHistory("Shift Schedule");
+            APP.Utils.showToast(`Shifted ${advisorName}'s schedule by ${offset} mins.`, "success");
+            
+            // Broadcast for Live Update
+            try {
+                if (APP.DataService.getSupabaseClient) {
+                    const channel = APP.DataService.getSupabaseClient().channel('rota-changes-advisor-portal-v3');
+                    channel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: advisorId, date: dateISO } });
+                    APP.DataService.getSupabaseClient().removeChannel(channel);
+                }
+            } catch(err) { console.warn("Broadcast failed", err); }
+
+            // Re-render
+            ScheduleViewer.render(); 
+        }
     };
     
 
