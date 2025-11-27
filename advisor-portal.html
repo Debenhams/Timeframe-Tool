@@ -610,78 +610,75 @@
         flex-grow: 1;
     }
 
-    /* --- Weekly Grid View (Premium Floating Rows) --- */
+    /* --- Weekly Grid View (Clarity Update) --- */
     .team-grid {
         width: 100%;
-        border-collapse: separate; /* Essential for rounded rows */
-        border-spacing: 0 6px; /* Space between advisor rows */
+        border-collapse: separate; 
+        border-spacing: 0 4px; /* Reduced gap slightly for better flow */
         padding-right: 12px;
     }
     
-    /* Glassy Header */
+    /* Sticky Header - Kept the same */
     .team-grid th {
         padding: 16px;
-        text-align: center; /* Centered Dates */
+        text-align: center;
         font-weight: 700;
         color: var(--color-text-muted);
         position: sticky;
         top: 0;
         z-index: 15;
-        background: rgba(249, 250, 251, 0.9);
-        backdrop-filter: blur(8px);
-        border-bottom: 1px solid rgba(0,0,0,0.05);
-        border-right: 1px solid rgba(0,0,0,0.03); /* Header Divider */
+        background: #F9FAFB; /* Solid background to hide scrolling content */
+        border-bottom: 2px solid var(--color-border); /* Stronger header line */
+        border-right: 1px solid rgba(0,0,0,0.05);
     }
-    .team-grid th:first-child { text-align: left; z-index: 20; } /* Keep name header left */
+    .team-grid th:first-child { text-align: left; z-index: 20; left: 0; } 
 
-    /* Floating Rows with Vertical Lines */
-    .team-grid td {
-        padding: 14px 8px; /* Slightly tighter padding */
-        border: none;
-        border-right: 1px solid rgba(0,0,0,0.06); /* Vertical Grid Line */
-        background: rgba(255,255,255,0.4);
-        border-bottom: 1px solid rgba(0,0,0,0.02);
-        transition: all 0.2s ease;
-        vertical-align: middle;
-        text-align: center; /* Center Shifts/RDOs */
+    /* === CLARITY FIX: 2-Tone Zebra Striping === */
+    
+    /* Default Row (Odd) - White */
+    .team-grid tbody tr:nth-child(odd) td {
+        background-color: #FFFFFF;
     }
-    /* Rounded ends for the rows + Stronger Name Divider */
+
+    /* Alternating Row (Even) - Subtle Cool Gray */
+    .team-grid tbody tr:nth-child(even) td {
+        background-color: #F3F4F6; /* The "2nd Tone" */
+    }
+
+    /* Standard Cell Styling */
+    .team-grid td {
+        padding: 12px 8px;
+        border: none;
+        /* Vertical Divider between days */
+        border-right: 1px solid rgba(0,0,0,0.08); 
+        vertical-align: middle;
+        text-align: center;
+        transition: background-color 0.1s ease;
+    }
+
+    /* Rounded Ends for the "Floating" Look */
     .team-grid td:first-child { 
-        border-radius: 10px 0 0 10px; 
-        background: rgba(255,255,255,0.6); 
+        border-radius: 8px 0 0 8px;
         font-weight: 600; 
         text-align: left; 
         padding-left: 16px;
-        border-right: 2px solid rgba(0,0,0,0.08); /* Stronger divider after name */
-    }
-    .team-grid td:last-child { 
-        border-radius: 0 10px 10px 0; 
-        border-right: none; /* No border on the far right */
-    }
-
-    /* Hover Spotlight */
-    .team-grid tbody tr:hover td {
-        background-color: #FFFFFF !important;
-        box-shadow: 0 8px 20px rgba(0,0,0,0.06);
-        transform: scale(1.005);
-        cursor: default;
-        border-right-color: rgba(0,0,0,0.03); /* Faint lines on hover */
-    }
-    
-    /* Sticky Name Column for Weekly Grid */
-    .team-grid th:first-child {
-        left: 0;
-        z-index: 20;
-    }
-    .team-grid td:first-child {
+        border-right: 2px solid rgba(0,0,0,0.1); /* Stronger divider after name */
         position: sticky;
         left: 0;
-        background-color: #fff;
         z-index: 10;
-     }
+        /* Ensure the name column also gets the zebra color */
+        background-color: inherit; 
+    }
+    .team-grid td:last-child { 
+        border-radius: 0 8px 8px 0;
+        border-right: none; 
+    }
 
+    /* === INTERACTIVE RULER (Hover Effect) === */
+    /* When hovering a row, turn the WHOLE row a distinct blue */
     .team-grid tbody tr:hover td {
-        background-color: var(--color-hover-bg);
+        background-color: #DBEAFE !important; /* Brand Blue Tint */
+        cursor: default;
     }
 
     .weekly-shift-time {
