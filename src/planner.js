@@ -1288,17 +1288,12 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
      * trimmed or expanded by the normalization logic.
      */
     const isAnchored = (componentId) => {
+        if (!componentId) return false;
         const component = APP.StateManager.getComponentById(componentId);
-        // Check for component and component.name
         if (!component || !component.name) return false;
-        
-        // Convert NAME to uppercase for a case-insensitive comparison
-        const componentName = component.name.toUpperCase();
-        
-        // --- THIS IS THE FIX ---
-        // We now check if the name *includes* these words.
-        // This will anchor "Break", "AM Break", "Lunch", "Paid Lunch", etc.
-        return componentName.includes('BREAK') || componentName.includes('LUNCH');
+        const name = component.name.toUpperCase().trim();
+        // Anchor Breaks and Lunches to prevents them from being auto-trimmed
+        return name.includes('BREAK') || name.includes('LUNCH');
     };
     SequentialBuilder.initialize = () => {
         // Modal Elements
@@ -1656,23 +1651,31 @@ ELS.exceptionReasonGroup.style.display = 'none';
         const durationToRedistribute = stone.duration_min;
         const newSegments = JSON.parse(JSON.stringify(segments));
         
-        // FIX: Distribute time LOCALLY to neighbors (Left/Right) to prevent downstream shifting
-        // This ensures the "hole" is filled immediately by the surrounding activity
         const leftIndex = indexToRemove - 1;
         const rightIndex = indexToRemove + 1;
         
-        // Try giving time to Left Neighbor first
+        // 1. Try giving time to Left Neighbor (If it's Work)
         if (leftIndex >= 0 && !isAnchored(newSegments[leftIndex].component_id)) {
             newSegments[leftIndex].duration_min += durationToRedistribute;
         } 
-        // Else try Right Neighbor
+        // 2. Else try Right Neighbor (If it's Work)
         else if (rightIndex < newSegments.length && !isAnchored(newSegments[rightIndex].component_id)) {
             newSegments[rightIndex].duration_min += durationToRedistribute;
         }
-        // If both are anchored (e.g., Break next to Lunch), global normalization (below) will handle it as fallback.
+        // 3. FALLBACK: Force-feed to Left Neighbor (Even if Anchored/Lunch)
+        // This prevents the "Vacuum" effect where the whole schedule shifts left.
+        // When you drop the stone back, it will carve this time back out.
+        else if (leftIndex >= 0) {
+            newSegments[leftIndex].duration_min += durationToRedistribute;
+        }
+        // 4. Fallback: Force-feed to Right
+        else if (rightIndex < newSegments.length) {
+            newSegments[rightIndex].duration_min += durationToRedistribute;
+        }
 
         newSegments.splice(indexToRemove, 1); 
-        // Gap closes, fuse neighbors, then normalize
+        
+        // Fuse and normalize (though normalize shouldn't be needed if logic holds)
         let fused = fuseNeighbors(newSegments);
         return normalizeShiftLength(fused);
     };
@@ -1712,7 +1715,7 @@ ELS.exceptionReasonGroup.style.display = 'none';
     };
 
     // --- INTERACTION HANDLERS ---
-// NEW FUNCTION: Replaces time instead of inserting
+// FIX: "Carve" logic replaces time instead of inserting, preventing Lunch from moving.
     const carveOutTime = (baseSegments, componentId, newDuration, insertTimeAbs) => {
         let segments = JSON.parse(JSON.stringify(baseSegments));
         let runningTime = BUILDER_STATE.startTimeMin;
@@ -1727,24 +1730,23 @@ ELS.exceptionReasonGroup.style.display = 'none';
             // Is this the segment we're dropping onto?
             if (!inserted && insertTimeAbs >= segStart && insertTimeAbs < segEnd) {
                 
-                // This is the target segment.
-                // It MUST be flexible.
+                // 1. Validation: Can we modify this segment?
                 if (isAnchored(seg.component_id)) {
-                    APP.Utils.showToast("Cannot modify an anchored segment (Break/Lunch).", "warning");
-                    return null; // Return null to indicate failure
+                    // Cannot drop onto a Break/Lunch/Anchor
+                    return null; 
                 }
                 
-                // Calculate the remaining duration *after* the new block is placed
+                // 2. Calculation: Does it fit?
                 const part1Duration = insertTimeAbs - segStart;
                 const part2Duration = segEnd - (insertTimeAbs + newDuration);
 
-                // Check if there's enough space
+                // If negative, it means we are pushing past the segment boundary (e.g. into Lunch)
                 if (part2Duration < 0) {
-                     APP.Utils.showToast(`Not enough space. Needs ${newDuration}m.`, "warning");
-                     return null; // Return null to indicate failure
+                     // Not enough space in this specific block
+                     return null; 
                 }
 
-                // Rebuild the segment
+                // 3. Reconstruction: Work -> Break -> Work
                 if (part1Duration > 0) {
                     result.push({ component_id: seg.component_id, duration_min: part1Duration });
                 }
@@ -1755,20 +1757,18 @@ ELS.exceptionReasonGroup.style.display = 'none';
                 
                 inserted = true;
             } else {
-                // This is not the target segment, just add it.
+                // Not the target, just copy it
                 result.push(seg);
             }
             runningTime += seg.duration_min;
         }
         
-        if (!inserted) {
-             console.error("carveOutTime failed to find an insertion point.");
-             return null;
-        }
+        if (!inserted) return null;
 
-        // Clean up by fusing any new neighbors
+        // Fuse neighbors to keep the list clean
         return fuseNeighbors(result);
     };
+
     const handleTimelineMouseDown = (e) => {
         const handle = e.target.closest('.ve-drag-handle');
         const segmentEl = e.target.closest('.ve-segment');
@@ -1782,117 +1782,109 @@ ELS.exceptionReasonGroup.style.display = 'none';
                 segmentIndex: index,
                 startX: e.clientX,
                 startDuration: BUILDER_STATE.segments[index].duration_min,
-                baseSegments: JSON.parse(JSON.stringify(BUILDER_STATE.segments))
+                baseSegments: JSON.parse(JSON.stringify(BUILDER_STATE.segments)),
+                lastVal: -1 // Init performance tracker
             };
         } else if (segmentEl) {
-            // === START POTENTIAL-MOVE ===
-            // This is the fix for the click-vs-drag issue.
-            // We are no longer blocking anchored items here.
+            // === START MOVE (WITH LIFT) ===
             e.preventDefault();
             const index = parseInt(segmentEl.dataset.index, 10);
-
+            
+            // 1. Snapshot the "Stone" (The item moving)
             const stone = BUILDER_STATE.segments[index];
+            
+            // 2. Create the "Water" (Timeline without the stone)
+            // liftStone handles the "healing" so neighbors don't shift
             const baseWater = liftStone(BUILDER_STATE.segments, index);
             
             BUILDER_STATE.interaction = {
-                type: 'potential-move', // <-- Set to 'potential-move'
-                startX: e.clientX,         // <-- Store startX
+                type: 'potential-move', // Deadzone state
+                startX: e.clientX,
                 draggedSegment: stone,
-                baseSegments: baseWater
+                baseSegments: baseWater,
+                lastVal: -1 // Init performance tracker
             };
         }
     };
 
     const handleGlobalMouseMove = (e) => {
-        const { type } = BUILDER_STATE.interaction;
+        const { type, startX } = BUILDER_STATE.interaction;
 
-        // --- NEW "POTENTIAL-MOVE" PROMOTION LOGIC ---
-        // This is the fix for the click-vs-drag issue.
+        // 1. Deadzone Check (Prevents blocks disappearing on simple clicks)
+        // User must drag at least 5 pixels to start the move
         if (type === 'potential-move') {
-            const { startX } = BUILDER_STATE.interaction;
             const pixelDiff = Math.abs(e.clientX - startX);
-            
-            // Only promote to a "move" if mouse moves more than 5 pixels
             if (pixelDiff > 5) {
-                BUILDER_STATE.interaction.type = 'move'; // <-- Promote to 'move'
-                // We re-call handleGlobalMouseMove to immediately start the move logic
-                handleGlobalMouseMove(e); 
-                return;
+                BUILDER_STATE.interaction.type = 'move';
+                handleGlobalMouseMove(e); // Trigger logic immediately
             }
-            // If not over threshold, do nothing. Wait.
             return; 
         }
-        // --- END NEW LOGIC ---
 
         if (!type || !ELS.visualEditorTimeline) return;
-
+        
         const rect = ELS.visualEditorTimeline.getBoundingClientRect();
         const pipeCapacity = BUILDER_STATE.fixedShiftLength;
         
         if (type === 'resize') {
             // === HANDLE RESIZE ===
-            const { startX, startDuration, segmentIndex, baseSegments } = BUILDER_STATE.interaction;
+            const { startDuration, segmentIndex, baseSegments } = BUILDER_STATE.interaction;
             const pixelDiff = e.clientX - startX;
-            // Calculate minutes delta based on pixels
             const pxPerMin = rect.width / pipeCapacity;
             const minDiff = Math.round(pixelDiff / pxPerMin / 5) * 5;
-            // Snap to 5m
-
             let newDuration = Math.max(5, startDuration + minDiff);
-            // Clone base segments to manipulate
+            
+            // Performance: Only render if value actually changed
+            if (BUILDER_STATE.interaction.lastVal === newDuration) return;
+            BUILDER_STATE.interaction.lastVal = newDuration;
+
             let workingSegments = JSON.parse(JSON.stringify(baseSegments));
             workingSegments[segmentIndex].duration_min = newDuration;
             
-            // Apply fixed shift logic (Trim or Extend end)
+            // Normalize handles the push/pull of neighbors
             BUILDER_STATE.segments = normalizeShiftLength(workingSegments);
             renderTimeline();
 
         } else if (type === 'move') {
-            // === HANDLE MOVE (STONE) ===
+            // === HANDLE MOVE ===
             let relativeX = e.clientX - rect.left;
             relativeX = Math.max(0, Math.min(relativeX, rect.width));
             const pct = relativeX / rect.width;
             const relativeMinutes = Math.round(pct * pipeCapacity);
-            const snappedMinutes = Math.round(relativeMinutes / 5) * 5;
+            const snappedMinutes = Math.round(relativeMinutes / 5) * 5; // Snap to 5m
             const insertTimeAbs = BUILDER_STATE.startTimeMin + snappedMinutes;
 
-            // Check if insertion point is inside an anchored segment
-            let runningTime = BUILDER_STATE.startTimeMin;
-            let isInsideAnchored = false;
-            // We check against the 'baseSegments' (the timeline *without* the stone)
-            for (const seg of BUILDER_STATE.interaction.baseSegments) {
-                const segStart = runningTime;
-                const segEnd = runningTime + seg.duration_min;
-                if (isAnchored(seg.component_id) && insertTimeAbs > segStart && insertTimeAbs < segEnd) {
-                    isInsideAnchored = true;
-                    break;
-                }
-                runningTime += seg.duration_min;
-            }
+            // Performance: Only render if time actually changed
+            if (BUILDER_STATE.interaction.lastVal === insertTimeAbs) return;
+            BUILDER_STATE.interaction.lastVal = insertTimeAbs;
 
-            if (isInsideAnchored) {
-                // Don't render the change, just return
-                return;
-            }
+            // Safety: Ensure we aren't dropping out of bounds
+            if (insertTimeAbs < BUILDER_STATE.startTimeMin || insertTimeAbs >= (BUILDER_STATE.startTimeMin + pipeCapacity)) return;
 
-            const previewSegments = insertStone(
+            // LOGIC FIX: Use 'carveOutTime' to overwrite space (Stable Lunch)
+            // instead of 'insertStone' which wedges and pushes (Moving Lunch)
+            const previewSegments = carveOutTime(
                 BUILDER_STATE.interaction.baseSegments, 
                 BUILDER_STATE.interaction.draggedSegment.component_id, 
                 BUILDER_STATE.interaction.draggedSegment.duration_min, 
                 insertTimeAbs
             );
-            BUILDER_STATE.segments = previewSegments;
-            renderTimeline();
+
+            // Only update if valid (carveOutTime returns null if hitting an Anchor)
+            if (previewSegments) {
+                BUILDER_STATE.segments = previewSegments;
+                renderTimeline();
+            }
         }
     };
 
     const handleGlobalMouseUp = (e) => {
         if (BUILDER_STATE.interaction.type) {
-            // Only save history if it was a completed move or resize
+            // Only save history if it was a real action (not just a click)
             if (BUILDER_STATE.interaction.type === 'move' || BUILDER_STATE.interaction.type === 'resize') {
                 saveVisualHistory();
             }
-            // Reset the interaction state, cancelling any 'potential-move'
+            // Reset state
             BUILDER_STATE.interaction = { type: null };
         }
     };
