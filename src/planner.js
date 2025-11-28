@@ -3303,7 +3303,9 @@ const handleDeleteRotation = async () => {
         // Cache Elements
         ELS.tree = document.getElementById('schedulesTree');
         ELS.treeSearch = document.getElementById('treeSearch');
+        ELS.treeBrandFilter = document.getElementById('treeBrandFilter'); // New
         ELS.btnClearSelection = document.getElementById('btnClearSelection');
+        ELS.btnSelectAll = document.getElementById('btnSelectAll');       // New
         ELS.visualizationContainer = document.getElementById('visualizationContainer');
         ELS.scheduleViewTitle = document.getElementById('scheduleViewTitle');
         ELS.viewToggleGroup = document.getElementById('viewToggleGroup');
@@ -3338,9 +3340,11 @@ const handleDeleteRotation = async () => {
         if (ELS.btnPrevDay) ELS.btnPrevDay.addEventListener('click', () => cycleDay(-1));
         if (ELS.btnNextDay) ELS.btnNextDay.addEventListener('click', () => cycleDay(1));
         // ----------------------------
-        // Event Listeners
+       // Event Listeners
         if (ELS.treeSearch) ELS.treeSearch.addEventListener('input', renderTree);
+        if (ELS.treeBrandFilter) ELS.treeBrandFilter.addEventListener('change', renderTree); // New
         if (ELS.btnClearSelection) ELS.btnClearSelection.addEventListener('click', clearSelection);
+        if (ELS.btnSelectAll) ELS.btnSelectAll.addEventListener('click', selectAllVisible); // New
         if (ELS.tree) ELS.tree.addEventListener('change', handleTreeChange);
         
         if (ELS.plannerDay) ELS.plannerDay.addEventListener('change', () => {
@@ -3441,44 +3445,59 @@ const handleDeleteRotation = async () => {
         }
     };
 
-    // Render the hierarchical team selection tree
+    // Render the hierarchical team selection tree (With Brand Filter)
     const renderTree = () => {
         if (!ELS.tree) return;
         const STATE = APP.StateManager.getState();
         const filter = ELS.treeSearch ? ELS.treeSearch.value.toLowerCase() : '';
-        let html = '';
+        const brandFilter = ELS.treeBrandFilter ? ELS.treeBrandFilter.value : '';
 
+        // 1. Populate Brand Dropdown (Auto-Discovery) if empty
+        if (ELS.treeBrandFilter && ELS.treeBrandFilter.options.length <= 1) {
+            const brands = new Set();
+            STATE.leaders.forEach(l => {
+                if (l.sites && l.sites.name) brands.add(l.sites.name);
+            });
+            Array.from(brands).sort().forEach(brand => {
+                const opt = document.createElement('option');
+                opt.value = brand;
+                opt.textContent = brand;
+                ELS.treeBrandFilter.appendChild(opt);
+            });
+        }
+
+        let html = '';
         const leaders = STATE.leaders.sort((a, b) => a.name.localeCompare(b.name));
         const advisors = STATE.advisors.sort((a, b) => a.name.localeCompare(b.name));
-
+        
         leaders.forEach(leader => {
+            // 2. Apply Brand Filter (Skip leader if brand doesn't match)
+            const site = leader.sites ? leader.sites.name : '';
+            if (brandFilter && site !== brandFilter) return; 
+
             const teamAdvisors = advisors.filter(a => a.leader_id === leader.id);
             
-            // Determine if the leader or any team member matches the filter
+            // 3. Apply Text Filter
             const matchesFilter = !filter || leader.name.toLowerCase().includes(filter) || teamAdvisors.some(a => a.name.toLowerCase().includes(filter));
 
             if (matchesFilter && teamAdvisors.length > 0) {
                 // Check if all advisors in the team are currently selected
                 const allSelected = teamAdvisors.every(a => STATE.selectedAdvisors.has(a.id));
-
-                // Get the site name (if it exists) from the data we fetched in Fix 1
-                const site = leader.sites ? leader.sites.name : '';
                 const siteHTML = site ? `<span class="team-brand">${site}</span>` : '';
 
                 html += `<div class="tree-node-leader">
                     <label>
-                   
-                     <input type="checkbox" class="select-leader" data-leader-id="${leader.id}" ${allSelected ? 'checked' : ''} />
+                        <input type="checkbox" class="select-leader" data-leader-id="${leader.id}" ${allSelected ? 'checked' : ''} />
                         ${leader.name} (Team Leader)
                         ${siteHTML}
                     </label>
                 </div>`;
-
+                
                 teamAdvisors.forEach(adv => {
-                    // Show advisor if filter matches or if the leader matches (to show the whole team)
+                    // Show advisor if filter matches or if the leader matches
                     if (!filter || adv.name.toLowerCase().includes(filter) || leader.name.toLowerCase().includes(filter)) {
                          const isChecked = STATE.selectedAdvisors.has(adv.id);
-                        html += `<div class="tree-node-advisor">
+                         html += `<div class="tree-node-advisor">
                             <label>
                                 <input type="checkbox" class="select-advisor" data-advisor-id="${adv.id}" data-leader-id="${leader.id}" ${isChecked ? 'checked' : ''} />
                                 ${adv.name}
@@ -3488,12 +3507,21 @@ const handleDeleteRotation = async () => {
                 });
             }
         });
-        
-        ELS.tree.innerHTML = html || '<div class="visualization-empty">No teams or advisors found.</div>';
-
-        
+        ELS.tree.innerHTML = html || '<div class="visualization-empty">No teams found.</div>';
     };
-
+const selectAllVisible = () => {
+        // Only select advisors that are currently visible in the tree (respects filters)
+        const visibleCheckboxes = ELS.tree.querySelectorAll('.select-advisor');
+        const STATE = APP.StateManager.getState();
+        
+        visibleCheckboxes.forEach(cb => {
+            cb.checked = true;
+            STATE.selectedAdvisors.add(cb.dataset.advisorId);
+        });
+        
+        renderTree(); // Update UI (Leaders become checked)
+        renderPlannerContent(); // Update Visualization
+    };
     const handleTreeChange = (e) => {
         const target = e.target;
         const STATE = APP.StateManager.getState();
