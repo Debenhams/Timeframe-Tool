@@ -1652,9 +1652,27 @@ ELS.exceptionReasonGroup.style.display = 'none';
     // --- LOGIC: CORE MANIPULATIONS ---
 
     const liftStone = (segments, indexToRemove) => {
+        const stone = segments[indexToRemove];
+        const durationToRedistribute = stone.duration_min;
         const newSegments = JSON.parse(JSON.stringify(segments));
+        
+        // FIX: Distribute time LOCALLY to neighbors (Left/Right) to prevent downstream shifting
+        // This ensures the "hole" is filled immediately by the surrounding activity
+        const leftIndex = indexToRemove - 1;
+        const rightIndex = indexToRemove + 1;
+        
+        // Try giving time to Left Neighbor first
+        if (leftIndex >= 0 && !isAnchored(newSegments[leftIndex].component_id)) {
+            newSegments[leftIndex].duration_min += durationToRedistribute;
+        } 
+        // Else try Right Neighbor
+        else if (rightIndex < newSegments.length && !isAnchored(newSegments[rightIndex].component_id)) {
+            newSegments[rightIndex].duration_min += durationToRedistribute;
+        }
+        // If both are anchored (e.g., Break next to Lunch), global normalization (below) will handle it as fallback.
+
         newSegments.splice(indexToRemove, 1); 
-        // Gap closes, fuse neighbors, then fill gap at the end
+        // Gap closes, fuse neighbors, then normalize
         let fused = fuseNeighbors(newSegments);
         return normalizeShiftLength(fused);
     };
