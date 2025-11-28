@@ -3779,7 +3779,9 @@ const handleDeleteRotation = async () => {
 
             let html = '';
             advisorsToRender.forEach(adv => {
-                html += `<tr><td>${adv.name}</td>`;
+                // Generate Initials
+                const initials = adv.name.split(' ').map(n => n[0]).join('').substring(0,2).toUpperCase();
+                html += `<tr><td><div class="avatar-cell"><div class="avatar-circle">${initials}</div><span>${adv.name}</span></div></td>`;
                 
                 daysOfWeek.forEach(day => {
                     // Use the centralized ScheduleCalculator
@@ -3806,39 +3808,14 @@ const handleDeleteRotation = async () => {
     // Updated to handle source for exception visualization
     const renderWeeklyCell = (segments, source) => {
         if (!segments || segments.length === 0) {
-            return `<div class="weekly-cell-content"><span class="weekly-rdo">RDO</span></div>`;
-        }
-        
-        let shiftCode = 'N/A';
-
-        // If the source is 'rotation', try to find the matching definition code.
-        if (source === 'rotation') {
-            const STATE = APP.StateManager.getState();
-            // Match by structure comparison (requires segments to be sorted consistently)
-            const definition = STATE.shiftDefinitions.find(def => {
-                if (!def.structure) return false;
-                // Ensure comparison is robust by sorting the definition structure as well
-                const sortedDefStructure = JSON.parse(JSON.stringify(def.structure)).sort((a, b) => a.start_min - b.start_min);
-                return JSON.stringify(sortedDefStructure) === JSON.stringify(segments);
-            });
-            if (definition) {
-                shiftCode = definition.code;
-            }
-        } else if (source === 'exception') {
-            // If it's an exception, label it as 'Custom'.
-            shiftCode = 'Custom';
+            return `<div class="weekly-cell-content"><span class="weekly-rdo-pill">RDO</span></div>`;
         }
         
         const startMin = segments[0].start_min;
         const endMin = segments[segments.length - 1].end_min;
         const timeString = `${APP.Utils.formatMinutesToTime(startMin)} - ${APP.Utils.formatMinutesToTime(endMin)}`;
 
-        return `
-            <div class="weekly-cell-content">
-                <span class="weekly-shift-code">${shiftCode}</span>
-                <span class="weekly-shift-time">${timeString}</span>
-            </div>
-        `;
+        return `<div class="weekly-cell-content"><span class="grid-shift-pill">${timeString}</span></div>`;
     };
 
 

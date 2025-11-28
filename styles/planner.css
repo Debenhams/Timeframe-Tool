@@ -767,6 +767,11 @@ tbody tr:hover { background-color: var(--color-hover-bg); }
 /* === WEEKLY VIEW === */
 .weekly-grid { width: 100%; }
 .weekly-grid thead th { position: sticky; top: 0; z-index: 10; }
+/* Visual updates for Advisor-Style Weekly View */
+.avatar-cell { display: flex; align-items: center; gap: 12px; }
+.avatar-circle { width: 32px; height: 32px; background: #DBEAFE; color: #1E40AF; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; }
+.grid-shift-pill { background: #FFFFFF; border: 1px solid #E5E7EB; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; display: inline-block; color: var(--color-text); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.weekly-rdo-pill { display: inline-block; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #9CA3AF; background: #F3F4F6; border: 1px dashed #D1D5DB; min-width: 80px; text-align: center; }
 .weekly-cell { cursor: pointer; }
 .weekly-cell.is-exception { border: 2px solid var(--color-exception); }
 .weekly-cell-content { display: flex; flex-direction: column; align-items: flex-start; }
