@@ -3629,64 +3629,18 @@ const handleDeleteRotation = async () => {
         setupIntradayIndicators(ELS_DAILY);
     };
 
-    // --- NEW: Option 1 Shift Slide Logic ---
+    // --- NEW: Transactional Wizard Prompt ---
     ScheduleViewer.handleRightClick = async (e, advisorId, advisorName) => {
-        e.preventDefault(); // Block default browser menu
-        
-        // 1. Simple Native Prompt
-        const input = prompt(`Shift Schedule for ${advisorName}?\n\nEnter minutes to shift (e.g. 60 or -30):`, "0");
-        if (!input) return;
-        
-        const offset = parseInt(input, 10);
-        if (isNaN(offset) || offset === 0) return;
-
+        e.preventDefault();
+        // 1. Get current context
         const STATE = APP.StateManager.getState();
-        const weekStart = STATE.weekStart;
-        const dayName = STATE.selectedDay;
+        const dayName = STATE.selectedDay; // "Monday", etc.
         
-        // 2. Get current segments (Source of Truth)
-        const { segments } = APP.ScheduleCalculator.calculateSegments(advisorId, dayName, weekStart);
-        
-        if (segments.length === 0) {
-            APP.Utils.showToast("Cannot shift an empty schedule (RDO).", "warning");
-            return;
-        }
-
-        // 3. Apply Offset to ALL segments (Moving the whole bar)
-        const newStructure = segments.map(seg => ({
-            component_id: seg.component_id,
-            start_min: seg.start_min + offset,
-            end_min: seg.end_min + offset
-        }));
-
-        // 4. Save as Exception
-        const dateISO = APP.Utils.getISODateForDayName(weekStart, dayName);
-        
-        const record = {
-            advisor_id: advisorId,
-            exception_date: dateISO,
-            structure: newStructure,
-            reason: `Shifted by ${offset} mins (Lateness/Adjustment)`
-        };
-
-        const result = await APP.DataService.saveRecord('schedule_exceptions', record, 'advisor_id, exception_date');
-        
-        if (!result.error) {
-            APP.StateManager.syncRecord('schedule_exceptions', result.data);
-            APP.StateManager.saveHistory("Shift Schedule");
-            APP.Utils.showToast(`Shifted ${advisorName}'s schedule by ${offset} mins.`, "success");
-            
-            // Broadcast for Live Update
-            try {
-                if (APP.DataService.getSupabaseClient) {
-                    const channel = APP.DataService.getSupabaseClient().channel('rota-changes-advisor-portal-v3');
-                    channel.send({ type: 'broadcast', event: 'schedule_update', payload: { advisor_id: advisorId, date: dateISO } });
-                    APP.DataService.getSupabaseClient().removeChannel(channel);
-                }
-            } catch(err) { console.warn("Broadcast failed", err); }
-
-            // Re-render
-            ScheduleViewer.render(); 
+        // 2. Open the new Wizard instead of the simple Prompt
+        if (APP.Components.MakeUpTimeWizard) {
+            APP.Components.MakeUpTimeWizard.open(advisorId, advisorName, dayName);
+        } else {
+            APP.Utils.showToast("Wizard module not loaded.", "danger");
         }
     };
     
@@ -4233,6 +4187,129 @@ const handleDeleteRotation = async () => {
     APP.Components.ShiftTradeCenter = ShiftTradeCenter;
 }(window.APP));
 
+/**
+ * MODULE: APP.Components.MakeUpTimeWizard
+ * Transactional tool for Lateness/IT Issues.
+ */
+(function(APP) {
+    const Wizard = {};
+    const ELS = {};
+    let CTX = { advisorId: null, advisorName: null, dayName: null, dateISO: null };
+
+    Wizard.initialize = () => {
+        ELS.modal = document.getElementById('makeupTimeModal');
+        ELS.closeBtn = document.getElementById('makeupClose');
+        ELS.saveBtn = document.getElementById('btnSaveMakeup');
+        ELS.paybackDay = document.getElementById('mutPaybackDay');
+        ELS.paybackMethod = document.getElementById('mutPaybackMethod');
+        ELS.customTimeGroup = document.getElementById('mutCustomTimeGroup');
+
+        if (ELS.closeBtn) ELS.closeBtn.addEventListener('click', () => ELS.modal.style.display = 'none');
+        if (ELS.saveBtn) ELS.saveBtn.addEventListener('click', handleSave);
+        if (ELS.paybackMethod) {
+            ELS.paybackMethod.addEventListener('change', (e) => {
+                ELS.customTimeGroup.style.display = e.target.value === 'custom' ? 'block' : 'none';
+            });
+        }
+    };
+
+    Wizard.open = (advisorId, advisorName, dayName) => {
+        if (!ELS.modal) Wizard.initialize();
+        const STATE = APP.StateManager.getState();
+        const weekStart = STATE.weekStart;
+        CTX = { advisorId, advisorName, dayName, dateISO: APP.Utils.getISODateForDayName(weekStart, dayName) };
+
+        // Populate Payback Days (Current Week)
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        ELS.paybackDay.innerHTML = days.map(d => `<option value="${d}" ${d === dayName ? 'selected' : ''}>${d} (${d === dayName ? 'Today' : 'Later'})</option>`).join('');
+        
+        document.getElementById('makeupTitle').textContent = `Manage Lost Time: ${advisorName}`;
+        ELS.modal.style.display = 'flex';
+    };
+
+    const handleSave = async () => {
+        const lostMins = parseInt(document.getElementById('mutLostMinutes').value, 10);
+        const cutType = document.getElementById('mutCutType').value;
+        const reasonType = document.getElementById('mutReason').value;
+        const paybackDay = ELS.paybackDay.value;
+        const paybackMethod = ELS.paybackMethod.value;
+        
+        if (!lostMins || lostMins <= 0) return APP.Utils.showToast("Invalid duration.", "danger");
+
+        // 1. Calculate DEBIT (The Cut) on the Source Day
+        const STATE = APP.StateManager.getState();
+        const debitDateISO = CTX.dateISO;
+        const { segments: debitSegments } = APP.ScheduleCalculator.calculateSegments(CTX.advisorId, CTX.dayName, STATE.weekStart);
+        
+        if (debitSegments.length === 0) return APP.Utils.showToast("Cannot cut time from an empty day.", "danger");
+        
+        // Deep copy for modification
+        const newDebitStructure = JSON.parse(JSON.stringify(debitSegments));
+        
+        if (cutType === 'start') {
+            // Shift Start Forward
+            const first = newDebitStructure[0];
+            first.start_min += lostMins;
+            // If segment consumed, remove it (simplified logic)
+            if (first.start_min >= first.end_min) newDebitStructure.shift();
+        } else {
+            // Shift End Backward
+            const last = newDebitStructure[newDebitStructure.length - 1];
+            last.end_min -= lostMins;
+            if (last.end_min <= last.start_min) newDebitStructure.pop();
+        }
+
+        // 2. Calculate CREDIT (The Add) on the Payback Day
+        const paybackDateISO = APP.Utils.getISODateForDayName(STATE.weekStart, paybackDay);
+        const { segments: creditSegments } = APP.ScheduleCalculator.calculateSegments(CTX.advisorId, paybackDay, STATE.weekStart);
+        let newCreditStructure = JSON.parse(JSON.stringify(creditSegments));
+
+        // Get the default activity ID (or fallback to first component in list)
+        const defaultActivityId = STATE.scheduleComponents.find(c => c.type === 'Activity')?.id || STATE.scheduleComponents[0].id;
+
+        if (paybackMethod === 'extend') {
+            if (newCreditStructure.length === 0) return APP.Utils.showToast("Cannot extend empty day. Use Custom Slot.", "warning");
+            newCreditStructure[newCreditStructure.length - 1].end_min += lostMins;
+        } else if (paybackMethod === 'early') {
+            if (newCreditStructure.length === 0) return APP.Utils.showToast("Cannot extend empty day. Use Custom Slot.", "warning");
+            newCreditStructure[0].start_min -= lostMins;
+        } else if (paybackMethod === 'custom') {
+            const timeStr = document.getElementById('mutCustomTime').value;
+            if (!timeStr) return APP.Utils.showToast("Custom time required.", "danger");
+            const [h, m] = timeStr.split(':').map(Number);
+            const startMin = h * 60 + m;
+            newCreditStructure.push({ component_id: defaultActivityId, start_min: startMin, end_min: startMin + lostMins });
+            newCreditStructure.sort((a,b) => a.start_min - b.start_min); // Keep sorted
+        }
+
+        // 3. TRANSACTIONAL SAVE
+        ELS.saveBtn.textContent = "Processing...";
+        
+        // Save Debit
+        const res1 = await APP.DataService.saveRecord('schedule_exceptions', {
+            advisor_id: CTX.advisorId, exception_date: debitDateISO, structure: newDebitStructure, reason: `${reasonType} (-${lostMins}m)`
+        }, 'advisor_id, exception_date');
+
+        // Save Credit (only if different day or we need to update the same day again)
+        const res2 = await APP.DataService.saveRecord('schedule_exceptions', {
+            advisor_id: CTX.advisorId, exception_date: paybackDateISO, structure: newCreditStructure, reason: `Payback for ${CTX.dayName} (+${lostMins}m)`
+        }, 'advisor_id, exception_date');
+
+        if (!res1.error && !res2.error) {
+            APP.StateManager.syncRecord('schedule_exceptions', res1.data);
+            APP.StateManager.syncRecord('schedule_exceptions', res2.data);
+            APP.Utils.showToast("Time balanced successfully.", "success");
+            ELS.modal.style.display = 'none';
+            ELS.saveBtn.textContent = "Confirm Transaction";
+            APP.Components.ScheduleViewer.render(); // Refresh Grid
+        } else {
+            APP.Utils.showToast("Error saving transaction.", "danger");
+            ELS.saveBtn.textContent = "Confirm Transaction";
+        }
+    };
+
+    APP.Components.MakeUpTimeWizard = Wizard;
+}(window.APP));
 
 /**
  * MODULE: APP.Core
