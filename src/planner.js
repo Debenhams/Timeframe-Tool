@@ -1524,14 +1524,15 @@ ELS.exceptionReasonGroup.style.display = 'none';
         const { startTimeMin, fixedShiftLength } = BUILDER_STATE;
         if (fixedShiftLength === 0) {
             ELS.visualEditorTimeRuler.innerHTML = '';
-            return;
+           return;
         }
         let html = '';
         const endTime = startTimeMin + fixedShiftLength;
         let firstHourMarker = Math.ceil(startTimeMin / 60) * 60;
-        for (let time = firstHourMarker; time < endTime; time += 60) {
+        // FIX: Changed '<' to '<=' to ensure the final hour marker (e.g., 19:00) is drawn
+        for (let time = firstHourMarker; time <= endTime; time += 60) {
             const pct = ((time - startTimeMin) / fixedShiftLength) * 100;
-            if (pct > 0 && pct < 100) {
+            if (pct >= 0 && pct <= 100) {
                 html += `<div class="ve-time-marker" style="left: ${pct}%;">${APP.Utils.formatMinutesToTime(time)}</div>`;
             }
         }
@@ -4205,7 +4206,19 @@ const handleDeleteRotation = async () => {
         ELS.customTimeGroup = document.getElementById('mutCustomTimeGroup');
 
         if (ELS.closeBtn) ELS.closeBtn.addEventListener('click', () => ELS.modal.style.display = 'none');
+        // Cache the new Mid-Time Group
+        ELS.midTimeGroup = document.getElementById('mutMidTimeGroup');
+        ELS.cutType = document.getElementById('mutCutType');
+
+        if (ELS.closeBtn) ELS.closeBtn.addEventListener('click', () => ELS.modal.style.display = 'none');
         if (ELS.saveBtn) ELS.saveBtn.addEventListener('click', handleSave);
+        
+        // Listeners for dynamic inputs
+        if (ELS.cutType) {
+            ELS.cutType.addEventListener('change', (e) => {
+                if (ELS.midTimeGroup) ELS.midTimeGroup.style.display = e.target.value === 'mid' ? 'block' : 'none';
+            });
+        }
         if (ELS.paybackMethod) {
             ELS.paybackMethod.addEventListener('change', (e) => {
                 ELS.customTimeGroup.style.display = e.target.value === 'custom' ? 'block' : 'none';
@@ -4254,14 +4267,48 @@ const handleDeleteRotation = async () => {
         
         if (cutType === 'start') {
             const first = newDebitStructure[0];
-            // Apply Cut
             first.start_min += lostMins;
-            // Validate: If cut consumes the whole block, remove it
             if (first.start_min >= first.end_min) newDebitStructure.shift();
-        } else {
+        } 
+        else if (cutType === 'end') {
             const last = newDebitStructure[newDebitStructure.length - 1];
             last.end_min -= lostMins;
             if (last.end_min <= last.start_min) newDebitStructure.pop();
+        } 
+        else if (cutType === 'mid') {
+            const timeStr = document.getElementById('mutMidTime').value;
+            if (!timeStr) { ELS.saveBtn.textContent = "Confirm Transaction"; return APP.Utils.showToast("Issue Start Time required.", "danger"); }
+            
+            const [h, m] = timeStr.split(':').map(Number);
+            const issueStart = h * 60 + m;
+            const issueEnd = issueStart + lostMins;
+
+            // Find segment that contains the issue
+            const targetIdx = newDebitStructure.findIndex(s => issueStart >= s.start_min && issueStart < s.end_min);
+            
+            if (targetIdx === -1) {
+                ELS.saveBtn.textContent = "Confirm Transaction"; 
+                return APP.Utils.showToast("Selected time is not within a working shift.", "danger");
+            }
+
+            const seg = newDebitStructure[targetIdx];
+            
+            // Check bounds (don't allow cutting past the end of the specific segment)
+            if (issueEnd > seg.end_min) {
+                ELS.saveBtn.textContent = "Confirm Transaction"; 
+                return APP.Utils.showToast("Issue duration exceeds segment limit.", "danger");
+            }
+
+            // Create the Split (Gap)
+            const preSplit = { ...seg, end_min: issueStart };
+            const postSplit = { ...seg, start_min: issueEnd };
+
+            // Remove old segment and insert the two new pieces (if they have valid duration)
+            const replacements = [];
+            if (preSplit.end_min > preSplit.start_min) replacements.push(preSplit);
+            if (postSplit.end_min > postSplit.start_min) replacements.push(postSplit);
+            
+            newDebitStructure.splice(targetIdx, 1, ...replacements);
         }
 
         // 2. Prepare CREDIT (The Add)
