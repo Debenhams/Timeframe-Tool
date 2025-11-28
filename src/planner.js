@@ -3304,6 +3304,10 @@ const handleDeleteRotation = async () => {
         ELS.tree = document.getElementById('schedulesTree');
         ELS.treeSearch = document.getElementById('treeSearch');
         ELS.btnClearSelection = document.getElementById('btnClearSelection');
+        ELS.treeBrandFilter = document.getElementById('treeBrandFilter');
+        ELS.btnSelectAll = document.getElementById('btnSelectAll');
+        if (ELS.treeBrandFilter) ELS.treeBrandFilter.addEventListener('change', renderTree);
+        if (ELS.btnSelectAll) ELS.btnSelectAll.addEventListener('click', selectAllVisible);
         ELS.visualizationContainer = document.getElementById('visualizationContainer');
         ELS.scheduleViewTitle = document.getElementById('scheduleViewTitle');
         ELS.viewToggleGroup = document.getElementById('viewToggleGroup');
@@ -3445,6 +3449,12 @@ const handleDeleteRotation = async () => {
     const renderTree = () => {
         if (!ELS.tree) return;
         const STATE = APP.StateManager.getState();
+        const brandFilter = ELS.treeBrandFilter ? ELS.treeBrandFilter.value : '';
+        // Populate Brand Dropdown if empty
+        if (ELS.treeBrandFilter && ELS.treeBrandFilter.options.length === 1) {
+            const brands = [...new Set(STATE.leaders.map(l => l.sites ? l.sites.name : 'Unknown'))].sort();
+            brands.forEach(b => ELS.treeBrandFilter.innerHTML += `<option value="${b}">${b}</option>`);
+        }
         const filter = ELS.treeSearch ? ELS.treeSearch.value.toLowerCase() : '';
         let html = '';
 
@@ -3453,6 +3463,10 @@ const handleDeleteRotation = async () => {
 
         leaders.forEach(leader => {
             const teamAdvisors = advisors.filter(a => a.leader_id === leader.id);
+
+            // Filter by Brand
+            const leaderSite = leader.sites ? leader.sites.name : 'Unknown';
+            if (brandFilter && leaderSite !== brandFilter) return;
             
             // Determine if the leader or any team member matches the filter
             const matchesFilter = !filter || leader.name.toLowerCase().includes(filter) || teamAdvisors.some(a => a.name.toLowerCase().includes(filter));
@@ -3528,6 +3542,12 @@ const handleDeleteRotation = async () => {
         APP.StateManager.getState().selectedAdvisors.clear();
         renderTree();
         // Render the content based on the selection change
+        renderPlannerContent();
+    };
+    const selectAllVisible = () => {
+        const checkboxes = ELS.tree.querySelectorAll('.select-advisor');
+        checkboxes.forEach(cb => APP.StateManager.getState().selectedAdvisors.add(cb.dataset.advisorId));
+        renderTree();
         renderPlannerContent();
     };
 

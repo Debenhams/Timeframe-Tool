@@ -259,6 +259,10 @@
         <div class="planner-layout">
             <div class="planner-controls card">
                 <h2>Team Selection</h2>
+                <div style="display:flex; gap:4px; margin-bottom:8px;">
+                    <select id="treeBrandFilter" class="form-select" style="flex:1;"><option value="">All Brands</option></select>
+                    <button id="btnSelectAll" class="btn btn-secondary btn-sm" style="white-space:nowrap;">Select All</button>
+                </div>
                 <input type="text" id="treeSearch" class="form-input" placeholder="Filter leaders/advisors...">
                 <button id="btnClearSelection" class="btn btn-secondary btn-sm" style="margin-top: 8px;">Clear All</button>
                 <div class="schedules-tree" id="schedulesTree"></div>
