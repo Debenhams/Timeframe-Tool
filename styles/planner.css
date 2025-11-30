@@ -343,22 +343,16 @@ body.authenticated .app-main-content { display: flex; }
   .dg-tagline { font-size: 20px; }
 }
 
-/* === SIDEBAR NAVIGATION (Structured Glass Upgrade) === */
+/* === SIDEBAR NAVIGATION === */
 .app-sidebar {
   width: var(--sidebar-width);
-  /* Dark Frosted Glass Effect */
-  background: linear-gradient(180deg, rgba(17, 24, 39, 0.85) 0%, rgba(17, 24, 39, 0.95) 100%);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background-color: var(--sidebar-bg);
   color: var(--sidebar-text);
   flex-direction: column;
   flex-shrink: 0;
-  /* Subtle glass border instead of solid line */
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  border-right: 1px solid var(--sidebar-border);
   height: 100vh;
   overflow-y: auto;
-  z-index: 50;
-  box-shadow: 4px 0 30px rgba(0,0,0,0.15); /* Lift off the canvas */
 }
 
 .sidebar-header {
