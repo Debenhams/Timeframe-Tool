@@ -1403,16 +1403,41 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
 
     SequentialBuilder.open = (config) => {
         const sequentialSegments = [];
-        let startTimeMin = 480;
+        let minStart = 420; // Default 07:00
+        let maxEnd = 1140;  // Default 19:00
 
         if (config.structure && config.structure.length > 0) {
             const sortedStructure = JSON.parse(JSON.stringify(config.structure)).sort((a, b) => a.start_min - b.start_min);
-            startTimeMin = sortedStructure[0].start_min;
+            
+            // 1. Calculate dynamic boundaries
+            const firstStart = sortedStructure[0].start_min;
+            const lastEnd = sortedStructure[sortedStructure.length - 1].end_min;
+
+            // Start 1 hour before first block, Snap to hour
+            minStart = Math.floor((firstStart - 60) / 60) * 60;
+            // End 1 hour after last block
+            maxEnd = Math.ceil((lastEnd + 60) / 60) * 60;
+
+            // 2. Build Segments with GAPS
+            let currentTracker = sortedStructure[0].start_min;
+
             sortedStructure.forEach(seg => {
+                // Detect Gap between previous end and current start
+                if (seg.start_min > currentTracker) {
+                    const gapDuration = seg.start_min - currentTracker;
+                    sequentialSegments.push({
+                        component_id: '_GAP_', // Special Internal Marker
+                        duration_min: gapDuration
+                    });
+                }
+                
+                // Add Actual Segment
                 sequentialSegments.push({
                     component_id: seg.component_id,
                     duration_min: seg.end_min - seg.start_min
                 });
+                
+                currentTracker = seg.end_min;
             });
         }
 
@@ -1420,36 +1445,43 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         BUILDER_STATE.mode = config.mode;
         BUILDER_STATE.contextId = config.id;
         BUILDER_STATE.exceptionDate = config.date || null;
-        BUILDER_STATE.startTimeMin = startTimeMin;
+        
+        // 3. Set View State
+        BUILDER_STATE.startTimeMin = minStart; 
         BUILDER_STATE.segments = JSON.parse(JSON.stringify(sequentialSegments));
-        // FIXED PIPE CAPACITY: Locked to initial length
-        BUILDER_STATE.fixedShiftLength = BUILDER_STATE.segments.reduce((sum, s) => sum + s.duration_min, 0);
-        if (BUILDER_STATE.fixedShiftLength === 0) BUILDER_STATE.fixedShiftLength = 60;
+
+        // 4. Set Pipe Capacity to fit the VIEW range (not just the shift)
+        // This ensures the timeline ruler stretches to show the full day
+        BUILDER_STATE.fixedShiftLength = maxEnd - minStart;
+        if (BUILDER_STATE.fixedShiftLength < 60) BUILDER_STATE.fixedShiftLength = 600; // Min 10 hours view
 
         BUILDER_STATE.reason = config.reason || null;
         BUILDER_STATE.visualHistory = [];
         BUILDER_STATE.visualHistoryIndex = -1;
+        
         ELS.modalTitle.textContent = config.title;
         if (ELS.visualEditorContainer) ELS.visualEditorContainer.style.display = 'none';
         if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'none';
         if (ELS.visualEditorControlsGroup) ELS.visualEditorControlsGroup.style.display = 'none';
+
         if (config.mode === 'exception') {
             if (ELS.visualEditorContainer) ELS.visualEditorContainer.style.display = 'block';
             if (ELS.visualEditorControlsGroup) ELS.visualEditorControlsGroup.style.display = 'flex';
             ELS.exceptionReasonGroup.style.display = 'block';
             ELS.modalExceptionReason.value = BUILDER_STATE.reason || '';
             ELS.modalSave.textContent = "Save Exception";
-            // Auto-fuse on load
+            
+            // Initial fuse to clean up neighbors, but respect Gaps
             BUILDER_STATE.segments = fuseNeighbors(BUILDER_STATE.segments);
             
             renderToolbox();
             renderTimeline();
-} else {
+        } else {
             if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'flex';
-ELS.exceptionReasonGroup.style.display = 'none';
+            ELS.exceptionReasonGroup.style.display = 'none';
             ELS.modalSave.textContent = "Save Definition";
             if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
-                ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(startTimeMin), false);
+                ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(minStart), false);
             }
             renderLegacyTable();
         }
@@ -1484,7 +1516,9 @@ ELS.exceptionReasonGroup.style.display = 'none';
     const renderTimeline = () => {
         if (!ELS.visualEditorTimeline) return;
         renderTimeRuler();
+        
         const totalDuration = BUILDER_STATE.fixedShiftLength > 0 ? BUILDER_STATE.fixedShiftLength : 60;
+        
         if (BUILDER_STATE.segments.length === 0) {
             ELS.visualEditorTimeline.innerHTML = '<div style="padding: 16px; color: #6B7280;">Empty Schedule (RDO).</div>';
             renderSummary();
@@ -1493,11 +1527,22 @@ ELS.exceptionReasonGroup.style.display = 'none';
 
         let html = '';
         let currentTime = BUILDER_STATE.startTimeMin;
+        
         BUILDER_STATE.segments.forEach((seg, index) => {
+            const widthPct = (seg.duration_min / totalDuration) * 100;
+
+            // --- GAP HANDLING ---
+            if (seg.component_id === '_GAP_') {
+                // Render transparent spacer
+                html += `<div style="width: ${widthPct}%; height: 100%; pointer-events: none;"></div>`;
+                currentTime += seg.duration_min;
+                return;
+            }
+            // --------------------
+
             const component = APP.StateManager.getComponentById(seg.component_id);
             if (!component) return;
 
-            const widthPct = (seg.duration_min / totalDuration) * 100;
             const startStr = APP.Utils.formatMinutesToTime(currentTime);
             const endStr = APP.Utils.formatMinutesToTime(currentTime + seg.duration_min);
             const tooltip = `${component.name}\n${startStr} - ${endStr}\n(${seg.duration_min}m)`;
@@ -2210,87 +2255,65 @@ return;
         const absoluteTimeSegments = [];
         let currentTime = startTimeMin;
 
-        // --- BEGIN FIX ---
-        let finalSegments;
-        if (BUILDER_STATE.mode === 'exception') { // Apply normalization ONLY for exceptions
-            // For exceptions, we MUST normalize to maintain the fixed shift length
-            const normalized = normalizeShiftLength(segments);
-            // Final check for zero-duration segments (from aggressive trimming)
-            finalSegments = normalized.filter(seg => seg.duration_min > 0);
-        } else {
-            // For definitions, the length is dynamic. DO NOT normalize.
-            // Just filter out any accidental zero-duration segments.
-            finalSegments = segments.filter(seg => seg.duration_min > 0);
-        }
-        // --- END FIX ---
+        // Note: For exceptions with gaps, we skip standard normalization to preserve the gaps visual
+        const segmentsToSave = segments; 
 
-        for (const seg of finalSegments) {
-            if (!seg.component_id) {
-                APP.Utils.showToast("Error: Invalid activity.", "danger");
-                return;
-            }
+        for (const seg of segmentsToSave) {
+            // Calculate times for ALL segments, including gaps, to keep time flowing
             const start = currentTime;
             const end = currentTime + seg.duration_min;
-            absoluteTimeSegments.push({ component_id: seg.component_id, start_min: start, end_min: end });
+            
+            // Only add to DB if it's a REAL component (Not a GAP)
+            if (seg.component_id && seg.component_id !== '_GAP_') {
+                absoluteTimeSegments.push({ 
+                    component_id: seg.component_id, 
+                    start_min: start, 
+                    end_min: end 
+                });
+            }
+            
             currentTime = end;
         }
-
-        // Final check on total duration
-        const finalDuration = currentTime - startTimeMin;
-        if (finalDuration !== BUILDER_STATE.fixedShiftLength) {
-             APP.Utils.showToast(`Warning: Final duration (${finalDuration}m) does not match target (${BUILDER_STATE.fixedShiftLength}m). Saving anyway.`, "warning");
-        }
-
 
         let result;
         if (mode === 'definition') {
             result = await APP.DataService.updateRecord('shift_definitions', { structure: absoluteTimeSegments }, { id: contextId });
-if (!result.error) {
+            if (!result.error) {
                 APP.StateManager.syncRecord('shift_definitions', result.data);
-APP.StateManager.saveHistory("Update Shift Structure");
+                APP.StateManager.saveHistory("Update Shift Structure");
                 APP.Utils.showToast("Shift definition saved.", "success");
                 if (APP.Components.ShiftDefinitionEditor) APP.Components.ShiftDefinitionEditor.render();
-}
+            }
         } else if (mode === 'exception') {
-            const record = { advisor_id: contextId, exception_date: exceptionDate, structure: absoluteTimeSegments, reason: reason ||
-null };
+            const record = { advisor_id: contextId, exception_date: exceptionDate, structure: absoluteTimeSegments, reason: reason || null };
             result = await APP.DataService.saveRecord('schedule_exceptions', record, 'advisor_id, exception_date');
             if (!result.error) {
                 APP.StateManager.syncRecord('schedule_exceptions', result.data);
-APP.StateManager.saveHistory("Save Schedule Exception");
+                APP.StateManager.saveHistory("Save Schedule Exception");
                 APP.Utils.showToast("Schedule exception saved.", "success");
 
-                // --- START OF NEW CODE TO FIX LIVE UPDATE ---
+                // Realtime Trigger
                 try {
-                    // This is the "Walkie-Talkie" channel from the Advisor Portal
                     const channel = APP.DataService.getSupabaseClient().channel('rota-changes-advisor-portal-v3');
-                    
-                    // This sends the "signal" over the channel
                     channel.send({
                         type: 'broadcast',
                         event: 'schedule_update',
                         payload: { 
                             message: 'A schedule was updated', 
-                            advisor_id: contextId, // Tell the portal *who* was updated
+                            advisor_id: contextId, 
                             date: exceptionDate
                         }
                     });
-                    
-                    // We don't need to stay connected, so we unsubscribe.
-                    // This is a "fire-and-forget" message.
                     APP.DataService.getSupabaseClient().removeChannel(channel);
-
                 } catch (e) {
                     console.warn("Realtime broadcast failed:", e);
                 }
-                // --- END OF NEW CODE ---
-
             }
         }
 
         if (result && !result.error) {
             SequentialBuilder.close();
-if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
+            if (APP.Components.ScheduleViewer) APP.Components.ScheduleViewer.render();
         }
     };
 
