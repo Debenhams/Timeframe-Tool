@@ -1419,14 +1419,15 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
             maxEnd = Math.ceil((lastEnd + 60) / 60) * 60;
 
             // 2. Build Segments with GAPS
-            let currentTracker = sortedStructure[0].start_min;
+            // FIX: Start tracking from the VIEW start (minStart), not the Shift Start
+            let currentTracker = minStart;
 
             sortedStructure.forEach(seg => {
-                // Detect Gap between previous end and current start
+                // Detect Gap between tracker and current start
                 if (seg.start_min > currentTracker) {
                     const gapDuration = seg.start_min - currentTracker;
                     sequentialSegments.push({
-                        component_id: '_GAP_', // Special Internal Marker
+                        component_id: '_GAP_', 
                         duration_min: gapDuration
                     });
                 }
@@ -1439,6 +1440,14 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
                 
                 currentTracker = seg.end_min;
             });
+            
+            // Optional: Add trailing gap to fill view
+            if (currentTracker < maxEnd) {
+                 sequentialSegments.push({
+                    component_id: '_GAP_',
+                    duration_min: maxEnd - currentTracker
+                });
+            }
         }
 
         BUILDER_STATE.isOpen = true;
@@ -1450,10 +1459,9 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         BUILDER_STATE.startTimeMin = minStart; 
         BUILDER_STATE.segments = JSON.parse(JSON.stringify(sequentialSegments));
 
-        // 4. Set Pipe Capacity to fit the VIEW range (not just the shift)
-        // This ensures the timeline ruler stretches to show the full day
+        // 4. Set Pipe Capacity to fit the VIEW range
         BUILDER_STATE.fixedShiftLength = maxEnd - minStart;
-        if (BUILDER_STATE.fixedShiftLength < 60) BUILDER_STATE.fixedShiftLength = 600; // Min 10 hours view
+        if (BUILDER_STATE.fixedShiftLength < 60) BUILDER_STATE.fixedShiftLength = 600;
 
         BUILDER_STATE.reason = config.reason || null;
         BUILDER_STATE.visualHistory = [];
@@ -1471,8 +1479,7 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
             ELS.modalExceptionReason.value = BUILDER_STATE.reason || '';
             ELS.modalSave.textContent = "Save Exception";
             
-            // Initial fuse to clean up neighbors, but respect Gaps
-            BUILDER_STATE.segments = fuseNeighbors(BUILDER_STATE.segments);
+            // Note: We skip fuseNeighbors here to prevent merging Gaps unexpectedly
             
             renderToolbox();
             renderTimeline();
@@ -1612,82 +1619,76 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         return fused;
     };
 
-    /**
-     * MODIFIED: Ensures total duration equals fixed shift length
-     * by trimming or extending the LAST NON-ANCHORED segment.
-     */
-    const normalizeShiftLength = (segments) => {
+   const normalizeShiftLength = (segments) => {
         let currentTotal = segments.reduce((sum, s) => sum + s.duration_min, 0);
         const target = BUILDER_STATE.fixedShiftLength;
 
         if (currentTotal === target) return segments;
-        
-        // Create a copy to avoid mutation issues
+
+        // Create a copy
         let adjusted = JSON.parse(JSON.stringify(segments));
 
-        // 1. Trim Excess (Drain)
+        // Helper: Check if segment is a GAP
+        const isGap = (id) => id === '_GAP_';
+
+        // 1. Trim Excess
         while (currentTotal > target && adjusted.length > 0) {
             const excess = currentTotal - target;
             
-            // --- MODIFIED LOGIC ---
-            // Find the *largest* non-anchored segment
-            let largestFlexibleIndex = -1;
-            let maxDuration = 0;
+            // PRIORITY: Trim GAPS first
+            let targetIndex = -1;
             
-            for (let i = 0; i < adjusted.length; i++) {
-                if (!isAnchored(adjusted[i].component_id)) {
-                    if (adjusted[i].duration_min > maxDuration) {
-                        maxDuration = adjusted[i].duration_min;
-                        largestFlexibleIndex = i;
+            // Try to find a GAP to trim
+            targetIndex = adjusted.findIndex(s => isGap(s.component_id) && s.duration_min > 0);
+            
+            // If no gap, fallback to largest non-anchored segment (Standard logic)
+            if (targetIndex === -1) {
+                let maxDuration = 0;
+                for (let i = 0; i < adjusted.length; i++) {
+                    if (!isAnchored(adjusted[i].component_id)) {
+                        if (adjusted[i].duration_min > maxDuration) {
+                            maxDuration = adjusted[i].duration_min;
+                            targetIndex = i;
+                        }
                     }
                 }
             }
 
-            if (largestFlexibleIndex === -1) {
-                 console.warn("Normalize: Shift is too long but no non-anchored segments found to trim.");
-                 break; 
-            }
+            if (targetIndex === -1) break; // Nothing left to trim
 
-            const segmentToTrim = adjusted[largestFlexibleIndex];
-
+            const segmentToTrim = adjusted[targetIndex];
             if (segmentToTrim.duration_min > excess) {
-                // Segment is long enough to absorb the excess. Trim it.
                 segmentToTrim.duration_min -= excess;
                 currentTotal -= excess; 
             } else {
-                // Segment is shorter than the excess. Remove it entirely.
                 currentTotal -= segmentToTrim.duration_min;
-                adjusted.splice(largestFlexibleIndex, 1);
+                adjusted.splice(targetIndex, 1);
             }
         }
 
-        // 2. Fill Gap (Refill)
+        // 2. Fill Deficit
         if (currentTotal < target) {
             const deficit = target - currentTotal;
             
-            // Find the *last* non-anchored segment (filling at the end is fine)
-            let lastNonAnchoredIndex = -1;
-            for (let i = adjusted.length - 1; i >= 0; i--) {
-                if (!isAnchored(adjusted[i].component_id)) {
-                    lastNonAnchoredIndex = i;
-                    break;
-                }
+            // PRIORITY: Expand GAPS first
+            let targetIndex = adjusted.findLastIndex(s => isGap(s.component_id));
+            
+            // If no gap, fallback to last non-anchored
+            if (targetIndex === -1) {
+                targetIndex = adjusted.findLastIndex(s => !isAnchored(s.component_id));
             }
 
-            if (lastNonAnchoredIndex !== -1) {
-                // Add the deficit to this segment
-                adjusted[lastNonAnchoredIndex].duration_min += deficit;
+            if (targetIndex !== -1) {
+                adjusted[targetIndex].duration_min += deficit;
                 currentTotal += deficit;
             } else {
-                console.warn("Normalize: Shift is too short but no non-anchored segments found to expand.");
+                // If absolutely nothing can expand, add a GAP at the end
+                adjusted.push({ component_id: '_GAP_', duration_min: deficit });
+                currentTotal += deficit;
             }
         }
         
-        // Filter out any zero-duration segments that might have been created
-        const finalSegments = adjusted.filter(seg => seg.duration_min > 0);
-
-        // We must fuse *after* normalizing to clean up
-        return fuseNeighbors(finalSegments);
+        return fuseNeighbors(adjusted.filter(seg => seg.duration_min > 0));
     };
     
     // --- LOGIC: CORE MANIPULATIONS ---
