@@ -404,6 +404,27 @@
                 </div>
             </div>
             <p class="helper-text">Manage the building blocks for shifts (Activities, Breaks, Lunch, etc.).</p>
+            <div style="display:flex; gap:12px; margin-bottom:16px; align-items:center; background:#F9FAFB; padding:12px; border-radius:8px; border:1px solid #E5E7EB;">
+                <input type="text" id="compManagerSearch" class="form-input" placeholder="Search by name..." style="flex:1;">
+                
+                <select id="compManagerTypeFilter" class="form-select" style="width:160px;">
+                    <option value="">All Types</option>
+                    <option value="Activity">Activity</option>
+                    <option value="Payback">Payback</option>
+                    <option value="Break">Break</option>
+                    <option value="Lunch">Lunch</option>
+                    <option value="Shrinkage">Shrinkage</option>
+                    <option value="Absence">Absence</option>
+                </select>
+
+                <select id="compManagerPaidFilter" class="form-select" style="width:140px;">
+                    <option value="">Any Status</option>
+                    <option value="true">Paid Only</option>
+                    <option value="false">Unpaid Only</option>
+                </select>
+                
+                <button id="compManagerReset" class="btn btn-secondary btn-sm">Reset</button>
+            </div>
             <div class="table-container" id="componentManagerGrid"></div>
         </div>
       </section>

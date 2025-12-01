@@ -756,6 +756,12 @@ return { data, error: null };
         ELS.grid = document.getElementById('componentManagerGrid');
         ELS.btnNew = document.getElementById('btnNewComponent');
         
+        // Filter Elements
+        ELS.filterSearch = document.getElementById('compManagerSearch');
+        ELS.filterType = document.getElementById('compManagerTypeFilter');
+        ELS.filterPaid = document.getElementById('compManagerPaidFilter');
+        ELS.filterReset = document.getElementById('compManagerReset');
+
         // Modal Elements
         ELS.modal = document.getElementById('compCreatorModal');
         ELS.modalBody = document.getElementById('compCreatorBody');
@@ -765,12 +771,41 @@ return { data, error: null };
         if (ELS.btnNew) ELS.btnNew.addEventListener('click', ComponentManager.openLab);
         if (ELS.grid) ELS.grid.addEventListener('click', handleClick);
         if (ELS.closeBtn) ELS.closeBtn.addEventListener('click', () => ELS.modal.style.display = 'none');
+
+        // Filter Listeners
+        if (ELS.filterSearch) ELS.filterSearch.addEventListener('input', ComponentManager.render);
+        if (ELS.filterType) ELS.filterType.addEventListener('change', ComponentManager.render);
+        if (ELS.filterPaid) ELS.filterPaid.addEventListener('change', ComponentManager.render);
+        if (ELS.filterReset) ELS.filterReset.addEventListener('click', () => {
+            ELS.filterSearch.value = '';
+            ELS.filterType.value = '';
+            ELS.filterPaid.value = '';
+            ComponentManager.render();
+        });
     };
 
     ComponentManager.render = () => {
         if (!ELS.grid) return;
         const STATE = APP.StateManager.getState();
-        const components = STATE.scheduleComponents.sort((a,b) => a.name.localeCompare(b.name));
+        let components = STATE.scheduleComponents;
+
+        // --- APPLY FILTERS ---
+        const term = ELS.filterSearch ? ELS.filterSearch.value.toLowerCase().trim() : '';
+        const type = ELS.filterType ? ELS.filterType.value : '';
+        const paid = ELS.filterPaid ? ELS.filterPaid.value : '';
+
+        if (term) components = components.filter(c => c.name.toLowerCase().includes(term));
+        if (type) components = components.filter(c => c.type === type);
+        if (paid !== '') components = components.filter(c => String(c.is_paid) === paid);
+        // ---------------------
+
+        components = components.sort((a,b) => a.name.localeCompare(b.name));
+
+        if (components.length === 0) {
+            ELS.grid.innerHTML = '<div style="padding:20px; text-align:center; color:#6B7280;">No components match your filters.</div>';
+            return;
+        }
+
         let html = '<table><thead><tr><th>Name</th><th>Type</th><th>Color</th><th>Default Duration</th><th>Paid</th><th>Override</th><th>Actions</th></tr></thead><tbody>';
         components.forEach(comp => {
             html += `<tr data-component-id="${comp.id}">
