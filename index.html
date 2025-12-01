@@ -668,5 +668,54 @@
   <script src="./src/planner.js?v=16.11"></script>
   <script src="./src/init.js?v=16.11"></script>
 
+  <div class="modal-backdrop" id="compCreatorModal" style="display:none;">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h2>Component Lab (Batch Creator)</h2>
+            <button class="btn-icon modal-close" id="compCreatorClose">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+        <div class="modal-body" style="display:flex; flex-direction:column; gap:16px;">
+            
+            <div style="display:flex; gap:10px; padding-bottom:16px; border-bottom:1px solid #E5E7EB;">
+                <span style="font-weight:600; align-self:center; margin-right:8px;">Quick Add:</span>
+                <button class="btn btn-secondary btn-sm" onclick="APP.Components.ComponentManager.addDraft('Payback')">+ Payback (Purple)</button>
+                <button class="btn btn-secondary btn-sm" onclick="APP.Components.ComponentManager.addDraft('Shrinkage')">+ Reason/Late (Black)</button>
+                <button class="btn btn-secondary btn-sm" onclick="APP.Components.ComponentManager.addDraft('Activity')">+ Standard Activity</button>
+                <button class="btn btn-secondary btn-sm" onclick="APP.Components.ComponentManager.addDraft('Break')">+ Break/Lunch</button>
+            </div>
+
+            <div class="table-container" style="max-height:400px; overflow-y:auto; margin-top:0;">
+                <table class="builder-grid">
+                    <thead>
+                        <tr>
+                            <th style="width:200px;">Name</th>
+                            <th>Type</th>
+                            <th style="width:60px;">Color</th>
+                            <th style="width:70px;">Mins</th>
+                            <th>Paid?</th>
+                            <th>Full Day?</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="compCreatorBody">
+                        </tbody>
+                </table>
+            </div>
+            
+            <div id="compCreatorEmpty" style="text-align:center; padding:20px; color:#9CA3AF; font-style:italic;">
+                No components queued. Click a "Quick Add" button above to start.
+            </div>
+
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="APP.Components.ComponentManager.addDraft('Empty')">Add Blank Row</button>
+            <div style="flex-grow:1;"></div>
+            <button class="btn btn-primary" onclick="APP.Components.ComponentManager.saveBatch()">Save All Components</button>
+        </div>
+    </div>
+</div>
+
 </body>
 </html>

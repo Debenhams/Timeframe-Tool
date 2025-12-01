@@ -743,17 +743,28 @@ return { data, error: null };
 
 /**
  * MODULE: APP.Components.ComponentManager
- * (No changes, but included for restore integrity)
+ * V16.15: Batch Creator (Component Lab)
  */
 (function(APP) {
     const ComponentManager = {};
     const ELS = {};
+    
+    // Internal State for the "Lab"
+    let DRAFT_COMPONENTS = [];
 
     ComponentManager.initialize = () => {
         ELS.grid = document.getElementById('componentManagerGrid');
         ELS.btnNew = document.getElementById('btnNewComponent');
-        if (ELS.btnNew) ELS.btnNew.addEventListener('click', handleNew);
+        
+        // Modal Elements
+        ELS.modal = document.getElementById('compCreatorModal');
+        ELS.modalBody = document.getElementById('compCreatorBody');
+        ELS.emptyMsg = document.getElementById('compCreatorEmpty');
+        ELS.closeBtn = document.getElementById('compCreatorClose');
+
+        if (ELS.btnNew) ELS.btnNew.addEventListener('click', ComponentManager.openLab);
         if (ELS.grid) ELS.grid.addEventListener('click', handleClick);
+        if (ELS.closeBtn) ELS.closeBtn.addEventListener('click', () => ELS.modal.style.display = 'none');
     };
 
     ComponentManager.render = () => {
@@ -767,6 +778,7 @@ return { data, error: null };
                 <td><span class="display-value">${comp.type}</span>
                    <select class="form-select edit-value" name="comp-type" style="display:none;">
                         <option value="Activity" ${comp.type === 'Activity' ? 'selected' : ''}>Activity</option>
+                        <option value="Payback" ${comp.type === 'Payback' ? 'selected' : ''}>Payback</option>
                         <option value="Break" ${comp.type === 'Break' ? 'selected' : ''}>Break</option>
                         <option value="Lunch" ${comp.type === 'Lunch' ? 'selected' : ''}>Lunch</option>
                         <option value="Shrinkage" ${comp.type === 'Shrinkage' ? 'selected' : ''}>Shrinkage</option>
@@ -800,26 +812,119 @@ return { data, error: null };
         ELS.grid.innerHTML = html;
     };
 
-    const handleNew = async () => {
-        const name = prompt("Enter component name:");
-        if (!name) return;
-        const type = prompt("Enter type (Activity, Break, Lunch, Shrinkage, Absence):", "Activity");
-        const color = prompt("Enter hex color code:", "#3498db");
-        const duration = parseInt(prompt("Enter default duration in minutes:", "60"), 10);
-        const isPaid = confirm("Is this a paid activity?");
-        const isOverride = confirm("Is this a 'Full Day Override' component (e.g., Sick, Holiday)?");
-        if (!name || !type || !color || isNaN(duration)) {
-            APP.Utils.showToast("Invalid input.", "danger");
+    // --- NEW: COMPONENT LAB LOGIC ---
+
+    ComponentManager.openLab = () => {
+        DRAFT_COMPONENTS = [];
+        renderDrafts();
+        ELS.modal.style.display = 'flex';
+    };
+
+    ComponentManager.addDraft = (templateType) => {
+        let draft = { name: '', type: 'Activity', color: '#3B82F6', default_duration_min: 60, is_paid: true, is_full_day_override: false };
+        
+        if (templateType === 'Payback') {
+            draft = { name: 'Work Back - ', type: 'Payback', color: '#8B5CF6', default_duration_min: 60, is_paid: true, is_full_day_override: false };
+        } else if (templateType === 'Shrinkage') {
+            draft = { name: 'Late - ', type: 'Shrinkage', color: '#000000', default_duration_min: 30, is_paid: false, is_full_day_override: false };
+        } else if (templateType === 'Break') {
+            draft = { name: 'Break', type: 'Break', color: '#10B981', default_duration_min: 15, is_paid: true, is_full_day_override: false };
+        }
+        
+        DRAFT_COMPONENTS.push(draft);
+        renderDrafts();
+    };
+
+    const renderDrafts = () => {
+        if (DRAFT_COMPONENTS.length === 0) {
+            ELS.modalBody.innerHTML = '';
+            ELS.emptyMsg.style.display = 'block';
             return;
         }
-        const newComponent = { name, type, color, default_duration_min: duration, is_paid: isPaid, is_full_day_override: isOverride };
-const { data, error } = await APP.DataService.saveRecord('schedule_components', newComponent);
-        if (!error) {
-            APP.StateManager.syncRecord('schedule_components', data);
-            APP.Utils.showToast(`Component '${name}' created.`, "success");
+        ELS.emptyMsg.style.display = 'none';
+        
+        let html = '';
+        DRAFT_COMPONENTS.forEach((d, i) => {
+            html += `
+            <tr>
+                <td><input type="text" class="form-input" value="${d.name}" onchange="APP.Components.ComponentManager.updateDraft(${i}, 'name', this.value)" placeholder="Component Name"></td>
+                <td>
+                    <select class="form-select" onchange="APP.Components.ComponentManager.updateDraft(${i}, 'type', this.value)">
+                        <option value="Activity" ${d.type==='Activity'?'selected':''}>Activity</option>
+                        <option value="Payback" ${d.type==='Payback'?'selected':''}>Payback</option>
+                        <option value="Shrinkage" ${d.type==='Shrinkage'?'selected':''}>Shrinkage</option>
+                        <option value="Break" ${d.type==='Break'?'selected':''}>Break</option>
+                        <option value="Lunch" ${d.type==='Lunch'?'selected':''}>Lunch</option>
+                        <option value="Absence" ${d.type==='Absence'?'selected':''}>Absence</option>
+                    </select>
+                </td>
+                <td><input type="color" class="form-input-color" value="${d.color}" onchange="APP.Components.ComponentManager.updateDraft(${i}, 'color', this.value)"></td>
+                <td><input type="number" class="form-input" value="${d.default_duration_min}" onchange="APP.Components.ComponentManager.updateDraft(${i}, 'default_duration_min', this.value)" style="width:70px;"></td>
+                <td>
+                    <select class="form-select" onchange="APP.Components.ComponentManager.updateDraft(${i}, 'is_paid', this.value)">
+                        <option value="true" ${d.is_paid?'selected':''}>Yes</option>
+                        <option value="false" ${!d.is_paid?'selected':''}>No</option>
+                    </select>
+                </td>
+                <td>
+                    <select class="form-select" onchange="APP.Components.ComponentManager.updateDraft(${i}, 'is_full_day_override', this.value)">
+                        <option value="false" ${!d.is_full_day_override?'selected':''}>No</option>
+                        <option value="true" ${d.is_full_day_override?'selected':''}>Yes</option>
+                    </select>
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-secondary" onclick="APP.Components.ComponentManager.cloneDraft(${i})" title="Duplicate">📋</button>
+                    <button class="btn btn-sm btn-danger" onclick="APP.Components.ComponentManager.removeDraft(${i})" title="Remove">X</button>
+                </td>
+            </tr>`;
+        });
+        ELS.modalBody.innerHTML = html;
+    };
+
+    ComponentManager.updateDraft = (index, field, value) => {
+        if (field === 'is_paid' || field === 'is_full_day_override') value = (value === 'true');
+        if (field === 'default_duration_min') value = parseInt(value, 10);
+        DRAFT_COMPONENTS[index][field] = value;
+    };
+
+    ComponentManager.cloneDraft = (index) => {
+        const clone = JSON.parse(JSON.stringify(DRAFT_COMPONENTS[index]));
+        clone.name += ' (Copy)';
+        DRAFT_COMPONENTS.splice(index + 1, 0, clone);
+        renderDrafts();
+    };
+
+    ComponentManager.removeDraft = (index) => {
+        DRAFT_COMPONENTS.splice(index, 1);
+        renderDrafts();
+    };
+
+    ComponentManager.saveBatch = async () => {
+        if (DRAFT_COMPONENTS.length === 0) return;
+        
+        // Validate
+        for (let d of DRAFT_COMPONENTS) {
+            if (!d.name.trim()) return APP.Utils.showToast("All components must have a name.", "danger");
+        }
+
+        const promises = DRAFT_COMPONENTS.map(d => APP.DataService.saveRecord('schedule_components', d));
+        const results = await Promise.all(promises);
+        
+        const errors = results.filter(r => r.error);
+        if (errors.length > 0) {
+            APP.Utils.showToast(`Saved with ${errors.length} errors.`, "warning");
+        } else {
+            APP.Utils.showToast(`${results.length} components created successfully!`, "success");
+            
+            // Update State
+            results.forEach(r => APP.StateManager.syncRecord('schedule_components', r.data));
+            
+            ELS.modal.style.display = 'none';
             ComponentManager.render();
         }
     };
+
+    // --- STANDARD CRUD (unchanged) ---
 
     const handleClick = (e) => {
         const target = e.target;
@@ -857,7 +962,7 @@ const { data, error } = await APP.DataService.saveRecord('schedule_components', 
             return;
         }
         const updatedComponent = { id: id, name, type, color, default_duration_min: duration, is_paid: isPaid, is_full_day_override: isOverride };
-const { data, error } = await APP.DataService.updateRecord('schedule_components', updatedComponent, { id: id });
+        const { data, error } = await APP.DataService.updateRecord('schedule_components', updatedComponent, { id: id });
         if (!error) {
             APP.StateManager.syncRecord('schedule_components', data);
             APP.Utils.showToast(`Component '${name}' updated.`, "success");
@@ -4295,11 +4400,37 @@ const handleDeleteRotation = async () => {
         const STATE = APP.StateManager.getState();
         const weekStart = STATE.weekStart;
         CTX = { advisorId, advisorName, dayName, dateISO: APP.Utils.getISODateForDayName(weekStart, dayName) };
-
-        // Populate Payback Days (Current Week)
+        
+        // 1. Populate Payback Days
         const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         ELS.paybackDay.innerHTML = days.map(d => `<option value="${d}" ${d === dayName ? 'selected' : ''}>${d} (${d === dayName ? 'Today' : 'Later'})</option>`).join('');
         
+        // 2. Populate "Reasons" (Shrinkage)
+        const shrinkageComps = STATE.scheduleComponents.filter(c => c.type === 'Shrinkage').sort((a,b) => a.name.localeCompare(b.name));
+        const reasonSelect = document.getElementById('mutReason');
+        if (reasonSelect) {
+            reasonSelect.innerHTML = shrinkageComps.length > 0 ? 
+                shrinkageComps.map(c => `<option value="${c.id}">${c.name}</option>`).join('') : 
+                `<option value="">No Shrinkage Found</option>`;
+        }
+
+        // 3. Populate "Payback Activities" (Priority: Type='Payback', Fallback: Type='Activity')
+        // This is the smart filter you asked for.
+        let paybackComps = STATE.scheduleComponents.filter(c => c.type === 'Payback');
+        if (paybackComps.length === 0) {
+            // Fallback if you haven't made them yet
+            paybackComps = STATE.scheduleComponents.filter(c => c.type === 'Activity');
+        }
+        
+        paybackComps.sort((a,b) => a.name.localeCompare(b.name));
+        
+        const paybackSelect = document.getElementById('mutPaybackActivity');
+        if (paybackSelect) {
+            paybackSelect.innerHTML = paybackComps.length > 0 ? 
+                paybackComps.map(c => `<option value="${c.id}">${c.name}</option>`).join('') : 
+                `<option value="">No Payback/Activity Found</option>`;
+        }
+
         document.getElementById('makeupTitle').textContent = `Manage Lost Time: ${advisorName}`;
         ELS.modal.style.display = 'flex';
     };
