@@ -1620,7 +1620,7 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
     };
 
    /**
-     * HYBRID: Uses Original Logic for standard shifts, New Logic for Lateness gaps.
+     * HYBRID V2: Restores "Water Pipe" healing (Neighbors expand before Gaps).
      */
     const normalizeShiftLength = (segments) => {
         let currentTotal = segments.reduce((sum, s) => sum + s.duration_min, 0);
@@ -1630,103 +1630,59 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
 
         // Create copy
         let adjusted = JSON.parse(JSON.stringify(segments));
+        const isGap = (id) => id === '_GAP_';
         
-        // CHECK: Does this shift have a Lateness Gap?
-        const hasGap = adjusted.some(s => s.component_id === '_GAP_');
-
-        // === PATH A: NEW LOGIC (Only runs if a Gap exists) ===
-        if (hasGap) {
-            const isGap = (id) => id === '_GAP_';
+        // 1. Trim Excess (When adding new blocks)
+        while (currentTotal > target && adjusted.length > 0) {
+            const excess = currentTotal - target;
             
-            // 1. Trim (Prioritize shrinking gaps)
-            while (currentTotal > target && adjusted.length > 0) {
-                const excess = currentTotal - target;
-                let targetIndex = adjusted.findIndex(s => isGap(s.component_id) && s.duration_min > 0);
-                
-                // Fallback to standard trim if no gap space left
-                if (targetIndex === -1) {
-                    let maxDuration = 0;
-                    for (let i = 0; i < adjusted.length; i++) {
-                        if (!isAnchored(adjusted[i].component_id)) {
-                            if (adjusted[i].duration_min > maxDuration) {
-                                maxDuration = adjusted[i].duration_min;
-                                targetIndex = i;
-                            }
+            // Priority: Trim GAPS first
+            let targetIndex = adjusted.findIndex(s => isGap(s.component_id) && s.duration_min > 0);
+            
+            // Fallback: Trim Work blocks
+            if (targetIndex === -1) {
+                let maxDuration = 0;
+                for (let i = 0; i < adjusted.length; i++) {
+                    if (!isAnchored(adjusted[i].component_id)) {
+                        if (adjusted[i].duration_min > maxDuration) {
+                            maxDuration = adjusted[i].duration_min;
+                            targetIndex = i;
                         }
                     }
                 }
-                if (targetIndex === -1) break;
-
-                const segmentToTrim = adjusted[targetIndex];
-                if (segmentToTrim.duration_min > excess) {
-                    segmentToTrim.duration_min -= excess;
-                    currentTotal -= excess; 
-                } else {
-                    currentTotal -= segmentToTrim.duration_min;
-                    adjusted.splice(targetIndex, 1);
-                }
             }
 
-            // 2. Expand (Prioritize expanding gaps)
-            if (currentTotal < target) {
-                const deficit = target - currentTotal;
-                let targetIndex = adjusted.findLastIndex(s => isGap(s.component_id));
-                if (targetIndex === -1) targetIndex = adjusted.findLastIndex(s => !isAnchored(s.component_id));
+            if (targetIndex === -1) break;
 
-                if (targetIndex !== -1) {
-                    adjusted[targetIndex].duration_min += deficit;
-                    currentTotal += deficit;
-                } else {
-                    adjusted.push({ component_id: '_GAP_', duration_min: deficit });
-                    currentTotal += deficit;
-                }
-            }
-            return fuseNeighbors(adjusted.filter(seg => seg.duration_min > 0));
-        }
-
-        // === PATH B: ORIGINAL LOGIC (Restored for Standard Shifts) ===
-        // This is your original "Water Pipe" logic that prevents knock-on effects
-        
-        // 1. Trim Excess
-        while (currentTotal > target && adjusted.length > 0) {
-            const excess = currentTotal - target;
-            let largestFlexibleIndex = -1;
-            let maxDuration = 0;
-            
-            for (let i = 0; i < adjusted.length; i++) {
-                if (!isAnchored(adjusted[i].component_id)) {
-                    if (adjusted[i].duration_min > maxDuration) {
-                        maxDuration = adjusted[i].duration_min;
-                        largestFlexibleIndex = i;
-                    }
-                }
-            }
-
-            if (largestFlexibleIndex === -1) break;
-
-            const segmentToTrim = adjusted[largestFlexibleIndex];
+            const segmentToTrim = adjusted[targetIndex];
             if (segmentToTrim.duration_min > excess) {
                 segmentToTrim.duration_min -= excess;
                 currentTotal -= excess; 
             } else {
                 currentTotal -= segmentToTrim.duration_min;
-                adjusted.splice(largestFlexibleIndex, 1);
+                adjusted.splice(targetIndex, 1);
             }
         }
 
-        // 2. Fill Gap
+        // 2. Fill Deficit (When lifting/moving blocks)
         if (currentTotal < target) {
             const deficit = target - currentTotal;
-            let lastNonAnchoredIndex = -1;
-            for (let i = adjusted.length - 1; i >= 0; i--) {
-                if (!isAnchored(adjusted[i].component_id)) {
-                    lastNonAnchoredIndex = i;
-                    break;
-                }
+            
+            // PRIORITY FIX: Try to expand a WORK block first (Restore Water Pipe Physics)
+            // This ensures the shift "heals" (snaps together) when you move blocks.
+            let targetIndex = adjusted.findLastIndex(s => !isGap(s.component_id) && !isAnchored(s.component_id));
+            
+            // Only if no work block exists, try expanding a Gap
+            if (targetIndex === -1) {
+                targetIndex = adjusted.findLastIndex(s => isGap(s.component_id));
             }
 
-            if (lastNonAnchoredIndex !== -1) {
-                adjusted[lastNonAnchoredIndex].duration_min += deficit;
+            if (targetIndex !== -1) {
+                adjusted[targetIndex].duration_min += deficit;
+                currentTotal += deficit;
+            } else {
+                // Last resort: Add a gap at the end to ensure we never shrink the view
+                adjusted.push({ component_id: '_GAP_', duration_min: deficit });
                 currentTotal += deficit;
             }
         }
