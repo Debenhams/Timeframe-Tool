@@ -3631,18 +3631,58 @@ const handleDeleteRotation = async () => {
     };
 
     // --- NEW: Transactional Wizard Prompt ---
-    ScheduleViewer.handleRightClick = async (e, advisorId, advisorName) => {
-        e.preventDefault();
-        // 1. Get current context
-        const STATE = APP.StateManager.getState();
-        const dayName = STATE.selectedDay; // "Monday", etc.
-        
-        // 2. Open the new Wizard instead of the simple Prompt
-        if (APP.Components.MakeUpTimeWizard) {
-            APP.Components.MakeUpTimeWizard.open(advisorId, advisorName, dayName);
-        } else {
-            APP.Utils.showToast("Wizard module not loaded.", "danger");
-        }
+    ScheduleViewer.handleRightClick = (e, advisorId, advisorName) => {
+        e.preventDefault(); // Stop the browser menu
+
+        const menu = document.getElementById('plannerContextMenu');
+        if (!menu) return;
+
+        // 1. Position and Show the Menu
+        menu.style.display = 'block';
+        menu.style.left = `${e.clientX}px`;
+        menu.style.top = `${e.clientY}px`;
+
+        // 2. Wire "Log Lateness" Button
+        const btnLog = document.getElementById('ctxLogLateness');
+        btnLog.onclick = () => {
+            menu.style.display = 'none';
+            const dayName = APP.StateManager.getState().selectedDay;
+            // Open the Wizard (Existing Logic)
+            if (APP.Components.MakeUpTimeWizard) {
+                APP.Components.MakeUpTimeWizard.open(advisorId, advisorName, dayName);
+            }
+        };
+
+        // 3. Wire "Edit Structure" Button
+        const btnEdit = document.getElementById('ctxEditShift');
+        btnEdit.onclick = () => {
+            menu.style.display = 'none';
+            const STATE = APP.StateManager.getState();
+            // Calculate data to pass to the builder
+            const dateISO = APP.Utils.getISODateForDayName(STATE.weekStart, STATE.selectedDay);
+            const weekStartISO = APP.Utils.getMondayForDate(dateISO);
+            const { segments, reason } = APP.ScheduleCalculator.calculateSegments(advisorId, STATE.selectedDay, weekStartISO);
+            
+            // Open the Visual Builder
+            if (APP.Components.SequentialBuilder) {
+                APP.Components.SequentialBuilder.open({
+                    mode: 'exception',
+                    id: advisorId,
+                    date: dateISO,
+                    title: `Edit Schedule: ${advisorName} (${STATE.selectedDay})`,
+                    structure: segments,
+                    reason: reason
+                });
+            }
+        };
+
+        // 4. Close menu when clicking anywhere else
+        const closeMenu = () => {
+            menu.style.display = 'none';
+            document.removeEventListener('click', closeMenu);
+        };
+        // Delay the listener slightly so the right-click itself doesn't close it
+        setTimeout(() => document.addEventListener('click', closeMenu), 0);
     };
     
 
@@ -4246,119 +4286,148 @@ const handleDeleteRotation = async () => {
         const reasonType = document.getElementById('mutReason').value;
         const paybackDay = ELS.paybackDay.value;
         const paybackMethod = ELS.paybackMethod.value;
-        
+
         if (!lostMins || lostMins <= 0) return APP.Utils.showToast("Invalid duration.", "danger");
 
         ELS.saveBtn.textContent = "Processing...";
 
-        // 1. Prepare DEBIT (The Cut)
+        // 1. Identify Components (Black Block vs Payback Block)
         const STATE = APP.StateManager.getState();
-        const debitDateISO = CTX.dateISO;
+        const comps = STATE.scheduleComponents;
+        
+        // Find Debit Comp (Lateness): Try matching reason name, then 'Lateness', then any Shrinkage
+        const debitComp = comps.find(c => c.name === reasonType) || 
+                          comps.find(c => c.name.toLowerCase().includes('lateness')) || 
+                          comps.find(c => c.type === 'Shrinkage') || comps[0];
+
+        // Find Credit Comp (Payback): Try 'Payback', 'Overtime', or fallback to Activity
+        const creditComp = comps.find(c => c.name.toLowerCase().includes('payback')) || 
+                           comps.find(c => c.name.toLowerCase().includes('overtime')) || 
+                           comps.find(c => c.type === 'Activity') || comps[0];
+
+        // 2. Prepare DEBIT (The Cut & Insert)
         // Force calculation from fresh state to ensure we aren't editing stale data
         const { segments: debitSegments } = APP.ScheduleCalculator.calculateSegments(CTX.advisorId, CTX.dayName, STATE.weekStart);
-        
         if (debitSegments.length === 0) {
             ELS.saveBtn.textContent = "Confirm Transaction";
             return APP.Utils.showToast("Cannot cut time from an empty day.", "danger");
         }
         
-        // Deep copy
+        // Deep copy structure
         const newDebitStructure = JSON.parse(JSON.stringify(debitSegments));
-        
+
         if (cutType === 'start') {
             const first = newDebitStructure[0];
+            const originalStart = first.start_min;
+            // Shrink the working shift
             first.start_min += lostMins;
-            if (first.start_min >= first.end_min) newDebitStructure.shift();
-        } 
-        else if (cutType === 'end') {
+            
+            // Insert the Black Block (Lateness) in the gap
+            newDebitStructure.unshift({
+                component_id: debitComp.id,
+                start_min: originalStart,
+                end_min: originalStart + lostMins
+            });
+
+            // Cleanup if shift was completely consumed
+            if (first.start_min >= first.end_min) newDebitStructure.splice(1, 1);
+
+        } else if (cutType === 'end') {
             const last = newDebitStructure[newDebitStructure.length - 1];
+            const originalEnd = last.end_min;
+            // Shrink
             last.end_min -= lostMins;
-            if (last.end_min <= last.start_min) newDebitStructure.pop();
-        } 
-        else if (cutType === 'mid') {
+            
+            // Insert Black Block
+            newDebitStructure.push({
+                component_id: debitComp.id,
+                start_min: originalEnd - lostMins,
+                end_min: originalEnd
+            });
+
+            if (last.end_min <= last.start_min) newDebitStructure.splice(newDebitStructure.length - 2, 1);
+
+        } else if (cutType === 'mid') {
             const timeStr = document.getElementById('mutMidTime').value;
             if (!timeStr) { ELS.saveBtn.textContent = "Confirm Transaction"; return APP.Utils.showToast("Issue Start Time required.", "danger"); }
             
             const [h, m] = timeStr.split(':').map(Number);
             const issueStart = h * 60 + m;
             const issueEnd = issueStart + lostMins;
-
-            // Find segment that contains the issue
-            const targetIdx = newDebitStructure.findIndex(s => issueStart >= s.start_min && issueStart < s.end_min);
             
+            const targetIdx = newDebitStructure.findIndex(s => issueStart >= s.start_min && issueStart < s.end_min);
             if (targetIdx === -1) {
-                ELS.saveBtn.textContent = "Confirm Transaction"; 
+                ELS.saveBtn.textContent = "Confirm Transaction";
                 return APP.Utils.showToast("Selected time is not within a working shift.", "danger");
             }
 
             const seg = newDebitStructure[targetIdx];
-            
-            // Check bounds (don't allow cutting past the end of the specific segment)
             if (issueEnd > seg.end_min) {
-                ELS.saveBtn.textContent = "Confirm Transaction"; 
+                ELS.saveBtn.textContent = "Confirm Transaction";
                 return APP.Utils.showToast("Issue duration exceeds segment limit.", "danger");
             }
 
-            // Create the Split (Gap)
+            // Create the Split: Work -> Lateness -> Work
             const preSplit = { ...seg, end_min: issueStart };
+            const issueSplit = { component_id: debitComp.id, start_min: issueStart, end_min: issueEnd };
             const postSplit = { ...seg, start_min: issueEnd };
 
-            // Remove old segment and insert the two new pieces (if they have valid duration)
             const replacements = [];
             if (preSplit.end_min > preSplit.start_min) replacements.push(preSplit);
+            replacements.push(issueSplit);
             if (postSplit.end_min > postSplit.start_min) replacements.push(postSplit);
             
             newDebitStructure.splice(targetIdx, 1, ...replacements);
         }
 
-        // 2. Prepare CREDIT (The Add)
+        // 3. Prepare CREDIT (The Payback)
         const paybackDateISO = APP.Utils.getISODateForDayName(STATE.weekStart, paybackDay);
-        // Important: If payback is SAME DAY as debit, use our *already modified* structure as the base
-        let creditBaseSegments = (debitDateISO === paybackDateISO) ? newDebitStructure : APP.ScheduleCalculator.calculateSegments(CTX.advisorId, paybackDay, STATE.weekStart).segments;
-        let newCreditStructure = JSON.parse(JSON.stringify(creditBaseSegments));
-
-        const defaultActivityId = STATE.scheduleComponents.find(c => c.type === 'Activity')?.id || STATE.scheduleComponents[0].id;
+        // If payback is same day, use our *already modified* structure so we don't lose the lateness block
+        let newCreditStructure = (CTX.dateISO === paybackDateISO) ? 
+            newDebitStructure : 
+            JSON.parse(JSON.stringify(APP.ScheduleCalculator.calculateSegments(CTX.advisorId, paybackDay, STATE.weekStart).segments));
 
         if (paybackMethod === 'extend') {
-            if (newCreditStructure.length === 0) {
-                 ELS.saveBtn.textContent = "Confirm Transaction";
-                 return APP.Utils.showToast("Cannot extend empty day. Use Custom Slot.", "warning");
-            }
-            newCreditStructure[newCreditStructure.length - 1].end_min += lostMins;
+            if (newCreditStructure.length === 0) { ELS.saveBtn.textContent = "Confirm"; return APP.Utils.showToast("Cannot extend empty day.", "warning"); }
+            const last = newCreditStructure[newCreditStructure.length - 1];
+            // Push NEW segment (Separate Block) instead of merging
+            newCreditStructure.push({
+                component_id: creditComp.id,
+                start_min: last.end_min,
+                end_min: last.end_min + lostMins
+            });
         } else if (paybackMethod === 'early') {
-            if (newCreditStructure.length === 0) {
-                 ELS.saveBtn.textContent = "Confirm Transaction";
-                 return APP.Utils.showToast("Cannot extend empty day. Use Custom Slot.", "warning");
-            }
-            newCreditStructure[0].start_min -= lostMins;
+            if (newCreditStructure.length === 0) { ELS.saveBtn.textContent = "Confirm"; return APP.Utils.showToast("Cannot extend empty day.", "warning"); }
+            const first = newCreditStructure[0];
+            // Push NEW segment
+            newCreditStructure.unshift({
+                component_id: creditComp.id,
+                start_min: first.start_min - lostMins,
+                end_min: first.start_min
+            });
         } else if (paybackMethod === 'custom') {
             const timeStr = document.getElementById('mutCustomTime').value;
-            if (!timeStr) {
-                ELS.saveBtn.textContent = "Confirm Transaction";
-                return APP.Utils.showToast("Custom time required.", "danger");
-            }
+            if (!timeStr) { ELS.saveBtn.textContent = "Confirm"; return APP.Utils.showToast("Custom time required.", "danger"); }
             const [h, m] = timeStr.split(':').map(Number);
             const startMin = h * 60 + m;
-            newCreditStructure.push({ component_id: defaultActivityId, start_min: startMin, end_min: startMin + lostMins });
-            // Sort to ensure valid structure for visualization
-            newCreditStructure.sort((a,b) => a.start_min - b.start_min); 
+            newCreditStructure.push({ component_id: creditComp.id, start_min: startMin, end_min: startMin + lostMins });
         }
-
-        // 3. EXECUTE SAVE (Parallel)
-        // Note: If Debit and Credit are the same day, we only save ONCE (the 'newCreditStructure' contains both changes)
-        let promises = [];
         
-        if (debitDateISO === paybackDateISO) {
+        // Sort credit structure to ensure time order (important for display)
+        newCreditStructure.sort((a,b) => a.start_min - b.start_min);
+
+        // 4. EXECUTE SAVE (Parallel)
+        let promises = [];
+        if (CTX.dateISO === paybackDateISO) {
             // Single Day Transaction
             promises.push(APP.DataService.saveRecord('schedule_exceptions', {
-                advisor_id: CTX.advisorId, exception_date: debitDateISO, structure: newCreditStructure, reason: `${reasonType} & Payback (Same Day)`
+                advisor_id: CTX.advisorId, exception_date: CTX.dateISO, structure: newCreditStructure, reason: `${reasonType} & Payback (Same Day)`
             }, 'advisor_id, exception_date'));
         } else {
             // Two Day Transaction
             promises.push(APP.DataService.saveRecord('schedule_exceptions', {
-                advisor_id: CTX.advisorId, exception_date: debitDateISO, structure: newDebitStructure, reason: `${reasonType} (-${lostMins}m)`
+                advisor_id: CTX.advisorId, exception_date: CTX.dateISO, structure: newDebitStructure, reason: `${reasonType} (-${lostMins}m)`
             }, 'advisor_id, exception_date'));
-            
             promises.push(APP.DataService.saveRecord('schedule_exceptions', {
                 advisor_id: CTX.advisorId, exception_date: paybackDateISO, structure: newCreditStructure, reason: `Payback for ${CTX.dayName} (+${lostMins}m)`
             }, 'advisor_id, exception_date'));
@@ -4366,19 +4435,12 @@ const handleDeleteRotation = async () => {
 
         const results = await Promise.all(promises);
         const errors = results.filter(r => r.error);
-
         if (errors.length === 0) {
-            // 4. CRITICAL: Update Local State & History
             results.forEach(res => APP.StateManager.syncRecord('schedule_exceptions', res.data));
-            
-            // This enables the UNDO button
             APP.StateManager.saveHistory("Make-Up Time Transaction");
-            
             APP.Utils.showToast("Time balanced successfully.", "success");
             ELS.modal.style.display = 'none';
-            
-            // Re-render to show changes immediately
-            APP.Components.ScheduleViewer.render(); 
+            APP.Components.ScheduleViewer.render();
         } else {
             console.error("Transaction Errors:", errors);
             APP.Utils.showToast("Error saving transaction. Check console.", "danger");
