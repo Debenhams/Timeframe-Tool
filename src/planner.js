@@ -1619,71 +1619,114 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         return fused;
     };
 
-   const normalizeShiftLength = (segments) => {
+   /**
+     * HYBRID: Uses Original Logic for standard shifts, New Logic for Lateness gaps.
+     */
+    const normalizeShiftLength = (segments) => {
         let currentTotal = segments.reduce((sum, s) => sum + s.duration_min, 0);
         const target = BUILDER_STATE.fixedShiftLength;
 
         if (currentTotal === target) return segments;
 
-        // Create a copy
+        // Create copy
         let adjusted = JSON.parse(JSON.stringify(segments));
+        
+        // CHECK: Does this shift have a Lateness Gap?
+        const hasGap = adjusted.some(s => s.component_id === '_GAP_');
 
-        // Helper: Check if segment is a GAP
-        const isGap = (id) => id === '_GAP_';
+        // === PATH A: NEW LOGIC (Only runs if a Gap exists) ===
+        if (hasGap) {
+            const isGap = (id) => id === '_GAP_';
+            
+            // 1. Trim (Prioritize shrinking gaps)
+            while (currentTotal > target && adjusted.length > 0) {
+                const excess = currentTotal - target;
+                let targetIndex = adjusted.findIndex(s => isGap(s.component_id) && s.duration_min > 0);
+                
+                // Fallback to standard trim if no gap space left
+                if (targetIndex === -1) {
+                    let maxDuration = 0;
+                    for (let i = 0; i < adjusted.length; i++) {
+                        if (!isAnchored(adjusted[i].component_id)) {
+                            if (adjusted[i].duration_min > maxDuration) {
+                                maxDuration = adjusted[i].duration_min;
+                                targetIndex = i;
+                            }
+                        }
+                    }
+                }
+                if (targetIndex === -1) break;
 
+                const segmentToTrim = adjusted[targetIndex];
+                if (segmentToTrim.duration_min > excess) {
+                    segmentToTrim.duration_min -= excess;
+                    currentTotal -= excess; 
+                } else {
+                    currentTotal -= segmentToTrim.duration_min;
+                    adjusted.splice(targetIndex, 1);
+                }
+            }
+
+            // 2. Expand (Prioritize expanding gaps)
+            if (currentTotal < target) {
+                const deficit = target - currentTotal;
+                let targetIndex = adjusted.findLastIndex(s => isGap(s.component_id));
+                if (targetIndex === -1) targetIndex = adjusted.findLastIndex(s => !isAnchored(s.component_id));
+
+                if (targetIndex !== -1) {
+                    adjusted[targetIndex].duration_min += deficit;
+                    currentTotal += deficit;
+                } else {
+                    adjusted.push({ component_id: '_GAP_', duration_min: deficit });
+                    currentTotal += deficit;
+                }
+            }
+            return fuseNeighbors(adjusted.filter(seg => seg.duration_min > 0));
+        }
+
+        // === PATH B: ORIGINAL LOGIC (Restored for Standard Shifts) ===
+        // This is your original "Water Pipe" logic that prevents knock-on effects
+        
         // 1. Trim Excess
         while (currentTotal > target && adjusted.length > 0) {
             const excess = currentTotal - target;
+            let largestFlexibleIndex = -1;
+            let maxDuration = 0;
             
-            // PRIORITY: Trim GAPS first
-            let targetIndex = -1;
-            
-            // Try to find a GAP to trim
-            targetIndex = adjusted.findIndex(s => isGap(s.component_id) && s.duration_min > 0);
-            
-            // If no gap, fallback to largest non-anchored segment (Standard logic)
-            if (targetIndex === -1) {
-                let maxDuration = 0;
-                for (let i = 0; i < adjusted.length; i++) {
-                    if (!isAnchored(adjusted[i].component_id)) {
-                        if (adjusted[i].duration_min > maxDuration) {
-                            maxDuration = adjusted[i].duration_min;
-                            targetIndex = i;
-                        }
+            for (let i = 0; i < adjusted.length; i++) {
+                if (!isAnchored(adjusted[i].component_id)) {
+                    if (adjusted[i].duration_min > maxDuration) {
+                        maxDuration = adjusted[i].duration_min;
+                        largestFlexibleIndex = i;
                     }
                 }
             }
 
-            if (targetIndex === -1) break; // Nothing left to trim
+            if (largestFlexibleIndex === -1) break;
 
-            const segmentToTrim = adjusted[targetIndex];
+            const segmentToTrim = adjusted[largestFlexibleIndex];
             if (segmentToTrim.duration_min > excess) {
                 segmentToTrim.duration_min -= excess;
                 currentTotal -= excess; 
             } else {
                 currentTotal -= segmentToTrim.duration_min;
-                adjusted.splice(targetIndex, 1);
+                adjusted.splice(largestFlexibleIndex, 1);
             }
         }
 
-        // 2. Fill Deficit
+        // 2. Fill Gap
         if (currentTotal < target) {
             const deficit = target - currentTotal;
-            
-            // PRIORITY: Expand GAPS first
-            let targetIndex = adjusted.findLastIndex(s => isGap(s.component_id));
-            
-            // If no gap, fallback to last non-anchored
-            if (targetIndex === -1) {
-                targetIndex = adjusted.findLastIndex(s => !isAnchored(s.component_id));
+            let lastNonAnchoredIndex = -1;
+            for (let i = adjusted.length - 1; i >= 0; i--) {
+                if (!isAnchored(adjusted[i].component_id)) {
+                    lastNonAnchoredIndex = i;
+                    break;
+                }
             }
 
-            if (targetIndex !== -1) {
-                adjusted[targetIndex].duration_min += deficit;
-                currentTotal += deficit;
-            } else {
-                // If absolutely nothing can expand, add a GAP at the end
-                adjusted.push({ component_id: '_GAP_', duration_min: deficit });
+            if (lastNonAnchoredIndex !== -1) {
+                adjusted[lastNonAnchoredIndex].duration_min += deficit;
                 currentTotal += deficit;
             }
         }
