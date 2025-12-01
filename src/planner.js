@@ -4440,30 +4440,30 @@ const handleDeleteRotation = async () => {
         const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
         ELS.paybackDay.innerHTML = days.map(d => `<option value="${d}" ${d === dayName ? 'selected' : ''}>${d} (${d === dayName ? 'Today' : 'Later'})</option>`).join('');
         
-        // 2. Populate "Reasons" (Shrinkage)
-        const shrinkageComps = STATE.scheduleComponents.filter(c => c.type === 'Shrinkage').sort((a,b) => a.name.localeCompare(b.name));
+        // 2. Populate "Reasons" (The Deficit) -> NOW SHOWS 'PAYBACK' TYPES
+        let debitComps = STATE.scheduleComponents.filter(c => c.type === 'Payback');
+        debitComps.sort((a,b) => a.name.localeCompare(b.name));
+
         const reasonSelect = document.getElementById('mutReason');
         if (reasonSelect) {
-            reasonSelect.innerHTML = shrinkageComps.length > 0 ? 
-                shrinkageComps.map(c => `<option value="${c.id}">${c.name}</option>`).join('') : 
-                `<option value="">No Shrinkage Found</option>`;
+            if (debitComps.length > 0) {
+                reasonSelect.innerHTML = debitComps.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            } else {
+                reasonSelect.innerHTML = `<option value="">No 'Payback' Components Found</option>`;
+            }
         }
 
-        // 3. Populate "Payback Activities" (Priority: Type='Payback', Fallback: Type='Activity')
-        // This is the smart filter you asked for.
-        let paybackComps = STATE.scheduleComponents.filter(c => c.type === 'Payback');
-        if (paybackComps.length === 0) {
-            // Fallback if you haven't made them yet
-            paybackComps = STATE.scheduleComponents.filter(c => c.type === 'Activity');
-        }
-        
-        paybackComps.sort((a,b) => a.name.localeCompare(b.name));
+        // 3. Populate "Payback Activities" (The Payback) -> NOW SHOWS 'ACTIVITY' TYPES
+        let creditComps = STATE.scheduleComponents.filter(c => c.type === 'Activity');
+        creditComps.sort((a,b) => a.name.localeCompare(b.name));
         
         const paybackSelect = document.getElementById('mutPaybackActivity');
         if (paybackSelect) {
-            paybackSelect.innerHTML = paybackComps.length > 0 ? 
-                paybackComps.map(c => `<option value="${c.id}">${c.name}</option>`).join('') : 
-                `<option value="">No Payback/Activity Found</option>`;
+            if (creditComps.length > 0) {
+                paybackSelect.innerHTML = creditComps.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+            } else {
+                paybackSelect.innerHTML = `<option value="">No 'Activity' Components Found</option>`;
+            }
         }
 
         document.getElementById('makeupTitle').textContent = `Manage Lost Time: ${advisorName}`;
