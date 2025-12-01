@@ -1697,31 +1697,36 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         const durationToRedistribute = stone.duration_min;
         const newSegments = JSON.parse(JSON.stringify(segments));
         
-        const leftIndex = indexToRemove - 1;
-        const rightIndex = indexToRemove + 1;
-        
-        // 1. Try giving time to Left Neighbor (If it's Work)
-        if (leftIndex >= 0 && !isAnchored(newSegments[leftIndex].component_id)) {
-            newSegments[leftIndex].duration_min += durationToRedistribute;
-        } 
-        // 2. Else try Right Neighbor (If it's Work)
-        else if (rightIndex < newSegments.length && !isAnchored(newSegments[rightIndex].component_id)) {
-            newSegments[rightIndex].duration_min += durationToRedistribute;
-        }
-        // 3. FALLBACK: Force-feed to Left Neighbor (Even if Anchored/Lunch)
-        // This prevents the "Vacuum" effect where the whole schedule shifts left.
-        // When you drop the stone back, it will carve this time back out.
-        else if (leftIndex >= 0) {
-            newSegments[leftIndex].duration_min += durationToRedistribute;
-        }
-        // 4. Fallback: Force-feed to Right
-        else if (rightIndex < newSegments.length) {
-            newSegments[rightIndex].duration_min += durationToRedistribute;
-        }
+        // Remove the stone first so we can find true neighbors
+        newSegments.splice(indexToRemove, 1);
 
-        newSegments.splice(indexToRemove, 1); 
-        
-        // Fuse and normalize (though normalize shouldn't be needed if logic holds)
+        // Indices shift after splice, so we look at indexToRemove (which is now the right neighbor)
+        // and indexToRemove - 1 (the left neighbor).
+        const rightNeighbor = newSegments[indexToRemove]; // Was index + 1
+        const leftNeighbor = newSegments[indexToRemove - 1]; // Was index - 1
+
+        const isWork = (seg) => seg && !isAnchored(seg.component_id) && seg.component_id !== '_GAP_';
+
+        // STRATEGY: "Magnetic Healing"
+        // 1. Prioritize giving time to the RIGHT neighbor (Sliding Left) - Common for start of shift
+        if (isWork(rightNeighbor)) {
+            rightNeighbor.duration_min += durationToRedistribute;
+        } 
+        // 2. Else give to LEFT neighbor (Sliding Right) - Common for end of shift
+        else if (isWork(leftNeighbor)) {
+            leftNeighbor.duration_min += durationToRedistribute;
+        }
+        // 3. Fallback: If neighbors are Breaks/Lunch/Gaps, force feed the Right Neighbor anyway
+        // This maintains the total pipe length even if we can't merge cleanly.
+        else if (rightNeighbor) {
+            rightNeighbor.duration_min += durationToRedistribute;
+        }
+        else if (leftNeighbor) {
+            leftNeighbor.duration_min += durationToRedistribute;
+        }
+        // 4. If it was the only block, we can't redistribute (rare), normalization handles it.
+
+        // Fuse and normalize to ensure stability
         let fused = fuseNeighbors(newSegments);
         return normalizeShiftLength(fused);
     };
