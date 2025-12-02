@@ -1,34 +1,34 @@
 /**
- * WFM Intelligence Platform - Styles (v17.5 - Aura Glass UI)
- * A premium, light-themed, professional WFM interface with advanced glass effects and Dark Mode support.
+ * WFM Intelligence Platform - Styles (v16.11 - Fixed Colors & Water Pipe)
+ * Includes Base Layout, Components, Editors, Visualization, Authentication, and Trade Center.
+ * FIXES:
+ * 1. Component colors now display correctly in all views (removed hardcoded overrides).
+ * 2. "Water Pipe" visuals: Blocks fuse neatly with no gaps or rounded edges between them.
+ * 3. Drag-and-Drop: Smooth transitions for the "stream" effect.
 */
 
-/* === VARIABLES & CONFIGURATION (Aura Glass UI - Light Default) === */
+/* === VARIABLES & CONFIGURATION === */
 :root {
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   
-  /* Aura Glass Palette (Light Mode Default) */
-  --brand-primary: #4F46E5; /* Indigo 600 - Professional Accent */
-  --brand-primary-dark: #4338CA; 
+  /* Modern Enterprise Palette (Indigo/Emerald) */
+  --brand-primary: #4F46E5; /* Indigo 600 */
+  --brand-primary-dark: #4338CA; /* Indigo 700 */
   --brand-accent: #059669; /* Emerald 600 */
   
-  /* Neutrals (Light/Airy) */
+  /* Neutrals (Cool Gray) */
   --color-text: #111827;
-  --color-text-muted: #64748B;
-  --color-bg: #F8FAFC; /* Base background color for Aurora effect */
+  --color-text-muted: #6B7280;
+  --color-bg: #F9FAFB; 
+  --color-panel-bg: #FFFFFF;
+  --color-border: #E5E7EB;
+  --color-hover-bg: #F3F4F6;
   
-  /* Glass Panel Styling */
-  --color-panel-bg: rgba(255, 255, 255, 0.7);
-  --color-panel-solid: #FFFFFF;
-  --blur-strength: 20px;
-  --color-border: rgba(0, 0, 0, 0.08);
-  --color-hover-bg: #F1F5F9;
-  
-  /* Sidebar (Light Glass) */
-  --sidebar-bg: rgba(255, 255, 255, 0.8);
-  --sidebar-text: #475569;
-  --sidebar-text-hover: #111827;
-  --sidebar-border: rgba(0, 0, 0, 0.1);
+  /* Sidebar (Dark) */
+  --sidebar-bg: #111827;
+  --sidebar-text: #D1D5DB;
+  --sidebar-text-hover: #FFFFFF;
+  --sidebar-border: #1F2937;
 
   /* UI States */
   --color-success: #10B981;
@@ -38,22 +38,22 @@
   --color-exception: #9333EA; /* Purple */
 
   /* Layout */
-  --sidebar-width: 240px;
-  --top-bar-height: 60px;
-  --border-radius: 16px; /* Modern, highly rounded corners */
-  --shadow-float: 0 15px 40px rgba(0, 0, 0, 0.06);
-  --shadow-heavy: 0 20px 50px rgba(0, 0, 0, 0.15);
+  --sidebar-width: 220px;
+  --top-bar-height: 55px;
+  --border-radius: 8px;
 
   /* Timeline Visualization */
-  --timeline-name-col: 200px;
-  --timeline-row-height: 34px;
-  --timeline-bar-height: 28px; 
-  --timeline-grid-color: rgba(0, 0, 0, 0.05);
-  --timeline-header-bg: #FFFFFF;
+  --timeline-name-col: 180px;
+  --timeline-row-height: 30px;
+  --timeline-bar-height: 30px; 
+  --timeline-grid-color: #E5E7EB;
+  --timeline-header-bg: #F3F4F6;
 
-  /* Branding (Login Screen - Preserved as requested) */
+  /* Branding */
   --debenhams-teal: #70E6D6;
   --debenhams-dark: #000000;
+
+  /* Login Screen Styling (Dark Theme) */
   --login-bg: #000000;
   --login-text: #FFFFFF;
   --login-text-muted: #9CA3AF;
@@ -62,90 +62,15 @@
   --login-button-green: #22C55E;
 }
 
-/* === DARK MODE VARIABLES (Optional Toggle) === */
-/* Activated by adding the class .dark-mode to the <body> tag */
-body.dark-mode {
-  --brand-primary: #6366F1; /* Lighter Indigo for dark mode */
-
-  /* Neutrals (Dark) */
-  --color-text: #F9FAFB;
-  --color-text-muted: #94A3B8;
-  --color-bg: #0F172A; /* Deep Navy Background */
-  
-  /* Glass Panel Styling (Dark) */
-  --color-panel-bg: rgba(30, 41, 59, 0.8);
-  --color-panel-solid: #1E293B;
-  --color-border: rgba(255, 255, 255, 0.1);
-  --color-hover-bg: rgba(255, 255, 255, 0.05);
-  
-  /* Sidebar (Darker in Dark Mode) */
-  --sidebar-bg: rgba(17, 24, 39, 0.9);
-  --sidebar-text: #94A3B8;
-  --sidebar-text-hover: #FFFFFF;
-  --sidebar-border: rgba(255, 255, 255, 0.1);
-
-  /* Timeline (Dark) */
-  --timeline-grid-color: rgba(255, 255, 255, 0.05);
-  --timeline-header-bg: #1E293B;
-
-  --shadow-float: 0 15px 40px rgba(0, 0, 0, 0.3);
-  --shadow-heavy: 0 20px 50px rgba(0, 0, 0, 0.5);
-}
-
-
 /* === BASE STYLES & LAYOUT === */
-
-/* Modern Slim Scrollbar */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
-
-/* Dark mode scrollbar */
-body.dark-mode ::-webkit-scrollbar-thumb { background: #475569; }
-body.dark-mode ::-webkit-scrollbar-thumb:hover { background: #64748B; }
-
-
 html, body {
   height: 100%;
   margin: 0;
   font-family: var(--font-family);
-  font-size: 14px;
+  font-size: 13px;
   background-color: var(--color-bg);
   color: var(--color-text);
   overflow: hidden;
-  -webkit-font-smoothing: antialiased;
-  transition: background-color 0.3s, color 0.3s;
-}
-
-/* The Aurora Mesh Background (Premium Wow Factor) */
-body::before {
-    content: '';
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    z-index: -1;
-    /* Light Mode Aurora */
-    background-image: 
-        radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.1) 0px, transparent 50%),
-        radial-gradient(at 100% 0%, rgba(5, 150, 105, 0.05) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(79, 70, 229, 0.05) 0px, transparent 50%),
-        radial-gradient(at 0% 100%, rgba(5, 150, 105, 0.1) 0px, transparent 50%);
-    background-size: 200% 200%;
-    animation: auroraMove 30s ease-in-out infinite alternate;
-}
-
-/* Dark Mode Aurora (If toggled) */
-body.dark-mode::before {
-     background-image: 
-        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-        radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.1) 0px, transparent 50%),
-        radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.1) 0px, transparent 50%);
-}
-
-@keyframes auroraMove {
-    0% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
 }
 
 *, *::before, *::after {
@@ -159,21 +84,18 @@ body {
 h1, h2, h3 {
     margin-top: 0;
     margin-bottom: 16px;
-    font-weight: 700;
+    font-weight: 600;
 }
 
 h2 {
-    font-size: 18px;
+    font-size: 17px;
 }
 
-/* === AUTHENTICATION OVERLAY (Preserved Branding) === */
-/* NOTE: Auth screen styles are kept identical to the original request as they are separate from the planning UI */
+/* === AUTHENTICATION OVERLAY === */
 
 /* Hide main application components initially */
 .app-sidebar, .app-main-content {
   display: none;
-  opacity: 0;
-  transition: opacity 0.5s ease-in-out;
 }
 
 .auth-link {
@@ -193,27 +115,26 @@ h2 {
 .auth-notice {
     margin-top: 24px;
     padding: 12px;
-    border-radius: 8px;
+    border-radius: var(--border-radius);
     font-size: 14px;
     text-align: left;
 }
 
-/* Use standard colors specifically for the login screen notices */
 .auth-notice.success {
-    background-color: #ECFDF5;
+    background-color: var(--color-success-bg);
     color: #065F46;
     border: 1px solid #A7F3D0;
 }
 
 .auth-notice.error {
-    background-color: #FEE2E2;
+    background-color: var(--color-danger-bg);
     color: #991B1B;
     border: 1px solid #FCA5A5;
 }
 
-/* Reveal app when authenticated (with animation) */
-body.authenticated .app-sidebar { display: flex; opacity: 1; }
-body.authenticated .app-main-content { display: flex; opacity: 1; }
+/* Reveal app when authenticated */
+body.authenticated .app-sidebar { display: flex; }
+body.authenticated .app-main-content { display: flex; }
 
 .auth-overlay {
   position: fixed;
@@ -236,7 +157,7 @@ body.authenticated .app-main-content { display: flex; opacity: 1; }
   overflow: hidden;
 }
 
-/* Banner Side (Preserved) */
+/* Banner Side */
 .auth-banner {
   width: 75%;
   background-color: var(--debenhams-teal); 
@@ -300,7 +221,7 @@ body.authenticated .app-main-content { display: flex; opacity: 1; }
     color: var(--debenhams-dark);
 }
 
-/* Form Side (Preserved) */
+/* Form Side */
 .auth-form-panel {
   width: 25%;
   padding: 60px;
@@ -349,13 +270,11 @@ body.authenticated .app-main-content { display: flex; opacity: 1; }
   background-color: var(--login-input-bg);
   border: 1px solid var(--login-input-border);
   color: var(--login-text);
-  border-radius: 8px;
 }
 
 .auth-form .form-input:focus {
   border-color: #FFFFFF; 
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
-  outline: none;
 }
 
 .btn-login {
@@ -378,7 +297,7 @@ body.authenticated .app-main-content { display: flex; opacity: 1; }
 .error-message {
     margin-top: 24px;
     font-weight: 500;
-    color: #EF4444; /* Standard danger color for login */
+    color: var(--color-danger);
     display: none;
 }
 
@@ -402,7 +321,7 @@ body.authenticated .app-main-content { display: flex; opacity: 1; }
     border-top: 1px solid var(--login-input-border);
 }
 
-/* Responsive Auth (Preserved) */
+/* Responsive Auth */
 @media (max-width: 1200px) {
   .dg-main-text { font-size: 72px; }
   .dg-sub-text { font-size: 28px; }
@@ -424,109 +343,73 @@ body.authenticated .app-main-content { display: flex; opacity: 1; }
   .dg-tagline { font-size: 20px; }
 }
 
-/* === SIDEBAR NAVIGATION (Aura Glass UI - Light Glass) === */
+/* === SIDEBAR NAVIGATION === */
 .app-sidebar {
   width: var(--sidebar-width);
-  /* Glassmorphism Implementation */
   background-color: var(--sidebar-bg);
-  backdrop-filter: blur(var(--blur-strength));
-  -webkit-backdrop-filter: blur(var(--blur-strength));
-  
   color: var(--sidebar-text);
   flex-direction: column;
   flex-shrink: 0;
   border-right: 1px solid var(--sidebar-border);
   height: 100vh;
   overflow-y: auto;
-  z-index: 100;
-  box-shadow: var(--shadow-float);
 }
 
 .sidebar-header {
-    padding: 24px;
-    font-size: 18px;
+    padding: 20px 24px;
+    font-size: 15px;
     font-weight: 700;
-    color: var(--color-text);
+    color: white;
     border-bottom: 1px solid var(--sidebar-border);
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-/* Logo Placeholder */
-.sidebar-header::before {
-    content: '';
-    width: 10px;
-    height: 10px;
-    background-color: var(--brand-primary);
-    border-radius: 50%;
 }
 
 .tab-nav {
     display: flex;
     flex-direction: column;
     padding: 16px;
-    gap: 6px;
+    gap: 4px;
 }
 
 .tab-link {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 16px;
-  font-size: 14px;
+  gap: 12px;
+  padding: 10px 16px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--sidebar-text);
   background-color: transparent;
   border: none;
-  border-radius: 12px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   text-align: left;
-  transition: background-color 0.2s, color 0.2s, transform 0.1s;
-  position: relative;
-}
-
-.tab-link svg {
-    transition: color 0.2s;
-    color: var(--sidebar-text);
+  transition: background-color 0.15s, color 0.15s;
 }
 
 .tab-link:hover {
-  background-color: var(--color-hover-bg);
+  background-color: rgba(255, 255, 255, 0.05);
   color: var(--sidebar-text-hover);
-  transform: translateX(4px);
 }
 
 .tab-link.active {
-  /* Solid Primary Color for Active State */
   background-color: var(--brand-primary);
   color: white;
-  font-weight: 600;
-  box-shadow: 0 4px 15px rgba(79, 70, 229, 0.4);
-  transform: none;
-}
-
-.tab-link.active svg {
-    color: white;
 }
 
 .tab-link.disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    transform: none;
 }
 
 .nav-separator {
-    margin: 20px 16px 12px 16px;
-    font-size: 11px;
+    margin: 12px 16px 8px 16px;
+    font-size: 12px;
     font-weight: 600;
-    color: var(--color-text-muted);
+    color: #6B7280;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    opacity: 0.7;
 }
 
-/* === MAIN CONTENT & TOP BAR (Aura Glass UI) === */
+/* === MAIN CONTENT & TOP BAR === */
 .app-main-content {
   flex-grow: 1;
   flex-direction: column;
@@ -535,27 +418,22 @@ body.authenticated .app-main-content { display: flex; opacity: 1; }
 
 .top-bar {
   height: var(--top-bar-height);
-  /* Glassmorphism Implementation */
   background-color: var(--color-panel-bg);
-  backdrop-filter: blur(var(--blur-strength));
-  -webkit-backdrop-filter: blur(var(--blur-strength));
-  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 32px;
+  padding: 0 24px;
   flex-shrink: 0;
-  z-index: 50;
-  box-shadow: var(--shadow-float);
 }
 
 .top-bar-controls {
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 12px;
 }
 
-.top-bar-controls label { font-weight: 500; color: var(--color-text-muted); }
+.top-bar-controls label { font-weight: 500; }
 
 .separator {
     height: 24px;
@@ -564,7 +442,7 @@ body.authenticated .app-main-content { display: flex; opacity: 1; }
     margin: 0 8px;
 }
 
-.ai-assistant-placeholder input { width: 350px; }
+.ai-assistant-placeholder input { width: 300px; }
 
 /* === CONTENT AREA & TABS === */
 .content-area {
@@ -572,144 +450,69 @@ body.authenticated .app-main-content { display: flex; opacity: 1; }
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding: 32px;
 }
 
 .tab-content {
   display: none;
+  padding: 24px;
   flex-grow: 1;
   overflow-y: auto;
-  /* Animation for tab switching */
-  animation: fadeIn 0.4s ease-out;
-}
-
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
 }
 
 .tab-content.active { display: block; }
 
-/* === CARDS & PANELS (The Core Glass Effect) === */
+/* === CARDS & PANELS === */
 .card {
-    /* Glassmorphism Implementation */
     background-color: var(--color-panel-bg);
-    backdrop-filter: blur(var(--blur-strength));
-    -webkit-backdrop-filter: blur(var(--blur-strength));
     border-radius: var(--border-radius);
-    box-shadow: var(--shadow-float);
-    /* Light border for definition */
-    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
     padding: 24px;
-    transition: box-shadow 0.3s ease-out, transform 0.3s ease-out;
-}
-
-/* Dark mode card border adjustment */
-body.dark-mode .card {
     border: 1px solid var(--color-border);
 }
 
-.card:hover {
-    box-shadow: var(--shadow-heavy);
-    transform: translateY(-2px);
-}
-
-/* === FORMS & INPUTS (Sleek & Modern) === */
+/* === FORMS & INPUTS === */
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .form-input, .form-select, .week-picker {
-  padding: 10px 14px;
+  padding: 7px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 10px;
-  font-size: 14px;
+  border-radius: var(--border-radius);
+  font-size: 12px;
   color: var(--color-text);
-  /* Clean white background for inputs */
-  background-color: var(--color-panel-solid);
-  transition: border-color 0.2s, box-shadow 0.2s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background-color: white;
 }
 
-/* Dark mode inputs */
-body.dark-mode .form-input, 
-body.dark-mode .form-select, 
-body.dark-mode .week-picker {
-    background-color: rgba(255, 255, 255, 0.05);
-    border-color: var(--color-border);
-}
-
-.form-input:focus, .form-select:focus, .week-picker:focus {
+.form-input:focus, .form-select:focus {
     outline: none;
     border-color: var(--brand-primary);
-    /* Indigo glow on focus */
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
 }
 
-/* === BUTTONS (Tactile & Vibrant) === */
+/* === BUTTONS === */
 .btn {
-  padding: 10px 18px;
-  border-radius: 10px;
-  font-size: 14px;
+  padding: 8px 14px;
+  border-radius: var(--border-radius);
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   border: none;
-  transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  transition: background-color 0.15s;
 }
 
-.btn:active {
-    transform: scale(0.98);
-}
+.btn-sm { padding: 6px 12px; font-size: 13px; }
+.btn-lg { padding: 12px 24px; font-size: 16px; }
 
-.btn-sm { padding: 8px 14px; font-size: 13px; border-radius: 8px; }
-.btn-lg { padding: 14px 28px; font-size: 16px; }
+.btn-primary { background-color: var(--brand-primary); color: white; }
+.btn-primary:hover { background-color: var(--brand-primary-dark); }
+.btn-primary:disabled { background-color: #A5B4FC; cursor: not-allowed; }
 
-/* Primary Button (Indigo Gradient) */
-.btn-primary { 
-    background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark)); 
-    color: white;
-    box-shadow: 0 4px 10px rgba(79, 70, 229, 0.3);
-}
-.btn-primary:hover { 
-    background: linear-gradient(135deg, var(--brand-primary-dark), var(--brand-primary));
-    box-shadow: 0 6px 15px rgba(79, 70, 229, 0.5);
-}
-.btn-primary:disabled { 
-    background: #A5B4FC; 
-    cursor: not-allowed;
-    box-shadow: none;
-}
+.btn-secondary { background-color: var(--color-hover-bg); color: var(--color-text); border: 1px solid var(--color-border); }
+.btn-secondary:hover { background-color: #E5E7EB; }
 
-body.dark-mode .btn-primary:disabled {
-    background: #475569;
-}
-
-/* Secondary Button (Glass/White) */
-.btn-secondary { 
-    background-color: #FFFFFF;
-    color: var(--color-text); 
-    border: 1px solid var(--color-border);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-.btn-secondary:hover { 
-    background-color: var(--color-hover-bg);
-}
-
-/* Dark mode secondary */
-body.dark-mode .btn-secondary {
-    background-color: rgba(255, 255, 255, 0.1);
-    color: var(--color-text);
-}
-body.dark-mode .btn-secondary:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-}
-
-/* Danger Button */
 .btn-danger { background-color: var(--color-danger); color: white; }
 .btn-danger:hover { background-color: #B91C1C; }
 
@@ -717,39 +520,33 @@ body.dark-mode .btn-secondary:hover {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 10px;
-    border-radius: 50%; /* Circular icons */
+    padding: 8px;
+    border-radius: var(--border-radius);
     background-color: transparent;
-    border: none;
+    border: 1px solid transparent;
     cursor: pointer;
     color: var(--color-text-muted);
-    transition: background-color 0.2s, color 0.2s;
 }
 
-.btn-icon:hover { background-color: var(--color-hover-bg); color: var(--brand-primary); }
+.btn-icon:hover { background-color: var(--color-hover-bg); color: var(--color-text); }
 .btn-icon:disabled { opacity: 0.4; cursor: not-allowed; background-color: transparent; }
 
-/* === TABLES (Clean Light Mode) === */
+/* === TABLES === */
 .table-container {
     overflow-x: auto;
     margin-top: 20px;
     border: 1px solid var(--color-border);
     border-radius: var(--border-radius);
-    background-color: var(--color-panel-solid);
-}
-
-body.dark-mode .table-container {
-    background-color: rgba(0, 0, 0, 0.2);
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
-  background-color: transparent;
+  background-color: white;
 }
 
 th, td {
-  padding: 14px 16px;
+  padding: 12px 16px;
   text-align: left;
   border-bottom: 1px solid var(--color-border);
 }
@@ -757,93 +554,49 @@ th, td {
 th {
   background-color: var(--color-hover-bg);
   font-weight: 600;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
-body.dark-mode th {
-    background-color: #1E293B;
-}
-
 tr:last-child td { border-bottom: none; }
-
-/* Zebra striping for readability */
-tbody tr:nth-child(even) {
-    background-color: rgba(0, 0, 0, 0.02);
-}
-
-body.dark-mode tbody tr:nth-child(even) {
-    background-color: rgba(255, 255, 255, 0.03);
-}
-
-
 tbody tr:hover { background-color: var(--color-hover-bg); }
-
-body.dark-mode tbody tr:hover {
-    background-color: var(--color-hover-bg);
-}
 
 /* === EDITOR LAYOUTS === */
 .editor-controls {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
 }
 
 .editor-buttons { display: flex; align-items: center; gap: 12px; }
-.helper-text { color: var(--color-text-muted); margin-top: -8px; margin-bottom: 16px; font-size: 13px; }
+.helper-text { color: var(--color-text-muted); margin-top: -8px; margin-bottom: 16px; }
 .auto-save-status { font-size: 13px; color: var(--brand-accent); opacity: 0; transition: opacity 0.3s; }
 
-/* === SCHEDULE VIEW (Aura Glass UI) === */
+/* === SCHEDULE VIEW === */
 .planner-section { height: 100%; overflow: hidden; }
 .planner-layout {
   display: grid;
-  grid-template-columns: 320px 1fr; /* Wider control panel */
-  gap: 32px;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
   height: 100%;
 }
 
-/* Ensure the planner tab content displays correctly when active */
-.tab-content.active.planner-section {
-    display: block;
-}
-
-.planner-controls { 
-    display: flex; 
-    flex-direction: column; 
-    gap: 20px; 
-    overflow-y: auto; 
-    height: 100%; 
-}
-
-/* Tree View (Sleek) */
+.planner-controls { display: flex; flex-direction: column; gap: 16px; overflow-y: auto; height: 100%; }
 .schedules-tree { flex-grow: 1; margin-top: 16px; }
-.schedules-tree label { 
-    cursor: pointer; 
-    display: block; 
-    padding: 10px 16px; 
-    border-radius: 10px; 
-    transition: background-color 0.2s, color 0.2s;
-    font-size: 14px;
-}
-.schedules-tree input[type="checkbox"] { margin-right: 10px; }
+.schedules-tree label { cursor: pointer; display: block; padding: 8px 12px; border-radius: 6px; }
+.schedules-tree input[type="checkbox"] { margin-right: 8px; }
 .schedules-tree label:hover { background-color: var(--color-hover-bg); }
 
 .tree-node-leader label {
-    font-weight: 700;
+    font-weight: 600;
     color: var(--brand-primary);
     background-color: #EEF2FF;
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    margin-bottom: 4px;
-}
-
-body.dark-mode .tree-node-leader label {
-    background-color: rgba(99, 102, 241, 0.2);
 }
 
 .tree-node-leader label .team-brand {
@@ -851,12 +604,12 @@ body.dark-mode .tree-node-leader label {
     font-weight: 600;
     color: var(--color-text);
     background-color: var(--color-border);
-    padding: 3px 8px;
+    padding: 2px 6px;
     border-radius: 4px;
     margin-left: auto;
 }
 
-.tree-node-advisor label { padding-left: 36px; }
+.tree-node-advisor label { padding-left: 32px; }
 
 .planner-viewer {
   display: flex;
@@ -872,63 +625,30 @@ body.dark-mode .tree-node-leader label {
   align-items: center;
   padding: 20px 24px;
   border-bottom: 1px solid var(--color-border);
-  flex-shrink: 0;
 }
 
-.planner-view-controls { display: flex; align-items: center; gap: 24px; }
+.planner-view-controls { display: flex; align-items: center; gap: 20px; }
 .planner-day-toggle { display: flex; align-items: center; gap: 12px; }
-
-/* Toggle Group (Pill Style - Light Mode) */
-.view-toggle-group { 
-    display: flex; 
-    border-radius: 50px; /* Pill shape */
-    background-color: var(--color-hover-bg);
-    padding: 4px;
-    border: 1px solid var(--color-border);
-}
-
-body.dark-mode .view-toggle-group {
-    background-color: rgba(0, 0, 0, 0.3);
-}
+.view-toggle-group { display: flex; border: 1px solid var(--color-border); border-radius: var(--border-radius); }
 
 .btn-toggle {
-    padding: 8px 20px;
+    padding: 8px 16px;
     font-size: 14px;
     font-weight: 500;
-    background-color: transparent;
+    background-color: var(--color-panel-bg);
     color: var(--color-text-muted);
     border: none;
     cursor: pointer;
-    border-radius: 50px;
-    transition: background-color 0.3s, color 0.3s, box-shadow 0.3s;
 }
 
-.btn-toggle.active { 
-    background-color: var(--color-panel-solid);
-    color: var(--brand-primary);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-}
+.btn-toggle:first-child { border-top-left-radius: var(--border-radius); border-bottom-left-radius: var(--border-radius); }
+.btn-toggle:last-child { border-top-right-radius: var(--border-radius); border-bottom-right-radius: var(--border-radius); }
+.btn-toggle.active { background-color: var(--brand-primary); color: white; }
 
-body.dark-mode .btn-toggle.active {
-    background-color: var(--brand-primary);
-    color: white;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-}
+.visualization-container { flex-grow: 1; overflow: auto; position: relative; }
+.visualization-empty { padding: 40px; text-align: center; color: var(--color-text-muted); }
 
-.visualization-container { 
-    flex-grow: 1; 
-    overflow: auto; 
-    position: relative; 
-    background-color: var(--color-panel-solid); /* Solid background for visualization area */
-}
-
-body.dark-mode .visualization-container {
-    background-color: rgba(0, 0, 0, 0.1);
-}
-
-.visualization-empty { padding: 50px; text-align: center; color: var(--color-text-muted); font-style: italic; }
-
-/* === DAILY TIMELINE (GANTT) VIEW (The WOW Factor) === */
+/* === DAILY TIMELINE (GANTT) VIEW === */
 .timeline-container { position: relative; min-width: 1200px; }
 .timeline-header {
   display: grid;
@@ -938,26 +658,25 @@ body.dark-mode .visualization-container {
   position: sticky;
   top: 0;
   z-index: 5;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
 }
 
 .header-name { 
-    padding: 14px 20px; 
+    padding: 12px 20px; 
     border-right: 1px solid var(--color-border);
-    font-weight: 700;
+    font-weight: 600;
     position: sticky;
     left: 0;
     background-color: var(--timeline-header-bg);
     z-index: 10;
 }
 
-.header-timeline { position: relative; height: 50px; background-color: var(--timeline-header-bg); }
+.header-timeline { position: relative; height: 48px; background-color: var(--timeline-header-bg); }
 
 .time-tick {
   position: absolute;
   font-size: 12px;
   font-weight: 600;
-  color: #94A3B8;
+  color: #4B5563;
   user-select: none;
   height: 100%;
   padding-left: 6px;
@@ -968,7 +687,6 @@ body.dark-mode .visualization-container {
   padding-right: 6px;
 }
 
-/* Grid Lines (Subtle) */
 .time-tick::after {
     content: '';
     position: absolute;
@@ -977,14 +695,12 @@ body.dark-mode .visualization-container {
     z-index: -1;
 }
 
-/* Current Time Indicator (Red Line) */
 .current-time-indicator {
     position: absolute; top: 0; height: 100%; width: 2px;
     background-color: var(--color-danger);
     z-index: 50; display: none; pointer-events: none;
 }
 
-/* Mouse Time Indicator (Interactive Cursor) */
 .mouse-time-indicator {
     position: absolute; top: 0; height: 100%; width: 1px;
     background-color: var(--color-text);
@@ -992,23 +708,9 @@ body.dark-mode .visualization-container {
 }
 
 .mouse-time-tooltip {
-    position: absolute; 
-    background-color: var(--color-text); 
-    color: white;
-    padding: 6px 12px; 
-    border-radius: 8px; 
-    font-size: 12px; 
-    font-weight: 600;
-    z-index: 52; 
-    display: none; 
-    transform: translateX(-50%) translateY(-35px); /* Position above cursor */
-    pointer-events: none;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-}
-
-body.dark-mode .mouse-time-tooltip {
-    background-color: var(--brand-primary);
-    color: white;
+    position: absolute; background-color: var(--color-text); color: white;
+    padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;
+    z-index: 52; display: none; transform: translateX(-50%); pointer-events: none;
 }
 
 .timeline-row {
@@ -1017,42 +719,24 @@ body.dark-mode .mouse-time-tooltip {
   height: var(--timeline-row-height);
   margin-bottom: 4px;
   cursor: pointer;
-  transition: background-color 0.2s;
-  border-radius: 8px;
 }
 
-.timeline-row:hover { background-color: #EEF2FF !important; }
-
-body.dark-mode .timeline-row:hover {
-    background-color: rgba(99, 102, 241, 0.2) !important;
-}
-
-/* Zebra Striping (Clean) */
+.timeline-row:hover { background-color: #F3F4F6 !important; }
 .timeline-row:nth-child(odd) { background-color: #FFFFFF; }
 .timeline-row:nth-child(even) { background-color: #F9FAFB; }
 
-body.dark-mode .timeline-row:nth-child(odd) { background-color: rgba(255, 255, 255, 0.02); }
-body.dark-mode .timeline-row:nth-child(even) { background-color: transparent; }
-
-
 .timeline-name { 
-    padding: 0 20px; 
-    border-right: 1px solid var(--color-border); 
-    display: flex; 
-    align-items: center; 
-    font-size: 14px;
-    position: sticky; 
-    left: 0; 
-    z-index: 15; 
-    background-color: inherit;
+    padding: 0 20px; border-right: 1px solid var(--color-border); 
+    display: flex; align-items: center; font-size: 14px;
+    position: sticky; left: 0; z-index: 15; background-color: inherit;
 }
 
-.timeline-track { position: relative; height: 100%; padding-top: 3px; }
+.timeline-track { position: relative; height: 100%; }
 
-/* --- Visualization Styles (Polished, Vibrant Bars) --- */
+/* --- Visualization Styles (Fixed for Custom Colors & Neatness) --- */
 .timeline-bar {
   position: absolute;
-  top: 3px; /* Center vertically in the row */
+  top: 0;
   height: var(--timeline-bar-height);
   display: flex;
   align-items: center;
@@ -1060,176 +744,59 @@ body.dark-mode .timeline-row:nth-child(even) { background-color: transparent; }
   /* NEATNESS FIX: Square edges allow neighbors to look like one solid block */
   border-radius: 0; 
   z-index: 10;
-  /* Ensure text is visible (JS handles contrast) */
-  font-size: 12px;
+  /* Ensure text is visible on dark colors */
+  color: #fff; 
+  font-size: 11px;
   font-weight: 600;
-  padding-left: 6px;
+  padding-left: 4px;
   /* ANIMATION: Smooth sliding for "Water Pipe" effect */
-  transition: width 0.15s ease-out, left 0.15s ease-out, background-color 0.2s; 
-  /* Add subtle depth and shine */
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.5), 0 1px 3px rgba(0,0,0,0.1);
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  transition: width 0.1s ease-out, left 0.1s ease-out; 
 }
 
 /* Exception Overlay (Hatched Pattern) */
 .is-exception .timeline-bar {
     background-image: repeating-linear-gradient(
         135deg,
-        rgba(255, 255, 255, 0.5),
-        rgba(255, 255, 255, 0.5) 8px,
-        transparent 8px,
-        transparent 16px
+        rgba(255, 255, 255, 0.2),
+        rgba(255, 255, 255, 0.2) 10px,
+        transparent 10px,
+        transparent 20px
     );
-    border: 1px solid var(--color-exception);
 }
 
-/* === WEEKLY VIEW (Aura Glass Adaptation) === */
+/* === WEEKLY VIEW === */
 .weekly-grid { width: 100%; }
-.weekly-grid thead th { position: sticky; top: 0; z-index: 10; background-color: var(--timeline-header-bg); }
-
-.weekly-cell { cursor: pointer; transition: background-color 0.2s; }
-.weekly-cell:hover { background-color: #EEF2FF; }
-
-body.dark-mode .weekly-cell:hover {
-    background-color: rgba(99, 102, 241, 0.2);
-}
-
-.weekly-cell.is-exception { 
-    border: 2px solid var(--color-exception); 
-    background-color: rgba(147, 51, 234, 0.05);
-}
+.weekly-grid thead th { position: sticky; top: 0; z-index: 10; }
+.weekly-cell { cursor: pointer; }
+.weekly-cell.is-exception { border: 2px solid var(--color-exception); }
 .weekly-cell-content { display: flex; flex-direction: column; align-items: flex-start; }
-.weekly-shift-code { font-weight: 700; font-size: 15px; color: var(--brand-primary); }
+.weekly-shift-code { font-weight: 700; font-size: 14px; color: var(--brand-primary); }
 .is-exception .weekly-shift-code { color: var(--color-exception); }
-.weekly-shift-time { font-size: 13px; color: var(--color-text-muted); }
-.weekly-rdo { font-size: 13px; color: #94A3B8; font-weight: 500; }
+.weekly-shift-time { font-size: 12px; color: var(--color-text-muted); }
+.weekly-rdo { font-size: 13px; color: #9CA3AF; font-weight: 500; }
 
-/* === SHIFT TRADE CENTER (Aura Glass UI) === */
-.trade-layout { display: flex; align-items: stretch; gap: 32px; margin-top: 24px; }
-.trade-panel { 
-    flex: 1; 
-    border: 1px solid var(--color-border); 
-    border-radius: var(--border-radius); 
-    padding: 24px; 
-    display: flex; 
-    flex-direction: column; 
-    gap: 20px; 
-    background-color: rgba(255, 255, 255, 0.5);
-}
-
-body.dark-mode .trade-panel {
-    background-color: rgba(0, 0, 0, 0.1);
-}
-
-.trade-swap-icon { 
-    color: var(--brand-primary); 
-    padding: 12px; 
-    align-self: center;
-    background-color: #EEF2FF;
-    border-radius: 50%;
-}
-
-body.dark-mode .trade-swap-icon {
-    background-color: rgba(99, 102, 241, 0.2);
-}
-
-.trade-preview { 
-    margin-top: 16px; 
-    padding: 16px; 
-    background-color: var(--color-hover-bg);
-    border: 1px dashed var(--color-border); 
-    border-radius: var(--border-radius); 
-    min-height: 150px; 
-    color: var(--color-text-muted); 
-    flex-grow: 1;
-}
-
-body.dark-mode .trade-preview {
-    background-color: rgba(0, 0, 0, 0.2);
-}
-
+/* === SHIFT TRADE CENTER === */
+.trade-layout { display: flex; align-items: stretch; gap: 24px; margin-top: 24px; }
+.trade-panel { flex: 1; border: 1px solid var(--color-border); border-radius: var(--border-radius); padding: 20px; display: flex; flex-direction: column; gap: 16px; background-color: var(--color-hover-bg); }
+.trade-swap-icon { color: var(--brand-primary); padding: 12px; align-self: center; }
+.trade-preview { margin-top: 16px; padding: 16px; background-color: white; border: 1px solid var(--color-border); border-radius: var(--border-radius); min-height: 100px; color: var(--color-text-muted); flex-grow: 1; }
 .trade-preview-details { color: var(--color-text); }
 .trade-preview-details h4 { margin-top: 0; margin-bottom: 12px; font-size: 16px; font-weight: 600; }
 .trade-preview-details ul { list-style-type: none; padding: 0; margin: 0; }
-.trade-preview-details li { font-size: 14px; margin-bottom: 6px; font-family: monospace; background-color: var(--color-panel-solid); padding: 4px 8px; border-radius: 4px; }
-
-body.dark-mode .trade-preview-details li {
-    background-color: rgba(255, 255, 255, 0.05);
-}
-
+.trade-preview-details li { font-size: 13px; margin-bottom: 4px; font-family: monospace; }
 .trade-actions { margin-top: 32px; text-align: center; }
 
-/* === MODAL & BUILDER STYLES (Premium Glassmorphism Pop-ups) === */
-.modal-backdrop { 
-    display: none; 
-    position: fixed; 
-    z-index: 1050; 
-    left: 0; 
-    top: 0; 
-    width: 100%; 
-    height: 100%; 
-    /* Overlay with significant blur */
-    background-color: rgba(15, 23, 42, 0.4);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    align-items: center; 
-    justify-content: center;
-    /* Modal open animation */
-    animation: fadeInOverlay 0.3s ease-out;
-}
-
-@keyframes fadeInOverlay {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.modal-content { 
-    /* Solid background for modal content for maximum readability */
-    background-color: var(--color-panel-solid); 
-    margin: auto; 
-    border-radius: var(--border-radius); 
-    box-shadow: var(--shadow-heavy); 
-    display: flex; 
-    flex-direction: column; 
-    max-height: 90vh;
-    border: 1px solid var(--color-border);
-    /* Modal pop animation (bouncy effect) */
-    animation: popInModal 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-@keyframes popInModal {
-    from { transform: scale(0.8); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-}
-
-.modal-lg { width: 90%; max-width: 1100px; }
-.modal-header { 
-    padding: 20px 28px; 
-    display: flex; 
-    justify-content: space-between; 
-    align-items: center; 
-    border-bottom: 1px solid var(--color-border);
-    background-color: var(--color-hover-bg);
-}
-
+/* === MODAL & BUILDER STYLES (Updated Layout) === */
+.modal-backdrop { display: none; position: fixed; z-index: 1050; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(17, 24, 39, 0.5); align-items: center; justify-content: center; }
+.modal-content { background-color: var(--color-panel-bg); margin: auto; border-radius: var(--border-radius); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); display: flex; flex-direction: column; max-height: 85vh; }
+.modal-lg { width: 90%; max-width: 1000px; }
+.modal-header { padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-border); }
 .modal-close { color: var(--color-text); }
-.modal-body { flex-grow: 1; overflow: hidden; padding: 28px; }
+.modal-body { flex-grow: 1; overflow: hidden; padding: 24px; }
 
 /* Fix Modal Layout for Water Pipe */
 .modal-body.sequential-layout { flex-direction: column !important; display: flex; }
-
-/* Visual Editor Layout (Internal visualization within the modal) */
-/* FIX: Ensuring the layout is robust and styled correctly */
-.visual-editor-layout { 
-    display: flex; /* Ensures Toolbox and Timeline are side-by-side */
-    width: 100%; 
-    height: 350px; 
-    border: 1px solid var(--color-border); 
-    border-radius: var(--border-radius); 
-    background-color: var(--color-bg); /* Background for the visualization area */
-    overflow: hidden; 
-}
-
+.visual-editor-layout { display: flex; width: 100%; height: 350px; border: 1px solid var(--color-border); border-radius: var(--border-radius); background-color: #fff; overflow: hidden; }
 /* FIX: Allow legacy editor to fill modal and scroll */
 #legacyEditorContainer {
     display: flex;
@@ -1238,407 +805,336 @@ body.dark-mode .trade-preview-details li {
     min-height: 0; /* Critical for child overflow scrolling in a flex parent */
 }
 .builder-controls { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; }
-.time-picker-input { width: 130px; }
-.builder-grid-container { flex-grow: 1; overflow-y: auto; border-radius: var(--border-radius); border: 1px solid var(--color-border); }
+.time-picker-input { width: 120px; }
+.builder-grid-container { flex-grow: 1; overflow-y: auto; border-radius: var(--border-radius); }
+.builder-grid th { font-size: 12px; padding: 10px 16px; position: sticky; top: 0; z-index: 1; }
+.btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.table-footer-inline { display: flex; justify-content: center; padding: 12px 0 4px; }
+.actions-cell .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+.builder-grid .form-select, .builder-grid .form-input { width: 100%; padding: 6px 10px; font-size: 13px; }
+.duration-input { max-width: 100px; }
+.exception-reason-group { margin-bottom: 24px; }
+#modalExceptionReason { width: 100%; }
 
-/* === NOTIFICATIONS (Toasts) === */
-#notification-container {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+/* Modal Footer */
+.modal-footer { border-top: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; gap: 20px; padding: 20px 24px; }
+.modal-footer-left { flex-grow: 1; }
+.modal-footer-left .form-group { width: 100%; max-width: 500px; }
+.modal-footer-left .form-group label { font-size: 11px; font-weight: 600; color: var(--color-text-muted); }
+.modal-footer-right { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+.ve-undo-redo { display: flex; gap: 4px; border-right: 1px solid var(--color-border); padding-right: 16px; }
+.editor-summary { font-size: 13px; color: var(--color-text-muted); white-space: nowrap; }
+.editor-summary strong { color: var(--color-text); font-weight: 600; }
+
+/* === VISUAL EDITOR COMPONENTS (Water Pipe) === */
+
+/* Toolbox */
+.ve-toolbox { width: 25%; height: 100%; display: flex; flex-direction: column; border-right: 1px solid var(--color-border); background-color: var(--color-panel-bg); }
+.ve-toolbox-header { padding: 12px 16px; border-bottom: 1px solid var(--color-border); background-color: var(--color-hover-bg); }
+.ve-toolbox-header p { font-size: 11px; color: var(--color-text-muted); margin: 4px 0 0 0; }
+.ve-toolbox-list { flex-grow: 1; overflow-y: auto; padding: 8px; }
+.ve-toolbox-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px; cursor: grab; font-weight: 500; font-size: 12px; margin-bottom: 4px; border: 1px solid transparent; transition: background-color 0.1s; }
+.ve-toolbox-item:hover { background-color: var(--color-hover-bg); }
+.ve-toolbox-color { width: 14px; height: 14px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); flex-shrink: 0; }
+
+/* Timeline Area */
+.ve-timeline-container { width: 75%; height: 100%; padding: 10px 16px 20px 16px; overflow-y: auto; display: flex; flex-direction: column; }
+.ve-timeline-track { display: flex; width: 100%; height: 50px; border-radius: 6px; overflow: hidden; border: 1px solid var(--color-border); background-color: #fff; position: relative; flex-shrink: 0; }
+
+/* Segments (The Water/Stone) */
+.ve-segment { display: flex; align-items: center; justify-content: center; height: 100%; border-right: none; border-radius: 0; overflow: hidden; white-space: nowrap; font-size: 11px; font-weight: 600; position: relative; cursor: grab; user-select: none; transition: width 0.1s ease-out; }
+.ve-drag-handle { position: absolute; right: -3px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 20; }
+
+/* Dragging Visuals */
+.ve-segment.is-dragging { opacity: 0.6; z-index: 50; box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: grabbing; background-image: repeating-linear-gradient(-45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.1) 5px, transparent 5px, transparent 10px); }
+.ve-toolbox-item.is-dragging { opacity: 0.5; background-color: var(--color-success-bg); border: 1px dashed var(--color-success); }
+
+/* Time Ruler */
+.ve-time-ruler { display: flex; position: relative; width: 100%; height: 25px; margin-bottom: 4px; font-size: 11px; font-weight: 600; color: var(--color-text-muted); flex-shrink: 0; }
+.ve-time-marker { position: absolute; height: 100%; border-left: 1px solid var(--color-border); padding-left: 4px; user-select: none; }
+.ve-time-marker:first-child { border-left: none; }
+
+/* Drop Cursor */
+.ve-drop-cursor { position: absolute; top: 35px; height: 50px; width: 2px; background-color: var(--color-danger); z-index: 100; pointer-events: none; box-shadow: 0 0 4px rgba(239, 68, 68, 0.6); }
+
+/* Pop-up */
+.ve-add-popup { position: absolute; width: 280px; background: var(--color-panel-bg); border: 1px solid var(--color-border); box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: var(--border-radius); padding: 16px; z-index: 20; display: none; }
+.ve-add-popup h4 { margin-top: 0; margin-bottom: 16px; }
+.ve-add-popup .form-group { margin-bottom: 12px; }
+.ve-add-popup .ve-add-popup-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+/* Context Menu */
+.ve-context-menu { position: fixed; z-index: 9999; display: flex; flex-direction: column; width: 180px; background-color: #fff; border: 1px solid var(--color-border); border-radius: 6px; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); padding: 4px; }
+.ve-context-menu-item { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 500; padding: 8px 12px; border: none; background-color: transparent; border-radius: 4px; cursor: pointer; text-align: left; color: var(--color-text); }
+.ve-context-menu-item:hover { background-color: var(--color-hover-bg); }
+.ve-context-menu-separator { height: 1px; background-color: var(--color-border); margin: 6px 0; }
+.ve-context-menu-item.is-danger { color: var(--color-danger); }
+.ve-context-menu-item.is-danger svg { color: var(--color-danger); }
+.ve-context-menu-item.is-danger:hover { background-color: var(--color-danger-bg); }
+
+/* === TOAST NOTIFICATIONS === */
+#notification-container { position: fixed; bottom: 24px; right: 24px; z-index: 2000; display: flex; flex-direction: column; gap: 12px; }
+.toast { padding: 16px 20px; border-radius: var(--border-radius); box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); min-width: 300px; color: var(--color-text); font-weight: 500; }
+.toast.is-success { background-color: #D1FAE5; border-left: 4px solid var(--brand-accent); }
+.toast.is-danger { background-color: var(--color-danger-bg); border-left: 4px solid var(--color-danger); }
+
+/* Button Specifics */
+#btnRemoveWeek.btn-danger { background-color: #dc3545; border-color: #dc3545; color: white; cursor: pointer; }
+#btnRemoveWeek.btn-danger:hover { background-color: #c82333; border-color: #bd2130; }
+.table .actions { white-space: nowrap; }
+.table .actions .btn { margin-right: 8px; }
+.table .actions .btn:last-child { margin-right: 0; }
+
+/* Color Picker Fix */
+.form-input-color { -webkit-appearance: none; -moz-appearance: none; appearance: none; width: 100%; height: 36px; padding: 0; border: 1px solid var(--color-border); border-radius: var(--border-radius); background-color: white; cursor: pointer; }
+.form-input-color::-webkit-color-swatch { border-radius: var(--border-radius); border: none; padding: 0; }
+.form-input-color::-webkit-color-swatch-wrapper { border-radius: var(--border-radius); border: none; padding: 0; }
+td .form-input-color.edit-value { width: 60px; height: 30px; }
+/* === V16.13: Assignment Manager Enhancements === */
+
+/* Style for the new "Start Wk #" input */
+.assign-start-week {
+  width: 70px;
+  padding: 7px 10px;
 }
 
-.toast {
-    padding: 14px 20px;
-    border-radius: 12px;
-    color: #fff;
-    font-weight: 500;
-    box-shadow: var(--shadow-heavy);
-    animation: slideInRight 0.3s ease-out;
-    min-width: 250px;
+/* Style for the new "View Plan" icon button */
+.act-view-plan {
+  padding: 8px; /* Make it a square icon button */
+  margin-left: 4px;
 }
 
-@keyframes slideInRight {
-    from { transform: translateX(100%); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
+/* Plan Viewer Modal Styles */
+#planModalBodyContainer {
+  max-height: 50vh; /* Make the table scrollable */
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
 }
 
-.toast.is-success { background-color: var(--color-success); }
-.toast.is-danger { background-color: var(--color-danger); }
+.plan-modal-table {
+  width: 100%;
+  border-collapse: collapse;
+}
 
-/* === HOME DASHBOARD (App Grid Style) === */
+.plan-modal-table th,
+.plan-modal-table td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.plan-modal-table th {
+  background-color: var(--color-hover-bg);
+  font-weight: 600;
+  font-size: 12px;
+  position: sticky; /* Keep header visible on scroll */
+  top: 0;
+}
+
+.plan-modal-table tr:last-child td {
+  border-bottom: none;
+}
+/* Styling for the new Team Header Row in Assignments */
+.team-header-row td {
+    background-color: #f3f4f6; /* A light grey background */
+    font-weight: 600;
+    font-size: 13px;
+    color: #4b5563; /* A muted dark grey text */
+    padding: 10px 16px;
+    border-top: 2px solid #e5e7eb; /* A slighly thicker top border */
+}
+/* Shift Definition Inline Edit */
+#shiftDefinitionsGrid .edit-value {
+    /* These make it feel "normal" like other inputs */
+    font-size: 13px;
+    padding: 6px 10px;
+
+    /* This makes the NAME box fill the space */
+    width: 100%;
+    min-width: 150px;
+}
+#shiftDefinitionsGrid input[name="def-code"] {
+    /* This overrides the width for the CODE box only */
+    width: 100px;
+    min-width: 150px;
+}
+/* === ROTATION EDITOR LAYOUT FIX (v2 - More Aggressive) === */
+
+/* Target the table headers and cells */
+#rotationGrid th,
+#rotationGrid td {
+    padding: 10px 4px; /* Drastically reduce left/right padding */
+    white-space: nowrap; 
+}
+
+/* Make the header text slightly smaller */
+#rotationGrid th {
+    font-size: 11px;
+}
+
+/* Make the dropdown (select) boxes inside the grid much tighter */
+#rotationGrid .form-select {
+    padding: 6px 2px; /* Tighter left/right padding */
+    font-size: 12px;
+    min-width: 120px; /* Prevent it from collapsing too much */
+    width: 100%; /* Ensure it fills the (now smaller) cell */
+}
+/* === New Home Dashboard (App Icon Style) === */
 .dashboard-app-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    /* Create a responsive grid of icons */
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 24px;
-    padding: 20px;
 }
 
-.dashboard-app {
-    /* Glass Effect for Dashboard Apps */
+/* The 'coming soon' chart widget */
+.dashboard-chart-widget {
+    /* Span the full width of the grid */
+    grid-column: 1 / -1;
     background-color: var(--color-panel-bg);
-    backdrop-filter: blur(var(--blur-strength));
-    -webkit-backdrop-filter: blur(var(--blur-strength));
-    border: 1px solid rgba(255, 255, 255, 0.8);
     border-radius: var(--border-radius);
-    padding: 24px;
-    text-align: center;
-    cursor: pointer;
-    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
-    position: relative;
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--color-border);
+}
+.dashboard-chart-widget h3 {
+    padding: 16px 20px;
+    margin: 0;
+    border-bottom: 1px solid var(--color-border);
+    font-size: 15px;
+}
+.dashboard-chart-widget .widget-content {
+    padding: 20px;
+    color: var(--color-text-muted);
+}
+
+/* The App Icon Button */
+.dashboard-app {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    height: 180px;
-    box-shadow: var(--shadow-float);
+    padding: 20px;
+    border: none;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    position: relative; /* For the badge */
+
+    /* The premium dark-mode feel */
+    background-color: var(--sidebar-bg); /* Dark background */
+    color: var(--sidebar-text); /* Light text */
+    box-shadow: var(--shadow-sm);
 }
 
-body.dark-mode .dashboard-app {
-    border: 1px solid var(--color-border);
+.dashboard-app:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md);
+    color: #fff;
 }
 
-.dashboard-app:hover:not(:disabled) {
-    transform: translateY(-5px);
-    box-shadow: var(--shadow-heavy);
-    border-color: var(--brand-primary);
+.dashboard-app .app-icon {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 12px;
+    color: #fff; /* White icon */
 }
 
-.app-icon {
-    margin-bottom: 16px;
-    color: var(--brand-primary);
+.dashboard-app .app-icon svg {
+    width: 100%;
+    height: 100%;
 }
 
-.app-icon svg {
-    width: 48px;
-    height: 48px;
-}
-
-.app-title {
-    font-size: 15px;
+.dashboard-app .app-title {
+    font-size: 14px;
     font-weight: 600;
-    color: var(--color-text);
+    text-align: center;
 }
 
+/* The Notification Badge */
 .app-badge {
     position: absolute;
-    top: -10px;
-    right: -10px;
+    top: -8px;
+    right: -8px;
     background-color: var(--color-danger);
     color: white;
-    border-radius: 50%;
-    padding: 4px 8px;
     font-size: 12px;
     font-weight: 700;
-    min-width: 24px;
+    border-radius: 50%;
+    width: 24px;
     height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* The new Modal Body (for lists) */
+#dashboardModal .modal-body {
+    padding: 0; /* Remove padding to let list be full-width */
+}
+
+/* Simple list for modal content */
+.dashboard-detail-list {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.dashboard-detail-list li {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text);
+    font-size: 14px;
+}
+.dashboard-detail-list li:last-child {
+    border-bottom: none;
+}
+.dashboard-detail-list li strong {
+    color: var(--brand-primary);
+}
+/* "Coming Soon" App Icon Styling */
+.dashboard-app.coming-soon {
+    opacity: 0.6;
+    cursor: not-allowed;
+    overflow: hidden; /* To contain the banner */
+}
+
+.dashboard-app.coming-soon:hover {
+    transform: none; /* Disable hover effect */
+    box-shadow: var(--shadow-sm);
+    color: var(--sidebar-text);
 }
 
 .app-banner {
     position: absolute;
-    bottom: 10px;
-    left: 50%;
-    transform: translateX(-50%);
+    top: 10px;
+    right: -30px;
     background-color: var(--brand-accent);
     color: white;
-    padding: 4px 12px;
-    border-radius: 50px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.dashboard-app.coming-soon {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.dashboard-app.coming-soon:hover {
-    transform: none;
-    box-shadow: var(--shadow-float);
-    border-color: rgba(255, 255, 255, 0.8);
-}
-
-body.dark-mode .dashboard-app.coming-soon:hover {
-    border-color: var(--color-border);
-}
-
-/* === VISUAL EDITOR (VE) - Toolbox & Timeline (v16.12) === */
-/* Ensuring layout integrity while applying the new aesthetic */
-
-.visual-editor-layout {
-    display: flex; /* Ensures Toolbox and Timeline are side-by-side */
-    width: 100%; 
-    height: 350px; 
-    border: 1px solid var(--color-border); 
-    border-radius: var(--border-radius); 
-    background-color: var(--color-bg); /* Background for the visualization area */
-    overflow: hidden; 
-}
-
-/* Toolbox Side */
-.ve-toolbox-container {
-    width: 220px;
-    flex-shrink: 0; /* Prevent toolbox from shrinking */
-    display: flex;
-    flex-direction: column;
-    border-right: 1px solid var(--color-border);
-    background-color: var(--color-panel-solid); /* Match modal background */
-    padding: 16px;
-}
-
-#veToolboxSearch {
-    margin-bottom: 16px;
-}
-
-.ve-toolbox {
-    flex-grow: 1;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.ve-toolbox-item {
-    padding: 8px 12px;
-    background-color: var(--color-hover-bg);
-    border-radius: 8px;
-    cursor: grab;
-    font-size: 13px;
-    font-weight: 500;
-    transition: background-color 0.1s;
-    /* Border color is dynamically set in JS */
-}
-
-body.dark-mode .ve-toolbox-item {
-    background-color: rgba(255, 255, 255, 0.05);
-}
-
-.ve-toolbox-item:hover {
-    background-color: var(--color-border);
-}
-
-body.dark-mode .ve-toolbox-item:hover {
-    background-color: rgba(255, 255, 255, 0.1);
-}
-
-
-.ve-toolbox-item:active {
-    cursor: grabbing;
-}
-
-/* Timeline Side */
-.ve-timeline-container {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    position: relative;
-}
-
-.ve-timeline-header {
-    padding: 16px;
-    border-bottom: 1px solid var(--color-border);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.ve-timeline-viewer {
-    flex-grow: 1;
-    position: relative;
-    overflow: hidden;
-    padding: 16px;
-}
-
-/* The actual timeline track */
-#visualEditorTimeline {
-    width: 100%;
-    height: 50px;
-    background-color: #E2E8F0;
-    border-radius: 12px;
-    display: flex;
-    align-items: stretch; /* Ensure segments fill the height */
-    position: relative;
-    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.1); /* Inner shadow for depth */
-}
-
-body.dark-mode #visualEditorTimeline {
-    background-color: #0F172A;
-    box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.3);
-}
-
-/* Segments within the timeline */
-.ve-segment {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    position: relative;
-    cursor: move;
-    user-select: none;
-    /* Removed border-radius to allow seamless connection (Water Pipe) */
-}
-
-/* Drag Handle (Resize) */
-.ve-drag-handle {
-    position: absolute;
-    right: 0;
-    top: 0;
-    height: 100%;
-    width: 6px;
-    cursor: ew-resize;
-    background-color: rgba(0, 0, 0, 0.1);
-    transition: background-color 0.1s;
-}
-
-body.dark-mode .ve-drag-handle {
-    background-color: rgba(255, 255, 255, 0.2);
-}
-
-.ve-drag-handle:hover {
-    background-color: var(--brand-primary);
-}
-
-/* Time Ruler */
-#visualEditorTimeRuler {
-    width: 100%;
-    height: 20px;
-    position: relative;
-    margin-bottom: 8px;
-}
-
-.ve-time-marker {
-    position: absolute;
-    font-size: 11px;
-    color: var(--color-text-muted);
-    transform: translateX(-50%);
-}
-
-.ve-time-marker::before {
-    content: '';
-    position: absolute;
-    bottom: -4px;
-    left: 50%;
-    height: 4px;
-    width: 1px;
-    background-color: var(--color-border);
-}
-
-/* Drop Cursor (for Toolbox Drag) */
-#visualEditorDropCursor {
-    position: absolute;
-    top: 0;
-    height: 100%;
-    width: 3px;
-    background-color: var(--brand-primary);
-    box-shadow: 0 0 8px rgba(79, 70, 229, 0.5);
-    z-index: 100;
-    display: none;
-    pointer-events: none;
-}
-
-/* Context Menu (Right Click) */
-#visualEditorContextMenu {
-    position: fixed;
-    background-color: var(--color-panel-solid);
-    border-radius: 12px;
-    box-shadow: var(--shadow-heavy);
-    z-index: 1000;
-    display: none;
-    padding: 8px 0;
-    border: 1px solid var(--color-border);
-}
-
-.ve-context-menu-item {
-    padding: 8px 20px;
-    cursor: pointer;
-    font-size: 14px;
-    color: var(--color-text);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.ve-context-menu-item:hover {
-    background-color: var(--color-hover-bg);
-}
-
-/* Add/Edit Popup (Floating Input Form) */
-#visualEditorAddPopup {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background-color: var(--color-panel-solid);
-    padding: 24px;
-    border-radius: var(--border-radius);
-    box-shadow: var(--shadow-heavy);
-    z-index: 500;
-    display: none;
-    width: 350px;
-    border: 1px solid var(--color-border);
-}
-
-#ve-add-popup-title {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 20px;
-}
-
-/* Component Lab (Batch Creator) */
-.comp-lab-grid {
-    margin-top: 20px;
-}
-
-.comp-lab-templates {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
-}
-
-/* Inline Color Input Styling */
-.form-input-color {
-    padding: 2px;
-    height: 34px;
-    width: 40px;
-    border: 1px solid var(--color-border);
-    border-radius: 4px;
-    cursor: pointer;
-    background-color: var(--color-panel-solid);
-}
-
-body.dark-mode .form-input-color {
-    background-color: rgba(255, 255, 255, 0.05);
-}
-
-/* Team Header Row (Assignments Tab) */
-.team-header-row td {
-    background-color: #EEF2FF !important; /* Indigo Tint background */
+    font-size: 10px;
     font-weight: 700;
-    font-size: 15px;
-    padding: 14px 16px;
-    color: var(--brand-primary);
-    border-top: 1px solid #D1D5DB;
-    border-bottom: 1px solid #D1D5DB;
-}
-
-body.dark-mode .team-header-row td {
-    background-color: #1E293B !important;
-    border-color: var(--color-border);
-}
-
-/* Ensure hover effect doesn't apply to header rows */
-tbody tr.team-header-row:hover {
-    background-color: #EEF2FF !important;
-}
-
-body.dark-mode tbody tr.team-header-row:hover {
-    background-color: #1E293B !important;
+    padding: 4px 30px;
+    transform: rotate(45deg);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    text-transform: uppercase;
+}/* Explicit Rest Day Indicator */
+.timeline-rdo-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.025); /* Subtle grey background */
+    color: #9CA3AF; /* Muted text */
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 1px;
+    user-select: none;
+    z-index: 0;
 }
