@@ -1731,16 +1731,21 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         ELS.visualEditorTimeRuler.innerHTML = html;
     };
     const renderSummary = () => {
-        let totalDuration = 0;
-        let paidDuration = 0;
-        BUILDER_STATE.segments.forEach(seg => {
-            const component = APP.StateManager.getComponentById(seg.component_id);
+    let totalDuration = 0;
+    let paidDuration = 0;
+    BUILDER_STATE.segments.forEach(seg => {
+        const component = APP.StateManager.getComponentById(seg.component_id);
+        
+        // FIX: Only add duration if it is NOT a gap
+        if (seg.component_id !== '_GAP_') {
             totalDuration += seg.duration_min;
-            if (component && component.is_paid) paidDuration += seg.duration_min;
-        });
-        if (ELS.modalTotalTime) ELS.modalTotalTime.textContent = APP.Utils.formatDuration(totalDuration);
-        if (ELS.modalPaidTime) ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
-    };
+        }
+
+        if (component && component.is_paid) paidDuration += seg.duration_min;
+    });
+    if (ELS.modalTotalTime) ELS.modalTotalTime.textContent = APP.Utils.formatDuration(totalDuration);
+    if (ELS.modalPaidTime) ELS.modalPaidTime.textContent = APP.Utils.formatDuration(paidDuration);
+};
     // --- LOGIC: NEIGHBOR FUSION & NORMALIZATION ---
     const fuseNeighbors = (segments) => {
         if (segments.length < 2) return segments;
