@@ -764,58 +764,50 @@ tbody tr:hover { background-color: var(--color-hover-bg); }
     );
 }
 
-/* === WEEKLY VIEW - ADVISOR GLASSMORPHIC STYLE === */
+/* === WEEKLY VIEW (Simple Advisor Team Style) === */
 .weekly-grid { 
     width: 100%; 
-    border-collapse: separate; 
-    border-spacing: 6px; /* Creates the gap between glass tiles */
-    padding: 0 10px;
+    border-collapse: collapse; /* Ensures a clean, simple grid with no gaps */
+    table-layout: fixed;
 }
 
 .weekly-grid thead th { 
     position: sticky; 
     top: 0; 
     z-index: 10;
-    padding: 15px;
-    color: var(--color-text-muted);
-    font-weight: 600;
-    text-transform: uppercase;
-    font-size: 11px;
-    letter-spacing: 1px;
-    background: transparent;
+    padding: 12px 8px;
+    background-color: var(--color-panel-bg);
+    border-bottom: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    text-align: center;
 }
 
 .weekly-cell { 
-    cursor: pointer;
-    background: rgba(255, 255, 255, 0.03); /* Glass tile background */
-    border: 1px solid rgba(255, 255, 255, 0.08); /* Subtle border */
-    border-radius: 16px; /* Rounded corners to match buttons */
-    height: 90px;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    cursor: pointer; 
+    border-bottom: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    height: 70px; /* Fixed height for uniformity */
     vertical-align: middle;
+    padding: 4px;
+    background-color: transparent;
+    transition: background-color 0.15s ease;
 }
 
 .weekly-cell:hover {
-    background: rgba(255, 255, 255, 0.08);
-    transform: translateY(-2px); /* 3D Lift effect */
-    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-    border-color: rgba(255, 255, 255, 0.2);
+    background-color: var(--color-hover-bg); /* Simple hover effect */
 }
 
 .weekly-cell.is-exception { 
-    border: 1px solid var(--color-exception); 
-    background: rgba(147, 51, 234, 0.1);
-    box-shadow: 0 0 10px rgba(147, 51, 234, 0.2);
+    border: 2px solid var(--color-exception) !important; /* Explicit border for exceptions */
 }
 
 .weekly-cell-content { 
     display: flex; 
     flex-direction: column; 
-    align-items: center; /* Ensures RD stays in the middle */
+    align-items: center; /* KEEPS RD IN THE MIDDLE */
     justify-content: center;
+    width: 100%;
     height: 100%;
-    gap: 6px;
 }
 .weekly-shift-code { font-weight: 700; font-size: 14px; color: var(--brand-primary); }
 .is-exception .weekly-shift-code { color: var(--color-exception); }
