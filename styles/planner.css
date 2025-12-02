@@ -764,12 +764,59 @@ tbody tr:hover { background-color: var(--color-hover-bg); }
     );
 }
 
-/* === WEEKLY VIEW === */
-.weekly-grid { width: 100%; }
-.weekly-grid thead th { position: sticky; top: 0; z-index: 10; }
-.weekly-cell { cursor: pointer; }
-.weekly-cell.is-exception { border: 2px solid var(--color-exception); }
-.weekly-cell-content { display: flex; flex-direction: column; align-items: flex-start; }
+/* === WEEKLY VIEW - ADVISOR GLASSMORPHIC STYLE === */
+.weekly-grid { 
+    width: 100%; 
+    border-collapse: separate; 
+    border-spacing: 6px; /* Creates the gap between glass tiles */
+    padding: 0 10px;
+}
+
+.weekly-grid thead th { 
+    position: sticky; 
+    top: 0; 
+    z-index: 10;
+    padding: 15px;
+    color: var(--color-text-muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 1px;
+    background: transparent;
+}
+
+.weekly-cell { 
+    cursor: pointer;
+    background: rgba(255, 255, 255, 0.03); /* Glass tile background */
+    border: 1px solid rgba(255, 255, 255, 0.08); /* Subtle border */
+    border-radius: 16px; /* Rounded corners to match buttons */
+    height: 90px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    vertical-align: middle;
+}
+
+.weekly-cell:hover {
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateY(-2px); /* 3D Lift effect */
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.weekly-cell.is-exception { 
+    border: 1px solid var(--color-exception); 
+    background: rgba(147, 51, 234, 0.1);
+    box-shadow: 0 0 10px rgba(147, 51, 234, 0.2);
+}
+
+.weekly-cell-content { 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; /* Ensures RD stays in the middle */
+    justify-content: center;
+    height: 100%;
+    gap: 6px;
+}
 .weekly-shift-code { font-weight: 700; font-size: 14px; color: var(--brand-primary); }
 .is-exception .weekly-shift-code { color: var(--color-exception); }
 .weekly-shift-time { font-size: 12px; color: var(--color-text-muted); }
