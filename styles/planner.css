@@ -764,16 +764,36 @@ tbody tr:hover { background-color: var(--color-hover-bg); }
     );
 }
 
-/* === WEEKLY VIEW === */
-.weekly-grid { width: 100%; }
-.weekly-grid thead th { position: sticky; top: 0; z-index: 10; }
+/* === WEEKLY VIEW (Director Layout Match) === */
+.weekly-grid { width: 100%; border-collapse: separate; border-spacing: 0 4px; padding-right: 12px; }
+
+/* Sticky Header */
+.weekly-grid th { padding: 16px; text-align: center; font-weight: 700; color: var(--color-text-muted); position: sticky; top: 0; z-index: 15; background: #F9FAFB; border-bottom: 2px solid var(--color-border); border-right: 1px solid rgba(0,0,0,0.05); }
+.weekly-grid th:first-child { text-align: left; z-index: 20; left: 0; }
+
+/* Zebra Striping & Floating Rows */
+.weekly-grid tbody tr:nth-child(odd) td { background-color: #FFFFFF; }
+.weekly-grid tbody tr:nth-child(even) td { background-color: #F3F4F6; }
+.weekly-grid tbody tr:hover td { background-color: #DBEAFE !important; cursor: default; }
+
+/* Cell Styling */
+.weekly-grid td { padding: 12px 8px; border: none; border-right: 1px solid rgba(0,0,0,0.08); vertical-align: middle; text-align: center; transition: background-color 0.1s ease; }
+
+/* Rounded Ends for Floating Look */
+.weekly-grid td:first-child { border-radius: 8px 0 0 8px; font-weight: 600; text-align: left; padding-left: 16px; border-right: 2px solid rgba(0,0,0,0.1); position: sticky; left: 0; z-index: 10; background-color: inherit; }
+.weekly-grid td:last-child { border-radius: 0 8px 8px 0; border-right: none; }
+
 .weekly-cell { cursor: pointer; }
-.weekly-cell.is-exception { border: 2px solid var(--color-exception); }
-.weekly-cell-content { display: flex; flex-direction: column; align-items: flex-start; }
-.weekly-shift-code { font-weight: 700; font-size: 14px; color: var(--brand-primary); }
-.is-exception .weekly-shift-code { color: var(--color-exception); }
-.weekly-shift-time { font-size: 12px; color: var(--color-text-muted); }
-.weekly-rdo { font-size: 13px; color: #9CA3AF; font-weight: 500; }
+.weekly-cell.is-exception { border: 2px solid var(--color-exception); border-radius: 6px; }
+.weekly-cell-content { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+
+/* Avatar Styling (Required for Layout) */
+.avatar-cell { display: flex; align-items: center; gap: 12px; }
+.avatar-circle { width: 32px; height: 32px; background: linear-gradient(135deg, #DBEAFE, #BFDBFE); color: #1E40AF; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; border: 2px solid #FFFFFF; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+
+/* Shift Pill Styling */
+.grid-shift-pill { background: rgba(255, 255, 255, 0.6); border: 1px solid rgba(0,0,0,0.05); padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; display: inline-block; color: var(--color-text); box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+.weekly-rdo-pill { display: inline-block; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; color: #9CA3AF; background: rgba(243, 244, 246, 0.6); border: 1px dashed #D1D5DB; min-width: 80px; text-align: center; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02); }
 
 /* === SHIFT TRADE CENTER === */
 .trade-layout { display: flex; align-items: stretch; gap: 24px; margin-top: 24px; }
