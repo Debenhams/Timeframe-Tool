@@ -859,9 +859,9 @@ return { data, error: null };
         let draft = { name: '', type: 'Activity', color: '#3B82F6', default_duration_min: 60, is_paid: true, is_full_day_override: false };
         
         if (templateType === 'Payback') {
-            draft = { name: 'Work Back - ', type: 'Payback', color: '#8B5CF6', default_duration_min: 60, is_paid: true, is_full_day_override: false };
+            draft = { name: '', type: 'Payback', color: '#8B5CF6', default_duration_min: 60, is_paid: true, is_full_day_override: false };
         } else if (templateType === 'Shrinkage') {
-            draft = { name: 'Late - ', type: 'Shrinkage', color: '#000000', default_duration_min: 30, is_paid: false, is_full_day_override: false };
+            draft = { name: '', type: 'Shrinkage', color: '#000000', default_duration_min: 30, is_paid: false, is_full_day_override: false };
         } else if (templateType === 'Break') {
             draft = { name: 'Break', type: 'Break', color: '#10B981', default_duration_min: 15, is_paid: true, is_full_day_override: false };
         }
