@@ -79,6 +79,22 @@ html, body {
 
 body {
   display: flex;
+  height: 100%;
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: 13px;
+  color: var(--color-text);
+  overflow: hidden;
+  
+  /* THE FIX: Aurora Mesh Background */
+  /* This creates a subtle blue/purple atmosphere that makes white panels POP */
+  background-color: #F3F4F6;
+  background-image: 
+      radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.1) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, rgba(124, 58, 237, 0.05) 0px, transparent 50%);
+  background-attachment: fixed;
+  background-size: 100% 100%;
 }
 
 h1, h2, h3 {
@@ -343,16 +359,22 @@ body.authenticated .app-main-content { display: flex; }
   .dg-tagline { font-size: 20px; }
 }
 
-/* === SIDEBAR NAVIGATION === */
+/* === SIDEBAR NAVIGATION (Structured Glass Upgrade) === */
 .app-sidebar {
   width: var(--sidebar-width);
-  background-color: var(--sidebar-bg);
+  /* Dark Frosted Glass Effect */
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.85) 0%, rgba(17, 24, 39, 0.95) 100%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   color: var(--sidebar-text);
   flex-direction: column;
   flex-shrink: 0;
-  border-right: 1px solid var(--sidebar-border);
+  /* Subtle glass border instead of solid line */
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   height: 100vh;
   overflow-y: auto;
+  z-index: 50;
+  box-shadow: 4px 0 30px rgba(0,0,0,0.15); /* Lift off the canvas */
 }
 
 .sidebar-header {
@@ -707,7 +729,7 @@ tbody tr:hover { background-color: var(--color-hover-bg); }
     
     /* Depth */
     box-shadow: 0 1px 2px rgba(0,0,0,0.03);
-    border: 1px solid rgba(0,0,0,0.02);
+    border: 1px solid #E2E8F0;
     
     transition: transform 0.1s ease, box-shadow 0.1s ease;
 }
@@ -802,21 +824,96 @@ tbody tr:hover { background-color: var(--color-hover-bg); }
     );
 }
 
-/* === WEEKLY VIEW === */
-.weekly-grid { width: 100%; }
-.weekly-grid thead th { position: sticky; top: 0; z-index: 10; }
-/* Visual updates for Advisor-Style Weekly View */
-.avatar-cell { display: flex; align-items: center; gap: 12px; }
-.avatar-circle { width: 32px; height: 32px; background: #DBEAFE; color: #1E40AF; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; }
-.grid-shift-pill { background: #FFFFFF; border: 1px solid #E5E7EB; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; display: inline-block; color: var(--color-text); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-.weekly-rdo-pill { display: inline-block; padding: 6px 12px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #9CA3AF; background: #F3F4F6; border: 1px dashed #D1D5DB; min-width: 80px; text-align: center; }
-.weekly-cell { cursor: pointer; }
-.weekly-cell.is-exception { border: 2px solid var(--color-exception); }
-.weekly-cell-content { display: flex; flex-direction: column; align-items: flex-start; }
-.weekly-shift-code { font-weight: 700; font-size: 14px; color: var(--brand-primary); }
-.is-exception .weekly-shift-code { color: var(--color-exception); }
-.weekly-shift-time { font-size: 12px; color: var(--color-text-muted); }
-.weekly-rdo { font-size: 13px; color: #9CA3AF; font-weight: 500; }
+/* === WEEKLY VIEW (Structured Glass Upgrade) === */
+
+/* 1. The Container */
+.weekly-grid {
+    width: 100%;
+    border-collapse: separate; /* Essential for gaps between rows */
+    border-spacing: 0 6px;     /* Creates the 6px gap between advisor strips */
+    margin-top: 10px;
+}
+
+/* 2. The Header (Frosted Glass) */
+.weekly-grid thead th {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background-color: rgba(249, 250, 251, 0.85); /* Semi-transparent grey */
+    backdrop-filter: blur(8px); /* The blur effect */
+    padding: 16px;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--color-text-muted);
+    font-weight: 700;
+    border-bottom: 1px solid rgba(0,0,0,0.05); /* Very subtle divider */
+}
+
+/* 3. The Rows (Floating Strips) */
+.weekly-grid tbody td {
+    background-color: #FFFFFF; /* Pure white strips */
+    padding: 14px 16px;
+    border: none; /* No vertical lines! */
+    
+    /* Subtle borders for depth */
+    border-top: 1px solid rgba(0,0,0,0.02);
+    border-bottom: 1px solid rgba(0,0,0,0.06); 
+    
+    /* Smooth hover animation */
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    vertical-align: middle;
+}
+
+/* 4. Rounded Corners for the Strips */
+.weekly-grid tbody td:first-child {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+}
+.weekly-grid tbody td:last-child {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+/* 5. Hover "Lift" Effect */
+.weekly-grid tbody tr:hover td {
+    background-color: #FFFFFF; /* Keep white */
+    transform: scale(1.003);   /* Micro-lift */
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05); /* Soft shadow */
+    z-index: 10;               /* Bring above neighbors */
+    cursor: pointer;
+    border-color: transparent; /* Hide the grey borders on hover */
+}
+
+/* 6. Exception Styling (Red Border on the Left) */
+.weekly-cell.is-exception {
+    /* Instead of a full border, use a colored marker */
+    box-shadow: inset 3px 0 0 var(--color-exception); 
+}
+
+/* 7. Avatar Styling (Add this to make names pop) */
+.avatar-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+    color: var(--color-text);
+}
+.avatar-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    /* Gradient matching your portal style */
+    background: linear-gradient(135deg, #E0E7FF 0%, #C7D2FE 100%);
+    color: var(--brand-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
 
 /* === SHIFT TRADE CENTER === */
 .trade-layout { display: flex; align-items: stretch; gap: 24px; margin-top: 24px; }
