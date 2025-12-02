@@ -733,10 +733,10 @@ tbody tr:hover { background-color: var(--color-hover-bg); }
 
 .timeline-track { position: relative; height: 100%; }
 
-/* --- Visualization Styles (Solid Full Bar Look) --- */
+/* --- Visualization Styles (Premium Full Bar Look) --- */
 .timeline-bar {
   position: absolute;
-  /* Bigger: Minimal gap to fill the row */
+  /* Maximize height while keeping a tiny gap for row definition */
   top: 1px;
   bottom: 1px;
   height: auto; 
@@ -744,29 +744,29 @@ tbody tr:hover { background-color: var(--color-hover-bg); }
   align-items: center;
   overflow: hidden;
   
-  /* One Full Bar: Sharper corners and no border to blend neighbors */
-  border-radius: 1px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); 
-  border: none;
+  /* Premium Finish: Slight rounding + subtle glass edge */
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,0.08); /* Crisp edge definition */
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.25), 0 1px 2px rgba(0,0,0,0.05); /* Inner shine + soft shadow */
   
   z-index: 10;
   
-  /* Text Polishing */
+  /* Text Styling */
   color: #fff; 
   font-size: 11px;
-  font-weight: 700; 
+  font-weight: 600; 
   padding-left: 6px;
-  text-shadow: 0 1px 1px rgba(0,0,0,0.1); 
+  text-shadow: 0 1px 2px rgba(0,0,0,0.15); /* Legibility shadow */
   
-  /* Smooth Interaction */
-  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, width 0.1s ease-out, left 0.1s ease-out;
+  /* Smooth transitions */
+  transition: transform 0.1s, box-shadow 0.1s, width 0.1s ease-out, left 0.1s ease-out;
 }
 
 .timeline-bar:hover {
     z-index: 20;
-    /* Subtle highlight without breaking the bar shape */
-    filter: brightness(1.05);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+    /* Interactive Pop */
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.3);
+    transform: scaleY(1.05); /* Slight vertical grow */
     cursor: pointer;
 }
 
