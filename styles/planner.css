@@ -764,51 +764,12 @@ tbody tr:hover { background-color: var(--color-hover-bg); }
     );
 }
 
-/* === WEEKLY VIEW (Simple Advisor Team Style) === */
-.weekly-grid { 
-    width: 100%; 
-    border-collapse: collapse; /* Ensures a clean, simple grid with no gaps */
-    table-layout: fixed;
-}
-
-.weekly-grid thead th { 
-    position: sticky; 
-    top: 0; 
-    z-index: 10;
-    padding: 12px 8px;
-    background-color: var(--color-panel-bg);
-    border-bottom: 1px solid var(--color-border);
-    border-right: 1px solid var(--color-border);
-    text-align: center;
-}
-
-.weekly-cell { 
-    cursor: pointer; 
-    border-bottom: 1px solid var(--color-border);
-    border-right: 1px solid var(--color-border);
-    height: 70px; /* Fixed height for uniformity */
-    vertical-align: middle;
-    padding: 4px;
-    background-color: transparent;
-    transition: background-color 0.15s ease;
-}
-
-.weekly-cell:hover {
-    background-color: var(--color-hover-bg); /* Simple hover effect */
-}
-
-.weekly-cell.is-exception { 
-    border: 2px solid var(--color-exception) !important; /* Explicit border for exceptions */
-}
-
-.weekly-cell-content { 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; /* KEEPS RD IN THE MIDDLE */
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-}
+/* === WEEKLY VIEW === */
+.weekly-grid { width: 100%; }
+.weekly-grid thead th { position: sticky; top: 0; z-index: 10; }
+.weekly-cell { cursor: pointer; }
+.weekly-cell.is-exception { border: 2px solid var(--color-exception); }
+.weekly-cell-content { display: flex; flex-direction: column; align-items: flex-start; }
 .weekly-shift-code { font-weight: 700; font-size: 14px; color: var(--brand-primary); }
 .is-exception .weekly-shift-code { color: var(--color-exception); }
 .weekly-shift-time { font-size: 12px; color: var(--color-text-muted); }
