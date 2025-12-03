@@ -4438,10 +4438,24 @@ const handleDeleteRotation = async () => {
         const weekStart = STATE.weekStart;
         CTX = { advisorId, advisorName, dayName, dateISO: APP.Utils.getISODateForDayName(weekStart, dayName) };
         
-        // 1. Populate Payback Days
-        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        ELS.paybackDay.innerHTML = days.map(d => `<option value="${d}" ${d === dayName ? 'selected' : ''}>${d} (${d === dayName ? 'Today' : 'Later'})</option>`).join('');
+        // 1. Populate Payback Days (Rolling 7-Day Window)
+        let optionsHtml = '';
+        const incidentDateObj = new Date(CTX.dateISO);
         
+        for (let i = 0; i <= 7; i++) {
+            // Create date object for i days in the future
+            const futureDate = new Date(incidentDateObj);
+            futureDate.setDate(incidentDateObj.getDate() + i);
+            
+            // Format: YYYY-MM-DD for value, "Wed 03/12" for display
+            const isoValue = futureDate.toISOString().split('T')[0];
+            const displayDate = futureDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'numeric' });
+            
+            const label = i === 0 ? 'Today' : `+${i} Days`;
+            optionsHtml += `<option value="${isoValue}">${displayDate} (${label})</option>`;
+        }
+        ELS.paybackDay.innerHTML = optionsHtml;
+
         // 2. Populate "Reasons" (The Deficit) -> NOW SHOWS 'PAYBACK' TYPES
         let debitComps = STATE.scheduleComponents.filter(c => c.type === 'Payback');
         debitComps.sort((a,b) => a.name.localeCompare(b.name));
@@ -4556,8 +4570,10 @@ const handleDeleteRotation = async () => {
                 }, 'advisor_id, exception_date'));
             } else {
                 // PAYBACK
-                const paybackDateISO = APP.Utils.getISODateForDayName(STATE.weekStart, paybackDay);
-                let newCreditStructure = (CTX.dateISO === paybackDateISO) ? 
+                // The dropdown now provides the direct ISO date (rolling 7-day window)
+                const paybackDateISO = paybackDay; 
+                
+                let newCreditStructure = (CTX.dateISO === paybackDateISO) ?
                     newDebitStructure : 
                     JSON.parse(JSON.stringify(APP.ScheduleCalculator.calculateSegments(CTX.advisorId, paybackDay, STATE.weekStart).segments));
 
