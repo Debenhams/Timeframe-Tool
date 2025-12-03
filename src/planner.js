@@ -1549,76 +1549,66 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
 
     SequentialBuilder.open = (config) => {
         const sequentialSegments = [];
-        // 1. Calculate Shift Boundaries (Dynamic Fit) & Full Day
-        // We use 'if (config)' to preserve the code block structure
-        if (config) {
-            const sortedStructure = JSON.parse(JSON.stringify(config.structure || [])).sort((a, b) => a.start_min - b.start_min);
-            let firstStart = 480; // Default 08:00
-            let lastEnd = 1020;   // Default 17:00
+        
+        // Default boundaries (Fit View)
+        let fitStart = 480; // 08:00
+        let fitEnd = 1020;  // 17:00
+
+        if (config.structure && config.structure.length > 0) {
+            const sortedStructure = JSON.parse(JSON.stringify(config.structure)).sort((a, b) => a.start_min - b.start_min);
             
-            if (sortedStructure.length > 0) {
-                firstStart = sortedStructure[0].start_min;
-                lastEnd = sortedStructure[sortedStructure.length - 1].end_min;
-            }
+            const firstStart = sortedStructure[0].start_min;
+            const lastEnd = sortedStructure[sortedStructure.length - 1].end_min;
 
-            // Fit: Snap to nearest hour (minStart)
-            const fitStart = Math.floor((firstStart - 60) / 60) * 60;
-            const fitEnd = Math.ceil((lastEnd + 60) / 60) * 60;
+            // 1. Calculate Fit Boundaries (Shift + 1hr padding)
+            fitStart = Math.floor((firstStart - 60) / 60) * 60;
+            fitEnd = Math.ceil((lastEnd + 60) / 60) * 60;
 
-            // Full Day: 05:00 (300) to 23:00 (1380), expanding if shift pushes outside
-            const fullStart = Math.min(300, fitStart);
-            const fullEnd = Math.max(1380, fitEnd);
-
-            // 3. Store Options in State
-            BUILDER_STATE.viewOptions = {
-                fit: { start: fitStart, length: fitEnd - fitStart },
-                full: { start: fullStart, length: fullEnd - fullStart }
-            };
-
-            // 4. Default to 'Full' but allow toggle. setViewMode sets startTimeMin and fixedShiftLength.
-            SequentialBuilder.setViewMode('full'); 
-            let currentTracker = BUILDER_STATE.startTimeMin;
-
-            // 5. Build Segments logic...
+            // 2. Build Segments based on Fit View
+            let currentTracker = fitStart;
             sortedStructure.forEach(seg => {
-                // Detect Gap between tracker and current start
+                // Gap before segment
                 if (seg.start_min > currentTracker) {
-                    const gapDuration = seg.start_min - currentTracker;
                     sequentialSegments.push({
                         component_id: '_GAP_', 
-                        duration_min: gapDuration
+                        duration_min: seg.start_min - currentTracker
                     });
                 }
-                
-                // Add Actual Segment
+                // Actual segment
                 sequentialSegments.push({
                     component_id: seg.component_id,
                     duration_min: seg.end_min - seg.start_min
                 });
-                
                 currentTracker = seg.end_min;
             });
-            
-            // Optional: Add trailing gap to fill view
-            if (currentTracker < maxEnd) {
+            // Gap after last segment
+            if (currentTracker < fitEnd) {
                  sequentialSegments.push({
                     component_id: '_GAP_',
-                    duration_min: maxEnd - currentTracker
+                    duration_min: fitEnd - currentTracker
                 });
             }
         }
+
+        // 3. Define View Options
+        // Full Day: 05:00 (300) to 23:00 (1380)
+        const fullStart = 300; 
+        const fullEnd = 1380;
+        
+        BUILDER_STATE.viewOptions = {
+            fit: { start: fitStart, length: fitEnd - fitStart },
+            full: { start: fullStart, length: fullEnd - fullStart }
+        };
 
         BUILDER_STATE.isOpen = true;
         BUILDER_STATE.mode = config.mode;
         BUILDER_STATE.contextId = config.id;
         BUILDER_STATE.exceptionDate = config.date || null;
         
-        // 3. Set View State
-        BUILDER_STATE.startTimeMin = minStart; 
+        // 4. Initialize State (Default to Fit View to match segment structure)
+        BUILDER_STATE.startTimeMin = fitStart; 
         BUILDER_STATE.segments = JSON.parse(JSON.stringify(sequentialSegments));
-
-        // 4. Set Pipe Capacity to fit the VIEW range
-        BUILDER_STATE.fixedShiftLength = maxEnd - minStart;
+        BUILDER_STATE.fixedShiftLength = fitEnd - fitStart;
         if (BUILDER_STATE.fixedShiftLength < 60) BUILDER_STATE.fixedShiftLength = 600;
 
         BUILDER_STATE.reason = config.reason || null;
@@ -1626,6 +1616,16 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         BUILDER_STATE.visualHistoryIndex = -1;
         
         ELS.modalTitle.textContent = config.title;
+        
+        // Update Toggle Buttons
+        const buttons = document.querySelectorAll('.ve-toggle-btn');
+        if (buttons.length > 0) {
+            buttons.forEach(b => b.classList.remove('active'));
+            const fitBtn = document.querySelector(`.ve-toggle-btn[data-mode="fit"]`);
+            if (fitBtn) fitBtn.classList.add('active');
+        }
+
+        // Toggle UI Panels
         if (ELS.visualEditorContainer) ELS.visualEditorContainer.style.display = 'none';
         if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'none';
         if (ELS.visualEditorControlsGroup) ELS.visualEditorControlsGroup.style.display = 'none';
@@ -1636,9 +1636,6 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
             ELS.exceptionReasonGroup.style.display = 'block';
             ELS.modalExceptionReason.value = BUILDER_STATE.reason || '';
             ELS.modalSave.textContent = "Save Exception";
-            
-            // Note: We skip fuseNeighbors here to prevent merging Gaps unexpectedly
-            
             renderToolbox();
             renderTimeline();
         } else {
@@ -1646,14 +1643,16 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
             ELS.exceptionReasonGroup.style.display = 'none';
             ELS.modalSave.textContent = "Save Definition";
             if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
-                ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(minStart), false);
+                ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(fitStart), false);
             }
             renderLegacyTable();
         }
+        
         saveVisualHistory();
         updateUndoRedoButtons(); 
         ELS.modal.style.display = 'flex';
     };
+
     // NEW: Function to handle view switching
     SequentialBuilder.setViewMode = (mode) => {
         if (!BUILDER_STATE.viewOptions) return;
