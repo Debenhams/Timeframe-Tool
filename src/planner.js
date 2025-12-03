@@ -1653,20 +1653,72 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         ELS.modal.style.display = 'flex';
     };
 
-    // NEW: Function to handle view switching
+    // --- View Toggle Logic (Smart Recalculation) ---
     SequentialBuilder.setViewMode = (mode) => {
-        if (!BUILDER_STATE.viewOptions) return;
-        const config = BUILDER_STATE.viewOptions[mode];
-        if (config) {
-            BUILDER_STATE.startTimeMin = config.start;
-            BUILDER_STATE.fixedShiftLength = config.length;
-            
-            // Update UI Button State
-            document.querySelectorAll('.ve-toggle-btn').forEach(b => b.classList.remove('active'));
-            document.querySelector(`.ve-toggle-btn[data-mode="${mode}"]`)?.classList.add('active');
-            
-            renderTimeline();
+        // 1. Capture current "Absolute" segments (Real times)
+        let currentTime = BUILDER_STATE.startTimeMin;
+        const absSegments = [];
+        BUILDER_STATE.segments.forEach(seg => {
+            if (seg.component_id !== '_GAP_') {
+                absSegments.push({
+                    component_id: seg.component_id,
+                    start_min: currentTime,
+                    end_min: currentTime + seg.duration_min
+                });
+            }
+            currentTime += seg.duration_min;
+        });
+
+        // 2. Calculate New Boundaries based on Real Data
+        const sorted = absSegments.sort((a,b) => a.start_min - b.start_min);
+        const dataStart = sorted.length > 0 ? sorted[0].start_min : 480;
+        const dataEnd = sorted.length > 0 ? sorted[sorted.length-1].end_min : 1020;
+        
+        let newStart, newEnd;
+
+        if (mode === 'fit') {
+            // Snug Fit: Shift start - 1hr, Shift end + 1hr
+            newStart = Math.floor((dataStart - 60) / 60) * 60;
+            newEnd = Math.ceil((dataEnd + 60) / 60) * 60;
+        } else {
+            // Full Day: 05:00 - 23:00 (Minimum), expand if shift is outside
+            newStart = Math.min(300, Math.floor((dataStart - 60) / 60) * 60);
+            newEnd = Math.max(1380, Math.ceil((dataEnd + 60) / 60) * 60);
         }
+
+        // 3. Rebuild "Relative" Segments (Inject Gaps for new scale)
+        const newSegments = [];
+        let tracker = newStart;
+        
+        sorted.forEach(seg => {
+            if (seg.start_min > tracker) {
+                newSegments.push({ component_id: '_GAP_', duration_min: seg.start_min - tracker });
+            }
+            newSegments.push({ component_id: seg.component_id, duration_min: seg.end_min - seg.start_min });
+            tracker = seg.end_min;
+        });
+        
+        // Fill trailing space
+        if (tracker < newEnd) {
+            newSegments.push({ component_id: '_GAP_', duration_min: newEnd - tracker });
+        }
+
+        // 4. Update State
+        BUILDER_STATE.startTimeMin = newStart;
+        BUILDER_STATE.fixedShiftLength = newEnd - newStart;
+        BUILDER_STATE.segments = newSegments;
+
+        // 5. Update UI (Buttons & Modal Width)
+        document.querySelectorAll('.ve-toggle-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector(`.ve-toggle-btn[data-mode="${mode}"]`)?.classList.add('active');
+        
+        const modalContent = document.querySelector('.modal-content');
+        if (modalContent) {
+            if (mode === 'full') modalContent.classList.add('modal-full-view');
+            else modalContent.classList.remove('modal-full-view');
+        }
+
+        renderTimeline();
     };
 
     SequentialBuilder.close = () => {
