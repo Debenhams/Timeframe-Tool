@@ -1479,11 +1479,6 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         // Listeners
         if (ELS.modalClose) ELS.modalClose.addEventListener('click', SequentialBuilder.close);
         
-        // NEW: Wire up View Toggle Buttons
-        document.querySelectorAll('.ve-toggle-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => SequentialBuilder.setViewMode(e.target.dataset.mode));
-        });
-
         if (ELS.modalSave) ELS.modalSave.addEventListener('click', handleSave);
         if (ELS.modalExceptionReason) {
             ELS.modalExceptionReason.addEventListener('input', (e) => {
@@ -1550,22 +1545,21 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
     SequentialBuilder.open = (config) => {
         const sequentialSegments = [];
         
-        // Default boundaries (Fit View)
-        let fitStart = 480; // 08:00
-        let fitEnd = 1020;  // 17:00
+        // 1. Hardcode Full Day Boundaries (05:00 - 23:00)
+        let fullStart = 300; 
+        let fullEnd = 1380;
 
+        // 2. Expand boundaries if shift falls outside (e.g. Night Shifts)
         if (config.structure && config.structure.length > 0) {
             const sortedStructure = JSON.parse(JSON.stringify(config.structure)).sort((a, b) => a.start_min - b.start_min);
-            
             const firstStart = sortedStructure[0].start_min;
             const lastEnd = sortedStructure[sortedStructure.length - 1].end_min;
 
-            // 1. Calculate Fit Boundaries (Shift + 1hr padding)
-            fitStart = Math.floor((firstStart - 60) / 60) * 60;
-            fitEnd = Math.ceil((lastEnd + 60) / 60) * 60;
+            fullStart = Math.min(fullStart, Math.floor((firstStart - 60) / 60) * 60);
+            fullEnd = Math.max(fullEnd, Math.ceil((lastEnd + 60) / 60) * 60);
 
-            // 2. Build Segments based on Fit View
-            let currentTracker = fitStart;
+            // 3. Build Segments (Inject Gaps relative to 05:00)
+            let currentTracker = fullStart;
             sortedStructure.forEach(seg => {
                 // Gap before segment
                 if (seg.start_min > currentTracker) {
@@ -1582,34 +1576,27 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
                 currentTracker = seg.end_min;
             });
             // Gap after last segment
-            if (currentTracker < fitEnd) {
+            if (currentTracker < fullEnd) {
                  sequentialSegments.push({
                     component_id: '_GAP_',
-                    duration_min: fitEnd - currentTracker
+                    duration_min: fullEnd - currentTracker
                 });
             }
+        } else {
+            // If new/empty, just create one big gap
+            sequentialSegments.push({ component_id: '_GAP_', duration_min: fullEnd - fullStart });
         }
 
-        // 3. Define View Options
-        // Full Day: 05:00 (300) to 23:00 (1380)
-        const fullStart = 300; 
-        const fullEnd = 1380;
-        
-        BUILDER_STATE.viewOptions = {
-            fit: { start: fitStart, length: fitEnd - fitStart },
-            full: { start: fullStart, length: fullEnd - fullStart }
-        };
-
+        // 4. Initialize State
         BUILDER_STATE.isOpen = true;
         BUILDER_STATE.mode = config.mode;
         BUILDER_STATE.contextId = config.id;
         BUILDER_STATE.exceptionDate = config.date || null;
         
-        // 4. Initialize State (Default to Fit View to match segment structure)
-        BUILDER_STATE.startTimeMin = fitStart; 
+        // Set fixed full-day view
+        BUILDER_STATE.startTimeMin = fullStart; 
         BUILDER_STATE.segments = JSON.parse(JSON.stringify(sequentialSegments));
-        BUILDER_STATE.fixedShiftLength = fitEnd - fitStart;
-        if (BUILDER_STATE.fixedShiftLength < 60) BUILDER_STATE.fixedShiftLength = 600;
+        BUILDER_STATE.fixedShiftLength = fullEnd - fullStart;
 
         BUILDER_STATE.reason = config.reason || null;
         BUILDER_STATE.visualHistory = [];
@@ -1617,14 +1604,6 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         
         ELS.modalTitle.textContent = config.title;
         
-        // Update Toggle Buttons
-        const buttons = document.querySelectorAll('.ve-toggle-btn');
-        if (buttons.length > 0) {
-            buttons.forEach(b => b.classList.remove('active'));
-            const fitBtn = document.querySelector(`.ve-toggle-btn[data-mode="fit"]`);
-            if (fitBtn) fitBtn.classList.add('active');
-        }
-
         // Toggle UI Panels
         if (ELS.visualEditorContainer) ELS.visualEditorContainer.style.display = 'none';
         if (ELS.legacyEditorContainer) ELS.legacyEditorContainer.style.display = 'none';
@@ -1643,7 +1622,7 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
             ELS.exceptionReasonGroup.style.display = 'none';
             ELS.modalSave.textContent = "Save Definition";
             if (ELS.modalStartTime && ELS.modalStartTime._flatpickr) {
-                ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(fitStart), false);
+                ELS.modalStartTime._flatpickr.setDate(APP.Utils.formatMinutesToTime(fullStart), false);
             }
             renderLegacyTable();
         }
@@ -1653,74 +1632,7 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         ELS.modal.style.display = 'flex';
     };
 
-    // --- View Toggle Logic (Smart Recalculation) ---
-    SequentialBuilder.setViewMode = (mode) => {
-        // 1. Capture current "Absolute" segments (Real times)
-        let currentTime = BUILDER_STATE.startTimeMin;
-        const absSegments = [];
-        BUILDER_STATE.segments.forEach(seg => {
-            if (seg.component_id !== '_GAP_') {
-                absSegments.push({
-                    component_id: seg.component_id,
-                    start_min: currentTime,
-                    end_min: currentTime + seg.duration_min
-                });
-            }
-            currentTime += seg.duration_min;
-        });
-
-        // 2. Calculate New Boundaries based on Real Data
-        const sorted = absSegments.sort((a,b) => a.start_min - b.start_min);
-        const dataStart = sorted.length > 0 ? sorted[0].start_min : 480;
-        const dataEnd = sorted.length > 0 ? sorted[sorted.length-1].end_min : 1020;
-        
-        let newStart, newEnd;
-
-        if (mode === 'fit') {
-            // Snug Fit: Shift start - 1hr, Shift end + 1hr
-            newStart = Math.floor((dataStart - 60) / 60) * 60;
-            newEnd = Math.ceil((dataEnd + 60) / 60) * 60;
-        } else {
-            // Full Day: 05:00 - 23:00 (Minimum), expand if shift is outside
-            newStart = Math.min(300, Math.floor((dataStart - 60) / 60) * 60);
-            newEnd = Math.max(1380, Math.ceil((dataEnd + 60) / 60) * 60);
-        }
-
-        // 3. Rebuild "Relative" Segments (Inject Gaps for new scale)
-        const newSegments = [];
-        let tracker = newStart;
-        
-        sorted.forEach(seg => {
-            if (seg.start_min > tracker) {
-                newSegments.push({ component_id: '_GAP_', duration_min: seg.start_min - tracker });
-            }
-            newSegments.push({ component_id: seg.component_id, duration_min: seg.end_min - seg.start_min });
-            tracker = seg.end_min;
-        });
-        
-        // Fill trailing space
-        if (tracker < newEnd) {
-            newSegments.push({ component_id: '_GAP_', duration_min: newEnd - tracker });
-        }
-
-        // 4. Update State
-        BUILDER_STATE.startTimeMin = newStart;
-        BUILDER_STATE.fixedShiftLength = newEnd - newStart;
-        BUILDER_STATE.segments = newSegments;
-
-        // 5. Update UI (Buttons & Modal Width)
-        document.querySelectorAll('.ve-toggle-btn').forEach(b => b.classList.remove('active'));
-        document.querySelector(`.ve-toggle-btn[data-mode="${mode}"]`)?.classList.add('active');
-        
-        const modalContent = document.querySelector('.modal-content');
-        if (modalContent) {
-            if (mode === 'full') modalContent.classList.add('modal-full-view');
-            else modalContent.classList.remove('modal-full-view');
-        }
-
-        renderTimeline();
-    };
-
+   
     SequentialBuilder.close = () => {
         BUILDER_STATE.isOpen = false;
         if (ELS.modal) ELS.modal.style.display = 'none';
