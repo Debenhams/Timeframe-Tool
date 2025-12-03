@@ -1478,6 +1478,12 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
 
         // Listeners
         if (ELS.modalClose) ELS.modalClose.addEventListener('click', SequentialBuilder.close);
+        
+        // NEW: Wire up View Toggle Buttons
+        document.querySelectorAll('.ve-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => SequentialBuilder.setViewMode(e.target.dataset.mode));
+        });
+
         if (ELS.modalSave) ELS.modalSave.addEventListener('click', handleSave);
         if (ELS.modalExceptionReason) {
             ELS.modalExceptionReason.addEventListener('input', (e) => {
@@ -1543,25 +1549,37 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
 
     SequentialBuilder.open = (config) => {
         const sequentialSegments = [];
-        let minStart = 420; // Default 07:00
-        let maxEnd = 1140;  // Default 19:00
-
-        if (config.structure && config.structure.length > 0) {
-            const sortedStructure = JSON.parse(JSON.stringify(config.structure)).sort((a, b) => a.start_min - b.start_min);
+        // 1. Calculate Shift Boundaries (Dynamic Fit) & Full Day
+        // We use 'if (config)' to preserve the code block structure
+        if (config) {
+            const sortedStructure = JSON.parse(JSON.stringify(config.structure || [])).sort((a, b) => a.start_min - b.start_min);
+            let firstStart = 480; // Default 08:00
+            let lastEnd = 1020;   // Default 17:00
             
-            // 1. Calculate dynamic boundaries
-            const firstStart = sortedStructure[0].start_min;
-            const lastEnd = sortedStructure[sortedStructure.length - 1].end_min;
+            if (sortedStructure.length > 0) {
+                firstStart = sortedStructure[0].start_min;
+                lastEnd = sortedStructure[sortedStructure.length - 1].end_min;
+            }
 
-            // Start 1 hour before first block, Snap to hour
-            minStart = Math.floor((firstStart - 60) / 60) * 60;
-            // End 1 hour after last block
-            maxEnd = Math.ceil((lastEnd + 60) / 60) * 60;
+            // Fit: Snap to nearest hour (minStart)
+            const fitStart = Math.floor((firstStart - 60) / 60) * 60;
+            const fitEnd = Math.ceil((lastEnd + 60) / 60) * 60;
 
-            // 2. Build Segments with GAPS
-            // FIX: Start tracking from the VIEW start (minStart), not the Shift Start
-            let currentTracker = minStart;
+            // Full Day: 05:00 (300) to 23:00 (1380), expanding if shift pushes outside
+            const fullStart = Math.min(300, fitStart);
+            const fullEnd = Math.max(1380, fitEnd);
 
+            // 3. Store Options in State
+            BUILDER_STATE.viewOptions = {
+                fit: { start: fitStart, length: fitEnd - fitStart },
+                full: { start: fullStart, length: fullEnd - fullStart }
+            };
+
+            // 4. Default to 'Full' but allow toggle. setViewMode sets startTimeMin and fixedShiftLength.
+            SequentialBuilder.setViewMode('full'); 
+            let currentTracker = BUILDER_STATE.startTimeMin;
+
+            // 5. Build Segments logic...
             sortedStructure.forEach(seg => {
                 // Detect Gap between tracker and current start
                 if (seg.start_min > currentTracker) {
@@ -1636,6 +1654,22 @@ ELS.grid.querySelectorAll('.act-change-week, .act-change-forward').forEach(btn =
         updateUndoRedoButtons(); 
         ELS.modal.style.display = 'flex';
     };
+    // NEW: Function to handle view switching
+    SequentialBuilder.setViewMode = (mode) => {
+        if (!BUILDER_STATE.viewOptions) return;
+        const config = BUILDER_STATE.viewOptions[mode];
+        if (config) {
+            BUILDER_STATE.startTimeMin = config.start;
+            BUILDER_STATE.fixedShiftLength = config.length;
+            
+            // Update UI Button State
+            document.querySelectorAll('.ve-toggle-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`.ve-toggle-btn[data-mode="${mode}"]`)?.classList.add('active');
+            
+            renderTimeline();
+        }
+    };
+
     SequentialBuilder.close = () => {
         BUILDER_STATE.isOpen = false;
         if (ELS.modal) ELS.modal.style.display = 'none';
