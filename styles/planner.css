@@ -802,16 +802,33 @@ tbody tr:hover { background-color: var(--color-hover-bg); }
 
 .weekly-cell { cursor: pointer; }
 .weekly-cell.is-exception { border: 2px solid var(--color-exception); border-radius: 6px; }
-.weekly-cell-content { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.weekly-cell-content { 
+    display: flex; 
+    flex-direction: column; 
+    align-items: center; /* Center horizontally */
+    justify-content: center; /* Center vertically */
+    width: 100%; 
+    height: 100%; 
+}
+.weekly-shift-code { font-weight: 700; font-size: 14px; color: var(--brand-primary); }
+.is-exception .weekly-shift-code { color: var(--color-exception); }
+.weekly-shift-time { font-size: 12px; color: var(--color-text-muted); }
 
-/* Avatar Styling (Required for Layout) */
-.avatar-cell { display: flex; align-items: center; gap: 12px; }
-.avatar-circle { width: 32px; height: 32px; background: linear-gradient(135deg, #DBEAFE, #BFDBFE); color: #1E40AF; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px; border: 2px solid #FFFFFF; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-
-/* Shift Pill Styling */
-.grid-shift-pill { background: rgba(255, 255, 255, 0.6); border: 1px solid rgba(0,0,0,0.05); padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; display: inline-block; color: var(--color-text); box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
-.weekly-rdo-pill { display: inline-block; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; color: #9CA3AF; background: rgba(243, 244, 246, 0.6); border: 1px dashed #D1D5DB; min-width: 80px; text-align: center; box-shadow: inset 0 1px 2px rgba(0,0,0,0.02); }
-
+/* RD Pill Styling (Director Look) */
+.weekly-rdo-pill { 
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #9CA3AF;
+    background: rgba(243, 244, 246, 0.6);
+    border: 1px dashed #D1D5DB;
+    min-width: 60px;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+}
 /* === SHIFT TRADE CENTER === */
 .trade-layout { display: flex; align-items: stretch; gap: 24px; margin-top: 24px; }
 .trade-panel { flex: 1; border: 1px solid var(--color-border); border-radius: var(--border-radius); padding: 20px; display: flex; flex-direction: column; gap: 16px; background-color: var(--color-hover-bg); }
