@@ -5424,7 +5424,7 @@ const handleAcknowledgeClick = (e) => {
 }(window.APP));
 /**
  * MODULE: APP.Components.Reports
- * ENTERPRISE EDITION: Glossy Charts (Glass-morphism), Heatmaps, and Payroll.
+ * FINAL EDITION: Debenhams Layout + Glossy Teal Bars.
  */
 (function(APP) {
     const Reports = {};
@@ -5434,11 +5434,11 @@ const handleAcknowledgeClick = (e) => {
     let RAW_DATA = [];
     let PAYROLL_SUMMARY = {};
 
-    // --- GLOSS ENGINE: Makes charts look premium ---
+    // --- GLOSS ENGINE: Adds 3D effect to your Teal color ---
     const createGlossGradient = (ctx, colorTop, colorBottom) => {
-        const gradient = ctx.createLinearGradient(0, 0, 0, 400); // Vertical Gradient
-        gradient.addColorStop(0, colorTop);    // Light top (Highlight)
-        gradient.addColorStop(1, colorBottom); // Dark bottom (Shadow)
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400); 
+        gradient.addColorStop(0, colorTop);    // Bright Teal top
+        gradient.addColorStop(1, colorBottom); // Slightly darker bottom for depth
         return gradient;
     };
 
@@ -5598,7 +5598,10 @@ const handleAcknowledgeClick = (e) => {
         ELS.kpiHeadcount.textContent = activeHeadcount.size;
         const shrinkPct = totals.paid > 0 ? ((totals.holiday + totals.sick) / totals.paid) * 100 : 0;
         ELS.kpiShrinkage.textContent = shrinkPct.toFixed(1) + "%";
-        ELS.kpiShrinkage.style.color = shrinkPct > 12 ? '#DC2626' : '#059669';
+        
+        // Colors from your original screenshot
+        ELS.kpiShrinkage.style.color = shrinkPct > 12 ? '#DC2626' : '#059669'; 
+        ELS.kpiPaid.style.color = '#059669'; 
 
         renderProCharts(dailyTrend, totals, heatmapData);
         renderProGrid(totals);
@@ -5609,13 +5612,13 @@ const handleAcknowledgeClick = (e) => {
         if (CHART_TREND) CHART_TREND.destroy();
         if (CHART_UTIL) CHART_UTIL.destroy();
 
-        // 1. Stacked Hours Trend (GLOSSY)
+        // 1. Stacked Hours Trend (Restored to Your Colors)
         const labels = Object.keys(dailyTrend).sort();
         const ctxTrend = document.getElementById('chart-trend').getContext('2d');
         
-        // Define Gloss Gradients
-        const tealGradient = createGlossGradient(ctxTrend, '#70E6D6', '#0F766E'); // Debenhams Teal -> Dark Teal
-        const darkGradient = createGlossGradient(ctxTrend, '#4B5563', '#111827'); // Grey -> Black
+        // Custom Glossy Gradients (Teal matching your screenshot, but 3D)
+        const tealGradient = createGlossGradient(ctxTrend, '#70E6D6', '#2DD4BF'); // Your Teal -> Slightly Darker
+        const blackGradient = createGlossGradient(ctxTrend, '#374151', '#000000'); // Grey -> Black
 
         CHART_TREND = new Chart(ctxTrend, {
             type: 'bar',
@@ -5625,19 +5628,19 @@ const handleAcknowledgeClick = (e) => {
                     { 
                         label: 'Productive Hours', 
                         data: labels.map(d => dailyTrend[d].productive), 
-                        backgroundColor: tealGradient, 
-                        borderRadius: 6, // Smooth corners
+                        backgroundColor: tealGradient, // Uses the gloss effect
+                        borderRadius: 4,
                         borderWidth: 1,
-                        borderColor: 'rgba(255,255,255,0.4)', // Glass edge
+                        borderColor: 'rgba(255,255,255,0.2)', // Slight glass edge
                         stack: 'Stack 0' 
                     },
                     { 
                         label: 'Loss (Sick/Hol)', 
                         data: labels.map(d => dailyTrend[d].loss), 
-                        backgroundColor: darkGradient, 
-                        borderRadius: 6,
+                        backgroundColor: blackGradient, 
+                        borderRadius: 4,
                         borderWidth: 1,
-                        borderColor: 'rgba(255,255,255,0.4)',
+                        borderColor: 'rgba(255,255,255,0.2)',
                         stack: 'Stack 0' 
                     }
                 ]
@@ -5646,19 +5649,17 @@ const handleAcknowledgeClick = (e) => {
                 responsive: true, 
                 maintainAspectRatio: false, 
                 scales: { 
-                    x: { grid: { display: false }, stacked: true }, 
-                    y: { grid: { color: '#F3F4F6' }, stacked: true } 
-                },
-                plugins: { legend: { labels: { usePointStyle: true, boxWidth: 8 } } }
+                    x: { grid: { display: true, color: '#F3F4F6' }, stacked: true }, 
+                    y: { grid: { color: '#E5E7EB' }, stacked: true } 
+                }
             }
         });
 
-        // 2. Heatmap Density Chart (GLOSSY)
+        // 2. Intraday Profile (Restored to Right Side Layout)
         const ctxUtil = document.getElementById('chart-utilization').getContext('2d');
-        const maxVal = Math.max(...heatmapData);
         
-        // Dynamic Opacity + Gloss
-        const heatmapGradient = createGlossGradient(ctxUtil, '#3B82F6', '#1E40AF'); // Blue Gloss
+        // Single Color Teal Gloss for the Profile (Like your image)
+        const profileGradient = createGlossGradient(ctxUtil, '#70E6D6', '#2DD4BF');
 
         CHART_UTIL = new Chart(ctxUtil, {
             type: 'bar',
@@ -5667,19 +5668,17 @@ const handleAcknowledgeClick = (e) => {
                 datasets: [{ 
                     label: 'Staffing Intensity', 
                     data: heatmapData, 
-                    backgroundColor: heatmapData.map(v => {
-                        // Create a unique opacity for each bar based on value
-                        return v > 0 ? heatmapGradient : 'rgba(0,0,0,0)'; 
-                    }), 
+                    backgroundColor: profileGradient, 
                     borderRadius: 4,
                     borderWidth: 1,
-                    borderColor: 'rgba(255,255,255,0.5)'
+                    borderColor: 'rgba(255,255,255,0.2)'
                 }]
             },
             options: { 
-                responsive: true, maintainAspectRatio: false,
+                responsive: true, 
+                maintainAspectRatio: false,
                 plugins: { legend: { display: false }, title: { display: true, text: 'Intraday Staffing Profile' } },
-                scales: { x: { grid: { display: false } }, y: { display: false } }
+                scales: { x: { grid: { display: false } }, y: { grid: { color: '#F3F4F6' } } }
             }
         });
     };
