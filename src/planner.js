@@ -5424,7 +5424,7 @@ const handleAcknowledgeClick = (e) => {
 }(window.APP));
 /**
  * MODULE: APP.Components.Reports
- * ENTERPRISE EDITION: Branded Charts, Heatmaps, and Payroll Reconciliation.
+ * ENTERPRISE EDITION: Glossy Charts (Glass-morphism), Heatmaps, and Payroll.
  */
 (function(APP) {
     const Reports = {};
@@ -5434,12 +5434,19 @@ const handleAcknowledgeClick = (e) => {
     let RAW_DATA = [];
     let PAYROLL_SUMMARY = {};
 
+    // --- GLOSS ENGINE: Makes charts look premium ---
+    const createGlossGradient = (ctx, colorTop, colorBottom) => {
+        const gradient = ctx.createLinearGradient(0, 0, 0, 400); // Vertical Gradient
+        gradient.addColorStop(0, colorTop);    // Light top (Highlight)
+        gradient.addColorStop(1, colorBottom); // Dark bottom (Shadow)
+        return gradient;
+    };
+
     Reports.initialize = () => {
         ELS.section = document.getElementById('tab-reports');
         ELS.dateRange = document.getElementById('reportDateRange');
         ELS.filterTeam = document.getElementById('reportFilterTeam');
         
-        // Inject Site Filter if missing
         if (!document.getElementById('reportFilterSite')) {
             const siteSelect = document.createElement('select');
             siteSelect.id = 'reportFilterSite';
@@ -5449,12 +5456,10 @@ const handleAcknowledgeClick = (e) => {
             if(ELS.filterTeam && ELS.filterTeam.parentNode) ELS.filterTeam.parentNode.insertBefore(siteSelect, ELS.filterTeam);
         }
         ELS.filterSite = document.getElementById('reportFilterSite');
-        
         ELS.btnRun = document.getElementById('btnRunReport');
         ELS.btnExport = document.getElementById('btnExportExcel');
         ELS.gridContainer = document.getElementById('report-grid-container');
         
-        // KPIs
         ELS.kpiTotal = document.getElementById('kpi-total-hours');
         ELS.kpiPaid = document.getElementById('kpi-paid-hours');
         ELS.kpiShrinkage = document.getElementById('kpi-shrinkage');
@@ -5469,7 +5474,6 @@ const handleAcknowledgeClick = (e) => {
 
         if (ELS.btnRun) ELS.btnRun.addEventListener('click', generateReport);
         if (ELS.btnExport) ELS.btnExport.addEventListener('click', exportToExcel);
-        
         setTimeout(populateFilters, 1000);
     };
 
@@ -5492,8 +5496,8 @@ const handleAcknowledgeClick = (e) => {
         const endObj = fp.selectedDates[1];
         if (!startObj || !endObj) return APP.Utils.showToast("Please select a date range.", "warning");
 
-        ELS.btnRun.disabled = true; ELS.btnRun.textContent = "Analyzing Data...";
-        ELS.gridContainer.innerHTML = '<div style="padding:60px; text-align:center; color:#6B7280;">Running Analysis...<br><small>Reconciling Shifts, Breaks, and Shrinkage.</small></div>';
+        ELS.btnRun.disabled = true; ELS.btnRun.textContent = "Analyzing...";
+        ELS.gridContainer.innerHTML = '<div style="padding:60px; text-align:center; color:#6B7280;">Running Analysis...</div>';
 
         setTimeout(async () => {
             try { await runCalculation(startObj, endObj); } 
@@ -5524,7 +5528,6 @@ const handleAcknowledgeClick = (e) => {
         dates.forEach(d => uniqueMondays.add(APP.Utils.getMondayForDate(d)));
         for (let monday of uniqueMondays) await APP.StateManager.loadEffectiveAssignments(monday);
 
-        // AGGREGATION
         RAW_DATA = []; PAYROLL_SUMMARY = {};
         const dailyTrend = {}; 
         let totals = { paid: 0, holiday: 0, sick: 0, unpaid: 0 };
@@ -5606,35 +5609,77 @@ const handleAcknowledgeClick = (e) => {
         if (CHART_TREND) CHART_TREND.destroy();
         if (CHART_UTIL) CHART_UTIL.destroy();
 
-        // 1. Stacked Hours Trend (Using Debenhams Colors)
+        // 1. Stacked Hours Trend (GLOSSY)
         const labels = Object.keys(dailyTrend).sort();
         const ctxTrend = document.getElementById('chart-trend').getContext('2d');
+        
+        // Define Gloss Gradients
+        const tealGradient = createGlossGradient(ctxTrend, '#70E6D6', '#0F766E'); // Debenhams Teal -> Dark Teal
+        const darkGradient = createGlossGradient(ctxTrend, '#4B5563', '#111827'); // Grey -> Black
+
         CHART_TREND = new Chart(ctxTrend, {
             type: 'bar',
             data: {
                 labels: labels.map(d => d.slice(5)),
                 datasets: [
-                    { label: 'Productive Hours', data: labels.map(d => dailyTrend[d].productive), backgroundColor: '#70E6D6', stack: 'Stack 0' }, // Teal
-                    { label: 'Loss (Sick/Hol)', data: labels.map(d => dailyTrend[d].loss), backgroundColor: '#000000', stack: 'Stack 0' } // Black
+                    { 
+                        label: 'Productive Hours', 
+                        data: labels.map(d => dailyTrend[d].productive), 
+                        backgroundColor: tealGradient, 
+                        borderRadius: 6, // Smooth corners
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,255,255,0.4)', // Glass edge
+                        stack: 'Stack 0' 
+                    },
+                    { 
+                        label: 'Loss (Sick/Hol)', 
+                        data: labels.map(d => dailyTrend[d].loss), 
+                        backgroundColor: darkGradient, 
+                        borderRadius: 6,
+                        borderWidth: 1,
+                        borderColor: 'rgba(255,255,255,0.4)',
+                        stack: 'Stack 0' 
+                    }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } }
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                scales: { 
+                    x: { grid: { display: false }, stacked: true }, 
+                    y: { grid: { color: '#F3F4F6' }, stacked: true } 
+                },
+                plugins: { legend: { labels: { usePointStyle: true, boxWidth: 8 } } }
+            }
         });
 
-        // 2. Heatmap Density Chart
+        // 2. Heatmap Density Chart (GLOSSY)
         const ctxUtil = document.getElementById('chart-utilization').getContext('2d');
         const maxVal = Math.max(...heatmapData);
-        const colors = heatmapData.map(v => `rgba(112, 230, 214, ${Math.max(0.3, v/maxVal)})`); // Teal scale
+        
+        // Dynamic Opacity + Gloss
+        const heatmapGradient = createGlossGradient(ctxUtil, '#3B82F6', '#1E40AF'); // Blue Gloss
 
         CHART_UTIL = new Chart(ctxUtil, {
             type: 'bar',
             data: {
                 labels: ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'],
-                datasets: [{ label: 'Staffing Intensity', data: heatmapData, backgroundColor: colors, borderRadius: 4 }]
+                datasets: [{ 
+                    label: 'Staffing Intensity', 
+                    data: heatmapData, 
+                    backgroundColor: heatmapData.map(v => {
+                        // Create a unique opacity for each bar based on value
+                        return v > 0 ? heatmapGradient : 'rgba(0,0,0,0)'; 
+                    }), 
+                    borderRadius: 4,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.5)'
+                }]
             },
             options: { 
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { display: false }, title: { display: true, text: 'Intraday Staffing Profile' } }
+                plugins: { legend: { display: false }, title: { display: true, text: 'Intraday Staffing Profile' } },
+                scales: { x: { grid: { display: false } }, y: { display: false } }
             }
         });
     };
@@ -5659,7 +5704,6 @@ const handleAcknowledgeClick = (e) => {
 
     const exportToExcel = () => {
         if (RAW_DATA.length === 0) return;
-        
         const summaryData = Object.values(PAYROLL_SUMMARY).map(p => ({
             Advisor: p.Name, Days_Scheduled: p.Days,
             Total_Paid_Hours: (p.Paid_Mins/60).toFixed(2),
@@ -5667,7 +5711,6 @@ const handleAcknowledgeClick = (e) => {
             Sickness_Hours: (p.Sick_Mins/60).toFixed(2),
             Net_Productive: ((p.Paid_Mins - p.Holiday_Mins - p.Sick_Mins)/60).toFixed(2)
         }));
-
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), "Payroll Summary");
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(RAW_DATA), "Daily Log");
