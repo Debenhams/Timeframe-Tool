@@ -5701,3 +5701,95 @@ const handleAcknowledgeClick = (e) => {
 
     APP.Components.Reports = Reports;
 }(window.APP));
+/**
+ * MODULE: APP.Components.HistoricalReports
+ * Viewer for Audit Logs and Assignment History.
+ */
+(function(APP) {
+    const HistReports = {};
+    const ELS = {};
+
+    HistReports.initialize = () => {
+        // 1. Wire Dashboard Button
+        const btnDash = document.getElementById('btn-dash-hist-reports');
+        if (btnDash) {
+            btnDash.addEventListener('click', () => {
+                // Switch tab manually
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                const content = document.getElementById('tab-hist-reports');
+                if(content) content.classList.add('active');
+                HistReports.render();
+            });
+        }
+
+        ELS.grid = document.getElementById('hist-grid-container');
+        ELS.search = document.getElementById('histSearch');
+        ELS.btnRefresh = document.getElementById('btnRefreshHist');
+
+        if (ELS.search) ELS.search.addEventListener('input', HistReports.render);
+        if (ELS.btnRefresh) ELS.btnRefresh.addEventListener('click', HistReports.render);
+    };
+
+    HistReports.render = async () => {
+        if (!ELS.grid) return;
+        ELS.grid.innerHTML = '<div style="padding:40px; text-align:center; color:#6B7280;">Fetching Audit Logs...</div>';
+
+        // 1. Fetch History Data
+        const STATE = APP.StateManager.getState();
+        const client = APP.DataService.getSupabaseClient();
+        
+        // We fetch the 'rotation_assignments_history' which acts as your audit trail
+        const { data, error } = await client
+            .from('rotation_assignments_history')
+            .select('*')
+            .order('start_date', { ascending: false }) // Newest first
+            .limit(500); // Safety limit
+
+        if (error) {
+            ELS.grid.innerHTML = `<div style="padding:20px; text-align:center; color:red;">Error loading history: ${error.message}</div>`;
+            return;
+        }
+
+        // 2. Filter
+        const term = ELS.search ? ELS.search.value.toLowerCase() : "";
+        
+        // 3. Build Table
+        let html = '<table class="weekly-grid" style="width:100%;"><thead><tr><th>Start Date</th><th>Advisor</th><th>Action / Rotation</th><th>End Date</th><th>Reason</th><th>Wk Offset</th></tr></thead><tbody>';
+        
+        const advisors = STATE.advisors;
+        let count = 0;
+
+        data.forEach(row => {
+            const advisor = advisors.find(a => a.id === row.advisor_id);
+            const advName = advisor ? advisor.name : 'Unknown ID: ' + row.advisor_id;
+
+            // Apply Search Filter
+            if (term && !advName.toLowerCase().includes(term)) return;
+
+            count++;
+            
+            // Format Dates
+            const start = APP.Utils.convertISOToUKDate(row.start_date);
+            const end = row.end_date ? APP.Utils.convertISOToUKDate(row.end_date) : '<span style="color:#059669; font-weight:700;">Active</span>';
+
+            html += `<tr>
+                <td>${start}</td>
+                <td><strong>${advName}</strong></td>
+                <td>${row.rotation_name || 'Manual Assignment'}</td>
+                <td>${end}</td>
+                <td style="color:#6B7280;">${row.reason || '-'}</td>
+                <td>${row.start_week_offset || 1}</td>
+            </tr>`;
+        });
+
+        if (count === 0) html += '<tr><td colspan="6" style="text-align:center; padding:20px;">No history found.</td></tr>';
+        
+        html += '</tbody></table>';
+        ELS.grid.innerHTML = html;
+    };
+
+    // Initialize immediately so the button listener is active
+    setTimeout(HistReports.initialize, 1000);
+
+    APP.Components.HistoricalReports = HistReports;
+}(window.APP));

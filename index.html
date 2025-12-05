@@ -249,12 +249,11 @@
             <div class="app-banner">Coming Soon</div>
         </button>
 
-        <button class="dashboard-app coming-soon" disabled>
+        <button class="dashboard-app" id="btn-dash-hist-reports">
             <div class="app-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>
             </div>
             <span class="app-title">Hist. Reports</span>
-            <div class="app-banner">Coming Soon</div>
         </button>
 
     </div>
@@ -481,7 +480,20 @@
         </div>
     </div>
 </section>
-
+<section id="tab-hist-reports" class="tab-content">
+    <div class="card" style="display:flex; flex-direction:column; height:100%; padding:0; overflow:hidden;">
+        <div class="editor-controls" style="padding: 20px 24px; border-bottom: 1px solid var(--color-border); background: var(--color-hover-bg); margin:0;">
+            <div><h2 style="margin-bottom:4px;">Audit Log & History</h2><p class="helper-text" style="margin:0;">Track schedule changes and assignment history.</p></div>
+            <div style="display:flex; gap:12px; align-items:center;">
+                <input type="text" id="histSearch" class="form-input" placeholder="Search Advisor..." style="width:200px;">
+                <button id="btnRefreshHist" class="btn btn-secondary">Refresh Log</button>
+            </div>
+        </div>
+        <div class="table-container" id="hist-grid-container" style="flex-grow:1; overflow-y:auto; margin:0; border:none; border-radius:0;">
+            <div style="padding:40px; text-align:center; color:#9CA3AF;">Loading History...</div>
+        </div>
+    </div>
+</section>
     </main>
   </div> 
 
