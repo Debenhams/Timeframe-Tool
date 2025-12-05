@@ -4683,8 +4683,10 @@ const handleDeleteRotation = async () => {
             APP.Components.ScheduleViewer.initialize();
             // Initialize the Trade Center
             if (APP.Components.ShiftTradeCenter) {
-                APP.Components.ShiftTradeCenter.initialize();
+      
+           APP.Components.ShiftTradeCenter.initialize();
                 APP.Components.AdvisorAdmin.initialize();
+                APP.Components.Reports.initialize(); // <-- NEW LINE HERE
                 
                 APP.Components.Dashboard.initialize();
             }
@@ -5209,6 +5211,7 @@ const ACKNOWLEDGED_ALERTS = new Set(); // This will store IDs of "read" exceptio
         ELS.badgeStats = document.getElementById('badge-dash-stats');
         ELS.badgeAlerts = document.getElementById('badge-dash-alerts');
         ELS.badgeUnassigned = document.getElementById('badge-dash-unassigned');
+        ELS.btnReports = document.getElementById('btn-dash-reports'); // <-- NEW LINE HERE
 
         // Cache the new modal elements
         ELS.modal = document.getElementById('dashboardModal');
@@ -5219,9 +5222,9 @@ const ACKNOWLEDGED_ALERTS = new Set(); // This will store IDs of "read" exceptio
         // Wire up click listeners
         if (ELS.btnStats) ELS.btnStats.addEventListener('click', handleStatsClick);
         if (ELS.btnAlerts) ELS.btnAlerts.addEventListener('click', handleAlertsClick);
-        if (ELS.btnUnassigned) ELS.btnUnassigned.addEventListener('click', handleUnassignedClick);
+if (ELS.btnUnassigned) ELS.btnUnassigned.addEventListener('click', handleUnassignedClick);
+        if (ELS.btnReports) ELS.btnReports.addEventListener('click', () => handleTabSwitch('tab-reports'));
         if (ELS.modalClose) ELS.modalClose.addEventListener('click', closeModal);
-        if (ELS.modalBody) ELS.modalBody.addEventListener('click', handleAcknowledgeClick);
     };
 
     // The main render function for the dashboard
@@ -5372,6 +5375,18 @@ const renderDailyStats = (allExceptions, weekStart) => {
         }
         openModal("Unassigned Advisors", html);
     };
+
+    // NEW: Helper to switch tabs from dashboard
+    const handleTabSwitch = (tabId) => {
+        const tabLink = document.querySelector(`.tab-link[data-tab="${tabId}"]`);
+        if (tabLink) tabLink.click();
+        else {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            const content = document.getElementById(tabId);
+            if(content) content.classList.add('active');
+        }
+    };
+
 const handleAcknowledgeClick = (e) => {
     const target = e.target.closest('.btn-acknowledge');
     if (target && !target.disabled) {
@@ -5406,4 +5421,175 @@ const handleAcknowledgeClick = (e) => {
     // Expose the component
     APP.Components = APP.Components || {};
     APP.Components.Dashboard = Dashboard;
+}(window.APP));
+/**
+ * MODULE: APP.Components.Reports
+ * Handles data aggregation, visualization, and excel export.
+ */
+(function(APP) {
+    const Reports = {};
+    const ELS = {};
+    let CHART_TREND = null;
+    let CHART_UTIL = null;
+    let RAW_DATA = [];
+
+    Reports.initialize = () => {
+        ELS.section = document.getElementById('tab-reports');
+        ELS.dateRange = document.getElementById('reportDateRange');
+        ELS.filterTeam = document.getElementById('reportFilterTeam');
+        ELS.btnRun = document.getElementById('btnRunReport');
+        ELS.btnExport = document.getElementById('btnExportExcel');
+        ELS.gridContainer = document.getElementById('report-grid-container');
+        
+        ELS.kpiTotal = document.getElementById('kpi-total-hours');
+        ELS.kpiPaid = document.getElementById('kpi-paid-hours');
+        ELS.kpiShrinkage = document.getElementById('kpi-shrinkage');
+        ELS.kpiHeadcount = document.getElementById('kpi-headcount');
+
+        if (ELS.dateRange && typeof flatpickr !== 'undefined') {
+            flatpickr(ELS.dateRange, {
+                mode: "range", dateFormat: "Y-m-d", altInput: true, altFormat: "d M Y",
+                defaultDate: [new Date(), new Date()]
+            });
+        }
+
+        if (ELS.btnRun) ELS.btnRun.addEventListener('click', generateReport);
+        if (ELS.btnExport) ELS.btnExport.addEventListener('click', exportToExcel);
+        setTimeout(populateTeamFilter, 1000);
+    };
+
+    const populateTeamFilter = () => {
+        if (!ELS.filterTeam) return;
+        const STATE = APP.StateManager.getState();
+        const leaders = STATE.leaders.sort((a,b) => a.name.localeCompare(b.name));
+        let html = '<option value="">All Teams</option>';
+        leaders.forEach(l => { html += `<option value="${l.id}">${l.name}</option>`; });
+        ELS.filterTeam.innerHTML = html;
+    };
+
+    const generateReport = async () => {
+        const fp = ELS.dateRange._flatpickr;
+        const startObj = fp.selectedDates[0];
+        const endObj = fp.selectedDates[1];
+        if (!startObj || !endObj) return APP.Utils.showToast("Select date range.", "warning");
+
+        ELS.btnRun.disabled = true; ELS.btnRun.textContent = "Processing...";
+        ELS.gridContainer.innerHTML = '<div style="padding:40px; text-align:center;">Calculating schedules...</div>';
+
+        setTimeout(async () => {
+            try { await runCalculation(startObj, endObj); } 
+            catch (e) { console.error(e); APP.Utils.showToast("Error generating report.", "danger"); } 
+            finally { ELS.btnRun.disabled = false; ELS.btnRun.textContent = "Generate Report"; }
+        }, 100);
+    };
+
+    const runCalculation = async (startDate, endDate) => {
+        const STATE = APP.StateManager.getState();
+        const filterLeaderId = ELS.filterTeam.value;
+        let advisors = STATE.advisors;
+        if (filterLeaderId) advisors = advisors.filter(a => a.leader_id == filterLeaderId);
+
+        const dates = [];
+        let curr = new Date(startDate);
+        while (curr <= endDate) { dates.push(APP.Utils.formatDateToISO(curr)); curr.setDate(curr.getDate() + 1); }
+
+        const uniqueMondays = new Set();
+        dates.forEach(d => uniqueMondays.add(APP.Utils.getMondayForDate(d)));
+        for (let monday of uniqueMondays) await APP.StateManager.loadEffectiveAssignments(monday);
+
+        RAW_DATA = [];
+        const dailyTrend = {};
+        let totalPaidMins = 0; let totalUnpaidMins = 0; let totalShrinkageMins = 0; let totalWorkMins = 0;
+        const uniqueAdvisors = new Set();
+
+        dates.forEach(dateISO => {
+            const dayName = APP.Utils.getDayNameFromISO(dateISO);
+            const weekStartISO = APP.Utils.getMondayForDate(dateISO);
+            if (!dailyTrend[dateISO]) dailyTrend[dateISO] = 0;
+
+            advisors.forEach(adv => {
+                const { segments } = APP.ScheduleCalculator.calculateSegments(adv.id, dayName, weekStartISO);
+                if (segments.length > 0) {
+                    uniqueAdvisors.add(adv.id);
+                    let dayPaid = 0; let dayUnpaid = 0; let dayShrinkage = 0; let dayWork = 0;
+
+                    segments.forEach(seg => {
+                        const comp = APP.StateManager.getComponentById(seg.component_id);
+                        if (!comp) return;
+                        const dur = seg.duration_min;
+                        if (comp.is_paid) { dayPaid += dur; totalPaidMins += dur; } else { dayUnpaid += dur; totalUnpaidMins += dur; }
+                        const type = (comp.type || 'Activity');
+                        if (['Shrinkage', 'Absence', 'Lateness', 'Sickness'].includes(type)) { dayShrinkage += dur; totalShrinkageMins += dur; }
+                        else if (['Activity', 'Payback'].includes(type)) { dayWork += dur; totalWorkMins += dur; }
+                    });
+
+                    dailyTrend[dateISO] += (dayPaid / 60);
+                    RAW_DATA.push({
+                        Date: dateISO, Advisor: adv.name,
+                        Leader: STATE.leaders.find(l=>l.id===adv.leader_id)?.name || 'Unassigned',
+                        Scheduled_Start: APP.Utils.formatMinutesToTime(segments[0].start_min),
+                        Scheduled_End: APP.Utils.formatMinutesToTime(segments[segments.length-1].end_min),
+                        Total_Hours: ((dayPaid + dayUnpaid)/60).toFixed(2),
+                        Paid_Hours: (dayPaid/60).toFixed(2),
+                        Shrinkage_Hours: (dayShrinkage/60).toFixed(2)
+                    });
+                }
+            });
+        });
+
+        const totalHours = (totalPaidMins + totalUnpaidMins) / 60;
+        ELS.kpiTotal.textContent = Math.round(totalHours).toLocaleString();
+        ELS.kpiPaid.textContent = Math.round(totalPaidMins / 60).toLocaleString();
+        ELS.kpiHeadcount.textContent = uniqueAdvisors.size;
+        const shrinkPct = totalHours > 0 ? (totalShrinkageMins / (totalPaidMins + totalUnpaidMins)) * 100 : 0;
+        ELS.kpiShrinkage.textContent = shrinkPct.toFixed(1) + "%";
+
+        renderCharts(dailyTrend, totalWorkMins, totalShrinkageMins, totalUnpaidMins);
+        renderTable();
+        ELS.btnExport.disabled = false;
+    };
+
+    const renderCharts = (trendData, workMins, shrinkMins, unpaidMins) => {
+        if (CHART_TREND) CHART_TREND.destroy();
+        if (CHART_UTIL) CHART_UTIL.destroy();
+
+        const labels = Object.keys(trendData).sort();
+        const dataPoints = labels.map(d => trendData[d]); 
+
+        CHART_TREND = new Chart(document.getElementById('chart-trend').getContext('2d'), {
+            type: 'bar',
+            data: { labels: labels.map(d => d.slice(5)), datasets: [{ label: 'Paid Hours', data: dataPoints, backgroundColor: '#4F46E5', borderRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+
+        CHART_UTIL = new Chart(document.getElementById('chart-utilization').getContext('2d'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Productive', 'Shrinkage', 'Unpaid/Breaks'],
+                datasets: [{ data: [Math.round(workMins/60), Math.round(shrinkMins/60), Math.round(unpaidMins/60)], backgroundColor: ['#10B981', '#EF4444', '#9CA3AF'], borderWidth: 0 }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+        });
+    };
+
+    const renderTable = () => {
+        if (RAW_DATA.length === 0) { ELS.gridContainer.innerHTML = '<div style="padding:20px; text-align:center;">No data found.</div>'; return; }
+        let html = '<table class="weekly-grid" style="width:100%;"><thead><tr><th>Date</th><th>Advisor</th><th>Leader</th><th>Shift</th><th>Total Hrs</th><th>Paid Hrs</th><th>Shrinkage</th></tr></thead><tbody>';
+        RAW_DATA.slice(0, 100).forEach(row => {
+            html += `<tr><td>${row.Date}</td><td>${row.Advisor}</td><td>${row.Leader}</td><td>${row.Scheduled_Start} - ${row.Scheduled_End}</td><td>${row.Total_Hours}</td><td>${row.Paid_Hours}</td><td>${row.Shrinkage_Hours}</td></tr>`;
+        });
+        html += '</tbody></table>';
+        if (RAW_DATA.length > 100) html += `<div style="padding:10px; text-align:center; background:#f9fafb; font-style:italic;">Showing first 100 of ${RAW_DATA.length} rows. Export to see full details.</div>`;
+        ELS.gridContainer.innerHTML = html;
+    };
+
+    const exportToExcel = () => {
+        if (RAW_DATA.length === 0) return;
+        const ws = XLSX.utils.json_to_sheet(RAW_DATA);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Schedule Data");
+        XLSX.writeFile(wb, `WFM_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+    };
+
+    APP.Components.Reports = Reports;
 }(window.APP));
