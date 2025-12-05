@@ -5424,7 +5424,7 @@ const handleAcknowledgeClick = (e) => {
 }(window.APP));
 /**
  * MODULE: APP.Components.Reports
- * EDITION: High-Gloss Visuals (3D Gradients & Shadows).
+ * FINAL EDITION: Glossy Visuals + Data-Rich Excel Export (Breaks, Net Work, Timings).
  */
 (function(APP) {
     const Reports = {};
@@ -5434,13 +5434,11 @@ const handleAcknowledgeClick = (e) => {
     let RAW_DATA = [];
     let PAYROLL_SUMMARY = {};
 
-    // --- ENHANCED GLOSS ENGINE ---
-    // Creates a 3-stop gradient: Highlight (Top) -> Color (Mid) -> Shadow (Bottom)
-    const createPremiumGradient = (ctx, cHighlight, cBody, cShadow) => {
+    // --- GLOSS ENGINE ---
+    const createGlossGradient = (ctx, colorTop, colorBottom) => {
         const gradient = ctx.createLinearGradient(0, 0, 0, 400); 
-        gradient.addColorStop(0, cHighlight); // The "Shine" at the top
-        gradient.addColorStop(0.3, cBody);    // The real color
-        gradient.addColorStop(1, cShadow);    // The depth/shadow at bottom
+        gradient.addColorStop(0, colorTop);    
+        gradient.addColorStop(1, colorBottom); 
         return gradient;
     };
 
@@ -5498,8 +5496,8 @@ const handleAcknowledgeClick = (e) => {
         const endObj = fp.selectedDates[1];
         if (!startObj || !endObj) return APP.Utils.showToast("Please select a date range.", "warning");
 
-        ELS.btnRun.disabled = true; ELS.btnRun.textContent = "Analyzing...";
-        ELS.gridContainer.innerHTML = '<div style="padding:60px; text-align:center; color:#6B7280;">Running Analysis...</div>';
+        ELS.btnRun.disabled = true; ELS.btnRun.textContent = "Processing...";
+        ELS.gridContainer.innerHTML = '<div style="padding:60px; text-align:center; color:#6B7280;">Compiling Data...</div>';
 
         setTimeout(async () => {
             try { await runCalculation(startObj, endObj); } 
@@ -5530,6 +5528,7 @@ const handleAcknowledgeClick = (e) => {
         dates.forEach(d => uniqueMondays.add(APP.Utils.getMondayForDate(d)));
         for (let monday of uniqueMondays) await APP.StateManager.loadEffectiveAssignments(monday);
 
+        // DATA CONTAINERS
         RAW_DATA = []; PAYROLL_SUMMARY = {};
         const dailyTrend = {}; 
         let totals = { paid: 0, holiday: 0, sick: 0, unpaid: 0 };
@@ -5546,12 +5545,20 @@ const handleAcknowledgeClick = (e) => {
                 
                 if (segments.length > 0) {
                     activeHeadcount.add(adv.id);
-                    if (!PAYROLL_SUMMARY[adv.id]) PAYROLL_SUMMARY[adv.id] = { Name: adv.name, Days: 0, Paid_Mins: 0, Holiday_Mins: 0, Sick_Mins: 0 };
+                    if (!PAYROLL_SUMMARY[adv.id]) PAYROLL_SUMMARY[adv.id] = { Name: adv.name, Days: 0, Paid_Mins: 0, Holiday_Mins: 0, Sick_Mins: 0, Work_Mins: 0 };
                     PAYROLL_SUMMARY[adv.id].Days++;
 
-                    let dPaid = 0, dHoliday = 0, dSick = 0;
+                    let dPaid = 0, dHoliday = 0, dSick = 0, dUnpaid = 0, dWork = 0;
                     const startM = segments[0].start_min;
                     const endM = segments[segments.length-1].end_min;
+                    
+                    // Identify Primary Activity for the Log
+                    let mainActivity = "Shift";
+                    const activities = segments.filter(s => !APP.StateManager.getComponentById(s.component_id)?.name.toLowerCase().includes('break'));
+                    if (activities.length > 0) {
+                        const firstComp = APP.StateManager.getComponentById(activities[0].component_id);
+                        mainActivity = firstComp ? firstComp.name : "Shift";
+                    }
 
                     segments.forEach(seg => {
                         const comp = APP.StateManager.getComponentById(seg.component_id);
@@ -5563,13 +5570,15 @@ const handleAcknowledgeClick = (e) => {
                         if (comp.is_paid) {
                             dPaid += dur; totals.paid += dur; PAYROLL_SUMMARY[adv.id].Paid_Mins += dur;
                         } else {
-                            totals.unpaid += dur;
+                            dUnpaid += dur; totals.unpaid += dur;
                         }
 
                         if (cType === 'Absence' || cName.includes('holiday') || cName.includes('vacation')) {
                             if (comp.is_paid) { dHoliday += dur; totals.holiday += dur; PAYROLL_SUMMARY[adv.id].Holiday_Mins += dur; }
                         } else if (cName.includes('sick')) {
                             dSick += dur; totals.sick += dur; PAYROLL_SUMMARY[adv.id].Sick_Mins += dur;
+                        } else if (comp.is_paid) {
+                            dWork += dur; PAYROLL_SUMMARY[adv.id].Work_Mins += dur;
                         }
 
                         if (cType === 'Activity') {
@@ -5582,25 +5591,32 @@ const handleAcknowledgeClick = (e) => {
                     dailyTrend[dateISO].productive += ((dPaid - dHoliday - dSick) / 60);
                     dailyTrend[dateISO].loss += ((dHoliday + dSick) / 60);
 
+                    // --- RICH DATA PUSH ---
                     RAW_DATA.push({
-                        Date: dateISO, Advisor: adv.name,
+                        Date: dateISO, 
+                        Advisor: adv.name,
                         Leader: STATE.leaders.find(l=>l.id===adv.leader_id)?.name || 'Unassigned',
-                        Shift: `${APP.Utils.formatMinutesToTime(startM)} - ${APP.Utils.formatMinutesToTime(endM)}`,
-                        Total_Paid: (dPaid/60).toFixed(2),
-                        Holiday: (dHoliday/60).toFixed(2),
-                        Sickness: (dSick/60).toFixed(2)
+                        Start_Time: APP.Utils.formatMinutesToTime(startM),
+                        End_Time: APP.Utils.formatMinutesToTime(endM),
+                        Main_Activity: mainActivity,
+                        Scheduled_Length_Hrs: ((endM - startM)/60).toFixed(2),
+                        Total_Paid_Hrs: (dPaid/60).toFixed(2),
+                        Unpaid_Break_Hrs: (dUnpaid/60).toFixed(2),
+                        Net_Working_Hrs: ((dPaid - dHoliday - dSick)/60).toFixed(2),
+                        Holiday_Hrs: (dHoliday/60).toFixed(2),
+                        Sickness_Hrs: (dSick/60).toFixed(2)
                     });
                 }
             });
         });
 
+        // UPDATE UI
         const totalHrs = (totals.paid + totals.unpaid) / 60;
         ELS.kpiTotal.textContent = Math.round(totalHrs).toLocaleString();
         ELS.kpiPaid.textContent = Math.round(totals.paid / 60).toLocaleString();
         ELS.kpiHeadcount.textContent = activeHeadcount.size;
         const shrinkPct = totals.paid > 0 ? ((totals.holiday + totals.sick) / totals.paid) * 100 : 0;
         ELS.kpiShrinkage.textContent = shrinkPct.toFixed(1) + "%";
-        
         ELS.kpiShrinkage.style.color = shrinkPct > 12 ? '#DC2626' : '#059669'; 
         ELS.kpiPaid.style.color = '#059669'; 
 
@@ -5613,95 +5629,58 @@ const handleAcknowledgeClick = (e) => {
         if (CHART_TREND) CHART_TREND.destroy();
         if (CHART_UTIL) CHART_UTIL.destroy();
 
-        // 1. Stacked Hours Trend (ULTRA GLOSSY)
         const labels = Object.keys(dailyTrend).sort();
         const ctxTrend = document.getElementById('chart-trend').getContext('2d');
-        
-        // DEBENHAMS TEAL GLOSS (Light Teal -> Teal -> Dark Teal)
-        const tealGradient = createPremiumGradient(ctxTrend, '#CCFBF6', '#70E6D6', '#0F766E');
-        // SHADOW BLACK GLOSS (Grey -> Black -> Deep Black)
-        const blackGradient = createPremiumGradient(ctxTrend, '#4B5563', '#111827', '#000000');
+        const tealGradient = createGlossGradient(ctxTrend, '#70E6D6', '#0F766E');
+        const blackGradient = createGlossGradient(ctxTrend, '#4B5563', '#000000');
 
         CHART_TREND = new Chart(ctxTrend, {
             type: 'bar',
             data: {
                 labels: labels.map(d => d.slice(5)),
                 datasets: [
-                    { 
-                        label: 'Productive Hours', 
-                        data: labels.map(d => dailyTrend[d].productive), 
-                        backgroundColor: tealGradient,
-                        borderRadius: 4,
-                        borderWidth: 1,
-                        borderColor: 'rgba(255,255,255,0.5)', // Glass Edge
-                        stack: 'Stack 0',
-                        barPercentage: 0.6 // Thinner, sleeker bars
-                    },
-                    { 
-                        label: 'Loss (Sick/Hol)', 
-                        data: labels.map(d => dailyTrend[d].loss), 
-                        backgroundColor: blackGradient, 
-                        borderRadius: 4,
-                        borderWidth: 1,
-                        borderColor: 'rgba(255,255,255,0.3)',
-                        stack: 'Stack 0',
-                        barPercentage: 0.6
-                    }
+                    { label: 'Productive Hours', data: labels.map(d => dailyTrend[d].productive), backgroundColor: tealGradient, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', stack: 'Stack 0' },
+                    { label: 'Loss (Sick/Hol)', data: labels.map(d => dailyTrend[d].loss), backgroundColor: blackGradient, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)', stack: 'Stack 0' }
                 ]
             },
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false, 
-                scales: { 
-                    x: { grid: { display: false }, stacked: true }, 
-                    y: { grid: { color: '#F3F4F6' }, stacked: true } 
-                },
-                plugins: { legend: { labels: { usePointStyle: true, boxWidth: 8 } } }
-            }
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false }, stacked: true }, y: { grid: { color: '#F3F4F6' }, stacked: true } }, plugins: { legend: { labels: { usePointStyle: true, boxWidth: 8 } } } }
         });
 
-        // 2. Intraday Profile (High Gloss)
         const ctxUtil = document.getElementById('chart-utilization').getContext('2d');
-        const profileGradient = createPremiumGradient(ctxUtil, '#CCFBF6', '#70E6D6', '#0F766E');
+        const profileGradient = createGlossGradient(ctxUtil, '#70E6D6', '#0F766E');
 
         CHART_UTIL = new Chart(ctxUtil, {
             type: 'bar',
             data: {
                 labels: ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'],
-                datasets: [{ 
-                    label: 'Staffing Intensity', 
-                    data: heatmapData, 
-                    backgroundColor: profileGradient, 
-                    borderRadius: 4,
-                    borderWidth: 1,
-                    borderColor: 'rgba(255,255,255,0.5)',
-                    barPercentage: 0.7
-                }]
+                datasets: [{ label: 'Staffing Intensity', data: heatmapData, backgroundColor: profileGradient, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' }]
             },
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false }, title: { display: true, text: 'Intraday Staffing Profile' } },
-                scales: { x: { grid: { display: false } }, y: { grid: { color: '#F3F4F6' } } }
-            }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, title: { display: true, text: 'Intraday Staffing Profile' } }, scales: { x: { grid: { display: false } }, y: { grid: { color: '#F3F4F6' } } } }
         });
     };
 
     const renderProGrid = (totals) => {
         if (RAW_DATA.length === 0) { ELS.gridContainer.innerHTML = '<div style="padding:40px; text-align:center;">No data found.</div>'; return; }
         
-        let html = '<table class="weekly-grid" style="width:100%;"><thead><tr><th>Date</th><th>Advisor</th><th>Leader</th><th>Shift</th><th>Paid Hrs</th><th>Holiday</th><th>Sick</th></tr></thead><tbody>';
+        let html = '<table class="weekly-grid" style="width:100%;"><thead><tr><th>Date</th><th>Advisor</th><th>Shift</th><th>Total Paid</th><th>Break (Unpaid)</th><th>Holiday</th><th>Sick</th></tr></thead><tbody>';
         
         RAW_DATA.slice(0, 200).forEach(row => {
-            const sickClass = parseFloat(row.Sickness) > 0 ? 'cell-danger' : '';
-            const holClass = parseFloat(row.Holiday) > 0 ? 'cell-success' : '';
-            html += `<tr><td><span style="font-family:monospace; color:#6B7280;">${row.Date}</span></td><td><strong>${row.Advisor}</strong></td><td>${row.Leader}</td><td>${row.Shift}</td><td>${row.Total_Paid}</td><td><span class="${holClass}">${row.Holiday}</span></td><td><span class="${sickClass}">${row.Sickness}</span></td></tr>`;
+            const sickClass = parseFloat(row.Sickness_Hrs) > 0 ? 'cell-danger' : '';
+            const holClass = parseFloat(row.Holiday_Hrs) > 0 ? 'cell-success' : '';
+            html += `<tr>
+                <td><span style="font-family:monospace; color:#6B7280;">${row.Date}</span></td>
+                <td><strong>${row.Advisor}</strong></td>
+                <td>${row.Start_Time} - ${row.End_Time}</td>
+                <td>${row.Total_Paid_Hrs}</td>
+                <td style="color:#9CA3AF;">${row.Unpaid_Break_Hrs}</td>
+                <td><span class="${holClass}">${row.Holiday_Hrs}</span></td>
+                <td><span class="${sickClass}">${row.Sickness_Hrs}</span></td>
+            </tr>`;
         });
 
-        html += `<tr class="table-footer-row"><td colspan="4" style="text-align:right;">GRAND TOTALS:</td><td>${(totals.paid/60).toFixed(2)}</td><td>${(totals.holiday/60).toFixed(2)}</td><td>${(totals.sick/60).toFixed(2)}</td></tr>`;
+        html += `<tr class="table-footer-row"><td colspan="3" style="text-align:right;">GRAND TOTALS:</td><td>${(totals.paid/60).toFixed(2)}</td><td>${(totals.unpaid/60).toFixed(2)}</td><td>${(totals.holiday/60).toFixed(2)}</td><td>${(totals.sick/60).toFixed(2)}</td></tr>`;
         html += '</tbody></table>';
-        
-        if (RAW_DATA.length > 200) html += `<div style="padding:10px; text-align:center; background:#f9fafb; font-style:italic;">Showing first 200 rows. Download Excel for full payroll data.</div>`;
+        if (RAW_DATA.length > 200) html += `<div style="padding:10px; text-align:center; background:#f9fafb; font-style:italic;">Showing first 200 rows. Download Excel for full detailed log.</div>`;
         ELS.gridContainer.innerHTML = html;
     };
 
@@ -5710,13 +5689,13 @@ const handleAcknowledgeClick = (e) => {
         const summaryData = Object.values(PAYROLL_SUMMARY).map(p => ({
             Advisor: p.Name, Days_Scheduled: p.Days,
             Total_Paid_Hours: (p.Paid_Mins/60).toFixed(2),
+            Net_Working_Hours: (p.Work_Mins/60).toFixed(2),
             Holiday_Hours: (p.Holiday_Mins/60).toFixed(2),
-            Sickness_Hours: (p.Sick_Mins/60).toFixed(2),
-            Net_Productive: ((p.Paid_Mins - p.Holiday_Mins - p.Sick_Mins)/60).toFixed(2)
+            Sickness_Hours: (p.Sick_Mins/60).toFixed(2)
         }));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), "Payroll Summary");
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(RAW_DATA), "Daily Log");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(RAW_DATA), "Daily Detailed Log");
         XLSX.writeFile(wb, `Debenhams_WFM_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
     };
 
