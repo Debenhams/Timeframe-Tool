@@ -5516,7 +5516,8 @@ const handleAcknowledgeClick = (e) => {
                     segments.forEach(seg => {
                         const comp = APP.StateManager.getComponentById(seg.component_id);
                         if (!comp) return;
-                        const dur = seg.duration_min;
+                        // FIX: Calculate duration dynamically (End - Start) instead of looking for duration_min
+                        const dur = seg.end_min - seg.start_min; 
                         if (comp.is_paid) { dayPaid += dur; totalPaidMins += dur; } else { dayUnpaid += dur; totalUnpaidMins += dur; }
                         const type = (comp.type || 'Activity');
                         if (['Shrinkage', 'Absence', 'Lateness', 'Sickness'].includes(type)) { dayShrinkage += dur; totalShrinkageMins += dur; }
