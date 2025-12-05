@@ -5424,7 +5424,7 @@ const handleAcknowledgeClick = (e) => {
 }(window.APP));
 /**
  * MODULE: APP.Components.Reports
- * FINAL EDITION: Debenhams Layout + Glossy Teal Bars.
+ * EDITION: High-Gloss Visuals (3D Gradients & Shadows).
  */
 (function(APP) {
     const Reports = {};
@@ -5434,11 +5434,13 @@ const handleAcknowledgeClick = (e) => {
     let RAW_DATA = [];
     let PAYROLL_SUMMARY = {};
 
-    // --- GLOSS ENGINE: Adds 3D effect to your Teal color ---
-    const createGlossGradient = (ctx, colorTop, colorBottom) => {
+    // --- ENHANCED GLOSS ENGINE ---
+    // Creates a 3-stop gradient: Highlight (Top) -> Color (Mid) -> Shadow (Bottom)
+    const createPremiumGradient = (ctx, cHighlight, cBody, cShadow) => {
         const gradient = ctx.createLinearGradient(0, 0, 0, 400); 
-        gradient.addColorStop(0, colorTop);    // Bright Teal top
-        gradient.addColorStop(1, colorBottom); // Slightly darker bottom for depth
+        gradient.addColorStop(0, cHighlight); // The "Shine" at the top
+        gradient.addColorStop(0.3, cBody);    // The real color
+        gradient.addColorStop(1, cShadow);    // The depth/shadow at bottom
         return gradient;
     };
 
@@ -5599,7 +5601,6 @@ const handleAcknowledgeClick = (e) => {
         const shrinkPct = totals.paid > 0 ? ((totals.holiday + totals.sick) / totals.paid) * 100 : 0;
         ELS.kpiShrinkage.textContent = shrinkPct.toFixed(1) + "%";
         
-        // Colors from your original screenshot
         ELS.kpiShrinkage.style.color = shrinkPct > 12 ? '#DC2626' : '#059669'; 
         ELS.kpiPaid.style.color = '#059669'; 
 
@@ -5612,13 +5613,14 @@ const handleAcknowledgeClick = (e) => {
         if (CHART_TREND) CHART_TREND.destroy();
         if (CHART_UTIL) CHART_UTIL.destroy();
 
-        // 1. Stacked Hours Trend (Restored to Your Colors)
+        // 1. Stacked Hours Trend (ULTRA GLOSSY)
         const labels = Object.keys(dailyTrend).sort();
         const ctxTrend = document.getElementById('chart-trend').getContext('2d');
         
-        // Custom Glossy Gradients (Teal matching your screenshot, but 3D)
-        const tealGradient = createGlossGradient(ctxTrend, '#70E6D6', '#2DD4BF'); // Your Teal -> Slightly Darker
-        const blackGradient = createGlossGradient(ctxTrend, '#374151', '#000000'); // Grey -> Black
+        // DEBENHAMS TEAL GLOSS (Light Teal -> Teal -> Dark Teal)
+        const tealGradient = createPremiumGradient(ctxTrend, '#CCFBF6', '#70E6D6', '#0F766E');
+        // SHADOW BLACK GLOSS (Grey -> Black -> Deep Black)
+        const blackGradient = createPremiumGradient(ctxTrend, '#4B5563', '#111827', '#000000');
 
         CHART_TREND = new Chart(ctxTrend, {
             type: 'bar',
@@ -5628,11 +5630,12 @@ const handleAcknowledgeClick = (e) => {
                     { 
                         label: 'Productive Hours', 
                         data: labels.map(d => dailyTrend[d].productive), 
-                        backgroundColor: tealGradient, // Uses the gloss effect
+                        backgroundColor: tealGradient,
                         borderRadius: 4,
                         borderWidth: 1,
-                        borderColor: 'rgba(255,255,255,0.2)', // Slight glass edge
-                        stack: 'Stack 0' 
+                        borderColor: 'rgba(255,255,255,0.5)', // Glass Edge
+                        stack: 'Stack 0',
+                        barPercentage: 0.6 // Thinner, sleeker bars
                     },
                     { 
                         label: 'Loss (Sick/Hol)', 
@@ -5640,8 +5643,9 @@ const handleAcknowledgeClick = (e) => {
                         backgroundColor: blackGradient, 
                         borderRadius: 4,
                         borderWidth: 1,
-                        borderColor: 'rgba(255,255,255,0.2)',
-                        stack: 'Stack 0' 
+                        borderColor: 'rgba(255,255,255,0.3)',
+                        stack: 'Stack 0',
+                        barPercentage: 0.6
                     }
                 ]
             },
@@ -5649,17 +5653,16 @@ const handleAcknowledgeClick = (e) => {
                 responsive: true, 
                 maintainAspectRatio: false, 
                 scales: { 
-                    x: { grid: { display: true, color: '#F3F4F6' }, stacked: true }, 
-                    y: { grid: { color: '#E5E7EB' }, stacked: true } 
-                }
+                    x: { grid: { display: false }, stacked: true }, 
+                    y: { grid: { color: '#F3F4F6' }, stacked: true } 
+                },
+                plugins: { legend: { labels: { usePointStyle: true, boxWidth: 8 } } }
             }
         });
 
-        // 2. Intraday Profile (Restored to Right Side Layout)
+        // 2. Intraday Profile (High Gloss)
         const ctxUtil = document.getElementById('chart-utilization').getContext('2d');
-        
-        // Single Color Teal Gloss for the Profile (Like your image)
-        const profileGradient = createGlossGradient(ctxUtil, '#70E6D6', '#2DD4BF');
+        const profileGradient = createPremiumGradient(ctxUtil, '#CCFBF6', '#70E6D6', '#0F766E');
 
         CHART_UTIL = new Chart(ctxUtil, {
             type: 'bar',
@@ -5671,7 +5674,8 @@ const handleAcknowledgeClick = (e) => {
                     backgroundColor: profileGradient, 
                     borderRadius: 4,
                     borderWidth: 1,
-                    borderColor: 'rgba(255,255,255,0.2)'
+                    borderColor: 'rgba(255,255,255,0.5)',
+                    barPercentage: 0.7
                 }]
             },
             options: { 
