@@ -5424,7 +5424,7 @@ const handleAcknowledgeClick = (e) => {
 }(window.APP));
 /**
  * MODULE: APP.Components.Reports
- * ENTERPRISE VERSION: Payroll-Ready Data, Multi-Tab Export, and Absence Ledgers.
+ * ENTERPRISE EDITION: Branded Charts, Heatmaps, and Payroll Reconciliation.
  */
 (function(APP) {
     const Reports = {};
@@ -5432,21 +5432,21 @@ const handleAcknowledgeClick = (e) => {
     let CHART_TREND = null;
     let CHART_UTIL = null;
     let RAW_DATA = [];
-    let PAYROLL_SUMMARY = []; // New dataset for Payroll
+    let PAYROLL_SUMMARY = {};
 
     Reports.initialize = () => {
         ELS.section = document.getElementById('tab-reports');
         ELS.dateRange = document.getElementById('reportDateRange');
         ELS.filterTeam = document.getElementById('reportFilterTeam');
         
-        // Ensure Site Filter exists
+        // Inject Site Filter if missing
         if (!document.getElementById('reportFilterSite')) {
             const siteSelect = document.createElement('select');
             siteSelect.id = 'reportFilterSite';
             siteSelect.className = 'form-select';
             siteSelect.style.width = '140px';
             siteSelect.innerHTML = '<option value="">All Sites</option>';
-            ELS.filterTeam.parentNode.insertBefore(siteSelect, ELS.filterTeam);
+            if(ELS.filterTeam && ELS.filterTeam.parentNode) ELS.filterTeam.parentNode.insertBefore(siteSelect, ELS.filterTeam);
         }
         ELS.filterSite = document.getElementById('reportFilterSite');
         
@@ -5454,13 +5454,12 @@ const handleAcknowledgeClick = (e) => {
         ELS.btnExport = document.getElementById('btnExportExcel');
         ELS.gridContainer = document.getElementById('report-grid-container');
         
-        // KPI Elements
+        // KPIs
         ELS.kpiTotal = document.getElementById('kpi-total-hours');
         ELS.kpiPaid = document.getElementById('kpi-paid-hours');
         ELS.kpiShrinkage = document.getElementById('kpi-shrinkage');
         ELS.kpiHeadcount = document.getElementById('kpi-headcount');
 
-        // Init Date Picker
         if (ELS.dateRange && typeof flatpickr !== 'undefined') {
             flatpickr(ELS.dateRange, {
                 mode: "range", dateFormat: "Y-m-d", altInput: true, altFormat: "d M Y",
@@ -5478,14 +5477,12 @@ const handleAcknowledgeClick = (e) => {
         const STATE = APP.StateManager.getState();
         if (ELS.filterTeam) {
             const leaders = STATE.leaders.sort((a,b) => a.name.localeCompare(b.name));
-            ELS.filterTeam.innerHTML = '<option value="">All Teams</option>' + 
-                leaders.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+            ELS.filterTeam.innerHTML = '<option value="">All Teams</option>' + leaders.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
         }
         if (ELS.filterSite) {
             const sites = new Set();
             STATE.leaders.forEach(l => { if(l.sites) sites.add(l.sites.name); });
-            ELS.filterSite.innerHTML = '<option value="">All Sites</option>' + 
-                Array.from(sites).sort().map(s => `<option value="${s}">${s}</option>`).join('');
+            ELS.filterSite.innerHTML = '<option value="">All Sites</option>' + Array.from(sites).sort().map(s => `<option value="${s}">${s}</option>`).join('');
         }
     };
 
@@ -5495,12 +5492,12 @@ const handleAcknowledgeClick = (e) => {
         const endObj = fp.selectedDates[1];
         if (!startObj || !endObj) return APP.Utils.showToast("Please select a date range.", "warning");
 
-        ELS.btnRun.disabled = true; ELS.btnRun.textContent = "Processing Payroll Data...";
-        ELS.gridContainer.innerHTML = '<div style="padding:60px; text-align:center; color:#6B7280;">Generating Report...<br><small>Reconciling shifts, holidays, and sickness.</small></div>';
+        ELS.btnRun.disabled = true; ELS.btnRun.textContent = "Analyzing Data...";
+        ELS.gridContainer.innerHTML = '<div style="padding:60px; text-align:center; color:#6B7280;">Running Analysis...<br><small>Reconciling Shifts, Breaks, and Shrinkage.</small></div>';
 
         setTimeout(async () => {
             try { await runCalculation(startObj, endObj); } 
-            catch (e) { console.error(e); APP.Utils.showToast("Report Generation Failed.", "danger"); } 
+            catch (e) { console.error(e); APP.Utils.showToast("Report Failed.", "danger"); } 
             finally { ELS.btnRun.disabled = false; ELS.btnRun.textContent = "Generate Report"; }
         }, 100);
     };
@@ -5510,7 +5507,6 @@ const handleAcknowledgeClick = (e) => {
         const filterLeaderId = ELS.filterTeam ? ELS.filterTeam.value : "";
         const filterSiteName = ELS.filterSite ? ELS.filterSite.value : "";
 
-        // 1. Filter Advisors
         let advisors = STATE.advisors.filter(a => {
             if (filterLeaderId && a.leader_id != filterLeaderId) return false;
             if (filterSiteName) {
@@ -5520,26 +5516,20 @@ const handleAcknowledgeClick = (e) => {
             return true;
         });
 
-        // 2. Prepare Date Array
         const dates = [];
         let curr = new Date(startDate);
         while (curr <= endDate) { dates.push(APP.Utils.formatDateToISO(curr)); curr.setDate(curr.getDate() + 1); }
 
-        // 3. Pre-load History
         const uniqueMondays = new Set();
         dates.forEach(d => uniqueMondays.add(APP.Utils.getMondayForDate(d)));
         for (let monday of uniqueMondays) await APP.StateManager.loadEffectiveAssignments(monday);
 
-        // 4. MAIN AGGREGATION
-        RAW_DATA = []; 
-        PAYROLL_SUMMARY = {}; // Key: AdvisorID
-        
+        // AGGREGATION
+        RAW_DATA = []; PAYROLL_SUMMARY = {};
         const dailyTrend = {}; 
-        let grandTotals = { paid: 0, holiday: 0, sick: 0, unpaid: 0 };
+        let totals = { paid: 0, holiday: 0, sick: 0, unpaid: 0 };
         const activeHeadcount = new Set();
-        
-        // Heatmap Data (Hour 8 to 21)
-        const heatmapData = new Array(14).fill(0); 
+        const heatmapData = new Array(14).fill(0);
 
         dates.forEach(dateISO => {
             const dayName = APP.Utils.getDayNameFromISO(dateISO);
@@ -5566,21 +5556,17 @@ const handleAcknowledgeClick = (e) => {
                         const cType = comp.type || 'Activity';
 
                         if (comp.is_paid) {
-                            dPaid += dur;
-                            grandTotals.paid += dur;
-                            PAYROLL_SUMMARY[adv.id].Paid_Mins += dur;
+                            dPaid += dur; totals.paid += dur; PAYROLL_SUMMARY[adv.id].Paid_Mins += dur;
                         } else {
-                            grandTotals.unpaid += dur;
+                            totals.unpaid += dur;
                         }
 
-                        // Specific Buckets for Debenhams Payroll
                         if (cType === 'Absence' || cName.includes('holiday') || cName.includes('vacation')) {
-                            if (comp.is_paid) { dHoliday += dur; grandTotals.holiday += dur; PAYROLL_SUMMARY[adv.id].Holiday_Mins += dur; }
+                            if (comp.is_paid) { dHoliday += dur; totals.holiday += dur; PAYROLL_SUMMARY[adv.id].Holiday_Mins += dur; }
                         } else if (cName.includes('sick')) {
-                            dSick += dur; grandTotals.sick += dur; PAYROLL_SUMMARY[adv.id].Sick_Mins += dur;
+                            dSick += dur; totals.sick += dur; PAYROLL_SUMMARY[adv.id].Sick_Mins += dur;
                         }
 
-                        // Heatmap Density
                         if (cType === 'Activity') {
                             for(let h=8; h<22; h++) {
                                 if (seg.start_min <= h*60 && seg.end_min > h*60) heatmapData[h-8]++; 
@@ -5588,14 +5574,11 @@ const handleAcknowledgeClick = (e) => {
                         }
                     });
 
-                    // Trend Graph Data
                     dailyTrend[dateISO].productive += ((dPaid - dHoliday - dSick) / 60);
                     dailyTrend[dateISO].loss += ((dHoliday + dSick) / 60);
 
-                    // Push Daily Log
                     RAW_DATA.push({
-                        Date: dateISO,
-                        Advisor: adv.name,
+                        Date: dateISO, Advisor: adv.name,
                         Leader: STATE.leaders.find(l=>l.id===adv.leader_id)?.name || 'Unassigned',
                         Shift: `${APP.Utils.formatMinutesToTime(startM)} - ${APP.Utils.formatMinutesToTime(endM)}`,
                         Total_Paid: (dPaid/60).toFixed(2),
@@ -5606,20 +5589,16 @@ const handleAcknowledgeClick = (e) => {
             });
         });
 
-        // 5. UPDATE UI
-        const totalHrs = (grandTotals.paid + grandTotals.unpaid) / 60;
+        const totalHrs = (totals.paid + totals.unpaid) / 60;
         ELS.kpiTotal.textContent = Math.round(totalHrs).toLocaleString();
-        ELS.kpiPaid.textContent = Math.round(grandTotals.paid / 60).toLocaleString();
+        ELS.kpiPaid.textContent = Math.round(totals.paid / 60).toLocaleString();
         ELS.kpiHeadcount.textContent = activeHeadcount.size;
-        
-        // Shrinkage = (Holiday + Sick) / Total Paid
-        const totalShrinkMins = grandTotals.holiday + grandTotals.sick;
-        const shrinkPct = grandTotals.paid > 0 ? (totalShrinkMins / grandTotals.paid) * 100 : 0;
+        const shrinkPct = totals.paid > 0 ? ((totals.holiday + totals.sick) / totals.paid) * 100 : 0;
         ELS.kpiShrinkage.textContent = shrinkPct.toFixed(1) + "%";
         ELS.kpiShrinkage.style.color = shrinkPct > 12 ? '#DC2626' : '#059669';
 
-        renderProCharts(dailyTrend, grandTotals, heatmapData);
-        renderProGrid(grandTotals); // Pass totals to grid
+        renderProCharts(dailyTrend, totals, heatmapData);
+        renderProGrid(totals);
         ELS.btnExport.disabled = false;
     };
 
@@ -5627,7 +5606,7 @@ const handleAcknowledgeClick = (e) => {
         if (CHART_TREND) CHART_TREND.destroy();
         if (CHART_UTIL) CHART_UTIL.destroy();
 
-        // 1. Stacked Hours Trend
+        // 1. Stacked Hours Trend (Using Debenhams Colors)
         const labels = Object.keys(dailyTrend).sort();
         const ctxTrend = document.getElementById('chart-trend').getContext('2d');
         CHART_TREND = new Chart(ctxTrend, {
@@ -5635,31 +5614,27 @@ const handleAcknowledgeClick = (e) => {
             data: {
                 labels: labels.map(d => d.slice(5)),
                 datasets: [
-                    { label: 'Productive', data: labels.map(d => dailyTrend[d].productive), backgroundColor: '#10B981', stack: 'Stack 0' },
-                    { label: 'Loss (Sick/Hol)', data: labels.map(d => dailyTrend[d].loss), backgroundColor: '#EF4444', stack: 'Stack 0' }
+                    { label: 'Productive Hours', data: labels.map(d => dailyTrend[d].productive), backgroundColor: '#70E6D6', stack: 'Stack 0' }, // Teal
+                    { label: 'Loss (Sick/Hol)', data: labels.map(d => dailyTrend[d].loss), backgroundColor: '#000000', stack: 'Stack 0' } // Black
                 ]
             },
             options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } }
         });
 
-        // 2. Absence Ledger (Breakdown of Non-Productive)
+        // 2. Heatmap Density Chart
         const ctxUtil = document.getElementById('chart-utilization').getContext('2d');
-        // Calculate Net Working Time
-        const netWork = totals.paid - totals.holiday - totals.sick;
-        
+        const maxVal = Math.max(...heatmapData);
+        const colors = heatmapData.map(v => `rgba(112, 230, 214, ${Math.max(0.3, v/maxVal)})`); // Teal scale
+
         CHART_UTIL = new Chart(ctxUtil, {
-            type: 'doughnut',
+            type: 'bar',
             data: {
-                labels: ['Working', 'Holiday', 'Sickness'],
-                datasets: [{ 
-                    data: [Math.round(netWork/60), Math.round(totals.holiday/60), Math.round(totals.sick/60)], 
-                    backgroundColor: ['#3B82F6', '#F59E0B', '#EF4444'],
-                    borderWidth: 0
-                }]
+                labels: ['08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00','21:00'],
+                datasets: [{ label: 'Staffing Intensity', data: heatmapData, backgroundColor: colors, borderRadius: 4 }]
             },
             options: { 
                 responsive: true, maintainAspectRatio: false,
-                plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Paid Hours Breakdown' } }
+                plugins: { legend: { display: false }, title: { display: true, text: 'Intraday Staffing Profile' } }
             }
         });
     };
@@ -5669,31 +5644,15 @@ const handleAcknowledgeClick = (e) => {
         
         let html = '<table class="weekly-grid" style="width:100%;"><thead><tr><th>Date</th><th>Advisor</th><th>Leader</th><th>Shift</th><th>Paid Hrs</th><th>Holiday</th><th>Sick</th></tr></thead><tbody>';
         
-        // Show top 200 rows
         RAW_DATA.slice(0, 200).forEach(row => {
             const sickClass = parseFloat(row.Sickness) > 0 ? 'cell-danger' : '';
-            const holClass = parseFloat(row.Holiday) > 0 ? 'cell-success' : ''; // Reuse success for holiday
-
-            html += `<tr>
-                <td><span style="font-family:monospace; color:#6B7280;">${row.Date}</span></td>
-                <td><strong>${row.Advisor}</strong></td>
-                <td>${row.Leader}</td>
-                <td>${row.Shift}</td>
-                <td>${row.Total_Paid}</td>
-                <td><span class="${holClass}">${row.Holiday}</span></td>
-                <td><span class="${sickClass}">${row.Sickness}</span></td>
-            </tr>`;
+            const holClass = parseFloat(row.Holiday) > 0 ? 'cell-success' : '';
+            html += `<tr><td><span style="font-family:monospace; color:#6B7280;">${row.Date}</span></td><td><strong>${row.Advisor}</strong></td><td>${row.Leader}</td><td>${row.Shift}</td><td>${row.Total_Paid}</td><td><span class="${holClass}">${row.Holiday}</span></td><td><span class="${sickClass}">${row.Sickness}</span></td></tr>`;
         });
 
-        // GRAND TOTALS ROW
-        html += `<tr class="table-footer-row">
-            <td colspan="4" style="text-align:right;">GRAND TOTALS:</td>
-            <td>${(totals.paid/60).toFixed(2)}</td>
-            <td>${(totals.holiday/60).toFixed(2)}</td>
-            <td>${(totals.sick/60).toFixed(2)}</td>
-        </tr>`;
-
+        html += `<tr class="table-footer-row"><td colspan="4" style="text-align:right;">GRAND TOTALS:</td><td>${(totals.paid/60).toFixed(2)}</td><td>${(totals.holiday/60).toFixed(2)}</td><td>${(totals.sick/60).toFixed(2)}</td></tr>`;
         html += '</tbody></table>';
+        
         if (RAW_DATA.length > 200) html += `<div style="padding:10px; text-align:center; background:#f9fafb; font-style:italic;">Showing first 200 rows. Download Excel for full payroll data.</div>`;
         ELS.gridContainer.innerHTML = html;
     };
@@ -5701,26 +5660,17 @@ const handleAcknowledgeClick = (e) => {
     const exportToExcel = () => {
         if (RAW_DATA.length === 0) return;
         
-        // 1. Create Summary Array from Object
         const summaryData = Object.values(PAYROLL_SUMMARY).map(p => ({
-            Advisor: p.Name,
-            Days_Scheduled: p.Days,
+            Advisor: p.Name, Days_Scheduled: p.Days,
             Total_Paid_Hours: (p.Paid_Mins/60).toFixed(2),
             Holiday_Hours: (p.Holiday_Mins/60).toFixed(2),
             Sickness_Hours: (p.Sick_Mins/60).toFixed(2),
-            Net_Productive_Hours: ((p.Paid_Mins - p.Holiday_Mins - p.Sick_Mins)/60).toFixed(2)
+            Net_Productive: ((p.Paid_Mins - p.Holiday_Mins - p.Sick_Mins)/60).toFixed(2)
         }));
 
         const wb = XLSX.utils.book_new();
-        
-        // Tab 1: Payroll Summary
-        const wsSummary = XLSX.utils.json_to_sheet(summaryData);
-        XLSX.utils.book_append_sheet(wb, wsSummary, "Payroll Summary");
-
-        // Tab 2: Daily Log
-        const wsDaily = XLSX.utils.json_to_sheet(RAW_DATA);
-        XLSX.utils.book_append_sheet(wb, wsDaily, "Daily Log");
-
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryData), "Payroll Summary");
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(RAW_DATA), "Daily Log");
         XLSX.writeFile(wb, `Debenhams_WFM_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
     };
 
