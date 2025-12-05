@@ -5424,7 +5424,7 @@ const handleAcknowledgeClick = (e) => {
 }(window.APP));
 /**
  * MODULE: APP.Components.Reports
- * Handles data aggregation, visualization, and excel export.
+ * PRO VERSION: Heatmaps, Stacked Trends, and Conditional Grids.
  */
 (function(APP) {
     const Reports = {};
@@ -5437,150 +5437,260 @@ const handleAcknowledgeClick = (e) => {
         ELS.section = document.getElementById('tab-reports');
         ELS.dateRange = document.getElementById('reportDateRange');
         ELS.filterTeam = document.getElementById('reportFilterTeam');
+        // Inject Site Filter HTML if missing
+        if (!document.getElementById('reportFilterSite')) {
+            const siteSelect = document.createElement('select');
+            siteSelect.id = 'reportFilterSite';
+            siteSelect.className = 'form-select';
+            siteSelect.style.width = '140px';
+            siteSelect.innerHTML = '<option value="">All Sites</option>';
+            ELS.filterTeam.parentNode.insertBefore(siteSelect, ELS.filterTeam);
+        }
+        ELS.filterSite = document.getElementById('reportFilterSite');
+        
         ELS.btnRun = document.getElementById('btnRunReport');
         ELS.btnExport = document.getElementById('btnExportExcel');
         ELS.gridContainer = document.getElementById('report-grid-container');
         
+        // KPI Elements
         ELS.kpiTotal = document.getElementById('kpi-total-hours');
         ELS.kpiPaid = document.getElementById('kpi-paid-hours');
         ELS.kpiShrinkage = document.getElementById('kpi-shrinkage');
         ELS.kpiHeadcount = document.getElementById('kpi-headcount');
 
+        // Init Date Picker
         if (ELS.dateRange && typeof flatpickr !== 'undefined') {
             flatpickr(ELS.dateRange, {
                 mode: "range", dateFormat: "Y-m-d", altInput: true, altFormat: "d M Y",
-                defaultDate: [new Date(), new Date()]
+                defaultDate: [new Date(), new Date()] // Default to today
             });
         }
 
         if (ELS.btnRun) ELS.btnRun.addEventListener('click', generateReport);
         if (ELS.btnExport) ELS.btnExport.addEventListener('click', exportToExcel);
-        setTimeout(populateTeamFilter, 1000);
+        
+        // Populate Filters
+        setTimeout(populateFilters, 1000);
     };
 
-    const populateTeamFilter = () => {
-        if (!ELS.filterTeam) return;
+    const populateFilters = () => {
         const STATE = APP.StateManager.getState();
-        const leaders = STATE.leaders.sort((a,b) => a.name.localeCompare(b.name));
-        let html = '<option value="">All Teams</option>';
-        leaders.forEach(l => { html += `<option value="${l.id}">${l.name}</option>`; });
-        ELS.filterTeam.innerHTML = html;
+        // 1. Teams
+        if (ELS.filterTeam) {
+            const leaders = STATE.leaders.sort((a,b) => a.name.localeCompare(b.name));
+            ELS.filterTeam.innerHTML = '<option value="">All Teams</option>' + 
+                leaders.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+        }
+        // 2. Sites (Extract unique sites from leaders)
+        if (ELS.filterSite) {
+            const sites = new Set();
+            STATE.leaders.forEach(l => { if(l.sites) sites.add(l.sites.name); });
+            const sortedSites = Array.from(sites).sort();
+            ELS.filterSite.innerHTML = '<option value="">All Sites</option>' + 
+                sortedSites.map(s => `<option value="${s}">${s}</option>`).join('');
+        }
     };
 
     const generateReport = async () => {
         const fp = ELS.dateRange._flatpickr;
         const startObj = fp.selectedDates[0];
         const endObj = fp.selectedDates[1];
-        if (!startObj || !endObj) return APP.Utils.showToast("Select date range.", "warning");
+        if (!startObj || !endObj) return APP.Utils.showToast("Please select a date range.", "warning");
 
-        ELS.btnRun.disabled = true; ELS.btnRun.textContent = "Processing...";
-        ELS.gridContainer.innerHTML = '<div style="padding:40px; text-align:center;">Calculating schedules...</div>';
+        ELS.btnRun.disabled = true; ELS.btnRun.textContent = "Crunching Data...";
+        ELS.gridContainer.innerHTML = '<div style="padding:60px; text-align:center; color:#6B7280;">Generating Analysis...<br><small>Calculating shifts, breaks, and shrinkage.</small></div>';
 
         setTimeout(async () => {
             try { await runCalculation(startObj, endObj); } 
-            catch (e) { console.error(e); APP.Utils.showToast("Error generating report.", "danger"); } 
+            catch (e) { console.error(e); APP.Utils.showToast("Analysis Failed.", "danger"); } 
             finally { ELS.btnRun.disabled = false; ELS.btnRun.textContent = "Generate Report"; }
         }, 100);
     };
 
     const runCalculation = async (startDate, endDate) => {
         const STATE = APP.StateManager.getState();
-        const filterLeaderId = ELS.filterTeam.value;
-        let advisors = STATE.advisors;
-        if (filterLeaderId) advisors = advisors.filter(a => a.leader_id == filterLeaderId);
+        const filterLeaderId = ELS.filterTeam ? ELS.filterTeam.value : "";
+        const filterSiteName = ELS.filterSite ? ELS.filterSite.value : "";
 
+        // 1. Filter Advisors based on inputs
+        let advisors = STATE.advisors.filter(a => {
+            if (filterLeaderId && a.leader_id != filterLeaderId) return false;
+            if (filterSiteName) {
+                const leader = STATE.leaders.find(l => l.id === a.leader_id);
+                if (!leader || !leader.sites || leader.sites.name !== filterSiteName) return false;
+            }
+            return true;
+        });
+
+        // 2. Prepare Date Array
         const dates = [];
         let curr = new Date(startDate);
         while (curr <= endDate) { dates.push(APP.Utils.formatDateToISO(curr)); curr.setDate(curr.getDate() + 1); }
 
+        // 3. Pre-load History
         const uniqueMondays = new Set();
         dates.forEach(d => uniqueMondays.add(APP.Utils.getMondayForDate(d)));
         for (let monday of uniqueMondays) await APP.StateManager.loadEffectiveAssignments(monday);
 
+        // 4. MAIN AGGREGATION
         RAW_DATA = [];
-        const dailyTrend = {};
-        let totalPaidMins = 0; let totalUnpaidMins = 0; let totalShrinkageMins = 0; let totalWorkMins = 0;
-        const uniqueAdvisors = new Set();
+        const dailyTrend = {}; // Key: DateISO, Value: { Paid: 0, Shrink: 0 }
+        let kpi = { paid: 0, unpaid: 0, shrink: 0, work: 0 };
+        const activeHeadcount = new Set();
+        
+        // Heatmap Data (Hour 8 to 21)
+        const heatmapData = new Array(14).fill(0); // Aggregated volume per hour
 
         dates.forEach(dateISO => {
             const dayName = APP.Utils.getDayNameFromISO(dateISO);
             const weekStartISO = APP.Utils.getMondayForDate(dateISO);
-            if (!dailyTrend[dateISO]) dailyTrend[dateISO] = 0;
+            
+            if (!dailyTrend[dateISO]) dailyTrend[dateISO] = { paid: 0, shrink: 0 };
 
             advisors.forEach(adv => {
                 const { segments } = APP.ScheduleCalculator.calculateSegments(adv.id, dayName, weekStartISO);
+                
                 if (segments.length > 0) {
-                    uniqueAdvisors.add(adv.id);
-                    let dayPaid = 0; let dayUnpaid = 0; let dayShrinkage = 0; let dayWork = 0;
+                    activeHeadcount.add(adv.id);
+                    
+                    let dPaid = 0, dUnpaid = 0, dShrink = 0, dWork = 0;
+                    const startM = segments[0].start_min;
+                    const endM = segments[segments.length-1].end_min;
 
+                    // A. Calculate Hours Buckets
                     segments.forEach(seg => {
                         const comp = APP.StateManager.getComponentById(seg.component_id);
                         if (!comp) return;
-                        // FIX: Calculate duration dynamically (End - Start) instead of looking for duration_min
-                        const dur = seg.end_min - seg.start_min; 
-                        if (comp.is_paid) { dayPaid += dur; totalPaidMins += dur; } else { dayUnpaid += dur; totalUnpaidMins += dur; }
+                        const dur = seg.end_min - seg.start_min; // Robust duration
+                        
+                        if (comp.is_paid) { dPaid += dur; kpi.paid += dur; } 
+                        else { dUnpaid += dur; kpi.unpaid += dur; }
+
                         const type = (comp.type || 'Activity');
-                        if (['Shrinkage', 'Absence', 'Lateness', 'Sickness'].includes(type)) { dayShrinkage += dur; totalShrinkageMins += dur; }
-                        else if (['Activity', 'Payback'].includes(type)) { dayWork += dur; totalWorkMins += dur; }
+                        if (['Shrinkage', 'Absence', 'Lateness', 'Sickness'].includes(type)) { 
+                            dShrink += dur; kpi.shrink += dur; 
+                        } else if (['Activity', 'Payback'].includes(type)) { 
+                            dWork += dur; kpi.work += dur; 
+                        }
+
+                        // B. Populate Heatmap (8am - 9pm)
+                        // If this segment overlaps an hour, add to density
+                        if (comp.type === 'Activity') {
+                            for(let h=8; h<22; h++) {
+                                const hMin = h*60;
+                                if (seg.start_min <= hMin && seg.end_min > hMin) {
+                                    heatmapData[h-8]++; 
+                                }
+                            }
+                        }
                     });
 
-                    dailyTrend[dateISO] += (dayPaid / 60);
+                    dailyTrend[dateISO].paid += (dPaid / 60);
+                    dailyTrend[dateISO].shrink += (dShrink / 60);
+
+                    // C. Push to Grid Data
                     RAW_DATA.push({
-                        Date: dateISO, Advisor: adv.name,
+                        Date: dateISO,
+                        Advisor: adv.name,
                         Leader: STATE.leaders.find(l=>l.id===adv.leader_id)?.name || 'Unassigned',
-                        Scheduled_Start: APP.Utils.formatMinutesToTime(segments[0].start_min),
-                        Scheduled_End: APP.Utils.formatMinutesToTime(segments[segments.length-1].end_min),
-                        Total_Hours: ((dayPaid + dayUnpaid)/60).toFixed(2),
-                        Paid_Hours: (dayPaid/60).toFixed(2),
-                        Shrinkage_Hours: (dayShrinkage/60).toFixed(2)
+                        Shift: `${APP.Utils.formatMinutesToTime(startM)} - ${APP.Utils.formatMinutesToTime(endM)}`,
+                        Total_Hrs: ((dPaid + dUnpaid)/60).toFixed(2),
+                        Paid_Hrs: (dPaid/60).toFixed(2),
+                        Shrinkage: (dShrink/60).toFixed(2),
+                        // Hidden sort keys
+                        _shrinkRaw: dShrink
                     });
                 }
             });
         });
 
-        const totalHours = (totalPaidMins + totalUnpaidMins) / 60;
-        ELS.kpiTotal.textContent = Math.round(totalHours).toLocaleString();
-        ELS.kpiPaid.textContent = Math.round(totalPaidMins / 60).toLocaleString();
-        ELS.kpiHeadcount.textContent = uniqueAdvisors.size;
-        const shrinkPct = totalHours > 0 ? (totalShrinkageMins / (totalPaidMins + totalUnpaidMins)) * 100 : 0;
+        // 5. UPDATE DASHBOARD
+        const totalHrs = (kpi.paid + kpi.unpaid) / 60;
+        ELS.kpiTotal.textContent = Math.round(totalHrs).toLocaleString();
+        ELS.kpiPaid.textContent = Math.round(kpi.paid / 60).toLocaleString();
+        ELS.kpiHeadcount.textContent = activeHeadcount.size;
+        
+        const shrinkPct = totalHrs > 0 ? (kpi.shrink / (kpi.paid + kpi.unpaid)) * 100 : 0;
         ELS.kpiShrinkage.textContent = shrinkPct.toFixed(1) + "%";
+        ELS.kpiShrinkage.style.color = shrinkPct > 15 ? '#DC2626' : '#059669'; // Conditional KPI Color
 
-        renderCharts(dailyTrend, totalWorkMins, totalShrinkageMins, totalUnpaidMins);
-        renderTable();
+        renderProCharts(dailyTrend, kpi, heatmapData);
+        renderProGrid();
         ELS.btnExport.disabled = false;
     };
 
-    const renderCharts = (trendData, workMins, shrinkMins, unpaidMins) => {
+    const renderProCharts = (dailyTrend, kpi, heatmapData) => {
         if (CHART_TREND) CHART_TREND.destroy();
         if (CHART_UTIL) CHART_UTIL.destroy();
 
-        const labels = Object.keys(trendData).sort();
-        const dataPoints = labels.map(d => trendData[d]); 
-
-        CHART_TREND = new Chart(document.getElementById('chart-trend').getContext('2d'), {
+        // 1. Stacked Trend Chart (Pro)
+        const labels = Object.keys(dailyTrend).sort();
+        const ctxTrend = document.getElementById('chart-trend').getContext('2d');
+        CHART_TREND = new Chart(ctxTrend, {
             type: 'bar',
-            data: { labels: labels.map(d => d.slice(5)), datasets: [{ label: 'Paid Hours', data: dataPoints, backgroundColor: '#4F46E5', borderRadius: 4 }] },
-            options: { responsive: true, maintainAspectRatio: false }
+            data: {
+                labels: labels.map(d => d.slice(5)), // MM-DD
+                datasets: [
+                    { label: 'Productive Hours', data: labels.map(d => dailyTrend[d].paid - dailyTrend[d].shrink), backgroundColor: '#10B981', stack: 'Stack 0' },
+                    { label: 'Shrinkage / Loss', data: labels.map(d => dailyTrend[d].shrink), backgroundColor: '#EF4444', stack: 'Stack 0' }
+                ]
+            },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true } } }
         });
 
-        CHART_UTIL = new Chart(document.getElementById('chart-utilization').getContext('2d'), {
-            type: 'doughnut',
+        // 2. Heatmap / Density Chart (Replaces simple donut)
+        const ctxUtil = document.getElementById('chart-utilization').getContext('2d');
+        
+        // Dynamic color for heatmap bars based on intensity
+        const maxVal = Math.max(...heatmapData);
+        const colors = heatmapData.map(v => {
+            const intensity = v / maxVal;
+            return `rgba(59, 130, 246, ${Math.max(0.2, intensity)})`;
+        });
+
+        CHART_UTIL = new Chart(ctxUtil, {
+            type: 'bar',
             data: {
-                labels: ['Productive', 'Shrinkage', 'Unpaid/Breaks'],
-                datasets: [{ data: [Math.round(workMins/60), Math.round(shrinkMins/60), Math.round(unpaidMins/60)], backgroundColor: ['#10B981', '#EF4444', '#9CA3AF'], borderWidth: 0 }]
+                labels: ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00'],
+                datasets: [{ 
+                    label: 'Staffing Intensity', 
+                    data: heatmapData, 
+                    backgroundColor: colors,
+                    borderRadius: 4
+                }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false }, title: { display: true, text: 'Intraday Staffing Profile' } }
+            }
         });
     };
 
-    const renderTable = () => {
-        if (RAW_DATA.length === 0) { ELS.gridContainer.innerHTML = '<div style="padding:20px; text-align:center;">No data found.</div>'; return; }
+    const renderProGrid = () => {
+        if (RAW_DATA.length === 0) { ELS.gridContainer.innerHTML = '<div style="padding:40px; text-align:center;">No data found.</div>'; return; }
+        
         let html = '<table class="weekly-grid" style="width:100%;"><thead><tr><th>Date</th><th>Advisor</th><th>Leader</th><th>Shift</th><th>Total Hrs</th><th>Paid Hrs</th><th>Shrinkage</th></tr></thead><tbody>';
-        RAW_DATA.slice(0, 100).forEach(row => {
-            html += `<tr><td>${row.Date}</td><td>${row.Advisor}</td><td>${row.Leader}</td><td>${row.Scheduled_Start} - ${row.Scheduled_End}</td><td>${row.Total_Hours}</td><td>${row.Paid_Hours}</td><td>${row.Shrinkage_Hours}</td></tr>`;
+        
+        // Show top 200 for performance
+        RAW_DATA.slice(0, 200).forEach(row => {
+            // CONDITIONAL FORMATTING
+            const shrinkClass = parseFloat(row.Shrinkage) > 0 ? 'cell-danger' : '';
+            const paidClass = parseFloat(row.Paid_Hrs) > 7 ? 'cell-success' : ''; // Highlight full shifts
+
+            html += `<tr>
+                <td><span style="font-family:monospace; color:#6B7280;">${row.Date}</span></td>
+                <td><strong>${row.Advisor}</strong></td>
+                <td>${row.Leader}</td>
+                <td>${row.Shift}</td>
+                <td>${row.Total_Hours}</td>
+                <td><span class="${paidClass}">${row.Paid_Hrs}</span></td>
+                <td><span class="${shrinkClass}">${row.Shrinkage}</span></td>
+            </tr>`;
         });
         html += '</tbody></table>';
-        if (RAW_DATA.length > 100) html += `<div style="padding:10px; text-align:center; background:#f9fafb; font-style:italic;">Showing first 100 of ${RAW_DATA.length} rows. Export to see full details.</div>`;
+        
+        if (RAW_DATA.length > 200) html += `<div style="padding:10px; text-align:center; background:#f9fafb; font-style:italic;">Showing first 200 of ${RAW_DATA.length} rows. Export to see full details.</div>`;
         ELS.gridContainer.innerHTML = html;
     };
 
@@ -5588,8 +5698,8 @@ const handleAcknowledgeClick = (e) => {
         if (RAW_DATA.length === 0) return;
         const ws = XLSX.utils.json_to_sheet(RAW_DATA);
         const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Schedule Data");
-        XLSX.writeFile(wb, `WFM_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "WFM_Data");
+        XLSX.writeFile(wb, `WFM_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
     };
 
     APP.Components.Reports = Reports;

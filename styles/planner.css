@@ -1179,3 +1179,13 @@ td .form-input-color.edit-value { width: 60px; height: 30px; }
     user-select: none;
     z-index: 0;
 }
+
+/* === REPORTS & EXPORTS PRO STYLES === */
+.heatmap-container { display: grid; grid-template-columns: 60px repeat(14, 1fr); gap: 2px; margin-top: 16px; overflow-x: auto; }
+.heatmap-header { font-size: 10px; font-weight: 700; text-align: center; color: #6B7280; padding-bottom: 4px; }
+.heatmap-row-label { font-size: 11px; font-weight: 600; color: #374151; align-self: center; }
+.heatmap-cell { height: 30px; border-radius: 4px; transition: transform 0.1s; position: relative; }
+.heatmap-cell:hover { transform: scale(1.1); z-index: 10; border: 1px solid #374151; }
+/* Table Conditionals */
+.cell-danger { color: #DC2626; font-weight: 700; background-color: #FEF2F2; border-radius: 4px; padding: 2px 6px; }
+.cell-success { color: #059669; font-weight: 700; background-color: #ECFDF5; border-radius: 4px; padding: 2px 6px; }
