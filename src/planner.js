@@ -5703,18 +5703,26 @@ const handleAcknowledgeClick = (e) => {
 }(window.APP));
 /**
  * MODULE: APP.Components.HistoricalReports
- * Viewer for Audit Logs and Assignment History.
+ * ENTERPRISE EDITION: Stability Analysis, Reason Breakdown, and Audit Log.
  */
 (function(APP) {
     const HistReports = {};
     const ELS = {};
+    let CHART_HISTORY = null;
+    let CHART_REASON = null;
+    let HISTORY_DATA = [];
+
+    // --- GLOSS ENGINE (Reused for consistent branding) ---
+    const createGloss = (ctx, cTop, cBot) => {
+        const g = ctx.createLinearGradient(0, 0, 0, 300);
+        g.addColorStop(0, cTop); g.addColorStop(1, cBot);
+        return g;
+    };
 
     HistReports.initialize = () => {
-        // 1. Wire Dashboard Button
         const btnDash = document.getElementById('btn-dash-hist-reports');
         if (btnDash) {
             btnDash.addEventListener('click', () => {
-                // Switch tab manually
                 document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
                 const content = document.getElementById('tab-hist-reports');
                 if(content) content.classList.add('active');
@@ -5726,70 +5734,183 @@ const handleAcknowledgeClick = (e) => {
         ELS.search = document.getElementById('histSearch');
         ELS.btnRefresh = document.getElementById('btnRefreshHist');
 
-        if (ELS.search) ELS.search.addEventListener('input', HistReports.render);
+        if (ELS.search) ELS.search.addEventListener('input', () => renderGrid(HISTORY_DATA)); // Filter local
         if (ELS.btnRefresh) ELS.btnRefresh.addEventListener('click', HistReports.render);
     };
 
     HistReports.render = async () => {
         if (!ELS.grid) return;
-        ELS.grid.innerHTML = '<div style="padding:40px; text-align:center; color:#6B7280;">Fetching Audit Logs...</div>';
+        // Inject Dashboard Structure
+        ELS.grid.innerHTML = `
+            <div style="padding:24px; min-height:600px;">
+                <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:24px; margin-bottom:24px; height:280px;">
+                    <div style="background:white; border:1px solid #E5E7EB; border-radius:12px; padding:20px; position:relative;">
+                        <h4 style="margin:0 0 16px 0; font-size:14px; color:#374151;">Schedule Stability (Last 500 Changes)</h4>
+                        <div style="height:220px;"><canvas id="hist-chart-trend"></canvas></div>
+                    </div>
+                    <div style="background:white; border:1px solid #E5E7EB; border-radius:12px; padding:20px; position:relative;">
+                        <h4 style="margin:0 0 16px 0; font-size:14px; color:#374151;">Change Drivers</h4>
+                        <div style="height:220px; display:flex; justify-content:center;"><canvas id="hist-chart-reason"></canvas></div>
+                    </div>
+                    <div style="background:white; border:1px solid #E5E7EB; border-radius:12px; padding:20px; overflow-y:auto;">
+                        <h4 style="margin:0 0 12px 0; font-size:14px; color:#374151;">Most Impacted Staff</h4>
+                        <ul class="dashboard-detail-list" id="hist-impact-list" style="max-height:220px; border:none;"></ul>
+                    </div>
+                </div>
+                
+                <div style="background:white; border:1px solid #E5E7EB; border-radius:12px; overflow:hidden;">
+                    <div style="padding:16px 20px; border-bottom:1px solid #E5E7EB; display:flex; justify-content:space-between; align-items:center; background:#F9FAFB;">
+                        <h4 style="margin:0; font-size:14px;">Detailed Audit Log</h4>
+                        <button id="btnHistExport" class="btn btn-sm btn-success">Download Log (.xlsx)</button>
+                    </div>
+                    <div id="hist-table-target">
+                        <div style="padding:40px; text-align:center; color:#6B7280;">Loading Analysis...</div>
+                    </div>
+                </div>
+            </div>
+        `;
 
-        // 1. Fetch History Data
-        const STATE = APP.StateManager.getState();
+        // Wire Export Button (Now that it exists in DOM)
+        document.getElementById('btnHistExport').addEventListener('click', exportHistory);
+
+        // Fetch Data
         const client = APP.DataService.getSupabaseClient();
-        
-        // We fetch the 'rotation_assignments_history' which acts as your audit trail
         const { data, error } = await client
             .from('rotation_assignments_history')
             .select('*')
-            .order('start_date', { ascending: false }) // Newest first
-            .limit(500); // Safety limit
+            .order('start_date', { ascending: false }) 
+            .limit(500); 
 
         if (error) {
-            ELS.grid.innerHTML = `<div style="padding:20px; text-align:center; color:red;">Error loading history: ${error.message}</div>`;
+            document.getElementById('hist-table-target').innerHTML = `<div style="padding:20px; color:red;">Error: ${error.message}</div>`;
             return;
         }
 
-        // 2. Filter
-        const term = ELS.search ? ELS.search.value.toLowerCase() : "";
-        
-        // 3. Build Table
-        let html = '<table class="weekly-grid" style="width:100%;"><thead><tr><th>Start Date</th><th>Advisor</th><th>Action / Rotation</th><th>End Date</th><th>Reason</th><th>Wk Offset</th></tr></thead><tbody>';
-        
-        const advisors = STATE.advisors;
-        let count = 0;
-
-        data.forEach(row => {
-            const advisor = advisors.find(a => a.id === row.advisor_id);
-            const advName = advisor ? advisor.name : 'Unknown ID: ' + row.advisor_id;
-
-            // Apply Search Filter
-            if (term && !advName.toLowerCase().includes(term)) return;
-
-            count++;
-            
-            // Format Dates
-            const start = APP.Utils.convertISOToUKDate(row.start_date);
-            const end = row.end_date ? APP.Utils.convertISOToUKDate(row.end_date) : '<span style="color:#059669; font-weight:700;">Active</span>';
-
-            html += `<tr>
-                <td>${start}</td>
-                <td><strong>${advName}</strong></td>
-                <td>${row.rotation_name || 'Manual Assignment'}</td>
-                <td>${end}</td>
-                <td style="color:#6B7280;">${row.reason || '-'}</td>
-                <td>${row.start_week_offset || 1}</td>
-            </tr>`;
-        });
-
-        if (count === 0) html += '<tr><td colspan="6" style="text-align:center; padding:20px;">No history found.</td></tr>';
-        
-        html += '</tbody></table>';
-        ELS.grid.innerHTML = html;
+        HISTORY_DATA = data;
+        processStats(data);
+        renderGrid(data);
     };
 
-    // Initialize immediately so the button listener is active
-    setTimeout(HistReports.initialize, 1000);
+    const processStats = (data) => {
+        const months = {};
+        const reasons = {};
+        const advisors = {};
 
+        data.forEach(row => {
+            // Trend (By Month)
+            const m = row.start_date.substring(0, 7); // YYYY-MM
+            months[m] = (months[m] || 0) + 1;
+
+            // Reasons
+            let r = row.reason || "Unspecified";
+            if (r.includes("Swap")) r = "Shift Swap";
+            else if (r.includes("Assign")) r = "Assignment";
+            reasons[r] = (reasons[r] || 0) + 1;
+
+            // Impact
+            advisors[row.advisor_id] = (advisors[row.advisor_id] || 0) + 1;
+        });
+
+        // 1. Render Trend Chart
+        if (CHART_HISTORY) CHART_HISTORY.destroy();
+        const ctxTrend = document.getElementById('hist-chart-trend').getContext('2d');
+        const sortedMonths = Object.keys(months).sort();
+        CHART_HISTORY = new Chart(ctxTrend, {
+            type: 'line',
+            data: {
+                labels: sortedMonths,
+                datasets: [{
+                    label: 'Changes per Month',
+                    data: sortedMonths.map(m => months[m]),
+                    borderColor: '#70E6D6', // Debenhams Teal
+                    backgroundColor: 'rgba(112, 230, 214, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: '#000000'
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+        });
+
+        // 2. Render Reason Chart
+        if (CHART_REASON) CHART_REASON.destroy();
+        const ctxReason = document.getElementById('hist-chart-reason').getContext('2d');
+        CHART_REASON = new Chart(ctxReason, {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(reasons),
+                datasets: [{
+                    data: Object.values(reasons),
+                    backgroundColor: ['#111827', '#70E6D6', '#9CA3AF', '#F59E0B', '#EF4444'],
+                    borderWidth: 0
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 10 } } } }
+        });
+
+        // 3. Render Top 5 Impact
+        const sortedAdvisors = Object.entries(advisors).sort((a,b) => b[1] - a[1]).slice(0, 5);
+        const listEl = document.getElementById('hist-impact-list');
+        const STATE = APP.StateManager.getState();
+        
+        listEl.innerHTML = sortedAdvisors.map(([id, count]) => {
+            const name = STATE.advisors.find(a => a.id == id)?.name || "Deleted User";
+            return `<li style="padding:10px 0; border-bottom:1px solid #F3F4F6; display:flex; justify-content:space-between; font-size:13px;">
+                <span>${name}</span>
+                <span class="tag" style="background:#F3F4F6;">${count} Changes</span>
+            </li>`;
+        }).join('');
+    };
+
+    const renderGrid = (data) => {
+        const term = ELS.search ? ELS.search.value.toLowerCase() : "";
+        const STATE = APP.StateManager.getState();
+        const target = document.getElementById('hist-table-target');
+        
+        let html = '<table class="weekly-grid" style="width:100%;"><thead><tr><th>Date</th><th>Advisor</th><th>Change Type</th><th>Effective Range</th><th>Reason</th></tr></thead><tbody>';
+        
+        const filtered = data.filter(row => {
+            const name = STATE.advisors.find(a => a.id == row.advisor_id)?.name || "";
+            return !term || name.toLowerCase().includes(term);
+        });
+
+        if(filtered.length === 0) { target.innerHTML = '<div style="padding:40px; text-align:center;">No matching records.</div>'; return; }
+
+        filtered.slice(0, 100).forEach(row => {
+            const advisorName = STATE.advisors.find(a => a.id == row.advisor_id)?.name || `<span style="color:#9CA3AF; font-style:italic;">Deleted (${row.advisor_id.substring(0,4)})</span>`;
+            const date = APP.Utils.convertISOToUKDate(row.start_date);
+            const range = row.end_date ? `${date} to ${APP.Utils.convertISOToUKDate(row.end_date)}` : `From ${date} (Ongoing)`;
+            
+            html += `<tr>
+                <td style="font-family:monospace; color:#6B7280;">${row.start_date}</td>
+                <td><strong>${advisorName}</strong></td>
+                <td>${row.rotation_name || 'Manual Edit'}</td>
+                <td>${range}</td>
+                <td>${row.reason || '-'}</td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        target.innerHTML = html;
+    };
+
+    const exportHistory = () => {
+        if (!HISTORY_DATA.length) return;
+        const STATE = APP.StateManager.getState();
+        const exportData = HISTORY_DATA.map(row => ({
+            Action_Date: row.start_date,
+            Advisor_Name: STATE.advisors.find(a => a.id == row.advisor_id)?.name || "Deleted",
+            Advisor_ID: row.advisor_id,
+            Change_Type: row.rotation_name || "Manual",
+            Reason: row.reason,
+            Week_Offset: row.start_week_offset
+        }));
+        
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportData), "Audit Log");
+        XLSX.writeFile(wb, `WFM_Audit_Log_${new Date().toISOString().slice(0,10)}.xlsx`);
+    };
+
+    setTimeout(HistReports.initialize, 1000);
     APP.Components.HistoricalReports = HistReports;
 }(window.APP));
